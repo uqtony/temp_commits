@@ -1,0 +1,1 @@
+cmd_/home/uqtony/android_src/vendor/nxp-opensource/nxp-mwifiex/mxm_wifiex/wlan_src/Module.symvers := sed 's/\.ko$$/.lto\.o/' /home/uqtony/android_src/vendor/nxp-opensource/nxp-mwifiex/mxm_wifiex/wlan_src/modules.order | scripts/mod/modpost -m  -E -o /home/uqtony/android_src/vendor/nxp-opensource/nxp-mwifiex/mxm_wifiex/wlan_src/Module.symvers -e -i Module.symvers   -T -
