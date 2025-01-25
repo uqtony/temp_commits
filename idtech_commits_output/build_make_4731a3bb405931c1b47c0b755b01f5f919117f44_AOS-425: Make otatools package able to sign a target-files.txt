@@ -1,0 +1,68 @@
+4731a3bb4 max.yang 2020-12-17
+
+AOS-425: Make otatools package able to sign a target-files
+
+  1. Packing all sign process' meterial into otatools package
+  2. When signing a target file, we just need otatools instead of android codebase
+
+Change-Id: I6ed3c2025f106d6bf15c5b6d0efde0e5cf24e464
+
+diff --git a/core/Makefile b/core/Makefile
+index 45fcddb36..5d35d9c42 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -3600,6 +3600,8 @@ OTATOOLS :=  $(HOST_OUT_EXECUTABLES)/minigzip \
+   $(HOST_OUT_EXECUTABLES)/care_map_generator \
+   $(HOST_OUT_EXECUTABLES)/fc_sort \
+   $(HOST_OUT_EXECUTABLES)/sefcontext_compile \
++  $(HOST_OUT_EXECUTABLES)/apksigner \
++  $(HOST_OUT_JAVA_LIBRARIES)/apksigner.jar \
+   $(LPMAKE) \
+   $(AVBTOOL) \
+   $(BLK_ALLOC_TO_BASE_FS) \
+@@ -3682,6 +3684,12 @@ OTATOOLS_DEPS += \
+   $(sort $(shell find external/vboot_reference/tests/devkeys -type f))
+ endif
+ 
++# IDT added for post signing process with CA
++# *.der and fake.keystore for apk sign, csf_parser for bootloader sign
++OTATOOLS_DEPS += \
++  $(sort $(shell find device -type f -name "*.der" -o -name "fake.keystore")) \
++  $(sort $(shell find vendor/idtech/cst -type f -name "*.py" -o -name "csf_parser"))
++
+ $(BUILT_OTATOOLS_PACKAGE): $(OTATOOLS) $(OTATOOLS_DEPS) $(OTATOOLS_RELEASETOOLS) $(SOONG_ZIP)
+ 	@echo "Package OTA tools: $@"
+ 	$(hide) rm -rf $@ $(zip_root)
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 64acc080b..2adec97bf 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -76,7 +76,7 @@ def handle_apks_CA_sign(data, key):
+     unsigned.flush()
+ 
+   shutil.copy(idt_cert_dir + key + ".x509.der", "./cert.der")
+-  args = ["./out/host/linux-x86/bin/apksigner", "sign", "--dump-sign-data", "true", "--v1-signing-enabled", "false",\
++  args = ["./bin/apksigner", "sign", "--dump-sign-data", "true", "--v1-signing-enabled", "false",\
+           "--ks", idt_cert_dir + "fake.keystore", "--ks-pass", "pass:testtest", apk_path]
+   p = subprocess.Popen(args)
+   retcode = p.wait()
+@@ -97,7 +97,7 @@ def handle_apks_CA_sign(data, key):
+   # combine signature to original app
+   shutil.move(apk_path + "v2.sig.bin", "v2.sig.bin")
+   shutil.move(apk_path + "v3.sig.bin", "v3.sig.bin")
+-  args = ["./out/host/linux-x86/bin/apksigner", "sign", "--combine-signature-data", "true", "--v1-signing-enabled", "false",\
++  args = ["./bin/apksigner", "sign", "--combine-signature-data", "true", "--v1-signing-enabled", "false",\
+           "--ks", idt_cert_dir + "fake.keystore", "--ks-pass", "pass:testtest", apk_path]
+   p = subprocess.Popen(args)
+   retcode = p.wait()
+@@ -270,6 +270,10 @@ def create_released_bootloader(output_zip, tmp_dir):
+       common.ZipWriteStr(output_zip, "SIGNED/" + file, f_img.read())
+ 
+ def main(argv):
++  # PATH environment, otatools/bin should put at front, or it will use system's mke2fs
++  os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
++  print('PATH: {}'.format(os.environ["PATH"]))
++
+   # Initial
+   input_zip = zipfile.ZipFile(argv[0], "r")
+   output_zip = zipfile.ZipFile(argv[1], "w",

@@ -1,0 +1,34 @@
+56c7c8fd max.yang 2020-11-30
+
+AOS-416: Add idt property for configuring unknown source app installation
+
+  1. property default as false, and could be enabled by AMS
+  2. Reuse "persist.idt." property permissions, as lock_orientation does
+  3. Add selinux rule for com.android.packageinstaller to read idtech_prop
+       avc: denied { read } for name="u:object_r:idtech_prop:s0" dev="tmpfs" ino=10696
+       scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:idtech_prop:s0
+       tclass=file permissive=1 app=com.android.packageinstaller
+
+Change-Id: Ibce5059c7d265d6e3a7dbe98482344c6bdd52d84
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index ec6fd37e..6e1f1a35 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -327,3 +327,7 @@ include frameworks/native/build/tablet-10in-xhdpi-2048-dalvik-heap.mk
+ -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_ms_codec/fsl_ms_codec.mk
+ 
+ PREBUILT_FSL_IMX_CODEC := true
++
++# IDT common properties
++PRODUCT_PROPERTY_OVERRIDES += \
++    persist.idt.enable_externalsource=0
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index 12260cf1..81596e03 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -9,3 +9,4 @@ allow platform_app idtech_prop:property_service  { set };
+ 
+ get_prop(platform_app, vendor_default_prop)
+ set_prop(platform_app, public_vendor_default_prop)
++get_prop(platform_app, idtech_prop)

@@ -1,0 +1,81 @@
+19fa4854 George.Huang 2020-03-10
+
+AOS-119: Switch symlinks to regular files for modifying
+
+Change-Id: I4694ca62c4137299d8cf2af9183cb487909799cd
+
+diff --git a/imx8m/evk_a300/sepolicy b/imx8m/evk_a300/sepolicy
+deleted file mode 120000
+index 06fb671b..00000000
+--- a/imx8m/evk_a300/sepolicy
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/sepolicy
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+new file mode 100644
+index 00000000..0dda8491
+--- /dev/null
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -0,0 +1,46 @@
++#sd boot
++/dev/block/platform/30b50000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
++/dev/block/platform/30b50000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++
++#emmc boot
++/dev/block/platform/30b40000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++
++#peripheral
++/vendor/bin/magd                u:object_r:sensors_exec:s0
++/vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
++/dev/mma8x5x                    u:object_r:sensors_device:s0
++/dev/ttymxc[0-9]*               u:object_r:tty_device:s0
++/dev/FreescaleAccelerometer     u:object_r:sensors_device:s0
++/dev/FreescaleMagnetometer      u:object_r:sensors_device:s0
++/dev/FreescaleGyroscope         u:object_r:sensors_device:s0
++/dev/sda[0-8]*                  u:object_r:fuse:s0
++
++#Neural Network HAL service
++/vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
++
++#Thermal HAL service
++/vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
++
++#quectel port
++/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
++/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
++/vendor/bin/hw/rild              u:object_r:rild_exec:s0
++#/system/socket/rild              u:object_r:rild_socket:s0
++#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+diff --git a/imx8m/evk_a300/sepolicy/genfs_contexts b/imx8m/evk_a300/sepolicy/genfs_contexts
+new file mode 100644
+index 00000000..4df5fe51
+--- /dev/null
++++ b/imx8m/evk_a300/sepolicy/genfs_contexts
+@@ -0,0 +1,9 @@
++genfscon sysfs /devices/platform/30b40000.usdhc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/30b50000.usdhc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/30bb0000.qspi/mtd/mtd0/mtdblock0                     u:object_r:sysfs_block_devices:s0
++
++genfscon sysfs /devices/platform/30a00000.mipi_dsi_bridge/30a00000.mipi_dsi_bridge.0/backlight u:object_r:sysfs_leds:s0
++genfscon sysfs /devices/platform/30be0000.ethernet/net u:object_r:sysfs_net:s0
++
++#8mq bcm 1CX wifi
++genfscon sysfs /devices/platform/hsio/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0

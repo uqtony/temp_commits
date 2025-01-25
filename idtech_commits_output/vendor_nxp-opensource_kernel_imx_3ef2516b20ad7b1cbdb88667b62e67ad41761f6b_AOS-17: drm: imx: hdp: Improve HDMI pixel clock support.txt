@@ -1,0 +1,76 @@
+3ef2516b20ad Sergii Postulga 2019-10-22
+
+AOS-17: drm: imx: hdp: Improve HDMI pixel clock support
+
+Patch adds functionality to pick closest
+supported pixel clock for HDMI mode with
+10% tolerance instead of rejecting.
+
+Change-Id: I0863dd47df7b2fce01a671a4fa4d063844d9f547
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Reviewed-on: https://gerrit.idtechproducts.com/c/android-imx/linux-imx/+/348
+Tested-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Reviewed-by: Arthur Chen <Arthur.Chen@idtechproducts.com>
+Reviewed-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+
+diff --git a/drivers/gpu/drm/imx/hdp/API_AFE_t28hpc_hdmitx.c b/drivers/gpu/drm/imx/hdp/API_AFE_t28hpc_hdmitx.c
+index 3b11545dad84..bc041aef93b7 100644
+--- a/drivers/gpu/drm/imx/hdp/API_AFE_t28hpc_hdmitx.c
++++ b/drivers/gpu/drm/imx/hdp/API_AFE_t28hpc_hdmitx.c
+@@ -49,12 +49,45 @@
+ #include "API_AFE_t28hpc_hdmitx.h"
+ #include "t28hpc_hdmitx_table.h"
+ 
++/*
++ * iMX has very limited list of supported pixel clocks
++ * however, most displays has some tolerance on pixel clock.
++ * This function will adjust pixel clock to closest supported
++ * with predefined tolerance.
++ */
++static void pixel_clock_fixup(struct drm_display_mode *mode) {
++	int i;
++	int ind = -1;
++	int tol = 5; /* pixel clock tolerance in % */
++	int rate_err = tol*2;
++
++	for (i = 0; i < T28HPC_HDMITX_CLOCK_CONTROL_TABLE_ROWS_PIXEL_OUT; i++) {
++		int rate = t28hpc_hdmitx_clock_control_table_pixel_out[i][T8_PIXEL_CLK_FREQ_KHZ];
++		int rate_err_new = abs(rate - mode->clock) * 100 / mode->clock;
++
++		if ((rate_err_new <= tol) && (rate_err_new < rate_err)) {
++			rate_err = rate_err_new;
++			ind = i;
++
++			if (!rate_err)
++				break;
++		}
++	}
++
++	if (ind >= 0 && rate_err) {
++		DRM_WARN("Pixel clock adjusted from %d to %d
+", mode->clock, t28hpc_hdmitx_clock_control_table_pixel_out[ind][T8_PIXEL_CLK_FREQ_KHZ]);
++		mode->clock = t28hpc_hdmitx_clock_control_table_pixel_out[ind][T8_PIXEL_CLK_FREQ_KHZ];
++	}
++}
++
+ /* check pixel clock rate in
+  * Table 8. HDMI TX pixel clock */
+ int pixel_clock_range_t28hpc(struct drm_display_mode *mode)
+ {
+ 	int i, row, rate;
+ 
++	pixel_clock_fixup(mode);
++
+ 	row = T28HPC_HDMITX_CLOCK_CONTROL_TABLE_ROWS_PIXEL_OUT;
+ 	for (i = 0; i < row; i++) {
+ 		   rate = t28hpc_hdmitx_clock_control_table_pixel_out[i][T8_PIXEL_CLK_FREQ_KHZ];
+@@ -152,6 +185,9 @@ int phy_cfg_hdp_t28hpc(state_struct *state,
+ 	vco_cal_code.msb = 8;
+ 	vco_cal_code.lsb = 0;
+ 
++	pixel_clock_fixup(mode);
++	pixel_freq_khz = mode->clock;
++
+ 	switch (format) {
+ 	case YCBCR_4_2_2:
+ 		clk_ratio = CLK_RATIO_1_1;

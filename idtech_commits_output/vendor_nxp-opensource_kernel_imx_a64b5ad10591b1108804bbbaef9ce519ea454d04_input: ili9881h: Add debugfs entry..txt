@@ -1,0 +1,168 @@
+a64b5ad10591 Arthur Chen 2020-03-18
+
+input: ili9881h: Add debugfs entry.
+
+    For touchscreen function switch controled by userspace via debugfs.
+    To match the flow scenario about IDG_V5 and K81.
+
+Change-Id: I0f187961564a4aaf8ec2f97e959fe988fb3cfda9
+
+diff --git a/drivers/input/touchscreen/ili/ilitek.h b/drivers/input/touchscreen/ili/ilitek.h
+index cd1199fe0439..30010650032d 100644
+--- a/drivers/input/touchscreen/ili/ilitek.h
++++ b/drivers/input/touchscreen/ili/ilitek.h
+@@ -77,6 +77,8 @@
+ #include <linux/security.h>
+ #include <linux/mount.h>
+ #include <linux/firmware.h>
++#include <linux/debugfs.h>
++#include <linux/mutex.h>
+ 
+ #ifdef CONFIG_OF
+ #include <linux/of_address.h>
+@@ -184,6 +186,10 @@ do {									\
+ #define NONE			-1
+ #define DO_SPI_RECOVER		-2
+ 
++#define K81_HOLD			"enabled"
++#define K81_RELEASE			"disabled"
++#define K81_STATUS_SIZE		16
++
+ enum TP_PLAT_TYPE {
+ 	TP_PLAT_MTK = 0,
+ 	TP_PLAT_QCOM,
+@@ -660,6 +666,7 @@ struct ilitek_tddi_dev {
+ 	bool ddi_rest_done;
+ 	bool resume_by_ddi;
+ 	bool tp_suspend;
++	bool k81_ctrl;
+ 
+ 	atomic_t irq_stat;
+ 	atomic_t tp_reset;
+diff --git a/drivers/input/touchscreen/ili/ilitek_i2c.c b/drivers/input/touchscreen/ili/ilitek_i2c.c
+index 4c04aae7a442..d6a17887dd41 100644
+--- a/drivers/input/touchscreen/ili/ilitek_i2c.c
++++ b/drivers/input/touchscreen/ili/ilitek_i2c.c
+@@ -29,6 +29,8 @@ struct touch_bus_info {
+ 
+ struct ilitek_tddi_dev *idev;
+ 
++static struct dentry *k81_dir;
++
+ #ifdef I2C_DMA_TRANSFER
+ static unsigned char *ilitek_dma_va;
+ static dma_addr_t ilitek_dma_pa;
+@@ -195,8 +197,75 @@ static int ilitek_i2c_read(void *buf, int len)
+ 	return ret;
+ }
+ 
++DEFINE_MUTEX(k81_mutex);
++
++static ssize_t k81_read(struct file *filp, char *buf,
++			size_t length, loff_t *offset)
++{
++	int rc;
++
++	if (mutex_lock_interruptible(&k81_mutex)) {
++		rc = -EINTR;
++		goto k81_read_out;
++	}
++
++	if (idev->k81_ctrl) {
++		rc = strlen(K81_HOLD);
++		if (copy_to_user(buf, K81_HOLD, rc))
++			rc = -EFAULT;
++
++	} else {
++		rc = strlen(K81_RELEASE);
++		if (copy_to_user(buf, K81_RELEASE, rc))
++			rc = -EFAULT;
++
++	}
++	mutex_unlock(&k81_mutex);
++
++k81_read_out:
++	return rc;
++}
++
++static ssize_t k81_write(struct file *filp, const char *buf,
++			 size_t length, loff_t *off)
++{
++	int rc;
++	char status[K81_STATUS_SIZE] = "error";
++
++	copy_from_user(status, buf, length);
++	if (mutex_lock_interruptible(&k81_mutex)) {
++		rc = -EINTR;
++		goto k81_write_out;
++	}
++
++	rc = strlen(status);
++	if (strncmp(status, K81_HOLD, strlen(K81_HOLD)) == 0) {
++		if (!idev->k81_ctrl)
++			disable_irq(idev->irq_num);
++
++		idev->k81_ctrl = ENABLE;
++	} else if (strncmp(status, K81_RELEASE, strlen(K81_RELEASE)) == 0) {
++		if (idev->k81_ctrl)
++			enable_irq(idev->irq_num);
++
++		idev->k81_ctrl = DISABLE;
++	} else {
++		rc = -EIO;
++	}
++	mutex_unlock(&k81_mutex);
++
++k81_write_out:
++	return rc;
++}
++
++const struct file_operations k81_fops = {
++	.read = k81_read,
++	.write = k81_write,
++};
++
+ static int ilitek_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+ {
++	struct dentry *k81_dfs;
+ 	struct touch_bus_info *info =
+ 		container_of(to_i2c_driver(i2c->dev.driver),
+ 			struct touch_bus_info, bus_driver);
+@@ -260,7 +329,21 @@ static int ilitek_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *
+ 	idev->netlink = DISABLE;
+ 	idev->debug_node_open = DISABLE;
+ 	idev->irq_tirgger_type = IRQF_TRIGGER_FALLING;
+-//	idev->irq_tirgger_type = IRQF_TRIGGER_RISING;
++	/* idev->irq_tirgger_type = IRQF_TRIGGER_RISING; */
++	idev->k81_ctrl = DISABLE;
++
++	k81_dir = debugfs_create_dir("touchscreen", 0);
++	if (!k81_dir)
++		ipio_err("Failed to create /sys/kernel/debug/touchscreen %ld
+",
++			 PTR_ERR(idev->i2c));
++
++	k81_dfs = debugfs_create_file("k81ctrl", 0664, k81_dir, NULL,
++				      &k81_fops);
++	if (!k81_dfs)
++		ipio_err("Failed to create "
++			 "/sys/kernel/debug/touchscreen/k81ctrl"
++			 " %ld
+",
++			 PTR_ERR(idev->i2c));
+ 
+ 	if (ENABLE_GESTURE)
+ 		idev->gesture = ENABLE;
+@@ -311,6 +394,10 @@ void ilitek_tddi_interface_dev_exit(struct ilitek_hwif_info *hwif)
+ {
+ 	struct touch_bus_info *info = (struct touch_bus_info *)hwif->info;
+ 
++	if (k81_dir) {
++		ipio_info("clean debugfs entry about K81 touch ctrl
+");
++		debugfs_remove_recursive(k81_dir);
++	}
+ 	ipio_info("remove i2c dev
+");
+ 	i2c_del_driver(&info->bus_driver);
+ 	ipio_kfree((void **)&info);

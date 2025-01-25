@@ -1,0 +1,122 @@
+f889d51c max.yang 2020-03-12
+
+AOS-121: [Uboot] Rename u-boots format as u-boot-${SOC_NAME}-${BOARD_TYPE}-${FEATURE}
+
+  1. There is no u-boots without BOARD_TYPE, it will specified for which board
+  2. The target is to select flashed u-boots from board_info by script
+  3. Sign devboard u-boot and u-boot-uuu images
+  4. Modify BOARD_TYPE for android-info.txt
+  5. Output of u-boots are named as below:
+     *** For devboard ***
+     u-boot-imx8mq-devboard-evk-uuu.imx
+     u-boot-imx8mq-devboard-evk-uuu-signed.imx
+     u-boot-imx8mq-devboard.imx
+     u-boot-imx8mq-devboard-signed.imx
+     u-boot-imx8mq-devboard-trusty.imx
+     u-boot-imx8mq-devboard-trusty-secure-unlock.imx
+
+     *** For evk ***
+     u-boot-imx8mq-evk-evk-uuu.imx
+     u-boot-imx8mq-evk.imx
+     u-boot-imx8mq-evk-ram1GB.imx
+     u-boot-imx8mq-evk-trusty.imx
+     u-boot-imx8mq-evk-trusty-secure-unlock.imx
+
+Change-Id: Ifd3fdbdedc79605abf8c9e5e38e79dcd15e26b20
+
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index db4e7258..8d14cf51 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -4,7 +4,7 @@
+ 
+ BOARD_SOC_TYPE := IMX8MQ
+ BOARD_SOM_TYPE := a300
+-BOARD_TYPE := EVK
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+ HAVE_FSL_IMX_GPU2D := false
+diff --git a/imx8m/evk_a300/UbootKernelBoardConfig.mk b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+index 31a8deda..0e21e87e 100644
+--- a/imx8m/evk_a300/UbootKernelBoardConfig.mk
++++ b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+@@ -2,16 +2,16 @@ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG := imx8mq:imx8mq_a300_devboard_android_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mq-dual:imx8mq_a300_devboard_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG := imx8mq-devboard:imx8mq_a300_devboard_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-dual:imx8mq_a300_devboard_android_dual_defconfig
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty:imx8mq_a300_devboard_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-secure-unlock:imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-dual:imx8mq_a300_devboard_android_trusty_dual_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty:imx8mq_a300_devboard_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty-secure-unlock:imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty-dual:imx8mq_a300_devboard_android_trusty_dual_defconfig
+ endif
+ 
+ # u-boot target used by uuu for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG += imx8mq-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig
+ 
+ TARGET_KERNEL_DEFCONFIG := android_defconfig
+ # TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index e8598bc2..cbb48fe3 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -4,7 +4,7 @@
+ 
+ BOARD_SOC_TYPE := IMX8MQ
+ BOARD_SOM_TYPE := a300
+-BOARD_TYPE := VP6820
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+ HAVE_FSL_IMX_GPU2D := false
+diff --git a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+index 2c09b392..c002aa72 100644
+--- a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+@@ -2,7 +2,7 @@ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target for a300 devboard
+-TARGET_BOOTLOADER_CONFIG := imx8mq-devboard:imx8mq_a300_devboard_android_defconfig
++TARGET_BOOTLOADER_CONFIG := imx8mq-devboard:imx8mq_a300_devboard_android_defconfig:signed
+ TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-dual:imx8mq_a300_devboard_android_dual_defconfig
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty:imx8mq_a300_devboard_android_trusty_defconfig
+@@ -11,21 +11,21 @@ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ endif
+ 
+ # u-boot target used by uuu for a300 devboard
+-TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig:signed
+ 
+ # u-boot target for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG += imx8mq:vp6820_8mq_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-evk:vp6820_8mq_evk_android_defconfig
+ # u-boot target for imx8mq_evk with RAM 1GB setting
+-TARGET_BOOTLOADER_CONFIG += imx8mq-ram1GB:vp6820_8mq_evk_ram1GB_android_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mq-dual:vp6820_8mq_evk_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-evk-ram1GB:vp6820_8mq_evk_ram1GB_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-evk-dual:vp6820_8mq_evk_android_dual_defconfig
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty:vp6820_8mq_evk_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-secure-unlock:vp6820_8mq_evk_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-dual:vp6820_8mq_evk_android_trusty_dual_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-evk-trusty:vp6820_8mq_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-evk-trusty-secure-unlock:vp6820_8mq_evk_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-evk-trusty-dual:vp6820_8mq_evk_android_trusty_dual_defconfig
+ endif
+ 
+ # u-boot target used by uuu for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG += imx8mq-evk-uuu:vp6820_8mq_evk_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-evk-evk-uuu:vp6820_8mq_evk_android_uuu_defconfig
+ 
+ TARGET_KERNEL_DEFCONFIG := android_defconfig
+ # TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig

@@ -1,0 +1,100 @@
+8787074951 George.Huang 2022-03-01
+
+AOS-887: fix conflicts from android-12.0.0_1.0.0
+
+Change-Id: I5d8492042bf89080956741d05b00de770e177112
+
+diff --git a/services/surfaceflinger/CompositionEngine/src/Output.cpp b/services/surfaceflinger/CompositionEngine/src/Output.cpp
+index df1268b436..a8c3a11a51 100644
+--- a/services/surfaceflinger/CompositionEngine/src/Output.cpp
++++ b/services/surfaceflinger/CompositionEngine/src/Output.cpp
+@@ -714,11 +714,6 @@ void Output::updateCompositionState(const compositionengine::CompositionRefreshA
+         if (layerFEState->forceClientComposition && skipForceClientComposition) {
+             layer->editState().forceClientComposition = false;
+         }
+-<<<<<<< HEAD
+-
+-        // Send the updated state to the HWC, if appropriate.
+-        layer->writeStateToHWC(refreshArgs.updatingGeometryThisFrame);
+-=======
+     }
+ }
+ 
+@@ -783,7 +778,6 @@ void Output::writeCompositionState(const compositionengine::CompositionRefreshAr
+ 
+         constexpr bool isPeekingThrough = false;
+         layer->writeStateToHWC(includeGeometry, skipLayer, z++, overrideZ, isPeekingThrough);
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     }
+ }
+ 
+diff --git a/services/surfaceflinger/StartPropertySetThread.cpp b/services/surfaceflinger/StartPropertySetThread.cpp
+index e59692de95..f42cd53e0a 100644
+--- a/services/surfaceflinger/StartPropertySetThread.cpp
++++ b/services/surfaceflinger/StartPropertySetThread.cpp
+@@ -31,20 +31,9 @@ bool StartPropertySetThread::threadLoop() {
+     property_set(kTimestampProperty, mTimestampPropertyValue ? "1" : "0");
+     // Clear BootAnimation exit flag
+     property_set("service.bootanim.exit", "0");
+-<<<<<<< HEAD
+-
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("debug.sf.nobootanimation", value, "0");
+-    if (atoi(value) == 0) {
+-        // Start BootAnimation if not started
+-        property_set("ctl.start", "bootanim");
+-    }
+-
+-=======
+     property_set("service.bootanim.progress", "0");
+     // Start BootAnimation if not started
+     property_set("ctl.start", "bootanim");
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     // Exit immediately
+     return false;
+ }
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 90c8a69993..2e6c4c135b 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -5983,16 +5983,10 @@ status_t SurfaceFlinger::captureDisplay(const DisplayCaptureArgs& args,
+                                         const sp<IScreenCaptureListener>& captureListener) {
+     ATRACE_CALL();
+ 
+-<<<<<<< HEAD
+-        const auto orientation = display->getOrientation();
+-        const auto physicalOrientation = display->getPhysicalOrientation();
+-        captureOrientation = ui::Transform::toRotationFlags(orientation + physicalOrientation);
+-=======
+     status_t validate = validateScreenshotPermissions(args);
+     if (validate != OK) {
+         return validate;
+     }
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     if (!args.displayToken) return BAD_VALUE;
+ 
+@@ -6213,15 +6207,6 @@ status_t SurfaceFlinger::captureScreenCommon(RenderAreaFuture renderAreaFuture,
+                                              const sp<IScreenCaptureListener>& captureListener) {
+     ATRACE_CALL();
+ 
+-<<<<<<< HEAD
+-    // TODO(b/116112787) Make buffer usage a parameter.
+-    const uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
+-            GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
+-    *outBuffer =
+-            getFactory().createGraphicBuffer(renderArea.getReqWidth(), renderArea.getReqHeight(),
+-                                             static_cast<android_pixel_format>(reqPixelFormat), 1,
+-                                             usage, "screenshot");
+-=======
+     // Loop over all visible layers to see whether there's any protected layer. A protected layer is
+     // typically a layer with DRM contents, or have the GRALLOC_USAGE_PROTECTED set on the buffer.
+     // A protected layer has no implication on whether it's secure, which is explicitly set by
+@@ -6264,7 +6249,6 @@ status_t SurfaceFlinger::captureScreenCommon(
+         const std::shared_ptr<renderengine::ExternalTexture>& buffer, bool regionSampling,
+         bool grayscale, const sp<IScreenCaptureListener>& captureListener) {
+     ATRACE_CALL();
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     if (captureListener == nullptr) {
+         ALOGE("capture screen must provide a capture listener callback");

@@ -1,0 +1,30 @@
+9051aacbad68 owen.wen 2021-12-06
+
+AOS-774: clear CS when response invalid
+
+Symptom: CS not released when IDG response invalid
+RootCause: lack of CS_CLEAR
+Solution: add a call of CS_CLEAR when IDG response invalid or spi_sync fail
+
+Change-Id: I69c2564ee256a619bc1e639a7448ff171d8251de
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 66383da5629e..ac147722c201 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -1007,6 +1007,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			}
+ #endif /* IDG_RETURN_WITH_HEADER */
+ 		} else {
++			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 			switch (err) {
+ 			case EINVAL:
+ 				dev_info(&spi->dev, "read data failed "
+@@ -1076,6 +1077,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			}
+ 		}
+ 	} else {
++		gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 		pr_err("%s: idg spi report failed(%d)", DRVNAME, status);
+ #if IDG_RETURN_WITH_HEADER
+ 		memcpy(&data[IDG_HEADER_LEN], READ_ERROR_HD, ERROR_HD_SIZE);

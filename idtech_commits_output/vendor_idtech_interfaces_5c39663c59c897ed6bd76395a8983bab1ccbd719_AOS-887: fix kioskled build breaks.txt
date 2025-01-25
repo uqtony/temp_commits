@@ -1,0 +1,197 @@
+5c39663 George.Huang 2022-03-07
+
+AOS-887: fix kioskled build breaks
+
+- remove deprecated 1.0 hidl
+- define version for kioskled-V1-ndk_platform
+
+Change-Id: I2f1cf59c681d29fd6b19e183bf8342865b0e3969
+
+diff --git a/kioskled/Android.bp b/kioskled/Android.bp
+index bd20e42..e8d32fe 100644
+--- a/kioskled/Android.bp
++++ b/kioskled/Android.bp
+@@ -9,7 +9,7 @@ cc_binary {
+     shared_libs: [
+         "libbase",
+         "libbinder_ndk",
+-        "android.hardware.kioskled-ndk_platform",
++        "android.hardware.kioskled-V1-ndk_platform",
+         "liblog",
+         "libutils",
+         "libjsoncpp",
+@@ -19,23 +19,3 @@ cc_binary {
+         "aidl/main.cpp",
+     ],
+ }
+-
+-cc_binary {
+-    name: "android.hardware.kioskled@1.0-service",
+-    defaults: ["hidl_defaults"],
+-    relative_install_path: "hw",
+-    vendor: true,
+-    vintf_fragments: ["hidl/android.hardware.kioskled@1.0-service.xml"],
+-    init_rc: ["hidl/android.hardware.kioskled@1.0-service.rc"],
+-    srcs: [
+-        "hidl/Kioskled.cpp",
+-        "hidl/service.cpp",
+-    ],
+-    shared_libs: [
+-        "libhidlbase",
+-        "libutils",
+-        "liblog",
+-        "libhardware",
+-        "android.hardware.kioskled@1.0",
+-    ],
+-}
+diff --git a/kioskled/hidl/Kioskled.cpp b/kioskled/hidl/Kioskled.cpp
+deleted file mode 100644
+index b121d49..0000000
+--- a/kioskled/hidl/Kioskled.cpp
++++ /dev/null
+@@ -1,44 +0,0 @@
+-// FIXME: your file license if you have one
+-
+-#include "Kioskled.h"
+-#include <utils/Log.h>
+-
+-namespace android {
+-namespace hardware {
+-namespace kioskled {
+-namespace V1_0 {
+-namespace implementation {
+-
+-// Methods from ::android::hardware::kioskled::V1_0::IKioskled follow.
+-Return<void> Kioskled::setLed(uint8_t idx, uint8_t onOff) {
+-    const hw_module_t *module = NULL;
+-    hw_device_t *device = NULL;
+-    kioskLed_device_t *kioskLed_device = NULL;
+-
+-    if (!hw_get_module(KIOSKLED_HARDWARE_MODULE_ID, &module) &&
+-        !module->methods->open(module, KIOSKLED_HARDWARE_MODULE_ID, &device)) {
+-        kioskLed_device = reinterpret_cast<kioskLed_device_t*>(device);
+-        kioskLed_device->setKioskLed(kioskLed_device, idx, onOff);
+-        kioskLed_device->common.close(device);
+-    } else {
+-        if (module == NULL)
+-            ALOGE("[KioskLed HIDL] Cannot find module
+");
+-        else
+-            ALOGE("[KioskLed HIDL] Cannot open device
+");
+-    }
+-
+-    return Void();
+-}
+-
+-
+-// Methods from ::android::hidl::base::V1_0::IBase follow.
+-
+-//IKioskled* HIDL_FETCH_IKioskled(const char* /* name */) {
+-    //return new Kioskled();
+-//}
+-//
+-}  // namespace implementation
+-}  // namespace V1_0
+-}  // namespace kioskled
+-}  // namespace hardware
+-}  // namespace android
+diff --git a/kioskled/hidl/Kioskled.h b/kioskled/hidl/Kioskled.h
+deleted file mode 100644
+index 1db7ed1..0000000
+--- a/kioskled/hidl/Kioskled.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-// FIXME: your file license if you have one
+-
+-#pragma once
+-
+-#include <android/hardware/kioskled/1.0/IKioskled.h>
+-#include <hidl/MQDescriptor.h>
+-#include <hidl/Status.h>
+-#include <hardware/hardware.h>
+-#include <hardware/kioskLed.h>
+-
+-namespace android {
+-namespace hardware {
+-namespace kioskled {
+-namespace V1_0 {
+-namespace implementation {
+-
+-using android::hardware::hidl_array;
+-using android::hardware::hidl_memory;
+-using android::hardware::hidl_string;
+-using android::hardware::hidl_vec;
+-using android::hardware::Return;
+-using android::hardware::Void;
+-using android::sp;
+-
+-struct Kioskled : public IKioskled {
+-    // Methods from ::android::hardware::kioskled::V1_0::IKioskled follow.
+-    Return < void > setLed(uint8_t idx, uint8_t onOff) override;
+-
+-    // Methods from ::android::hidl::base::V1_0::IBase follow.
+-
+-};
+-
+-// FIXME: most likely delete, this is only for passthrough implementations
+-// extern "C" IKioskled* HIDL_FETCH_IKioskled(const char* name);
+-
+-}  // namespace implementation
+-}  // namespace V1_0
+-}  // namespace kioskled
+-}  // namespace hardware
+-}  // namespace android
+diff --git a/kioskled/hidl/android.hardware.kioskled@1.0-service.rc b/kioskled/hidl/android.hardware.kioskled@1.0-service.rc
+deleted file mode 100644
+index ef7db92..0000000
+--- a/kioskled/hidl/android.hardware.kioskled@1.0-service.rc
++++ /dev/null
+@@ -1,5 +0,0 @@
+-service vendor.kioskled-hal-1.0 /vendor/bin/hw/android.hardware.kioskled@1.0-service
+-interface android.hardware.kioskled@1.0::IKioskled default
+-class hal
+-user system
+-group system
+diff --git a/kioskled/hidl/android.hardware.kioskled@1.0-service.xml b/kioskled/hidl/android.hardware.kioskled@1.0-service.xml
+deleted file mode 100644
+index 4d18ec8..0000000
+--- a/kioskled/hidl/android.hardware.kioskled@1.0-service.xml
++++ /dev/null
+@@ -1,11 +0,0 @@
+-<manifest version="1.0" type="device">
+-     <hal format="hidl">
+-        <name>android.hardware.kioskled</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IKioskled</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-</manifest>
+diff --git a/kioskled/hidl/service.cpp b/kioskled/hidl/service.cpp
+deleted file mode 100644
+index 3710e9b..0000000
+--- a/kioskled/hidl/service.cpp
++++ /dev/null
+@@ -1,19 +0,0 @@
+-#include <android/hardware/kioskled/1.0/IKioskled.h>
+-#include <hidl/LegacySupport.h>
+-#include "Kioskled.h"
+-
+-using android::hardware::kioskled::V1_0::IKioskled;
+-using android::hardware::kioskled::V1_0::implementation::Kioskled;
+-
+-using android::hardware::defaultPassthroughServiceImplementation;
+-using android::hardware::configureRpcThreadpool;
+-using android::hardware::joinRpcThreadpool;
+-
+-int main() {
+-    android::sp<IKioskled> service = new Kioskled();
+-    configureRpcThreadpool(1, true /*callerWillJoin*/);
+-    if(android::OK !=  service->registerAsService())
+-        return 1;
+-    joinRpcThreadpool();
+-    return 1;
+-}

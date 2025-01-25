@@ -1,0 +1,481 @@
+60048f7eee Jay 2022-01-04
+
+AOS-780: add icn6211 bridge driver
+
+Change-Id: I260b6dff90a9d2a8122cd186d03d0020bfa50e02
+
+diff --git a/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts b/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts
+index 04ff2217a3..518000aafc 100644
+--- a/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts
++++ b/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts
+@@ -62,6 +62,15 @@
+ 		regulator-always-on;
+ 	};
+ 
++	reg_lcm_lcd_vdd: fixed-regulator-3v3-vdd {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd_3v3_supply";
++		regualtor-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio4 11 GPIO_ACTIVE_LOW>;
++		off-on_delay-us = <2000>;
++	};
++
+ 	ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+@@ -314,6 +323,62 @@
+ 	#size-cells = <0>;
+ 	status = "okay";
+ 	data-lanes-num = <4>;
++
++	icn6211@0 {
++		compatible = "chipone,icn6211";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_lcd_module>;
++		reg = <0>;
++		enable-gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		lvds-gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
++		vbus-supply = <&reg_lcm_lcd_vdd>;
++		display-id = "840000";
++		video-mode = <2>;       /* 0: burst mode */
++		rgb-data-seq = <5>;
++		backlight = <&lm3697_backlight>;
++		status = "okay";
++		display-timings {
++			timing {
++				clock-frequency = <27770880>;
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <48>;
++				hsync-len = <8>;
++				hback-porch = <48>;
++				vfront-porch = <12>;
++				vsync-len =  <8>;
++				vback-porch = <12>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				bridge_in_dsi: endpoint {
++					remote-endpoint = <&mipi_dsi_out>;
++				};
++			};
++		};
++	};
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port@1 {
++			reg = <1>;
++			mipi_dsi_out: endpoint {
++				remote-endpoint = <&bridge_in_dsi>;
++			};
++		};
++	};
+ };
+ 
+ &i2c2 {
+@@ -335,6 +400,7 @@
+ 		auto-freq-threshold = <0x74>;
+ 		start-up-ramp-level = <1>;
+ 		default-on;
++		status = "okay";
+ 	};
+ };
+ 
+@@ -548,13 +614,6 @@
+ 		>;
+ 	};
+ 
+-	pinctrl_mipi_dsi: mipidsigrp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19  /* DSI_RESET */
+-			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  /* DSI_TE */
+-		>;
+-	};
+-
+ 	pinctrl_i2c2: i2c2grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL	0x40000067
+@@ -736,4 +795,12 @@
+ 			MX8MQ_IOMUXC_UART4_TXD_GPIO5_IO29		0x16
+ 		>;
+ 	};
++
++	pinctrl_lcd_module: lcd-module-grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11			0x19		// LCD_PWR_ONn
++			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16			0x19		// LCD_DISP
++			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4			0x19		// LCD_RSTn
++		>;
++	};
+ };
+diff --git a/configs/redwood_8mq_evk_android_defconfig b/configs/redwood_8mq_evk_android_defconfig
+index c1670fcc62..c28cffab34 100644
+--- a/configs/redwood_8mq_evk_android_defconfig
++++ b/configs/redwood_8mq_evk_android_defconfig
+@@ -162,4 +162,5 @@ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
+-CONFIG_BACKLIGHT_LM3697=y
+\ No newline at end of file
++CONFIG_BACKLIGHT_LM3697=y
++CONFIG_VIDEO_CHIPONE_ICN6211=y
+diff --git a/configs/redwood_8mq_evk_android_dp_dual_defconfig b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+index 4dfd32e4aa..bbf2365196 100644
+--- a/configs/redwood_8mq_evk_android_dp_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+@@ -165,4 +165,5 @@ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
+-CONFIG_BACKLIGHT_LM3697=y
+\ No newline at end of file
++CONFIG_BACKLIGHT_LM3697=y
++CONFIG_VIDEO_CHIPONE_ICN6211=y
+diff --git a/configs/redwood_8mq_evk_android_dual_defconfig b/configs/redwood_8mq_evk_android_dual_defconfig
+index 5df418ba39..8d1331920f 100644
+--- a/configs/redwood_8mq_evk_android_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dual_defconfig
+@@ -166,3 +166,4 @@ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
+ CONFIG_BACKLIGHT_LM3697=y
++CONFIG_VIDEO_CHIPONE_ICN6211=y
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 94ffee2119..784bf83eb3 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -1108,4 +1108,13 @@ config FB_ADDR
+ 	  This option could indicate framebuffer address which locate
+ 	  memory for framebuffer.
+ 
++config VIDEO_CHIPONE_ICN6211
++	bool "Enable chipone icn6211 bridge panel"
++	depends on DM_VIDEO
++	select VIDEO_MIPI_DSI
++	default n
++	help
++	Say Y here if you want to enable support for ICN6211
++	DSI to RGB connector.
++
+ endmenu
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index b62fe161bf..b6fad96de1 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -82,6 +82,7 @@ obj-$(CONFIG_VIDEO_VADC) += mxc_vadc.o
+ obj-$(CONFIG_VIDEO_CSI) += mxc_csi.o
+ obj-$(CONFIG_VIDEO_PXP) += mxc_pxp.o
+ obj-$(CONFIG_VIDEO_GIS) += mxc_gis.o
++obj-$(CONFIG_VIDEO_CHIPONE_ICN6211) += chipone-icn6211.o
+ 
+ obj-y += bridge/
+ obj-y += sunxi/
+diff --git a/drivers/video/chipone-icn6211.c b/drivers/video/chipone-icn6211.c
+new file mode 100644
+index 0000000000..edbd9a54c7
+--- /dev/null
++++ b/drivers/video/chipone-icn6211.c
+@@ -0,0 +1,279 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2022, ID Tech - All Rights Reserved
++ * Author: Jay Deng <jay.deng@idtechproducts.com>
++ */
++#include <common.h>
++#include <dm.h>
++#include <errno.h>
++#include <log.h>
++#include <backlight.h>
++#include <mipi_dsi.h>
++#include <panel.h>
++#include <asm/gpio.h>
++#include <linux/err.h>
++#include <linux/delay.h>
++#include <video_link.h>
++#include <dm/device_compat.h>
++#include <linux/kernel.h>
++
++#define SYS_CTRL_0		0x10
++#define SYS_CTRL_1		0x11
++#define HACTIVE_LI		0x20
++#define VACTIVE_LI		0x21
++#define VACTIVE_HACTIVE_HI	0x22
++#define HFP_LI			0x23
++#define HSYNC_LI		0x24
++#define HBP_LI			0x25
++#define HFP_HSW_HBP_HI		0x26
++#define VFP			0x27
++#define VSYNC			0x28
++#define VBP			0x29
++
++#define DEFAULT_COLOR_SEQ	0x40
++#define COLOR_ORDER_MAX		6
++
++struct icn6211_priv {
++	fdt_addr_t base;
++	u32 lanes;
++	u32 rgb_seq;
++	enum mipi_dsi_pixel_format format;
++	unsigned long mode_flags;
++	struct udevice *backlight;
++	struct udevice *power;
++	struct gpio_desc enable;
++	struct gpio_desc lvds;
++	struct display_timing timings;
++};
++
++static inline int icn6211_dsi_write(struct mipi_dsi_device *device,  const void *seq,
++				    size_t len)
++{
++	return mipi_dsi_generic_write(device, seq, len);
++}
++
++#define ICN6211_DSI(dev, seq...)				\
++	{							\
++		const u8 d[] = { seq };				\
++		icn6211_dsi_write(dev, d, ARRAY_SIZE(d));	\
++	}
++
++
++
++static int icn6211_enable(struct udevice *dev)
++{
++	int ret = 0;
++	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
++	struct mipi_dsi_device *device = plat->device;
++	struct icn6211_priv *priv = dev_get_priv(dev);
++	struct display_timing timings;
++
++	ret = video_link_get_display_timings(&timings);
++	if (ret) {
++		dev_err(dev, "decode display timing error %d
+", ret);
++		return ret;
++	}
++
++	device->mode_flags = priv->mode_flags;
++	device->format = priv->format;
++	device->lanes = priv->lanes;
++
++	ICN6211_DSI(device, 0x7a, 0xc1);
++
++	ICN6211_DSI(device, HACTIVE_LI, timings.hactive.typ & 0xff);
++
++	ICN6211_DSI(device, VACTIVE_LI, timings.vactive.typ & 0xff);
++
++	/**
++	 * lsb nibble: 2nd nibble of hdisplay
++	 * msb nibble: 2nd nibble of vdisplay
++	 */
++	ICN6211_DSI(device, VACTIVE_HACTIVE_HI,
++		    ((timings.hactive.typ >> 8) & 0xf) |
++		    (((timings.vactive.typ >> 8) & 0xf) << 4));
++
++	ICN6211_DSI(device, HFP_LI, timings.hfront_porch.typ);
++
++	ICN6211_DSI(device, HSYNC_LI, timings.hsync_len.typ);
++
++	ICN6211_DSI(device, HBP_LI, timings.hback_porch.typ);
++
++	ICN6211_DSI(device, HFP_HSW_HBP_HI, 0x00);
++
++	ICN6211_DSI(device, VFP, timings.vback_porch.typ);
++
++	ICN6211_DSI(device, VSYNC, timings.vsync_len.typ);
++
++	ICN6211_DSI(device, VBP, timings.vfront_porch.typ);
++
++	/* dsi specific sequence */
++	ICN6211_DSI(device, MIPI_DCS_SET_TEAR_OFF, 0x80);
++	ICN6211_DSI(device, MIPI_DCS_SET_ADDRESS_MODE, 0x28);
++	ICN6211_DSI(device, 0xb5, 0xa0);
++	ICN6211_DSI(device, 0x5c, 0xff);
++	ICN6211_DSI(device, MIPI_DCS_SET_COLUMN_ADDRESS, 0x01);
++	ICN6211_DSI(device, MIPI_DCS_GET_POWER_SAVE, 0x92);
++	ICN6211_DSI(device, 0x6b, 0x71);
++	ICN6211_DSI(device, 0x69, 0x2C);
++	ICN6211_DSI(device, MIPI_DCS_ENTER_SLEEP_MODE, 0x40);
++	ICN6211_DSI(device, MIPI_DCS_EXIT_SLEEP_MODE, 0x98);
++
++	ICN6211_DSI(device, SYS_CTRL_0, DEFAULT_COLOR_SEQ | (priv->rgb_seq & 0xff));
++	ICN6211_DSI(device, SYS_CTRL_1, 0x88);
++
++	/* icn6211 specific sequence */
++	ICN6211_DSI(device, 0xb6, 0x20);
++	ICN6211_DSI(device, 0x51, 0x20);
++	ICN6211_DSI(device, 0x09, 0x10);
++
++	dm_gpio_set_value(&priv->lvds, 1);
++
++	return 0;
++}
++
++static int icn6211_enable_backlight(struct udevice *dev)
++{
++	struct mipi_dsi_panel_plat *plat = dev_get_plat(dev);
++	struct mipi_dsi_device *device = plat->device;
++	struct icn6211_priv *priv = dev_get_priv(dev);
++	int ret = 0;
++
++	if (device) {
++		device->lanes = priv->lanes;
++		device->format = priv->format;
++		device->mode_flags = priv->mode_flags;
++	}
++
++	ret = mipi_dsi_attach(device);
++	if (ret)
++		return ret;
++
++	ret = icn6211_enable(dev);
++	if (ret)
++		return ret;
++
++
++	ret = backlight_enable(priv->backlight);
++	if (ret)
++		return ret;
++
++	return ret;
++}
++
++static int icn6211_get_display_timing(struct udevice *dev,
++				      struct display_timing *timings)
++{
++	struct icn6211_priv *priv = dev_get_priv(dev);
++
++	if (!timings)
++		return -EINVAL;
++	memcpy(timings, &priv->timings, sizeof(struct display_timing));
++	return 0;
++}
++
++static int icn6211_probe(struct udevice *dev)
++{
++	struct icn6211_priv *priv = dev_get_priv(dev);
++	int ret;
++	u32 video_mode = 0, rgb_seq = 0;
++
++	priv->base = dev_read_addr(dev);
++	if (priv->base == FDT_ADDR_T_NONE)
++		return -EINVAL;
++
++	ret = fdtdec_decode_display_timing(gd->fdt_blob, dev_of_offset(dev), 0, &priv->timings);
++	if (ret) {
++		dev_err(dev, "decode display timing error %d
+", ret);
++		return ret;
++	}
++
++	priv->lanes = 4;
++	priv->format = MIPI_DSI_FMT_RGB888;
++
++	ret = gpio_request_by_name(dev, "enable-gpios", 0, &priv->enable,
++				   GPIOD_IS_OUT);
++	if (ret) {
++		dev_err(dev, "Failed to request enable gpio for enable(%d)
+", ret);
++		goto err;
++	}
++
++	ret = gpio_request_by_name(dev, "lvds-gpios", 0, &priv->lvds,
++				   GPIOD_IS_OUT);
++	if (ret) {
++		dev_err(dev, "Failed to request lvds gpio for enable(%d)
+", ret);
++		goto err;
++	}
++
++	ret = uclass_get_device_by_phandle(UCLASS_PANEL_BACKLIGHT, dev,
++					   "backlight", &priv->backlight);
++	if (ret) {
++		dev_err(dev, "Failed to get backlight(%d)
+", ret);
++		goto err;
++	}
++
++	ret = device_get_supply_regulator(dev, "vbus-supply", &priv->power);
++	if (ret) {
++		dev_err(dev, "No vbus supply
+");
++		goto err;
++	}
++
++	ret = regulator_set_enable(priv->power, true);
++	if (ret) {
++		dev_err(dev, "Enable powr failed
+");
++		goto err;
++	}
++
++	priv->mode_flags = MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++	video_mode = dev_read_u32_default(dev, "video-mode", 2);
++	switch (video_mode) {
++	case 0:
++		/* burst mode */
++		priv->mode_flags |= MIPI_DSI_MODE_VIDEO_BURST;
++		break;
++	case 1:
++		/* non-burst mode with sync event */
++		break;
++	case 2:
++		/* non-burst mode with sync pulse */
++		priv->mode_flags |= MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++		break;
++	default:
++		dev_warn(dev, "invalid video mode %d
+", video_mode);
++		break;
++	}
++
++	if (!dev_read_u32(dev, "rgb-data-seq", &rgb_seq) && rgb_seq < COLOR_ORDER_MAX)
++		priv->rgb_seq = rgb_seq;
++
++	dm_gpio_set_value(&priv->enable, 0);
++	mdelay(10);
++	dm_gpio_set_value(&priv->enable, 1);
++	mdelay(10);
++	return 0;
++err:
++	if (&priv->enable)
++		dm_gpio_free(dev, &priv->enable);
++	if (&priv->lvds)
++		dm_gpio_free(dev, &priv->lvds);
++	return ret;
++}
++
++static const struct panel_ops icn6211_ops = {
++	.enable_backlight = icn6211_enable_backlight,
++	.get_display_timing = icn6211_get_display_timing,
++};
++
++static const struct udevice_id icn6211_ids[] = {
++	{ .compatible = "chipone,icn6211" },
++	{ }
++};
++
++U_BOOT_DRIVER(icn6211_mipi2lvds) = {
++	.name				= "icn6211_mipi2lvds",
++	.id				= UCLASS_PANEL,
++	.of_match			= icn6211_ids,
++	.ops				= &icn6211_ops,
++	.probe				= icn6211_probe,
++	.plat_auto			= sizeof(struct mipi_dsi_panel_plat),
++	.priv_auto			= sizeof(struct icn6211_priv),
++};
+\ No newline at end of file

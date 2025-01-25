@@ -1,0 +1,267 @@
+94bf555 Arthur Chen 2020-01-22
+
+AOS-61: IDGdemoapp: Add IDG V2 & V5 support.
+
+    With 2 sockets connection, one is for IDG V2 with port 1221.
+    Another is for IDG V5 with port 1220.
+    With 2 threads are to read IDG V2 & V5 responses.
+
+Change-Id: I37f51390fde73337b2f249c5b2d148cf79433b80
+
+diff --git a/IDGdemoapp/res/layout/main_activity.xml b/IDGdemoapp/res/layout/main_activity.xml
+index 94fad13..a8a0463 100644
+--- a/IDGdemoapp/res/layout/main_activity.xml
++++ b/IDGdemoapp/res/layout/main_activity.xml
+@@ -35,15 +35,37 @@
+                 android:layout_below="@+id/but1"
+                 android:text="Not Connect" />
+ 
+-            <TextView
+-                android:id="@+id/textView2"
++            <LinearLayout
+                 android:layout_width="match_parent"
+                 android:layout_height="50dp"
+                 android:layout_weight="3"
++                android:orientation="horizontal">
++            <TextView
++                android:id="@+id/textView2"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:layout_weight="1"
+                 android:textSize="60dp"
+                 android:textStyle="bold"
+                 android:layout_below="@+id/textView1"
++                android:layout_toLeftOf="@+id/sw"
+                 android:text="IDG:" />
++            <Switch
++                android:id="@+id/sw"
++                android:layout_width="match_parent"
++                android:layout_height="match_parent"
++                android:layout_weight="3"
++                android:showText="true"
++                android:scaleX="4"
++                android:scaleY="4"
++                android:textOff="V5"
++                android:textOn="V2"
++                android:layout_below="@+id/textView1"
++                android:layout_toRightOf="@+id/textView2"
++                android:layout_marginRight="50dp"
++                android:layout_marginBottom="60dp" />
++            </LinearLayout>
++
+ 
+         </LinearLayout>
+ 
+diff --git a/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java b/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
+index 32b38d7..03ee3e1 100644
+--- a/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
++++ b/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
+@@ -11,6 +11,8 @@ import android.util.Log;
+ import android.view.View;
+ import android.widget.ArrayAdapter;
+ import android.widget.Button;
++import android.widget.CompoundButton;
++import android.widget.Switch;
+ import android.widget.ListView;
+ import android.widget.TextView;
+ import android.widget.EditText;
+@@ -36,24 +38,36 @@ import java.util.concurrent.Executors;
+ 
+ public class MainActivity extends Activity {
+ 
+-    private static final int PORT = 1221;
++    private static final int V2PORT = 1221;
++    private static final int V5PORT = 1220;
++    private static final int BUF_SIZE = 2048;
+     private static final String Localhost = "127.0.0.1";
+     private static final String Hex = "0123456789ABCDEF";
++    private static boolean protocol = true;
++    private static String input = "";
+     private String hostip;
+     private ListView mListview;
+     private TextView mText1;
+     private EditText mEdit1;
+     private Button mBut1 = null;
+     private Button mBut2 = null;
+-    private volatile boolean flag = true;
++    private Switch mSw;
+     public Handler myHandler = new Handler();
+-    public Thread myThread;
++    public Thread myThreadV2;
++    public Thread myThreadV5;
+     private static String data = "" ;
+     private ArrayList<String> listItems=new ArrayList<String>();
+     private ArrayAdapter madapter;
+-    private Socket socket;
+-    private BufferedWriter out;
+-    private BufferedReader in;
++    private Socket socketV2;
++    private Socket socketV5;
++    private BufferedWriter outV2;
++    private BufferedReader inV2;
++    private BufferedWriter outV5;
++    private BufferedReader inV5;
++
++    private static String toHex (Byte b) {
++        return (""+Hex.charAt(0xf&b >> 4) + Hex.charAt(b&0xf));
++    }
+ 
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+@@ -81,7 +95,20 @@ public class MainActivity extends Activity {
+ 
+         mEdit1 = (EditText) findViewById(R.id.edit1);
+ 
+-        myThread = new Thread(readData);
++        mSw = (Switch) findViewById(R.id.sw);
++        mSw.setChecked(true);
++        mSw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
++            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
++                if (isChecked) {
++                    protocol = true;
++                } else {
++                    protocol = false;
++                }
++            }
++        });
++
++        myThreadV2 = new Thread(readDataV2);
++        myThreadV5 = new Thread(readDataV5);
+     }
+ 
+     private final class Button1ClickListener implements View.OnClickListener {
+@@ -91,10 +118,20 @@ public class MainActivity extends Activity {
+             if (mBut1.getText().toString().equals("Start")) {
+                 mBut1.setText("Stop");
+                 mText1.setText("IDG enabled");
+-                myThread.start();
++                myThreadV2.start();
++                try{
++                    // delay 50 milli second
++                    Thread.sleep(50);
++
++                } catch(InterruptedException e){
++                    e.printStackTrace();
++
++                }
++                myThreadV5.start();
+             } else {
+                 try {
+-                    socket.close();
++                    socketV2.close();
++                    socketV5.close();
+                     mText1.setText("Not Connect");
+                     Log.v("Socket-status","Service have been closed");
+                 } catch (IOException e) {
+@@ -110,17 +147,28 @@ public class MainActivity extends Activity {
+         @Override
+         public void onClick(View v) {
+             // TODO Auto-generated method stub
+-            String input = mEdit1.getText().toString();
++            input = mEdit1.getText().toString();
++
+             try {
+-                Log.v("socket", "Socket created");
+-                out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
++                if (protocol) {
++                    Log.v("socket", "SocketV2 created");
++                    outV2 = new BufferedWriter(new OutputStreamWriter(socketV2.getOutputStream()));
+ 
+-                Log.v("socket", "Socket output created");
+-                if (socket.isConnected()) {
+-                    out.write(input);
+-                    out.flush();
+-                }
++                    Log.v("socket", "SocketV2 output created");
++                    if (socketV2.isConnected()) {
++                        outV2.write(input);
++                        outV2.flush();
++                    }
++                } else {
++                    Log.v("socket", "SocketV5 created");
++                    outV5 = new BufferedWriter(new OutputStreamWriter(socketV5.getOutputStream()));
+ 
++                    Log.v("socket", "SocketV5 output created");
++                    if (socketV5.isConnected()) {
++                        outV5.write(input);
++                        outV5.flush();
++                    }
++                }
+             } catch (Exception e) {
+                 e.printStackTrace();
+                 Log.e("text", "Socket connection = " + e.toString());
+@@ -139,21 +187,66 @@ public class MainActivity extends Activity {
+         }
+     };
+ 
+-    private Runnable readData = new Runnable() {
++    private Runnable readDataV2 = new Runnable() {
+         public void run() {
++            InetAddress serverIp;
++            char[] buf = new char[BUF_SIZE];
++            byte[] bytes;
++            Byte b;
++            String toascii;
++            int len, i;
++            try {
++                serverIp = InetAddress.getByName(Localhost);
++                socketV2 = new Socket(serverIp, V2PORT);
++                inV2 = new BufferedReader(new InputStreamReader(socketV2.getInputStream()));
++                while (socketV2.isConnected()) {
++                    len = inV2.read(buf, 0, BUF_SIZE);
++                    if(len != 0) {
++                        bytes = new String(buf).getBytes("UTF-8");
++                        for (i = 0; i < len; i++) {
++                            b = bytes[i];
++                            if ((b.intValue() < 32) || (b.intValue() > 126)) {
++                                data += " (0x" + toHex(b) + ")";
++                            } else {
++                                toascii = new String(new byte[]{b}, "UTF-8");
++                                data += toascii;
++                            }
++                        }
++                        myHandler.post(updateText);
++                        Arrays.fill(buf, ' ');
++                    }
++                }
++            } catch (IOException e) {
++                e.printStackTrace();
++            }
++        }
++    };
+ 
++    private Runnable readDataV5 = new Runnable() {
++        public void run() {
+             InetAddress serverIp;
+-            char[] buf = new char[2048];
++            char[] buf = new char[BUF_SIZE];
++            byte[] bytes;
++            Byte b;
++            String toascii;
+             int len, i;
+             try {
+                 serverIp = InetAddress.getByName(Localhost);
+-                socket = new Socket(serverIp, PORT);
+-                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+-                while (socket.isConnected()) {
+-                    len = in.read(buf,0,2048);
++                socketV5 = new Socket(serverIp, V5PORT);
++                inV5 = new BufferedReader(new InputStreamReader(socketV5.getInputStream()));
++                while (socketV5.isConnected()) {
++                    len = inV5.read(buf, 0, BUF_SIZE);
+                     if(len != 0) {
+-                        data = "";
+-                        data = new String(buf);
++                        bytes = new String(buf).getBytes("UTF-8");
++                        for (i = 0; i < len; i++) {
++                            b = bytes[i];
++                            if ((b.intValue() < 32) || (b.intValue() > 126)) {
++                                data += " (0x" + toHex(b) + ")";
++                            } else {
++                                toascii = new String(new byte[]{b}, "UTF-8");
++                                data += toascii;
++                            }
++                        }
+                         myHandler.post(updateText);
+                         Arrays.fill(buf, ' ');
+                     }

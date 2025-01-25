@@ -1,0 +1,24 @@
+beed7c0c9541 owen.wen 2021-04-21
+
+AOS-566: Initialising SD card error on ibase board
+
+Sympyom: fail to mount SD Card
+RootCause: mmc_sd_init_card didn't consider that an UHS SD may response
+           1.8 voltage is not accpet(SD_ROCR_S18A is 0)
+Solution: go to retry when SD_ROCR_S18A is 0
+Change-Id: I49a11fa22d645b2013d610f743719696a928388a
+
+diff --git a/drivers/mmc/core/sd.c b/drivers/mmc/core/sd.c
+index a2d46003c27a..1d327b68ff69 100644
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -1044,7 +1044,8 @@ static int mmc_sd_init_card(struct mmc_host *host, u32 ocr,
+ 		}
+ 		if (mmc_sd_card_using_v18(card)) {
+ 			if (mmc_host_set_uhs_voltage(host) ||
+-			    mmc_sd_init_uhs_card(card)) {
++			    mmc_sd_init_uhs_card(card) ||
++				!(rocr & SD_ROCR_S18A)) {
+ 				v18_fixup_failed = true;
+ 				mmc_power_cycle(host, ocr);
+ 				if (!oldcard)

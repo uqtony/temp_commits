@@ -1,0 +1,411 @@
+36fe9122f4eb George.Huang 2020-09-04
+
+AOS-270: arm64: dts: force to use dynamic_partition layout
+
+Change-Id: I5b529453dfe3db88d89bec47bd66f84579925a93
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index efbe9b0e4473..732ced4e6467 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -17,57 +17,6 @@
+ #include <dt-bindings/usb/pd.h>
+ #include "imx8mn.dtsi"
+ 
+-/ {
+-	firmware {
+-		android {
+-			compatible = "android,firmware";
+-			/* default emmc node used for GSI */
+-			boot_devices = "soc@0/30800000.bus/30b60000.mmc";
+-			/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-			boot_devices_mmcblk2 = "soc@0/30800000.bus/30b60000.mmc";
+-			fstab {
+-				compatible = "android,fstab";
+-				system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-				product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-			vbmeta {
+-				/*we need use FirstStageMountVBootV2 if we enable avb*/
+-				compatible = "android,vbmeta";
+-				/*parts means the partition witch can be mount in first stage*/
+-				parts = "vbmeta,dtbo,boot,system,vendor,product";
+-			};
+-		};
+-	};
+-};
+-
+ / {
+ 	trusty {
+ 		compatible = "android,trusty-smc-v1";
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index 43f837e64c44..bba6e5e11288 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -15,39 +15,32 @@ android {
+ 			compatible = "android,firmware";
+ 			/* default emmc node used for GSI */
+ 			boot_devices = "soc@0/soc@0:bus@30800000/30b40000.mmc";
++			/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
++			boot_devices_mmcblk1 = "soc@0/soc@0:bus@30800000/30b50000.mmc";
+ 			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+ 			boot_devices_mmcblk0 = "soc@0/soc@0:bus@30800000/30b40000.mmc";
+ 			fstab {
+ 				compatible = "android,fstab";
+ 				system {
+ 					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
++					dev = "system";
+ 					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey,logical,first_stage_mount";
+ 				};
+ 				vendor {
+ 					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
++					dev = "vendor";
+ 					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,logical,first_stage_mount";
+ 				};
+ 				product {
+ 					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
++					dev = "product";
+ 					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,logical,first_stage_mount";
+ 				};
+ 			};
+ 			vbmeta {
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mn_evt-0_evk_evk-0_mic2g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mn_evt-0_evk_evk-0_mic2g.dts
+index 96bfcdbb6998..fb3ce38192bf 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mn_evt-0_evk_evk-0_mic2g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mn_evt-0_evk_evk-0_mic2g.dts
+@@ -13,47 +13,3 @@ / {
+ 	idt,prod-id = "idt_imx8mn_evt-0_evk_evk-0_mic2g";
+ };
+ 
+-/ {
+-	firmware {
+-		android {
+-			fstab {
+-				system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-				product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-		};
+-	};
+-};
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
+index 37340603ae6b..a3f56ed22e72 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
+@@ -12,54 +12,3 @@
+ / {
+ 	idt,prod-id = "idt_imx8mp_evt-0_evk_evk-0_mic6g";
+ };
+-
+-/ {
+-	firmware {
+-		android {
+-			fstab {
+-                                system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-                                product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/30800000.bus/30b50000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk2 */
+-					dev_mmcblk2 = "/dev/block/platform/soc@0/30800000.bus/30b60000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-			vbmeta {
+-				/*we need use FirstStageMountVBootV2 if we enable avb*/
+-				compatible = "android,vbmeta";
+-				/*parts means the partition witch can be mount in first stage*/
+-				parts = "vbmeta,dtbo,boot,system,vendor,product";
+-			};
+-		};
+-	};
+-};
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
+index e3a4c7979b96..649a7fb85778 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
+@@ -12,48 +12,3 @@
+ / {
+ 	idt,prod-id = "idt_imx8mq_evt-0_evk_evk-0_mic3g";
+ };
+-
+-/ {
+-	firmware {
+-		android {
+-			fstab {
+-				system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-				product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
+-					dev_mmcblk1 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-		};
+-	};
+-};
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g.dts
+index 5ef250a67caa..ecee93ff6def 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g.dts
+@@ -9,57 +9,6 @@
+ 
+ #include "imx8mq-evk-lcdif-rm67191.dts"
+ 
+-/ {
+-	firmware {
+-		android {
+-			compatible = "android,firmware";
+-			/* default emmc node used for GSI */
+-			boot_devices = "soc@0/soc@0:bus@30800000/30b40000.mmc";
+-			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-			boot_devices_mmcblk0 = "soc@0/soc@0:bus@30800000/30b40000.mmc";
+-			fstab {
+-				compatible = "android,fstab";
+-				system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-				product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-			vbmeta {
+-				/*we need use FirstStageMountVBootV2 if we enable avb*/
+-				compatible = "android,vbmeta";
+-				/*parts means the partition witch can be mount in first stage*/
+-				parts = "vbmeta,dtbo,boot,system,vendor,product";
+-			};
+-		};
+-	};
+-};
+-
+ / {
+ 	idt,prod-id = "idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0_mic3g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0_mic3g.dts
+index 8cf62a8485e8..c51f6f605b85 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0_mic3g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0_mic3g.dts
+@@ -9,57 +9,6 @@
+ 
+ #include "imx8mq-evk-dcss-rm67191.dts"
+ 
+-/ {
+-	firmware {
+-		android {
+-			compatible = "android,firmware";
+-			/* default emmc node used for GSI */
+-			boot_devices = "soc@0/soc@0:bus@30800000/30b40000.mmc";
+-			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-			boot_devices_mmcblk0 = "soc@0/soc@0:bus@30800000/30b40000.mmc";
+-			fstab {
+-				compatible = "android,fstab";
+-				system {
+-					compatible = "android,system";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
+-				};
+-				vendor {
+-					compatible = "android,vendor";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-				product {
+-					compatible = "android,product";
+-					/* default emmc node used for GSI */
+-					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
+-					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
+-					type = "ext4";
+-					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+-					fsmgr_flags = "wait,slotselect,avb";
+-				};
+-			};
+-			vbmeta {
+-				/*we need use FirstStageMountVBootV2 if we enable avb*/
+-				compatible = "android,vbmeta";
+-				/*parts means the partition witch can be mount in first stage*/
+-				parts = "vbmeta,dtbo,boot,system,vendor,product";
+-			};
+-		};
+-	};
+-};
+-
+ / {
+ 	idt,prod-id = "idt_imx8mq_evt-0_evk_mipipanel-0_mic3g";
+ };

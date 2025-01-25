@@ -1,0 +1,45 @@
+465db5b owen.wen 2022-03-10
+
+AOS-891: rild: android12: create build rule for chat
+
+Android12 build break on chat, Check non-ELF: vendor/quectel/chat
+Create build rule for chat to fix the problem
+
+I also tried Android.bp format but failed on "local_module_path"
+so keep using Android.mk for chat
+
+$ androidmk Android.mk
+cc_prebuilt_binary {
+    name: "chat",
+    srcs: ["chat"],
+
+    local_module_path: {
+        var: "TARGET_OUT",
+        fixed: "/system/bin",
+    },
+    shared_libs: [
+        "liblog",
+        "libstdc++",
+    ],
+}
+Got build error when change to android.bp
+error: vendor/quectel/Android.bp:7:22: unrecognized property "local_module_path"
+
+Change-Id: If1a5d400b3a1bc77c4606853df37c1a8c9347591
+
+diff --git a/Android.mk b/Android.mk
+new file mode 100644
+index 0000000..f2c7d38
+--- /dev/null
++++ b/Android.mk
+@@ -0,0 +1,10 @@
++LOCAL_PATH:=$(call my-dir)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := chat
++LOCAL_SRC_FILES := chat
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := EXECUTABLES
++LOCAL_MODULE_PATH := $(TARGET_OUT)/bin
++LOCAL_SHARED_LIBRARIES := liblog libstdc++
++include $(BUILD_PREBUILT)

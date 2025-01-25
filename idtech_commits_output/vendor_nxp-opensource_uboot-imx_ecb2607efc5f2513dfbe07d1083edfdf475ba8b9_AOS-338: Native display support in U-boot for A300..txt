@@ -1,0 +1,798 @@
+ecb2607efc Arthur Chen 2020-09-28
+
+AOS-338: Native display support in U-boot for A300.
+
+    - add change source about drivers initialization of mipi, lcdif & clock
+    for i.mx8mq.
+    - original mipi driver supports imx7 series only.
+
+Change-Id: I2c49d78cb8d73329fc54593e2e960cf8a5f04b68
+
+diff --git a/arch/arm/include/asm/arch-imx8m/clock.h b/arch/arm/include/asm/arch-imx8m/clock.h
+index 33472d4238..6c1300865c 100644
+--- a/arch/arm/include/asm/arch-imx8m/clock.h
++++ b/arch/arm/include/asm/arch-imx8m/clock.h
+@@ -29,6 +29,13 @@ enum mxc_clock {
+ 	MXC_I2C_CLK,
+ 	MXC_UART_CLK,
+ 	MXC_QSPI_CLK,
++	MXC_MIPI_DSI_PHY_REF_CLK,
++	MXC_MIPI_DSI_ESC_RX_CLK,
++	MXC_MIPI_DSI_ESC_TX_CLK,
++	MXC_MIPI_DSI_CORE_CLK,
++	MXC_MIPI_DSI_DBI_CLK,
++	MXC_OLD_MIPI_DSI_ESC_RX_CLK,
++	MXC_LCDIF_PIXEL_CLK,
+ };
+ 
+ enum clk_slice_type {
+@@ -263,6 +270,7 @@ void init_uart_clk(u32 index);
+ void init_usb_clk(void);
+ void init_wdog_clk(void);
+ void init_clk_ecspi(u32 index);
++void init_mipi_clk(void);
+ unsigned int mxc_get_clock(enum mxc_clock clk);
+ int clock_enable(enum clk_ccgr_index index, bool enable);
+ int clock_root_enabled(enum clk_root_index clock_id);
+diff --git a/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h b/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
+index 9dda6ddc8c..4d2dd7ba05 100644
+--- a/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
++++ b/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
+@@ -42,7 +42,8 @@ enum clk_root_index {
+ 	AHB_CLK_ROOT			= 32,
+ 	IPG_CLK_ROOT			= 33,
+ 	AUDIO_AHB_CLK_ROOT		= 34,
+-	MIPI_DSI_ESC_RX_CLK_ROOT	= 36,
++	MIPI_DSI_ESC_RX_CLK_ROOT	= 36, /* in linux kernel: DSI_AHB */
++	MIPI_DSI_ESC_TX_CLK_ROOT        = 37, /* in linux kernel: DSI_IPGDIV */
+ 	DRAM_SEL_CFG			= 48,
+ 	CORE_SEL_CFG			= 49,
+ 	DRAM_ALT_CLK_ROOT		= 64,
+diff --git a/arch/arm/mach-imx/imx8m/clock_imx8mq.c b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+index 62df5491f8..0cb45a192f 100644
+--- a/arch/arm/mach-imx/imx8m/clock_imx8mq.c
++++ b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+@@ -31,6 +31,12 @@ static u32 decode_frac_pll(enum clk_root_src frac_pll)
+ 		pllout_div_shift = HW_FRAC_ARM_PLL_DIV_SHIFT;
+ 		pllout_div_mask = HW_FRAC_ARM_PLL_DIV_MASK;
+ 		break;
++	case VIDEO_PLL_CLK:
++		pll_cfg0 = readl(&ana_pll->video_pll_cfg0);
++		pll_cfg1 = readl(&ana_pll->video_pll_cfg1);
++		pllout_div_shift = HW_FRAC_ARM_PLL_DIV_SHIFT;
++		pllout_div_mask = HW_FRAC_ARM_PLL_DIV_MASK;
++		break;
+ 	default:
+ 		printf("Frac PLL %d not supporte
+", frac_pll);
+ 		return 0;
+@@ -256,6 +262,7 @@ static u32 get_root_src_clk(enum clk_root_src root_src)
+ 	case OSC_32K_CLK:
+ 		return 32768;
+ 	case ARM_PLL_CLK:
++	case VIDEO_PLL_CLK:
+ 		return decode_frac_pll(root_src);
+ 	case SYSTEM_PLL1_800M_CLK:
+ 	case SYSTEM_PLL1_400M_CLK:
+@@ -369,6 +376,20 @@ unsigned int mxc_get_clock(enum mxc_clock clk)
+ 		return get_root_clk(UART1_CLK_ROOT);
+ 	case MXC_QSPI_CLK:
+ 		return get_root_clk(QSPI_CLK_ROOT);
++	case MXC_MIPI_DSI_PHY_REF_CLK:
++		return get_root_clk(MIPI_DSI_PHY_REF_CLK_ROOT);
++	case MXC_MIPI_DSI_ESC_RX_CLK:
++		return get_root_clk(MIPI_DSI_ESC_RX_CLK_ROOT);
++	case MXC_OLD_MIPI_DSI_ESC_RX_CLK:
++		return get_root_clk(OLD_MIPI_DSI_ESC_RX_ROOT);
++	case MXC_MIPI_DSI_ESC_TX_CLK:
++		return get_root_clk(MIPI_DSI_ESC_TX_CLK_ROOT);
++	case MXC_MIPI_DSI_CORE_CLK:
++		return get_root_clk(MIPI_DSI_CORE_CLK_ROOT);
++	case MXC_MIPI_DSI_DBI_CLK:
++		return get_root_clk(MIPI_DSI_DBI_CLK_ROOT);
++	case MXC_LCDIF_PIXEL_CLK:
++		return get_root_clk(LCDIF_PIXEL_CLK_ROOT);
+ 	default:
+ 		printf("Unsupported mxc_clock %d
+", clk);
+ 		break;
+@@ -500,6 +521,66 @@ void init_clk_usdhc(u32 index)
+ 	}
+ }
+ 
++void init_mipi_clk(void)
++{
++	/* MIPI power on */
++	writel(0x0000ffff, (GPC_BASE_ADDR + 0xEC));
++	writel(0x1, (GPC_BASE_ADDR + 0XF8));
++
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_BYPASS_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_PD_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_REFCLK_SEL_OSC_27M |
++		     FRAC_PLL_LOCK_SEL_MASK);
++	clrbits_le32(&ana_pll->video_pll_cfg0,
++		     FRAC_PLL_COUNTCLK_SEL_MASK | BIT(0));
++
++	setbits_le32(&ana_pll->video_pll_cfg1,
++		     BIT(30) | BIT(26) | BIT(25) | BIT(24) | BIT(20) |
++		     BIT(19) | BIT(18) | BIT(14) | BIT(13) | BIT(12) |
++		     BIT(8) | BIT(5) | BIT(3) | BIT(2));
++	clrbits_le32(&ana_pll->video_pll_cfg1, BIT(6));
++
++	clrbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_PD_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_CLKE_MASK);
++	clrbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_BYPASS_MASK);
++	udelay(50);
++	clrbits_le32(&ana_pll->sys_pll1_cfg0,
++		     SSCG_PLL_BYPASS1_MASK | SSCG_PLL_BYPASS2_MASK);
++
++	clock_set_target_val(MIPI_DSI_PHY_REF_CLK_ROOT, CLK_ROOT_ON |
++			     BIT(5) | BIT(3) |
++			     CLK_ROOT_SOURCE_SEL(7));
++	clock_enable(MIPI_DSI_PHY_REF_CLK_ROOT, 1);
++
++	clock_enable(MIPI_DSI_CORE_CLK_ROOT, 0);
++	clock_set_target_val(MIPI_DSI_CORE_CLK_ROOT, CLK_ROOT_ON |
++			     CLK_ROOT_SOURCE_SEL(1));
++	clock_enable(MIPI_DSI_CORE_CLK_ROOT, 1);
++
++	clock_set_target_val(MIPI_DSI_DBI_CLK_ROOT, CLK_ROOT_OFF);
++	clrbits_le32(MIPI_DSI_DBI_CLK_ROOT, BIT(28));
++	writel(0x0, MIPI_DSI_DBI_CLK_ROOT);
++
++	clock_set_target_val(OLD_MIPI_DSI_ESC_RX_ROOT, CLK_ROOT_OFF);
++	clrbits_le32(OLD_MIPI_DSI_ESC_RX_ROOT, BIT(28));
++	writel(0x0, OLD_MIPI_DSI_ESC_RX_ROOT);
++
++	clock_enable(MIPI_DSI_ESC_RX_CLK_ROOT, 0); /* IMX8MQ_CLK_DSI_AHB */
++	clock_set_target_val(MIPI_DSI_ESC_RX_CLK_ROOT, CLK_ROOT_ON |
++			     CLK_ROOT_SOURCE_SEL(2));
++	clock_enable(MIPI_DSI_ESC_RX_CLK_ROOT, 1);
++
++	clock_enable(MIPI_DSI_ESC_TX_CLK_ROOT, 0);
++	writel(0x3, 0x30389280);
++	clock_enable(MIPI_DSI_ESC_TX_CLK_ROOT, 1);
++
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 0); /* IMX8MQ_CLK_DSI_AHB */
++	clock_set_target_val(LCDIF_PIXEL_CLK_ROOT, CLK_ROOT_ON |
++			     BIT(3) | BIT(1) | BIT(0) |
++			     CLK_ROOT_SOURCE_SEL(1));
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 1);
++}
++
+ int set_clk_qspi(void)
+ {
+ 	/*
+@@ -889,6 +970,22 @@ static int do_imx8m_showclocks(cmd_tbl_t *cmdtp, int flag, int argc,
+ 	printf("ARM_PLL    %8d MHz
+", freq / 1000000);
+ 	freq = decode_sscg_pll(DRAM_PLL1_CLK);
+ 	printf("DRAM_PLL    %8d MHz
+", freq / 1000000);
++	freq = decode_frac_pll(VIDEO_PLL_CLK);
++	printf("VIDEO_PLL_CLK	 %d Hz
+", freq);
++	freq = mxc_get_clock(MXC_MIPI_DSI_PHY_REF_CLK);
++	printf("MIPI_DSI_PHY_REF_CLK	 %d Hz
+", freq);
++	freq = mxc_get_clock(MXC_MIPI_DSI_ESC_RX_CLK);
++	printf("MIPI_DSI_ESC_RX_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_OLD_MIPI_DSI_ESC_RX_CLK);
++	printf("OLD_MIPI_DSI_ESC_RX_ROOT	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_ESC_TX_CLK);
++	printf("MIPI_DSI_ESC_TX_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_CORE_CLK);
++	printf("MIPI_DSI_CORE_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_DBI_CLK);
++	printf("MIPI_DSI_DBI_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_LCDIF_PIXEL_CLK);
++	printf("MXC_LCDIF_PIXEL_CLK	 %d Hz
+", freq);
+ 	freq = decode_sscg_pll(SYSTEM_PLL1_800M_CLK);
+ 	printf("SYS_PLL1_800    %8d MHz
+", freq / 1000000);
+ 	freq = decode_sscg_pll(SYSTEM_PLL1_400M_CLK);
+diff --git a/drivers/video/imx/mipi_dsi_northwest.c b/drivers/video/imx/mipi_dsi_northwest.c
+index 135284217d..763d30b4ac 100644
+--- a/drivers/video/imx/mipi_dsi_northwest.c
++++ b/drivers/video/imx/mipi_dsi_northwest.c
+@@ -25,6 +25,20 @@
+ #include <regmap.h>
+ #include <syscon.h>
+ 
++#define CN_BUF	0xcb7a89c0
++#define CO_BUF	0x63
++#define CM(x)	( \
++		((x) <  32)?0xe0|((x)-16) : \
++		((x) <  64)?0xc0|((x)-32) : \
++		((x) < 128)?0x80|((x)-64) : \
++		((x) - 128))
++#define CN(x)	(((x) == 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
++#define CO(x)	((CO_BUF)>>(8-(x))&0x3)
++
++#define NWL_DSI_TX_PKT_DONE_MASK	BIT(1)
++#define NWL_DSI_TX_FIFO_OVFLW_MASK	BIT(3)
++#define NWL_DSI_RX_PKT_HDR_RCVD_MASK	BIT(7)
++#define NWL_DSI_HS_TX_TIMEOUT_MASK	BIT(31)
+ 
+ #define MIPI_LCD_SLEEP_MODE_DELAY	(120)
+ #define MIPI_FIFO_TIMEOUT		250000 /* 250ms */
+@@ -698,6 +712,7 @@ static int mipi_dsi_dcs_cmd(struct mipi_dsi_northwest_info *mipi_dsi,
+ 	return err;
+ }
+ 
++#ifndef CONFIG_IMX8MQ
+ static void reset_dsi_domains(struct mipi_dsi_northwest_info *mipi_dsi, bool reset)
+ {
+ 	/* escape domain */
+@@ -711,6 +726,7 @@ static void reset_dsi_domains(struct mipi_dsi_northwest_info *mipi_dsi, bool res
+ 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG,
+ 			DSI_RST_DPI_N, (reset ? 0 : DSI_RST_DPI_N));
+ }
++#endif /* !CONFIG_IMX8MQ */
+ 
+ static void mipi_dsi_shutdown(struct mipi_dsi_northwest_info *mipi_dsi)
+ {
+@@ -719,7 +735,9 @@ static void mipi_dsi_shutdown(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
+ 
++#ifndef CONFIG_IMX8MQ
+ 	reset_dsi_domains(mipi_dsi, true);
++#endif /* !CONFIG_IMX8MQ */
+ }
+ 
+ static inline struct mipi_dsi_northwest_info *host_to_dsi(struct mipi_dsi_host *host)
+@@ -727,14 +745,338 @@ static inline struct mipi_dsi_northwest_info *host_to_dsi(struct mipi_dsi_host *
+ 	return container_of(host, struct mipi_dsi_northwest_info, dsi_host);
+ }
+ 
++static int imx8mq_mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
++{
++	uint32_t time_out = 100;
++	uint32_t lock;
++	uint64_t req_bit_clk;
++	uint64_t bpp;
++	uint64_t ref_clk;
++	uint64_t div_rate;
++	int hs_reg;
++
++	int i, best_div = -1;
++	int64_t delta;
++	uint64_t least_delta = ~0U;
++	uint64_t limit, div_result;
++	uint64_t denominator, numerator, divisor;
++	uint64_t norm_denom, norm_num, split_denom;
++	struct pll_divider div = { 0 };
++
++	bpp = mipi_dsi_pixel_format_to_bpp(mipi_dsi->device->format);
++
++	/*  req_bit_clk is PLL out, clk_byte is 1/8th of the req_bit_clk
++	 *  We need meet clk_byte_freq >= dpi_pclk_freq * DPI_pixel_size / ( 8 * (cfg_num_lanes + 1))
++	 */
++
++	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
++	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
++	ref_clk = mxc_get_clock(MXC_MIPI_DSI_PHY_REF_CLK);
++	req_bit_clk = mxc_get_clock(MXC_LCDIF_PIXEL_CLK);
++	req_bit_clk = req_bit_clk * bpp;
++
++
++	switch (mipi_dsi->device->lanes) {
++	case 1:
++		break;
++	case 2:
++		req_bit_clk = req_bit_clk >> 1;
++		break;
++	case 4:
++		req_bit_clk = req_bit_clk >> 2;
++		break;
++	default:
++		printf("requested data lane num is invalid
+");
++		return -EINVAL;
++	}
++
++	debug("req_bit_clk %u
+", req_bit_clk);
++
++	/* calc CM, CN and CO according to PHY PLL formula:
++	 *
++	 * 'PLL out bitclk = refclk * CM / (CN * CO);'
++	 *
++	 * Let:
++	 * 'numerator   = bitclk / divisor';
++	 * 'denominator = refclk / divisor';
++	 * Then:
++	 * 'numerator / denominator = CM / (CN * CO)';
++	 *
++	 * CM is in [16, 255]
++	 * CN is in [1, 32]
++	 * CO is in { 1, 2, 4, 8 };
++	 */
++
++	writel(0x0, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_PREPARE);
++	if (req_bit_clk <= 61000000)
++		writel(0x3, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else if (req_bit_clk <= 90000000)
++		writel(0x2, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else if (req_bit_clk <= 500000000)
++		writel(0x1, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else
++		writel(0x0, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++
++	hs_reg = ((34 * ((int)req_bit_clk / 1000000)) - 2500) / 1000;
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_ZERO);
++	hs_reg = ((144 * ((int)req_bit_clk / 1000000)) - 47500) / 10000;
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_M_PRG_HS_ZERO);
++
++	hs_reg = ((103 * ((int)req_bit_clk / 1000000)) + 10000) / 10000;
++	if (hs_reg > 15)
++		hs_reg = 15;
++
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_TRAIL);
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_M_PRG_HS_TRAIL);
++
++	if (req_bit_clk <= 80000000)
++		writel(0xd, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 90000000)
++		writel(0xc, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 125000000)
++		writel(0xb, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 150000000)
++		writel(0xa, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 2250000000)
++		writel(0x9, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 5000000000)
++		writel(0x8, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else
++		writel(0x7, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++
++	writel(0x0, mipi_dsi->mmio_base + DPHY_LOCK_BYP);
++	writel(0x1, mipi_dsi->mmio_base + DPHY_RTERM_SEL);
++	writel(0x0, mipi_dsi->mmio_base + DPHY_AUTO_PD_EN);
++	writel(0x2, mipi_dsi->mmio_base + DPHY_RXLPRP);
++	writel(0x2, mipi_dsi->mmio_base + DPHY_RXCDRP);
++	/* write 0x25 to DPHY_TST */
++	setbits_le32(mipi_dsi->mmio_base + DPHY_TST, BIT(5) | BIT(2) | BIT(0));
++	denominator = 1;
++	numerator = 0;
++	div_rate = (req_bit_clk * 1000) / ref_clk;
++	while (denominator <= 256) {
++		if (div_rate % 1000 == 0)
++			numerator = div_rate / 1000;
++
++		if (numerator > 15)
++			break;
++
++		denominator = denominator << 1;
++		div_rate = div_rate << 1;
++	}
++
++	/* CM ranges between 16 and 255 */
++	/* CN ranges between 1 and 32 */
++	/* CO is power of 2: 1, 2, 4, 8 */
++	if (numerator < 16)
++		numerator = div_rate / 1000;
++
++	if (numerator > 255) {
++		while (numerator > 255 && denominator > 1) {
++			numerator = DIV_ROUND_UP(numerator, 2);
++			denominator = denominator >> 1;
++		}
++	}
++
++	div.cn = 1;
++	if (denominator > 8) {
++		div.cn = denominator >> 3;
++		denominator = 8;
++	}
++	div.co = denominator;
++	div.cm = numerator;
++	debug("cn %u, cm %u, co %u
+", div.cn, div.cm, div.co);
++	/* DPHY_PLL = ref_clk x (cn \ (cm x co)) */
++	writel(CN(div.cn), mipi_dsi->mmio_base + DPHY_CN);
++	writel(CM(div.cm), mipi_dsi->mmio_base + DPHY_CM);
++	writel(CO(div.co), mipi_dsi->mmio_base + DPHY_CO);
++	udelay(100);
++	writel(0x0, mipi_dsi->mmio_base + DPHY_PD_PLL);
++	setbits_le32(mipi_dsi->mmio_base + DPHY_TST, BIT(2) | BIT(0));
++	writel(0x25, mipi_dsi->mmio_base + DPHY_TST);
++	udelay(100);
++	time_out = 100;
++	while (!(lock = readl(mipi_dsi->mmio_base + DPHY_LOCK))) {
++		udelay(10);
++		time_out--;
++		if (time_out == 0) {
++			printf("cannot get the dphy lock = 0x%x
+", lock);
++			return -EINVAL;
++		}
++	}
++	debug("%s: dphy lock = 0x%x
+", __func__, lock);
++	writel(0x0, mipi_dsi->mmio_base + DPHY_PD_DPHY);
++
++	return 0;
++}
++
++static int imx8mq_mipi_dsi_host_init(struct mipi_dsi_northwest_info *mipi_dsi)
++{
++	uint32_t lane_num;
++
++	switch (mipi_dsi->device->lanes) {
++	case 1:
++		lane_num = 0x0;
++		break;
++	case 2:
++		lane_num = 0x1;
++		break;
++	case 3:
++		lane_num = 0x2;
++		break;
++	case 4:
++		lane_num = 0x3;
++		break;
++	default:
++		/* Invalid lane num */
++		return -EINVAL;
++	}
++
++	writel(lane_num, mipi_dsi->mmio_base + HOST_CFG_NUM_LANES);
++	writel(0x1, mipi_dsi->mmio_base + HOST_CFG_NONCONTINUOUS_CLK);
++	writel(0x1, mipi_dsi->mmio_base + HOST_CFG_AUTOINSERT_EOTP);
++	writel(0x1, mipi_dsi->mmio_base + HOST_CFG_T_PRE);
++	writel(52, mipi_dsi->mmio_base + HOST_CFG_T_POST);
++	writel(13, mipi_dsi->mmio_base + HOST_CFG_TX_GAP);
++	writel(0x1, mipi_dsi->mmio_base + HOST_CFG_EXTRA_CMDS_AFTER_EOTP);
++	writel(0x0, mipi_dsi->mmio_base + HOST_CFG_HTX_TO_COUNT);
++	writel(0x0, mipi_dsi->mmio_base + HOST_CFG_LRX_H_TO_COUNT);
++	writel(0x0, mipi_dsi->mmio_base + HOST_CFG_BTA_H_TO_COUNT);
++	writel(0x3A98, mipi_dsi->mmio_base + HOST_CFG_TWAKEUP);
++
++	return 0;
++}
++
++static int imx8mq_mipi_dsi_dpi_init(struct mipi_dsi_northwest_info *mipi_dsi)
++{
++	uint32_t bpp, color_coding, pixel_fmt;
++	struct display_timing *timings = &(mipi_dsi->timings);
++
++	bpp = mipi_dsi_pixel_format_to_bpp(mipi_dsi->device->format);
++	if (bpp < 0)
++		return -EINVAL;
++
++	writel(timings->hactive.typ,
++	       mipi_dsi->mmio_base + DPI_PIXEL_FIFO_SEND_LEVEL);
++
++	switch (bpp) {
++	case 24:
++		color_coding = 5;
++		pixel_fmt = 3;
++		break;
++	case 16:
++	case 18:
++	default:
++		/* Not supported */
++		return -EINVAL;
++	}
++	writel(color_coding, mipi_dsi->mmio_base + DPI_INTERFACE_COLOR_CODING);
++	writel(pixel_fmt, mipi_dsi->mmio_base + DPI_PIXEL_FORMAT);
++	writel(0x0, mipi_dsi->mmio_base + DPI_VSYNC_POLARITY);
++	/* NWL_DSI_VSYNC_POLARITY_ACTIVE_LOW */
++	writel(0x0, mipi_dsi->mmio_base + DPI_HSYNC_POLARITY);
++	/* NWL_DSI_HSYNC_POLARITY_ACTIVE_LOW */
++	writel(0x0, mipi_dsi->mmio_base + DPI_VIDEO_MODE);
++	/* NWL_DSI_VM_BURST_MODE_WITH_SYNC_PULSES */
++
++	writel(timings->hfront_porch.typ, mipi_dsi->mmio_base + DPI_HFP);
++	writel(timings->hback_porch.typ, mipi_dsi->mmio_base + DPI_HBP);
++	writel(timings->hsync_len.typ, mipi_dsi->mmio_base + DPI_HSA);
++
++	writel(0x0, mipi_dsi->mmio_base + DPI_ENABLE_MULT_PKTS);
++	writel(0x1, mipi_dsi->mmio_base + DPI_BLLP_MODE);
++	writel(0x0, mipi_dsi->mmio_base + DPI_ENABLE_MULT_PKTS);
++	writel(0x0, mipi_dsi->mmio_base + DPI_USE_NULL_PKT_BLLP);
++	writel(0x0, mipi_dsi->mmio_base + DPI_VC);
++
++	writel(timings->hactive.typ,
++	       mipi_dsi->mmio_base + DPI_PIXEL_PAYLOAD_SIZE);
++	writel(timings->vactive.typ - 1, mipi_dsi->mmio_base + DPI_VACTIVE);
++	writel(timings->vback_porch.typ, mipi_dsi->mmio_base + DPI_VBP);
++	writel(timings->vfront_porch.typ, mipi_dsi->mmio_base + DPI_VFP);
++
++	return 0;
++}
++
++static void imx8mq_mipi_dsi_init_interrupt(struct mipi_dsi_northwest_info *mipi_dsi)
++{
++	u32 irq_enable;
++
++	/* disable all the irqs */
++	writel(0xffffffff, mipi_dsi->mmio_base + HOST_IRQ_MASK);
++	writel(0x7, mipi_dsi->mmio_base + HOST_IRQ_MASK2);
++
++	irq_enable = ~(u32)(NWL_DSI_TX_PKT_DONE_MASK |
++			    NWL_DSI_RX_PKT_HDR_RCVD_MASK |
++			    NWL_DSI_TX_FIFO_OVFLW_MASK |
++			    NWL_DSI_HS_TX_TIMEOUT_MASK);
++
++	writel(irq_enable, mipi_dsi->mmio_base + HOST_IRQ_MASK);
++}
++
++static int imx8mq_mipi_dsi_northwest_host_attach(struct mipi_dsi_host *host,
++				   struct mipi_dsi_device *device)
++{
++	struct mipi_dsi_northwest_info *mipi_dsi = host_to_dsi(host);
++	int ret;
++
++	/* Assert resets */
++	/* imx8mq_dsi_poweron */
++	debug("mipi_dsi_northwest_host_attach, %x
+",
++	      (SRC_IPS_BASE_ADDR + SRC_MIPIPHY_RCR));
++	setbits_le32((SRC_IPS_BASE_ADDR + SRC_MIPIPHY_RCR),
++		     BIT(5) | BIT(4) | BIT(3) | BIT(1));
++
++	debug("mipi_dsi_dphy_init
+");
++	ret = imx8mq_mipi_dsi_dphy_init(mipi_dsi);
++	if (ret < 0)
++		return ret;
++
++	debug("mipi_dsi_host_init
+");
++	ret = imx8mq_mipi_dsi_host_init(mipi_dsi);
++	if (ret < 0)
++		return ret;
++
++	debug("mipi_dsi_dpi_init
+");
++	ret = imx8mq_mipi_dsi_dpi_init(mipi_dsi);
++	if (ret < 0)
++		return ret;
++
++	/* Deassert resets */
++
++	mdelay(20);
++
++	/* Disable all interrupts, since we use polling */
++	debug("mipi_dsi_init_interrupt
+");
++	imx8mq_mipi_dsi_init_interrupt(mipi_dsi);
++
++	return 0;
++}
++
+ static int mipi_dsi_northwest_host_attach(struct mipi_dsi_host *host,
+ 				   struct mipi_dsi_device *device)
+ {
+ 	struct mipi_dsi_northwest_info *mipi_dsi = host_to_dsi(host);
+ 	int ret;
+ 
++#ifdef CONFIG_IMX8MQ
++	ret = imx8mq_mipi_dsi_northwest_host_attach(host, device);
++	return ret;
++#endif /* CONFIG_IMX8MQ */
++
++#ifndef CONFIG_IMX8MQ
+ 	/* Assert resets */
+ 	reset_dsi_domains(mipi_dsi, true);
++#endif /* !CONFIG_IMX8MQ */
+ 
+ 	ret = mipi_dsi_dphy_init(mipi_dsi);
+ 	if (ret < 0)
+@@ -823,6 +1165,7 @@ static int mipi_dsi_northwest_init(struct udevice *dev,
+ 		return -EINVAL;
+ 	}
+ 
++#ifndef CONFIG_IMX8MQ
+ 	ret = dev_read_u32(device->dev, "max-data-rate", &dsi->max_data_rate);
+ 	if (ret) {
+ 		dev_err(device->dev, "fail to get max-data-rate
+");
+@@ -840,6 +1183,7 @@ static int mipi_dsi_northwest_init(struct udevice *dev,
+ 		dev_err(device->dev, "fail to get sim regmap
+");
+ 		return PTR_ERR(dsi->sim);
+ 	}
++#endif /* !CONFIG_IMX8MQ */
+ 
+ 	return 0;
+ }
+@@ -875,6 +1219,7 @@ static int mipi_dsi_northwest_probe(struct udevice *dev)
+ 
+ static const struct udevice_id mipi_dsi_northwest_ids[] = {
+ 	{ .compatible = "northwest,mipi-dsi" },
++	{ .compatible = "fsl,imx8mq-mipi-dphy" },
+ 	{ }
+ };
+ 
+diff --git a/drivers/video/imx/mipi_dsi_northwest_regs.h b/drivers/video/imx/mipi_dsi_northwest_regs.h
+index 6493403a0c..fcc92fa567 100644
+--- a/drivers/video/imx/mipi_dsi_northwest_regs.h
++++ b/drivers/video/imx/mipi_dsi_northwest_regs.h
+@@ -23,6 +23,10 @@
+ #define DSI_CM			0x100
+ #define DSI_PLL_EN		0x80
+ 
++#define SRC_MIPIPHY_RCR		0x28
++#define SRC_DISP_RCR		0x34
++
++
+ /* dphy */
+ #define DPHY_PD_DPHY			0x300
+ #define DPHY_M_PRG_HS_PREPARE		0x304
+@@ -42,6 +46,9 @@
+ #define DPHY_AUTO_PD_EN			0x33c
+ #define DPHY_RXLPRP			0x340
+ #define DPHY_RXCDRP			0x344
++#define DPHY_RXHS_SETTLE		0x348
++#define DPHY_BYPASS_PLL			0x34c
++
+ 
+ /* host */
+ #define HOST_CFG_NUM_LANES		0x0
+diff --git a/drivers/video/imx/nw_dsi_imx.c b/drivers/video/imx/nw_dsi_imx.c
+index 4919253ebe..240977d6ce 100644
+--- a/drivers/video/imx/nw_dsi_imx.c
++++ b/drivers/video/imx/nw_dsi_imx.c
+@@ -107,7 +107,11 @@ static int nw_dsi_imx_probe(struct udevice *dev)
+ 		return -EINVAL;
+ 	}
+ 
++#ifdef CONFIG_IMX8MQ
++	init_mipi_clk();
++#else /* !CONFIG_IMX8MQ */
+ 	enable_mipi_dsi_clk(true);
++#endif /* CONFIG_IMX8MQ */
+ 
+ 	return ret;
+ }
+@@ -126,7 +130,9 @@ static int nw_dsi_imx_remove(struct udevice *dev)
+ 		return ret;
+ 	}
+ 
++#ifndef CONFIG_IMX8MQ
+ 	enable_mipi_dsi_clk(false);
++#endif /* !CONFIG_IMX8MQ */
+ 
+ 	return 0;
+ }
+@@ -138,6 +144,7 @@ struct video_bridge_ops nw_dsi_imx_ops = {
+ 
+ static const struct udevice_id nw_dsi_imx_ids[] = {
+ 	{ .compatible = "fsl,imx7ulp-mipi-dsi" },
++	{ .compatible = "fsl,imx8mq-nwl-dsi" },
+ 	{ }
+ };
+ 
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index be79dd9fea..0e938bb751 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -44,6 +44,95 @@
+ 
+ struct mxs_dma_desc desc;
+ 
++static void imx8mq_lcdif_init(phys_addr_t reg_base, u32 fb_addr, struct ctfb_res_modes *mode, int bpp, bool bridge, bool enable_pol)
++{
++	struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *)(reg_base);
++	uint32_t word_len = 0, bus_width = 0;
++	uint8_t valid_data = 0;
++
++	/* Kick in the LCDIF clock */
++	debug("mode->pixclock: %u, PS2KHZ(mode->pixclock): %u
+", mode->pixclock, PS2KHZ(mode->pixclock));
++
++	/* Restart the LCDIF block */
++	mxs_reset_block(&regs->hw_lcdif_ctrl_reg);
++
++	switch (bpp) {
++	case 24:
++		word_len = LCDIF_CTRL_WORD_LENGTH_24BIT;
++		bus_width = LCDIF_CTRL_LCD_DATABUS_WIDTH_24BIT;
++		valid_data = 0x7;
++		break;
++	case 18:
++		word_len = LCDIF_CTRL_WORD_LENGTH_24BIT;
++		bus_width = LCDIF_CTRL_LCD_DATABUS_WIDTH_18BIT;
++		valid_data = 0x7;
++		break;
++	case 16:
++		word_len = LCDIF_CTRL_WORD_LENGTH_16BIT;
++		bus_width = LCDIF_CTRL_LCD_DATABUS_WIDTH_16BIT;
++		valid_data = 0xf;
++		break;
++	case 8:
++		word_len = LCDIF_CTRL_WORD_LENGTH_8BIT;
++		bus_width = LCDIF_CTRL_LCD_DATABUS_WIDTH_8BIT;
++		valid_data = 0xf;
++		break;
++	}
++
++	writel(bus_width | word_len | LCDIF_CTRL_DOTCLK_MODE |
++		LCDIF_CTRL_BYPASS_COUNT | LCDIF_CTRL_LCDIF_MASTER,
++		&regs->hw_lcdif_ctrl);
++
++	writel(valid_data << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET,
++		&regs->hw_lcdif_ctrl1);
++
++	writel(LCDIF_CTRL2_OUTSTANDING_REQS_REQ_16, &regs->hw_lcdif_ctrl2);
++
++	writel((mode->yres << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) | mode->xres,
++		&regs->hw_lcdif_transfer_count);
++
++	writel(LCDIF_VDCTRL0_ENABLE_PRESENT | LCDIF_VDCTRL0_VSYNC_POL |
++	       LCDIF_VDCTRL0_HSYNC_POL |
++	       LCDIF_VDCTRL0_VSYNC_PERIOD_UNIT |
++	       LCDIF_VDCTRL0_VSYNC_PULSE_WIDTH_UNIT |
++	       mode->vsync_len, &regs->hw_lcdif_vdctrl0);
++
++
++	debug("mode->upper_margin: %u, mode->lower_margin: %u, mode->vsync_len: %u, mode->yres: %u
+",
++		mode->upper_margin, mode->lower_margin, mode->vsync_len, mode->yres);
++	writel(mode->upper_margin + mode->lower_margin +
++		mode->vsync_len + mode->yres,
++		&regs->hw_lcdif_vdctrl1);
++
++	writel((mode->hsync_len << LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_OFFSET) |
++		(mode->left_margin + mode->right_margin +
++		mode->hsync_len + mode->xres),
++		&regs->hw_lcdif_vdctrl2);
++	writel(((mode->left_margin + mode->hsync_len) <<
++		LCDIF_VDCTRL3_HORIZONTAL_WAIT_CNT_OFFSET) |
++		(mode->upper_margin + mode->vsync_len),
++		&regs->hw_lcdif_vdctrl3);
++	writel((0 << LCDIF_VDCTRL4_DOTCLK_DLY_SEL_OFFSET) | mode->xres,
++		&regs->hw_lcdif_vdctrl4);
++
++	writel(fb_addr, &regs->hw_lcdif_cur_buf);
++	writel(fb_addr, &regs->hw_lcdif_next_buf);
++
++	/* Flush FIFO first */
++	writel(LCDIF_CTRL1_FIFO_CLEAR, &regs->hw_lcdif_ctrl1_set);
++
++#ifndef CONFIG_VIDEO_MXS_MODE_SYSTEM
++	/* Sync signals ON */
++	setbits_le32(&regs->hw_lcdif_vdctrl4, LCDIF_VDCTRL4_SYNC_SIGNALS_ON);
++#endif /* !CONFIG_VIDEO_MXS_MODE_SYSTEM */
++
++	/* FIFO cleared */
++	writel(LCDIF_CTRL1_FIFO_CLEAR, &regs->hw_lcdif_ctrl1_clr);
++
++	/* RUN! */
++	writel(LCDIF_CTRL_RUN, &regs->hw_lcdif_ctrl_set);
++}
++
+ /**
+  * mxsfb_system_setup() - Fine-tune LCDIF configuration
+  *
+@@ -163,7 +252,11 @@ static void mxs_lcd_init(phys_addr_t reg_base, u32 fb_addr, struct ctfb_res_mode
+ static int mxs_probe_common(phys_addr_t reg_base, struct ctfb_res_modes *mode, int bpp, u32 fb, bool bridge, bool enable_pol)
+ {
+ 	/* Start framebuffer */
++#ifdef CONFIG_IMX8MQ
++	imx8mq_lcdif_init(reg_base, fb, mode, bpp, bridge, enable_pol);
++#else /* !CONFIG_IMX8MQ */
+ 	mxs_lcd_init(reg_base, fb, mode, bpp, bridge, enable_pol);
++#endif /* CONFIG_IMX8MQ */
+ 
+ #ifdef CONFIG_VIDEO_MXS_MODE_SYSTEM
+ 	/*

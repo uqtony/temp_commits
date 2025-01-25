@@ -1,0 +1,125 @@
+fe7dc1d jenkins 2020-02-10
+
+Download imx-android-10.0.0_1.0.0.tar.gz from nxp.com
+
+Change-Id: I8528de2b993e097deae61948f5af2a401eed8439
+
+diff --git a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/isi_board.c b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/isi_board.c
+index c223e72..4961c26 100644
+--- a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/isi_board.c
++++ b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/isi_board.c
+@@ -147,13 +147,12 @@
+ 
+ #define SWITCH_I2C_ADDR 0x71
+ 
+-#if (APP_MIPI_DSI_BASE == MIPI_DSI_HOST0_BASE) || (APP_LDB_BASE == DI_MIPI_DSI_LVDS_0__LDB_BASE)
++/* android support two display: central control display and cluster display */
+ #define IOEXP_I2C_ADDR 0x1A
+ #define IOEXP_MIPI_DSI_PIN 6
+-#else
+-#define IOEXP_I2C_ADDR 0x1D
+-#define IOEXP_MIPI_DSI_PIN 7
+-#endif /* (APP_MIPI_DSI_BASE == MIPI_DSI_HOST0_BASE) */
++
++#define CLUSTER_DISPLAY_IOEXP_I2C_ADDR 0x1D
++#define CLUSTER_DISPLAY_IOEXP_MIPI_DSI_PIN 7
+ 
+ #define PCA9557_REG_INTPUT_PORT (0x00)
+ #define PCA9557_REG_OUTPUT_PORT (0x01)
+@@ -397,6 +396,7 @@ static status_t BOARD_InitExpansionIO(void)
+     sc_err_t err = SC_ERR_NONE;
+     lpi2c_master_config_t masterConfig;
+     sc_pm_clock_rate_t i2cClkFreq = SC_24MHZ;
++    status_t status;
+ 
+     ipc = BOARD_GetRpcHandle();
+ 
+@@ -426,6 +426,10 @@ static status_t BOARD_InitExpansionIO(void)
+     /* PCA9646 channel 3 is output to PCA9557. */
+     PCA9646_Write(IOEXP_I2C, SWITCH_I2C_ADDR, (1 << 3));
+ 
++    status = PCA9557_ModifyReg(IOEXP_I2C, CLUSTER_DISPLAY_IOEXP_I2C_ADDR, PCA9557_REG_CONFIGURATION, (1 << CLUSTER_DISPLAY_IOEXP_MIPI_DSI_PIN), 0);
++    if (kStatus_Success != status)
++        return status;
++
+     /* Set DSI pin enable and standby pin as output */
+     return PCA9557_ModifyReg(IOEXP_I2C, IOEXP_I2C_ADDR, PCA9557_REG_CONFIGURATION, (1 << IOEXP_MIPI_DSI_PIN), 0);
+ }
+@@ -454,10 +458,12 @@ static void IT6263_PullResetPin(bool pullUp)
+     if (pullUp)
+     {
+         PCA9557_ModifyReg(IOEXP_I2C, IOEXP_I2C_ADDR, PCA9557_REG_OUTPUT_PORT, (1 << IOEXP_MIPI_DSI_PIN), 0xFF);
++        PCA9557_ModifyReg(IOEXP_I2C, CLUSTER_DISPLAY_IOEXP_I2C_ADDR, PCA9557_REG_OUTPUT_PORT, (1 << CLUSTER_DISPLAY_IOEXP_MIPI_DSI_PIN), 0xFF);
+     }
+     else
+     {
+         PCA9557_ModifyReg(IOEXP_I2C, IOEXP_I2C_ADDR, PCA9557_REG_OUTPUT_PORT, (1 << IOEXP_MIPI_DSI_PIN), 0x00);
++        PCA9557_ModifyReg(IOEXP_I2C, CLUSTER_DISPLAY_IOEXP_I2C_ADDR, PCA9557_REG_OUTPUT_PORT, (1 << CLUSTER_DISPLAY_IOEXP_MIPI_DSI_PIN), 0x00);
+     }
+ }
+ #endif /* DPU_EXAMPLE_DI */
+diff --git a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/srtm_demo/board.c b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/srtm_demo/board.c
+index 198002f..dbcd2d9 100644
+--- a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/srtm_demo/board.c
++++ b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/srtm_demo/board.c
+@@ -262,9 +262,11 @@ status_t BOARD_LPI2C_Send(LPI2C_Type *base,
+ 
+     if (kStatus_Success == LPI2C_MasterStart(base, dev_addr, kLPI2C_Write))
+     {
++#if 0
+         while (LPI2C_MasterGetStatusFlags(base) & kLPI2C_MasterNackDetectFlag)
+         {
+         }
++#endif
+ 
+         reVal = LPI2C_MasterSend(base, &subAddress, subaddressSize);
+         if (reVal != kStatus_Success)
+@@ -295,9 +297,11 @@ status_t BOARD_LPI2C_SendWithoutSubAddr(LPI2C_Type *base, uint8_t deviceAddress,
+     reVal = LPI2C_MasterStart(base, deviceAddress, kLPI2C_Write);
+     if (kStatus_Success == reVal)
+     {
++#if 0
+         while (LPI2C_MasterGetStatusFlags(base) & kLPI2C_MasterNackDetectFlag)
+         {
+         }
++#endif
+ 
+         reVal = LPI2C_MasterSend(base, txBuff, txBuffSize);
+         if (reVal != kStatus_Success)
+@@ -328,9 +332,11 @@ status_t BOARD_LPI2C_Receive(LPI2C_Type *base,
+     reVal = LPI2C_MasterStart(base, deviceAddress, kLPI2C_Write);
+     if (kStatus_Success == reVal)
+     {
++#if 0
+         while (LPI2C_MasterGetStatusFlags(base) & kLPI2C_MasterNackDetectFlag)
+         {
+         }
++#endif
+ 
+         reVal = LPI2C_MasterSend(base, &subAddress, subAddressSize);
+         if (reVal != kStatus_Success)
+@@ -367,9 +373,12 @@ status_t BOARD_LPI2C_ReceiveWithoutSubAddr(LPI2C_Type *base, uint8_t deviceAddre
+     reVal = LPI2C_MasterStart(base, deviceAddress, kLPI2C_Read);
+     if (kStatus_Success == reVal)
+     {
++#if 0
+         while (LPI2C_MasterGetStatusFlags(base) & kLPI2C_MasterNackDetectFlag)
+         {
+         }
++#endif
++
+         reVal = LPI2C_MasterReceive(base, rxBuff, rxBuffSize);
+         if (reVal != kStatus_Success)
+         {
+@@ -407,9 +416,11 @@ status_t BOARD_LPI2C_ReceiveSCCB(LPI2C_Type *base,
+     reVal = LPI2C_MasterStart(base, deviceAddress, kLPI2C_Write);
+     if (kStatus_Success == reVal)
+     {
++#if 0
+         while (LPI2C_MasterGetStatusFlags(base) & kLPI2C_MasterNackDetectFlag)
+         {
+         }
++#endif
+ 
+         reVal = LPI2C_MasterSend(base, &subAddress, subAddressSize);
+         if (reVal != kStatus_Success)

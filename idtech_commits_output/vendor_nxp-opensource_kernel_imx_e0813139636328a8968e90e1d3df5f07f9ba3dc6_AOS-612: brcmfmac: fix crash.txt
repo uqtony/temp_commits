@@ -1,0 +1,87 @@
+e08131396363 George.Huang 2021-05-26
+
+AOS-612: brcmfmac: fix crash
+
+in kernel 5.10, it's not necessary to control brcmfmac in dts
+
+Error Log:
+[ 7.018601] Unable to handle kernel access to user memory outside uaccess routines at virtual address 0000000000000000
+[ 7.029369] Mem abort info:
+[ 7.032215] ESR = 0x96000004
+[ 7.035280] EC = 0x25: DABT (current EL), IL = 32 bits
+[ 7.040600] SET = 0, FnV = 0
+[ 7.043660] EA = 0, S1PTW = 0
+[ 7.046806] Data abort info:
+[ 7.049685] ISV = 0, ISS = 0x00000004
+[ 7.053526] CM = 0, WnR = 0
+[ 7.056502] user pgtable: 4k pages, 48-bit VAs, pgdp=000000004a7fe000
+[ 7.062948] [0000000000000000] pgd=0000000000000000, p4d=0000000000000000
+[ 7.069753] Internal error: Oops: 96000004 1 PREEMPT SMP
+[ 7.075325] Modules linked in: brcmfmac brcmutil
+[ 7.080214] CPU: 2 PID: 228 Comm: modprobe Not tainted 5.10.9-00001-g64219597c1d1-dirty #5
+[ 7.088476] Hardware name: IDTECH A300 EVT-0 DEVBOARD EVT-1 (DT)
+[ 7.094484] pstate: a0400005 (NzCv daif +PAN UAO -TCO BTYPE=-)
+[ 7.100590] pc : brcmf_common_pd_probe+0x1c/0x3c [brcmfmac]
+[ 7.106166] lr : platform_drv_probe+0x9c/0xd4
+[ 7.110520] sp : ffff80001cb538b0
+[ 7.113834] x29: ffff80001cb538b0 x28: ffff80001cb53da0-
+[ 7.119149] x27: 0000000000000100 x26: ffff8000094b1a10-
+[ 7.124463] x25: ffff00000a733cf0 x24: 0000000000000047-
+[ 7.129778] x23: ffff800012435000 x22: ffff80001229f180-
+[ 7.135093] x21: ffff8000094b11d0 x20: 0000000000000000-
+[ 7.140407] x19: ffff0000083f3810 x18: ffff8000137ed0a0-
+[ 7.145721] x17: 0000000000000000 x16: 0000000000000028-
+[ 7.151035] x15: ffff8000127d0000 x14: fffffffffffff000-
+[ 7.156348] x13: ffff000007100900 x12: 0000000000000018-
+[ 7.161662] x11: 0000000000000001 x10: 0101010101010101-
+[ 7.166976] x9 : ffff8000094b0000 x8 : 0000000000000000-
+[ 7.172291] x7 : 0000000000000002 x6 : 061906065f084203-
+[ 7.177606] x5 : 0342085f06061906 x4 : 0000000000000000-
+[ 7.182920] x3 : 0000000000000070 x2 : 000000000000006e-
+[ 7.188234] x1 : 0000000000000000 x0 : ffff0000083f3800-
+[ 7.193549] Call trace:
+[ 7.196044] brcmf_common_pd_probe+0x1c/0x3c [brcmfmac]
+[ 7.201270] platform_drv_probe+0x9c/0xd4
+[ 7.205281] really_probe+0x1d8/0x4bc
+[ 7.208944] driver_probe_device+0x80/0xc0
+[ 7.213041] device_driver_attach+0x70/0xb4
+[ 7.217225] __driver_attach+0xc8/0x150
+[ 7.221061] bus_for_each_dev+0x80/0xd0
+[ 7.224898] driver_attach+0x28/0x38
+[ 7.228473] bus_add_driver+0x108/0x1e8
+[ 7.232310] driver_register+0x7c/0x118
+[ 7.236145] __platform_driver_probe+0x78/0x108
+[ 7.240719] init_module+0x30/0xb0 [brcmfmac]
+[ 7.245078] do_one_initcall+0x11c/0x2bc
+[ 7.249002] do_init_module+0x60/0x21c
+[ 7.252751] load_module+0x2b14/0x3204
+[ 7.256501] __arm64_sys_finit_module+0xc4/0xfc
+[ 7.261033] el0_svc_common+0xa0/0x170
+[ 7.264783] do_el0_svc+0x78/0x88
+[ 7.268100] el0_svc+0x14/0x24
+[ 7.271155] el0_sync_handler+0x6c/0xb4
+[ 7.274991] el0_sync+0x160/0x180
+[ 7.278310] Code: 910003fd f9404008 f0ffff69 f9001528 (f9400108)-
+[ 7.284405] --[ end trace 285ab4460821c651 ]--
+
+Change-Id: I30bcccde1a9450d98e40ed6963de50e8a265701e
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index 9b983ede3c09..b3c0fd6a2076 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -115,14 +115,6 @@ rpmsg_reserved: rpmsg@0xb8000000 {
+ 		};
+ 	};
+ 
+-	brcmfmac: brcmfmac {
+-		compatible = "cypress,brcmfmac";
+-		pinctrl-names = "init", "idle", "default";
+-		pinctrl-0 = <&pinctrl_wlan_init>;
+-		pinctrl-1 = <&pinctrl_wlan_init>;
+-		pinctrl-2 = <&pinctrl_wlan>;
+-	};
+-
+ 	sound-rt5640 {
+ 		compatible = "fsl,imx-audio-rt5640";
+ 		model = "rt5640-audio";

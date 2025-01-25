@@ -1,0 +1,168 @@
+eb4a3c23ffef George.Huang 2022-03-07
+
+AOS-887: fix ov2685 camera build break from android-12.0.0_1.0.0
+
+Log:
+  field designator 'g_parm' does not refer to any field in type 'struct v4l2_subdev_video_ops'
+        .g_parm = ov2685_g_parm,
+         ^
+  field designator 's_parm' does not refer to any field in type 'struct v4l2_subdev_video_ops'
+        .s_parm = ov2685_s_parm,
+         ^
+
+Reference:
+  commit 569f420bba36 ("MA-19289-1 [Android] use s/g_frame_interval to set fps")
+
+Change-Id: I4af982fb2f7dc504ea90917214c5e227d9cb748f
+
+diff --git a/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c b/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
+index 9d408ee41b8b..f5626ed10b99 100644
+--- a/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
++++ b/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
+@@ -1014,42 +1014,13 @@ static int ov2685_s_power(struct v4l2_subdev *sd, int on)
+  *
+  * Returns the sensor's video CAPTURE parameters.
+  */
+-static int ov2685_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int ov2685_g_frame_interval(struct v4l2_subdev *sd, struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct ov2685 *sensor = to_ov2685(client);
+-	struct device *dev = &sensor->i2c_client->dev;
+-	struct v4l2_captureparm *cparm = &a->parm.capture;
+-	int ret = 0;
+-
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		memset(a, 0, sizeof(*a));
+-		a->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+-		cparm->capability = sensor->streamcap.capability;
+-		cparm->timeperframe = sensor->streamcap.timeperframe;
+-		cparm->capturemode = sensor->streamcap.capturemode;
+-		ret = 0;
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
+ 
+-	return ret;
++	ival->interval = sensor->streamcap.timeperframe;
++	return 0;
+ }
+ 
+ /*!
+@@ -1061,81 +1032,14 @@ static int ov2685_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
+  * not possible, reverts to the old parameters and returns the
+  * appropriate error code.
+  */
+-static int ov2685_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int ov2685_s_frame_interval(struct v4l2_subdev *sd, struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct ov2685 *sensor = to_ov2685(client);
+-	struct device *dev = &sensor->i2c_client->dev;
+-	struct v4l2_fract *timeperframe = &a->parm.capture.timeperframe;
+-	u32 tgt_fps;	/* target frames per secound */
+-	enum ov2685_frame_rate frame_rate;
+-	enum ov2685_mode orig_mode;
+-	int ret = 0;
+-
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		/* Check that the new frame rate is allowed. */
+-		if ((timeperframe->numerator == 0) ||
+-		    (timeperframe->denominator == 0)) {
+-			timeperframe->denominator = DEFAULT_FPS;
+-			timeperframe->numerator = 1;
+-		}
+-
+-		tgt_fps = timeperframe->denominator /
+-			  timeperframe->numerator;
++	struct v4l2_fract *timeperframe = &ival->interval;
+ 
+-		if (tgt_fps > MAX_FPS) {
+-			timeperframe->denominator = MAX_FPS;
+-			timeperframe->numerator = 1;
+-		} else if (tgt_fps < MIN_FPS) {
+-			timeperframe->denominator = MIN_FPS;
+-			timeperframe->numerator = 1;
+-		}
+-
+-		/* Actual frame rate we use */
+-		tgt_fps = timeperframe->denominator /
+-			  timeperframe->numerator;
+-
+-		if (tgt_fps == 30)
+-			frame_rate = ov2685_30_fps;
+-		else {
+-			dev_warn(dev,
+-				"The camera frame rate is not supported!
+");
+-			return -EINVAL;
+-		}
+-
+-		orig_mode = sensor->streamcap.capturemode;
+-		ret = ov2685_init_mode(sensor, frame_rate,
+-				(u32)a->parm.capture.capturemode, orig_mode);
+-		if (ret < 0)
+-			return ret;
+-
+-		sensor->streamcap.timeperframe = *timeperframe;
+-		sensor->streamcap.capturemode =
+-				(u32)a->parm.capture.capturemode;
+-
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		dev_warn(dev, "Type is not V4L2_BUF_TYPE_VIDEO_CAPTURE but %d
+",
+-			a->type);
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
+-
+-	return ret;
++	sensor->streamcap.timeperframe = *timeperframe;
++	return 0;
+ }
+ 
+ static int ov2685_set_fmt(struct v4l2_subdev *sd,
+@@ -1334,8 +1238,8 @@ static int ov2685_s_stream(struct v4l2_subdev *sd, int enable)
+ }
+ 
+ static struct v4l2_subdev_video_ops ov2685_subdev_video_ops = {
+-	.g_parm = ov2685_g_parm,
+-	.s_parm = ov2685_s_parm,
++	.g_frame_interval = ov2685_g_frame_interval,
++	.s_frame_interval = ov2685_s_frame_interval,
+ 	.s_stream = ov2685_s_stream,
+ };
+ 

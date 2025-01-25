@@ -1,0 +1,1171 @@
+e5a082aa23 jenkins 2022-02-21
+
+Merge branch 'merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev' into idt-imx-android-12-dev
+
+Change-Id: I1d2ca28bb8ad9b3ecbd788f4b6b4a2b32e52e83a
+
+diff --cc services/inputflinger/reader/EventHub.cpp
+index 3dabb5d12c,b19b4195d1..fbe2eaf84d
+--- a/services/inputflinger/reader/EventHub.cpp
++++ b/services/inputflinger/reader/EventHub.cpp
+@@@ -43,49 -48,85 +48,107 @@@
+  #include <utils/Errors.h>
+  #include <utils/Log.h>
+  #include <utils/Timers.h>
+- #include <utils/threads.h>
+- 
+- #include <input/KeyCharacterMap.h>
+- #include <input/KeyLayoutMap.h>
+- #include <input/VirtualKeyMap.h>
+  
+++<<<<<<< HEAD
+ +#include <binder/IServiceManager.h>
+ +#include <binder/IBinder.h>
+ +#include <binder/Parcel.h>
+ +#include <binder/ProcessState.h>
+ +#include <binder/IPCThreadState.h>
+ +
+ +/* this macro is used to tell if "bit" is set in "array"
+ + * it selects a byte from the array, and does a boolean AND
+ + * operation with a byte that only has the relevant bit set.
+ + * eg. to check for the 12th bit, we do (array[1] & 1<<4)
+ + */
+ +#define test_bit(bit, array) ((array)[(bit) / 8] & (1 << ((bit) % 8)))
+++=======
++ #include <filesystem>
++ #include <regex>
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+- /* this macro computes the number of bytes needed to represent a bit array of the specified size */
+- #define sizeof_bit_array(bits) (((bits) + 7) / 8)
++ #include "EventHub.h"
+  
+  #define INDENT "  "
+  #define INDENT2 "    "
+  #define INDENT3 "      "
+ +#define SERVICE_NAME "com.idtech.pinpad"
+ +#define FUNC_SUSPEND 1
+ +#define FUNC_RESUME 2
+  
+  using android::base::StringPrintf;
++ using namespace android::flag_operators;
+  
+  namespace android {
+  
+- static constexpr bool DEBUG = false;
+- 
+  static const char* DEVICE_PATH = "/dev/input";
+  // v4l2 devices go directly into /dev
+ -static const char* VIDEO_DEVICE_PATH = "/dev";
+ +static const char *VIDEO_DEVICE_PATH = "/dev";
+ +/* clear_event=0: resume input event
+ + * clear_event=1: suspend input event
+ + */
+ +static int clear_event = 0;
+  
++ static constexpr size_t OBFUSCATED_LENGTH = 8;
++ 
++ static constexpr int32_t FF_STRONG_MAGNITUDE_CHANNEL_IDX = 0;
++ static constexpr int32_t FF_WEAK_MAGNITUDE_CHANNEL_IDX = 1;
++ 
++ // Mapping for input battery class node IDs lookup.
++ // https://www.kernel.org/doc/Documentation/power/power_supply_class.txt
++ static const std::unordered_map<std::string, InputBatteryClass> BATTERY_CLASSES =
++         {{"capacity", InputBatteryClass::CAPACITY},
++          {"capacity_level", InputBatteryClass::CAPACITY_LEVEL},
++          {"status", InputBatteryClass::STATUS}};
++ 
++ // Mapping for input battery class node names lookup.
++ // https://www.kernel.org/doc/Documentation/power/power_supply_class.txt
++ static const std::unordered_map<InputBatteryClass, std::string> BATTERY_NODES =
++         {{InputBatteryClass::CAPACITY, "capacity"},
++          {InputBatteryClass::CAPACITY_LEVEL, "capacity_level"},
++          {InputBatteryClass::STATUS, "status"}};
++ 
++ // must be kept in sync with definitions in kernel /drivers/power/supply/power_supply_sysfs.c
++ static const std::unordered_map<std::string, int32_t> BATTERY_STATUS =
++         {{"Unknown", BATTERY_STATUS_UNKNOWN},
++          {"Charging", BATTERY_STATUS_CHARGING},
++          {"Discharging", BATTERY_STATUS_DISCHARGING},
++          {"Not charging", BATTERY_STATUS_NOT_CHARGING},
++          {"Full", BATTERY_STATUS_FULL}};
++ 
++ // Mapping taken from
++ // https://gitlab.freedesktop.org/upower/upower/-/blob/master/src/linux/up-device-supply.c#L484
++ static const std::unordered_map<std::string, int32_t> BATTERY_LEVEL = {{"Critical", 5},
++                                                                        {"Low", 10},
++                                                                        {"Normal", 55},
++                                                                        {"High", 70},
++                                                                        {"Full", 100},
++                                                                        {"Unknown", 50}};
++ 
++ // Mapping for input led class node names lookup.
++ // https://www.kernel.org/doc/html/latest/leds/leds-class.html
++ static const std::unordered_map<std::string, InputLightClass> LIGHT_CLASSES =
++         {{"red", InputLightClass::RED},
++          {"green", InputLightClass::GREEN},
++          {"blue", InputLightClass::BLUE},
++          {"global", InputLightClass::GLOBAL},
++          {"brightness", InputLightClass::BRIGHTNESS},
++          {"multi_index", InputLightClass::MULTI_INDEX},
++          {"multi_intensity", InputLightClass::MULTI_INTENSITY},
++          {"max_brightness", InputLightClass::MAX_BRIGHTNESS}};
++ 
++ // Mapping for input multicolor led class node names.
++ // https://www.kernel.org/doc/html/latest/leds/leds-class-multicolor.html
++ static const std::unordered_map<InputLightClass, std::string> LIGHT_NODES =
++         {{InputLightClass::BRIGHTNESS, "brightness"},
++          {InputLightClass::MULTI_INDEX, "multi_index"},
++          {InputLightClass::MULTI_INTENSITY, "multi_intensity"}};
++ 
++ // Mapping for light color name and the light color
++ const std::unordered_map<std::string, LightColor> LIGHT_COLORS = {{"red", LightColor::RED},
++                                                                   {"green", LightColor::GREEN},
++                                                                   {"blue", LightColor::BLUE}};
++ 
+  static inline const char* toString(bool value) {
+      return value ? "true" : "false";
+  }
+@@@ -248,46 -401,228 +423,271 @@@ bool EventHub::Device::hasValidFd() con
+      return !isVirtual && enabled;
+  }
+  
+++<<<<<<< HEAD
+ +class IdtechEventHub: public BBinder {
+ +public:
+ +     IdtechEventHub() {
+ +          mydescriptor = String16(SERVICE_NAME);
+ +     }
+ +
+ +     virtual ~IdtechEventHub() {
+ +     }
+ +
+ +     virtual const String16& getInterfaceDescriptor() const {
+ +           return mydescriptor;
+ +     }
+ +
+ +protected:
+ +     void suspend() {
+ +          clear_event = 1;
+ +     }
+ +     void resume() {
+ +          clear_event = 0;
+ +     }
+ +
+ +     virtual status_t onTransact(uint32_t code, const Parcel& data,
+ +              Parcel* reply, uint32_t flags = 0) {
+ +         switch (code) {
+ +             case FUNC_SUSPEND: {
+ +                 suspend();
+ +                 return NO_ERROR;
+ +             } break;
+ +             case FUNC_RESUME: {
+ +                 resume();
+ +                 return NO_ERROR;
+ +             } break;
+ +             default:
+ +                 return BBinder::onTransact(code, data, reply, flags);
+ +         }
+ +         return BBinder::onTransact(code, data, reply, flags);
+ +     }
+ +private:
+ +     String16 mydescriptor;
+ +};
+++=======
++ const std::shared_ptr<KeyCharacterMap> EventHub::Device::getKeyCharacterMap() const {
++     return keyMap.keyCharacterMap;
++ }
++ 
++ template <std::size_t N>
++ status_t EventHub::Device::readDeviceBitMask(unsigned long ioctlCode, BitArray<N>& bitArray) {
++     if (!hasValidFd()) {
++         return BAD_VALUE;
++     }
++     if ((_IOC_SIZE(ioctlCode) == 0)) {
++         ioctlCode |= _IOC(0, 0, 0, bitArray.bytes());
++     }
++ 
++     typename BitArray<N>::Buffer buffer;
++     status_t ret = ioctl(fd, ioctlCode, buffer.data());
++     bitArray.loadFromBuffer(buffer);
++     return ret;
++ }
++ 
++ void EventHub::Device::configureFd() {
++     // Set fd parameters with ioctl, such as key repeat, suspend block, and clock type
++     if (classes.test(InputDeviceClass::KEYBOARD)) {
++         // Disable kernel key repeat since we handle it ourselves
++         unsigned int repeatRate[] = {0, 0};
++         if (ioctl(fd, EVIOCSREP, repeatRate)) {
++             ALOGW("Unable to disable kernel key repeat for %s: %s", path.c_str(), strerror(errno));
++         }
++     }
++ 
++     // Tell the kernel that we want to use the monotonic clock for reporting timestamps
++     // associated with input events.  This is important because the input system
++     // uses the timestamps extensively and assumes they were recorded using the monotonic
++     // clock.
++     int clockId = CLOCK_MONOTONIC;
++     if (classes.test(InputDeviceClass::SENSOR)) {
++         // Each new sensor event should use the same time base as
++         // SystemClock.elapsedRealtimeNanos().
++         clockId = CLOCK_BOOTTIME;
++     }
++     bool usingClockIoctl = !ioctl(fd, EVIOCSCLOCKID, &clockId);
++     ALOGI("usingClockIoctl=%s", toString(usingClockIoctl));
++ }
++ 
++ bool EventHub::Device::hasKeycodeLocked(int keycode) const {
++     if (!keyMap.haveKeyLayout()) {
++         return false;
++     }
++ 
++     std::vector<int32_t> scanCodes;
++     keyMap.keyLayoutMap->findScanCodesForKey(keycode, &scanCodes);
++     const size_t N = scanCodes.size();
++     for (size_t i = 0; i < N && i <= KEY_MAX; i++) {
++         int32_t sc = scanCodes[i];
++         if (sc >= 0 && sc <= KEY_MAX && keyBitmask.test(sc)) {
++             return true;
++         }
++     }
++ 
++     return false;
++ }
++ 
++ void EventHub::Device::loadConfigurationLocked() {
++     configurationFile =
++             getInputDeviceConfigurationFilePathByDeviceIdentifier(identifier,
++                                                                   InputDeviceConfigurationFileType::
++                                                                           CONFIGURATION);
++     if (configurationFile.empty()) {
++         ALOGD("No input device configuration file found for device '%s'.", identifier.name.c_str());
++     } else {
++         android::base::Result<std::unique_ptr<PropertyMap>> propertyMap =
++                 PropertyMap::load(configurationFile.c_str());
++         if (!propertyMap.ok()) {
++             ALOGE("Error loading input device configuration file for device '%s'.  "
++                   "Using default configuration.",
++                   identifier.name.c_str());
++         } else {
++             configuration = std::move(*propertyMap);
++         }
++     }
++ }
++ 
++ bool EventHub::Device::loadVirtualKeyMapLocked() {
++     // The virtual key map is supplied by the kernel as a system board property file.
++     std::string propPath = "/sys/board_properties/virtualkeys.";
++     propPath += identifier.getCanonicalName();
++     if (access(propPath.c_str(), R_OK)) {
++         return false;
++     }
++     virtualKeyMap = VirtualKeyMap::load(propPath);
++     return virtualKeyMap != nullptr;
++ }
++ 
++ status_t EventHub::Device::loadKeyMapLocked() {
++     return keyMap.load(identifier, configuration.get());
++ }
++ 
++ bool EventHub::Device::isExternalDeviceLocked() {
++     if (configuration) {
++         bool value;
++         if (configuration->tryGetProperty(String8("device.internal"), value)) {
++             return !value;
++         }
++     }
++     return identifier.bus == BUS_USB || identifier.bus == BUS_BLUETOOTH;
++ }
++ 
++ bool EventHub::Device::deviceHasMicLocked() {
++     if (configuration) {
++         bool value;
++         if (configuration->tryGetProperty(String8("audio.mic"), value)) {
++             return value;
++         }
++     }
++     return false;
++ }
++ 
++ void EventHub::Device::setLedStateLocked(int32_t led, bool on) {
++     int32_t sc;
++     if (hasValidFd() && mapLed(led, &sc) != NAME_NOT_FOUND) {
++         struct input_event ev;
++         ev.time.tv_sec = 0;
++         ev.time.tv_usec = 0;
++         ev.type = EV_LED;
++         ev.code = sc;
++         ev.value = on ? 1 : 0;
++ 
++         ssize_t nWrite;
++         do {
++             nWrite = write(fd, &ev, sizeof(struct input_event));
++         } while (nWrite == -1 && errno == EINTR);
++     }
++ }
++ 
++ void EventHub::Device::setLedForControllerLocked() {
++     for (int i = 0; i < MAX_CONTROLLER_LEDS; i++) {
++         setLedStateLocked(ALED_CONTROLLER_1 + i, controllerNumber == i + 1);
++     }
++ }
++ 
++ status_t EventHub::Device::mapLed(int32_t led, int32_t* outScanCode) const {
++     if (!keyMap.haveKeyLayout()) {
++         return NAME_NOT_FOUND;
++     }
++ 
++     int32_t scanCode;
++     if (keyMap.keyLayoutMap->findScanCodeForLed(led, &scanCode) != NAME_NOT_FOUND) {
++         if (scanCode >= 0 && scanCode <= LED_MAX && ledBitmask.test(scanCode)) {
++             *outScanCode = scanCode;
++             return NO_ERROR;
++         }
++     }
++     return NAME_NOT_FOUND;
++ }
++ 
++ // Check the sysfs path for any input device batteries, returns true if battery found.
++ bool EventHub::AssociatedDevice::configureBatteryLocked() {
++     nextBatteryId = 0;
++     // Check if device has any battery.
++     const auto& paths = findSysfsNodes(sysfsRootPath, SysfsClass::POWER_SUPPLY);
++     for (const auto& nodePath : paths) {
++         RawBatteryInfo info;
++         info.id = ++nextBatteryId;
++         info.path = nodePath;
++         info.name = nodePath.filename();
++ 
++         // Scan the path for all the files
++         // Refer to https://www.kernel.org/doc/Documentation/leds/leds-class.txt
++         const auto& files = allFilesInPath(nodePath);
++         for (const auto& file : files) {
++             const auto it = BATTERY_CLASSES.find(file.filename().string());
++             if (it != BATTERY_CLASSES.end()) {
++                 info.flags |= it->second;
++             }
++         }
++         batteryInfos.insert_or_assign(info.id, info);
++         ALOGD("configureBatteryLocked rawBatteryId %d name %s", info.id, info.name.c_str());
++     }
++     return !batteryInfos.empty();
++ }
++ 
++ // Check the sysfs path for any input device lights, returns true if lights found.
++ bool EventHub::AssociatedDevice::configureLightsLocked() {
++     nextLightId = 0;
++     // Check if device has any lights.
++     const auto& paths = findSysfsNodes(sysfsRootPath, SysfsClass::LEDS);
++     for (const auto& nodePath : paths) {
++         RawLightInfo info;
++         info.id = ++nextLightId;
++         info.path = nodePath;
++         info.name = nodePath.filename();
++         info.maxBrightness = std::nullopt;
++         size_t nameStart = info.name.rfind(":");
++         if (nameStart != std::string::npos) {
++             // Trim the name to color name
++             info.name = info.name.substr(nameStart + 1);
++             // Set InputLightClass flag for colors
++             const auto it = LIGHT_CLASSES.find(info.name);
++             if (it != LIGHT_CLASSES.end()) {
++                 info.flags |= it->second;
++             }
++         }
++         // Scan the path for all the files
++         // Refer to https://www.kernel.org/doc/Documentation/leds/leds-class.txt
++         const auto& files = allFilesInPath(nodePath);
++         for (const auto& file : files) {
++             const auto it = LIGHT_CLASSES.find(file.filename().string());
++             if (it != LIGHT_CLASSES.end()) {
++                 info.flags |= it->second;
++                 // If the node has maximum brightness, read it
++                 if (it->second == InputLightClass::MAX_BRIGHTNESS) {
++                     std::string str;
++                     if (base::ReadFileToString(file, &str)) {
++                         info.maxBrightness = std::stoi(str);
++                     }
++                 }
++             }
++         }
++         lightInfos.insert_or_assign(info.id, info);
++         ALOGD("configureLightsLocked rawLightId %d name %s", info.id, info.name.c_str());
++     }
++     return !lightInfos.empty();
++ }
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  /**
+   * Get the capabilities for the current process.
+@@@ -1058,12 -1623,9 +1698,13 @@@ size_t EventHub::getEvents(int timeoutM
+  
+                      size_t count = size_t(readSize) / sizeof(struct input_event);
+                      for (size_t i = 0; i < count; i++) {
+ +                        // discard the event processing duing pin pad shows
+ +                        if(clear_event == 1){
+ +                            break;
+ +                        }
+                          struct input_event& iev = readBuffer[i];
+                          event->when = processEventTimestamp(iev);
++                         event->readTime = systemTime(SYSTEM_TIME_MONOTONIC);
+                          event->deviceId = deviceId;
+                          event->type = iev.type;
+                          event->code = iev.code;
+diff --cc services/inputflinger/reader/InputDevice.cpp
+index cdb615d1fc,7af014cb34..e7a1d04d59
+--- a/services/inputflinger/reader/InputDevice.cpp
++++ b/services/inputflinger/reader/InputDevice.cpp
+@@@ -18,8 -18,8 +18,9 @@@
+  
+  #include "InputDevice.h"
+  
++ #include <input/Flags.h>
+  #include <algorithm>
+ +#include <cutils/properties.h>
+  
+  #include "CursorInputMapper.h"
+  #include "ExternalStylusInputMapper.h"
+@@@ -286,18 -309,15 +310,25 @@@ void InputDevice::configure(nsecs_t whe
+                  const auto& displayPort = ports.find(inputPort);
+                  if (displayPort != ports.end()) {
+                      mAssociatedDisplayPort = std::make_optional(displayPort->second);
+ +                } else {
+ +                    char value[PROPERTY_VALUE_MAX];
+ +                    property_get("persist.idt.default_touch_location", value, "0");
+ +                    const std::string defaultTouchLocation = value;
+ +                    auto found = inputPort.find(defaultTouchLocation);
+ +                    if (found != std::string::npos) {
+ +                        const auto& defaultPort = ports.find(defaultTouchLocation);
+ +                        if (defaultPort != ports.end())
+ +                            mAssociatedDisplayPort = std::make_optional(defaultPort->second);
+ +                    }
+                  }
+              }
++             const std::string& inputDeviceName = mIdentifier.name;
++             const std::unordered_map<std::string, std::string>& names =
++                     config->uniqueIdAssociations;
++             const auto& displayUniqueId = names.find(inputDeviceName);
++             if (displayUniqueId != names.end()) {
++                 mAssociatedDisplayUniqueId = displayUniqueId->second;
++             }
+  
+              // If the device was explicitly disabled by the user, it would be present in the
+              // "disabledDevices" list. If it is associated with a specific display, and it was not
+diff --cc services/surfaceflinger/CompositionEngine/src/Output.cpp
+index fe3c4448fb,a8c3a11a51..df1268b436
+--- a/services/surfaceflinger/CompositionEngine/src/Output.cpp
++++ b/services/surfaceflinger/CompositionEngine/src/Output.cpp
+@@@ -602,9 -714,70 +714,76 @@@ void Output::updateCompositionState(con
+          if (layerFEState->forceClientComposition && skipForceClientComposition) {
+              layer->editState().forceClientComposition = false;
+          }
+++<<<<<<< HEAD
+ +
+ +        // Send the updated state to the HWC, if appropriate.
+ +        layer->writeStateToHWC(refreshArgs.updatingGeometryThisFrame);
+++=======
++     }
++ }
++ 
++ void Output::planComposition() {
++     if (!mPlanner || !getState().isEnabled) {
++         return;
++     }
++ 
++     ATRACE_CALL();
++     ALOGV(__FUNCTION__);
++ 
++     mPlanner->plan(getOutputLayersOrderedByZ());
++ }
++ 
++ void Output::writeCompositionState(const compositionengine::CompositionRefreshArgs& refreshArgs) {
++     ATRACE_CALL();
++     ALOGV(__FUNCTION__);
++ 
++     if (!getState().isEnabled) {
++         return;
++     }
++ 
++     editState().earliestPresentTime = refreshArgs.earliestPresentTime;
++     editState().previousPresentFence = refreshArgs.previousPresentFence;
++ 
++     compositionengine::OutputLayer* peekThroughLayer = nullptr;
++     sp<GraphicBuffer> previousOverride = nullptr;
++     bool includeGeometry = refreshArgs.updatingGeometryThisFrame;
++     uint32_t z = 0;
++     bool overrideZ = false;
++     for (auto* layer : getOutputLayersOrderedByZ()) {
++         if (layer == peekThroughLayer) {
++             // No longer needed, although it should not show up again, so
++             // resetting it is not truly needed either.
++             peekThroughLayer = nullptr;
++ 
++             // peekThroughLayer was already drawn ahead of its z order.
++             continue;
++         }
++         bool skipLayer = false;
++         const auto& overrideInfo = layer->getState().overrideInfo;
++         if (overrideInfo.buffer != nullptr) {
++             if (previousOverride && overrideInfo.buffer->getBuffer() == previousOverride) {
++                 ALOGV("Skipping redundant buffer");
++                 skipLayer = true;
++             } else {
++                 // First layer with the override buffer.
++                 if (overrideInfo.peekThroughLayer) {
++                     peekThroughLayer = overrideInfo.peekThroughLayer;
++ 
++                     // Draw peekThroughLayer first.
++                     overrideZ = true;
++                     includeGeometry = true;
++                     constexpr bool isPeekingThrough = true;
++                     peekThroughLayer->writeStateToHWC(includeGeometry, false, z++, overrideZ,
++                                                       isPeekingThrough);
++                 }
++ 
++                 previousOverride = overrideInfo.buffer->getBuffer();
++             }
++         }
++ 
++         constexpr bool isPeekingThrough = false;
++         layer->writeStateToHWC(includeGeometry, skipLayer, z++, overrideZ, isPeekingThrough);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+      }
+  }
+  
+diff --cc services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+index 2dc84ed95e,7349dde21f..82fb244d82
+--- a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
++++ b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+@@@ -57,7 -57,7 +57,11 @@@ using ui::Dataspace
+   * imx8qm/imx8qxp support framebuffer tile.
+   */
+  
+++<<<<<<< HEAD
+ +static uint64_t GetPlatformPrivateUsage(HWComposer& hwc, DisplayId displayId)
+++=======
++ static uint64_t GetPlatformPrivateUsage(HWComposer& hwc, PhysicalDisplayId displayId)
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  {
+      uint64_t usage = 0;
+      char prop[PROPERTY_VALUE_MAX] = {};
+@@@ -120,9 -119,7 +123,13 @@@ FramebufferSurface::FramebufferSurface(
+                                         GRALLOC_USAGE_HW_RENDER |
+                                         GRALLOC_USAGE_HW_COMPOSER |
+                                         GetPlatformPrivateUsage(hwc, displayId));
+++<<<<<<< HEAD
+ +    const auto& activeConfig = mHwc.getActiveConfig(displayId);
+ +    ui::Size limitedSize =
+ +            limitFramebufferSize(activeConfig->getWidth(), activeConfig->getHeight());
+++=======
++     const auto limitedSize = limitSize(size);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+      mConsumer->setDefaultBufferSize(limitedSize.width, limitedSize.height);
+      mConsumer->setMaxAcquiredBufferCount(
+              SurfaceFlinger::maxFrameBufferAcquiredBuffers - 1);
+diff --cc services/surfaceflinger/StartPropertySetThread.cpp
+index fc2f207ad0,f42cd53e0a..e59692de95
+--- a/services/surfaceflinger/StartPropertySetThread.cpp
++++ b/services/surfaceflinger/StartPropertySetThread.cpp
+@@@ -31,14 -31,9 +31,20 @@@ bool StartPropertySetThread::threadLoop
+      property_set(kTimestampProperty, mTimestampPropertyValue ? "1" : "0");
+      // Clear BootAnimation exit flag
+      property_set("service.bootanim.exit", "0");
+++<<<<<<< HEAD
+ +
+ +    char value[PROPERTY_VALUE_MAX];
+ +    property_get("debug.sf.nobootanimation", value, "0");
+ +    if (atoi(value) == 0) {
+ +        // Start BootAnimation if not started
+ +        property_set("ctl.start", "bootanim");
+ +    }
+ +
+++=======
++     property_set("service.bootanim.progress", "0");
++     // Start BootAnimation if not started
++     property_set("ctl.start", "bootanim");
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+      // Exit immediately
+      return false;
+  }
+diff --cc services/surfaceflinger/SurfaceFlinger.cpp
+index 6c6d0829b3,3b4f1f325d..28dba4fd66
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@@ -544,8 -644,12 +644,17 @@@ std::vector<PhysicalDisplayId> SurfaceF
+  
+      std::vector<PhysicalDisplayId> displayIds;
+      displayIds.reserve(mPhysicalDisplayTokens.size());
+++<<<<<<< HEAD
+ +    for (const auto id : mPhysicalDisplayIdList) {
+ +        displayIds.push_back(id);
+++=======
++     displayIds.push_back(*internalDisplayId);
++ 
++     for (const auto& [id, token] : mPhysicalDisplayTokens) {
++         if (id != *internalDisplayId) {
++             displayIds.push_back(id);
++         }
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+      }
+  
+      return displayIds;
+@@@ -2460,24 -2603,12 +2612,28 @@@ void SurfaceFlinger::processDisplayHotp
+                  sp<IBinder> token = new BBinder();
+                  mCurrentState.displays.add(token, state);
+                  mPhysicalDisplayTokens.emplace(displayId, std::move(token));
+ +                mPhysicalDisplayIdList.push_back(displayId.value);
+  
++                 if (event.hwcDisplayId == getHwComposer().getInternalHwcDisplayId()) {
++                     initScheduler(state);
++                 }
++ 
+                  mInterceptor->saveDisplayCreation(state);
+ +
+ +                // persist.service.bootanim.displays only referenced in bootanimation,
+ +                // so we only configure this property before boot finished.
+ +                if (!mBootFinished) {
+ +                    // create propperties for later use in bootanimation
+ +                    char value[PROPERTY_VALUE_MAX];
+ +                    property_get("persist.service.bootanim.displays", value, "");
+ +                    if (event.hwcDisplayId == 0) {
+ +                        strcpy(value, to_string(displayId).c_str());
+ +                    } else {
+ +                        strcat(value, ",");
+ +                        strcat(value, to_string(displayId).c_str());
+ +                    }
+ +                    property_set("persist.service.bootanim.displays", value);
+ +                }
+              } else {
+                  ALOGV("Recreating display %s", to_string(displayId).c_str());
+  
+@@@ -4209,15 -4503,17 +4529,19 @@@ void SurfaceFlinger::onInitializeDispla
+      d.width = 0;
+      d.height = 0;
+      displays.add(d);
+-     setTransactionState(state, displays, 0, nullptr, mPendingInputWindowCommands, -1, {}, false,
+-                         {});
++ 
++     nsecs_t now = systemTime();
++     // It should be on the main thread, apply it directly.
++     applyTransactionState(FrameTimelineInfo{}, state, displays, 0, mInputWindowCommands,
++                           /* desiredPresentTime */ now, true, {}, /* postTime */ now, true, false,
++                           {}, getpid(), getuid(), 0 /* Undefined transactionId */);
+  
+ -    setPowerModeInternal(display, hal::PowerMode::ON);
+ +    for (const auto& [token, displayDevice] : mDisplays)
+ +        setPowerModeInternal(displayDevice, hal::PowerMode::ON);
+ +
+      const nsecs_t vsyncPeriod = mRefreshRateConfigs->getCurrentRefreshRate().getVsyncPeriod();
+      mAnimFrameTracker.setDisplayRefreshPeriod(vsyncPeriod);
+- 
++     mDefaultDisplayTransformHint = display->getTransformHint();
+      // Use phase of 0 since phase is not known.
+      // Use latency of 0, which will snap to the ideal latency.
+      DisplayStatInfo stats{0 /* vsyncTime */, vsyncPeriod};
+@@@ -5506,170 -5923,159 +5951,165 @@@ status_t SurfaceFlinger::setSchedFifo(b
+      return NO_ERROR;
+  }
+  
+- sp<DisplayDevice> SurfaceFlinger::getDisplayByIdOrLayerStack(uint64_t displayOrLayerStack) {
+-     const sp<IBinder> displayToken = getPhysicalDisplayTokenLocked(DisplayId{displayOrLayerStack});
+-     if (displayToken) {
+-         return getDisplayDeviceLocked(displayToken);
++ status_t SurfaceFlinger::setSchedAttr(bool enabled) {
++     static const unsigned int kUclampMin =
++             base::GetUintProperty<unsigned int>("ro.surface_flinger.uclamp.min", 0U);
++ 
++     if (!kUclampMin) {
++         // uclamp.min set to 0 (default), skip setting
++         return NO_ERROR;
+      }
+-     // Couldn't find display by displayId. Try to get display by layerStack since virtual displays
+-     // may not have a displayId.
+-     return getDisplayByLayerStack(displayOrLayerStack);
+- }
+  
+- sp<DisplayDevice> SurfaceFlinger::getDisplayByLayerStack(uint64_t layerStack) {
+-     for (const auto& [token, display] : mDisplays) {
+-         if (display->getLayerStack() == layerStack) {
+-             return display;
+-         }
++     // Currently, there is no wrapper in bionic: b/183240349.
++     struct sched_attr {
++         uint32_t size;
++         uint32_t sched_policy;
++         uint64_t sched_flags;
++         int32_t sched_nice;
++         uint32_t sched_priority;
++         uint64_t sched_runtime;
++         uint64_t sched_deadline;
++         uint64_t sched_period;
++         uint32_t sched_util_min;
++         uint32_t sched_util_max;
++     };
++ 
++     sched_attr attr = {};
++     attr.size = sizeof(attr);
++ 
++     attr.sched_flags = (SCHED_FLAG_KEEP_ALL | SCHED_FLAG_UTIL_CLAMP);
++     attr.sched_util_min = enabled ? kUclampMin : 0;
++     attr.sched_util_max = 1024;
++ 
++     if (syscall(__NR_sched_setattr, 0, &attr, 0)) {
++         return -errno;
+      }
+-     return nullptr;
+- }
+  
+- status_t SurfaceFlinger::captureScreen(uint64_t displayOrLayerStack, Dataspace* outDataspace,
+-                                        sp<GraphicBuffer>* outBuffer) {
+-     sp<DisplayDevice> display;
+-     uint32_t width;
+-     uint32_t height;
+-     ui::Transform::RotationFlags captureOrientation;
+-     {
+-         Mutex::Autolock lock(mStateLock);
+-         display = getDisplayByIdOrLayerStack(displayOrLayerStack);
+-         if (!display) {
+-             return NAME_NOT_FOUND;
+-         }
++     return NO_ERROR;
++ }
+  
+-         width = uint32_t(display->getViewport().width());
+-         height = uint32_t(display->getViewport().height());
++ status_t SurfaceFlinger::captureDisplay(const DisplayCaptureArgs& args,
++                                         const sp<IScreenCaptureListener>& captureListener) {
++     ATRACE_CALL();
+  
+++<<<<<<< HEAD
+ +        const auto orientation = display->getOrientation();
+ +        const auto physicalOrientation = display->getPhysicalOrientation();
+ +        captureOrientation = ui::Transform::toRotationFlags(orientation + physicalOrientation);
+++=======
++     status_t validate = validateScreenshotPermissions(args);
++     if (validate != OK) {
++         return validate;
++     }
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+-         switch (captureOrientation) {
+-             case ui::Transform::ROT_90:
+-                 captureOrientation = ui::Transform::ROT_270;
+-                 break;
++     if (!args.displayToken) return BAD_VALUE;
+  
+-             case ui::Transform::ROT_270:
+-                 captureOrientation = ui::Transform::ROT_90;
+-                 break;
++     wp<const DisplayDevice> displayWeak;
++     ui::LayerStack layerStack;
++     ui::Size reqSize(args.width, args.height);
++     ui::Dataspace dataspace;
++     {
++         Mutex::Autolock lock(mStateLock);
++         sp<DisplayDevice> display = getDisplayDeviceLocked(args.displayToken);
++         if (!display) return NAME_NOT_FOUND;
++         displayWeak = display;
++         layerStack = display->getLayerStack();
+  
+-             case ui::Transform::ROT_INVALID:
+-                 ALOGE("%s: Invalid orientation: %s", __FUNCTION__, toCString(orientation));
+-                 captureOrientation = ui::Transform::ROT_0;
+-                 break;
++         // set the requested width/height to the logical display layer stack rect size by default
++         if (args.width == 0 || args.height == 0) {
++             reqSize = display->getLayerStackSpaceRect().getSize();
++         }
+  
+-             default:
+-                 break;
++         // The dataspace is depended on the color mode of display, that could use non-native mode
++         // (ex. displayP3) to enhance the content, but some cases are checking native RGB in bytes,
++         // and failed if display is not in native mode. This provide a way to force using native
++         // colors when capture.
++         dataspace = args.dataspace;
++         if (dataspace == ui::Dataspace::UNKNOWN) {
++             const ui::ColorMode colorMode = display->getCompositionDisplay()->getState().colorMode;
++             dataspace = pickDataspaceFromColorMode(colorMode);
+          }
+-         *outDataspace =
+-                 pickDataspaceFromColorMode(display->getCompositionDisplay()->getState().colorMode);
+      }
+  
+-     DisplayRenderArea renderArea(display, Rect(), width, height, *outDataspace, captureOrientation,
+-                                  false /* captureSecureLayers */);
++     RenderAreaFuture renderAreaFuture = ftl::defer([=] {
++         return DisplayRenderArea::create(displayWeak, args.sourceCrop, reqSize, dataspace,
++                                          args.useIdentityTransform, args.captureSecureLayers);
++     });
++ 
++     auto traverseLayers = [this, args, layerStack](const LayerVector::Visitor& visitor) {
++         traverseLayersInLayerStack(layerStack, args.uid, visitor);
++     };
+  
+-     auto traverseLayers = std::bind(&SurfaceFlinger::traverseLayersInDisplay, this, display,
+-                                     std::placeholders::_1);
+-     bool ignored = false;
+-     return captureScreenCommon(renderArea, traverseLayers, outBuffer, ui::PixelFormat::RGBA_8888,
+-                                false /* useIdentityTransform */,
+-                                ignored /* outCapturedSecureLayers */);
++     return captureScreenCommon(std::move(renderAreaFuture), traverseLayers, reqSize,
++                                args.pixelFormat, args.allowProtected, args.grayscale,
++                                captureListener);
+  }
+  
+- status_t SurfaceFlinger::captureLayers(
+-         const sp<IBinder>& layerHandleBinder, sp<GraphicBuffer>* outBuffer,
+-         const Dataspace reqDataspace, const ui::PixelFormat reqPixelFormat, const Rect& sourceCrop,
+-         const std::unordered_set<sp<IBinder>, ISurfaceComposer::SpHash<IBinder>>& excludeHandles,
+-         float frameScale, bool childrenOnly) {
+-     ATRACE_CALL();
++ status_t SurfaceFlinger::captureDisplay(uint64_t displayIdOrLayerStack,
++                                         const sp<IScreenCaptureListener>& captureListener) {
++     ui::LayerStack layerStack;
++     wp<const DisplayDevice> displayWeak;
++     ui::Size size;
++     ui::Dataspace dataspace;
++     {
++         Mutex::Autolock lock(mStateLock);
++         auto display = getDisplayDeviceLocked(PhysicalDisplayId{displayIdOrLayerStack});
+  
+-     class LayerRenderArea : public RenderArea {
+-     public:
+-         LayerRenderArea(SurfaceFlinger* flinger, const sp<Layer>& layer, const Rect crop,
+-                         int32_t reqWidth, int32_t reqHeight, Dataspace reqDataSpace,
+-                         bool childrenOnly, const Rect& displayViewport)
+-               : RenderArea(reqWidth, reqHeight, CaptureFill::CLEAR, reqDataSpace, displayViewport),
+-                 mLayer(layer),
+-                 mCrop(crop),
+-                 mNeedsFiltering(false),
+-                 mFlinger(flinger),
+-                 mChildrenOnly(childrenOnly) {}
+-         const ui::Transform& getTransform() const override { return mTransform; }
+-         Rect getBounds() const override { return mLayer->getBufferSize(mLayer->getDrawingState()); }
+-         int getHeight() const override {
+-             return mLayer->getBufferSize(mLayer->getDrawingState()).getHeight();
+-         }
+-         int getWidth() const override {
+-             return mLayer->getBufferSize(mLayer->getDrawingState()).getWidth();
+-         }
+-         bool isSecure() const override { return false; }
+-         bool needsFiltering() const override { return mNeedsFiltering; }
+-         sp<const DisplayDevice> getDisplayDevice() const override { return nullptr; }
+-         Rect getSourceCrop() const override {
+-             if (mCrop.isEmpty()) {
+-                 return getBounds();
+-             } else {
+-                 return mCrop;
+-             }
++         // Fall back to first display whose layer stack matches.
++         if (!display) {
++             const auto layerStack = static_cast<ui::LayerStack>(displayIdOrLayerStack);
++             display = findDisplay(WithLayerStack(layerStack));
+          }
+-         class ReparentForDrawing {
+-         public:
+-             const sp<Layer>& oldParent;
+-             const sp<Layer>& newParent;
+- 
+-             ReparentForDrawing(const sp<Layer>& oldParent, const sp<Layer>& newParent,
+-                                const Rect& drawingBounds)
+-                   : oldParent(oldParent), newParent(newParent) {
+-                 // Compute and cache the bounds for the new parent layer.
+-                 newParent->computeBounds(drawingBounds.toFloatRect(), ui::Transform(),
+-                                          0.f /* shadowRadius */);
+-                 oldParent->setChildrenDrawingParent(newParent);
+-             }
+-             ~ReparentForDrawing() { oldParent->setChildrenDrawingParent(oldParent); }
+-         };
+- 
+-         void render(std::function<void()> drawLayers) override {
+-             const Rect sourceCrop = getSourceCrop();
+-             // no need to check rotation because there is none
+-             mNeedsFiltering = sourceCrop.width() != getReqWidth() ||
+-                 sourceCrop.height() != getReqHeight();
+  
+-             if (!mChildrenOnly) {
+-                 mTransform = mLayer->getTransform().inverse();
+-                 drawLayers();
+-             } else {
+-                 uint32_t w = static_cast<uint32_t>(getWidth());
+-                 uint32_t h = static_cast<uint32_t>(getHeight());
+-                 // In the "childrenOnly" case we reparent the children to a screenshot
+-                 // layer which has no properties set and which does not draw.
+-                 sp<ContainerLayer> screenshotParentLayer =
+-                         mFlinger->getFactory().createContainerLayer({mFlinger, nullptr,
+-                                                                      "Screenshot Parent"s, w, h, 0,
+-                                                                      LayerMetadata()});
+- 
+-                 ReparentForDrawing reparent(mLayer, screenshotParentLayer, sourceCrop);
+-                 drawLayers();
+-             }
++         if (!display) {
++             return NAME_NOT_FOUND;
+          }
+  
+-     private:
+-         const sp<Layer> mLayer;
+-         const Rect mCrop;
++         layerStack = display->getLayerStack();
++         displayWeak = display;
++ 
++         size = display->getLayerStackSpaceRect().getSize();
+  
+-         ui::Transform mTransform;
+-         bool mNeedsFiltering;
++         dataspace =
++                 pickDataspaceFromColorMode(display->getCompositionDisplay()->getState().colorMode);
++     }
++ 
++     RenderAreaFuture renderAreaFuture = ftl::defer([=] {
++         return DisplayRenderArea::create(displayWeak, Rect(), size, dataspace,
++                                          false /* useIdentityTransform */,
++                                          false /* captureSecureLayers */);
++     });
+  
+-         SurfaceFlinger* mFlinger;
+-         const bool mChildrenOnly;
++     auto traverseLayers = [this, layerStack](const LayerVector::Visitor& visitor) {
++         traverseLayersInLayerStack(layerStack, CaptureArgs::UNSET_UID, visitor);
+      };
+  
+-     int reqWidth = 0;
+-     int reqHeight = 0;
++     return captureScreenCommon(std::move(renderAreaFuture), traverseLayers, size,
++                                ui::PixelFormat::RGBA_8888, false /* allowProtected */,
++                                false /* grayscale */, captureListener);
++ }
++ 
++ status_t SurfaceFlinger::captureLayers(const LayerCaptureArgs& args,
++                                        const sp<IScreenCaptureListener>& captureListener) {
++     ATRACE_CALL();
++ 
++     status_t validate = validateScreenshotPermissions(args);
++     if (validate != OK) {
++         return validate;
++     }
++ 
++     ui::Size reqSize;
+      sp<Layer> parent;
+-     Rect crop(sourceCrop);
++     Rect crop(args.sourceCrop);
+      std::unordered_set<sp<Layer>, ISurfaceComposer::SpHash<Layer>> excludeLayers;
+-     Rect displayViewport;
++     Rect layerStackSpaceRect;
++     ui::Dataspace dataspace;
++     bool captureSecureLayers;
++ 
++     // Call this before holding mStateLock to avoid any deadlocking.
++     bool canCaptureBlackoutContent = hasCaptureBlackoutContentPermission();
++ 
+      {
+          Mutex::Autolock lock(mStateLock);
+  
+@@@ -5754,77 -6176,122 +6210,132 @@@
+          });
+      };
+  
+-     bool outCapturedSecureLayers = false;
+-     return captureScreenCommon(renderArea, traverseLayers, outBuffer, reqPixelFormat, false,
+-                                outCapturedSecureLayers);
++     return captureScreenCommon(std::move(renderAreaFuture), traverseLayers, reqSize,
++                                args.pixelFormat, args.allowProtected, args.grayscale,
++                                captureListener);
+  }
+  
+- status_t SurfaceFlinger::captureScreenCommon(RenderArea& renderArea,
++ status_t SurfaceFlinger::captureScreenCommon(RenderAreaFuture renderAreaFuture,
+                                               TraverseLayersFunction traverseLayers,
+-                                              sp<GraphicBuffer>* outBuffer,
+-                                              const ui::PixelFormat reqPixelFormat,
+-                                              bool useIdentityTransform,
+-                                              bool& outCapturedSecureLayers) {
++                                              ui::Size bufferSize, ui::PixelFormat reqPixelFormat,
++                                              bool allowProtected, bool grayscale,
++                                              const sp<IScreenCaptureListener>& captureListener) {
+      ATRACE_CALL();
+  
+++<<<<<<< HEAD
+ +    // TODO(b/116112787) Make buffer usage a parameter.
+ +    const uint32_t usage = GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN |
+ +            GRALLOC_USAGE_HW_RENDER | GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER;
+ +    *outBuffer =
+ +            getFactory().createGraphicBuffer(renderArea.getReqWidth(), renderArea.getReqHeight(),
+ +                                             static_cast<android_pixel_format>(reqPixelFormat), 1,
+ +                                             usage, "screenshot");
+++=======
++     // Loop over all visible layers to see whether there's any protected layer. A protected layer is
++     // typically a layer with DRM contents, or have the GRALLOC_USAGE_PROTECTED set on the buffer.
++     // A protected layer has no implication on whether it's secure, which is explicitly set by
++     // application to avoid being screenshot or drawn via unsecure display.
++     const bool supportsProtected = getRenderEngine().supportsProtectedContent();
++     bool hasProtectedLayer = false;
++     if (allowProtected && supportsProtected) {
++         hasProtectedLayer = schedule([=]() {
++                                 bool protectedLayerFound = false;
++                                 traverseLayers([&](Layer* layer) {
++                                     protectedLayerFound = protectedLayerFound ||
++                                             (layer->isVisible() && layer->isProtected());
++                                 });
++                                 return protectedLayerFound;
++                             }).get();
++     }
++ 
++     const uint32_t usage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_RENDER |
++             GRALLOC_USAGE_HW_TEXTURE |
++             (hasProtectedLayer && allowProtected && supportsProtected
++                      ? GRALLOC_USAGE_PROTECTED
++                      : GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN);
++     sp<GraphicBuffer> buffer =
++             getFactory().createGraphicBuffer(bufferSize.getWidth(), bufferSize.getHeight(),
++                                              static_cast<android_pixel_format>(reqPixelFormat),
++                                              1 /* layerCount */, usage, "screenshot");
++ 
++     const status_t bufferStatus = buffer->initCheck();
++     LOG_ALWAYS_FATAL_IF(bufferStatus != OK, "captureScreenCommon: Buffer failed to allocate: %d",
++                         bufferStatus);
++     const auto texture = std::make_shared<
++             renderengine::ExternalTexture>(buffer, getRenderEngine(),
++                                            renderengine::ExternalTexture::Usage::WRITEABLE);
++     return captureScreenCommon(std::move(renderAreaFuture), traverseLayers, texture,
++                                false /* regionSampling */, grayscale, captureListener);
++ }
++ 
++ status_t SurfaceFlinger::captureScreenCommon(
++         RenderAreaFuture renderAreaFuture, TraverseLayersFunction traverseLayers,
++         const std::shared_ptr<renderengine::ExternalTexture>& buffer, bool regionSampling,
++         bool grayscale, const sp<IScreenCaptureListener>& captureListener) {
++     ATRACE_CALL();
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+-     return captureScreenCommon(renderArea, traverseLayers, *outBuffer, useIdentityTransform,
+-                                false /* regionSampling */, outCapturedSecureLayers);
+- }
++     if (captureListener == nullptr) {
++         ALOGE("capture screen must provide a capture listener callback");
++         return BAD_VALUE;
++     }
+  
+- status_t SurfaceFlinger::captureScreenCommon(RenderArea& renderArea,
+-                                              TraverseLayersFunction traverseLayers,
+-                                              const sp<GraphicBuffer>& buffer,
+-                                              bool useIdentityTransform, bool regionSampling,
+-                                              bool& outCapturedSecureLayers) {
+-     const int uid = IPCThreadState::self()->getCallingUid();
+-     const bool forSystem = uid == AID_GRAPHICS || uid == AID_SYSTEM;
++     bool canCaptureBlackoutContent = hasCaptureBlackoutContentPermission();
+  
+-     status_t result;
+-     int syncFd;
++     static_cast<void>(schedule([=, renderAreaFuture = std::move(renderAreaFuture)]() mutable {
++         if (mRefreshPending) {
++             ALOGW("Skipping screenshot for now");
++             captureScreenCommon(std::move(renderAreaFuture), traverseLayers, buffer, regionSampling,
++                                 grayscale, captureListener);
++             return;
++         }
++         ScreenCaptureResults captureResults;
++         std::unique_ptr<RenderArea> renderArea = renderAreaFuture.get();
++         if (!renderArea) {
++             ALOGW("Skipping screen capture because of invalid render area.");
++             captureResults.result = NO_MEMORY;
++             captureListener->onScreenCaptureCompleted(captureResults);
++             return;
++         }
+  
+-     do {
+-         std::tie(result, syncFd) =
+-                 schedule([&] {
+-                     if (mRefreshPending) {
+-                         ATRACE_NAME("Skipping screenshot for now");
+-                         return std::make_pair(EAGAIN, -1);
+-                     }
++         status_t result = NO_ERROR;
++         renderArea->render([&] {
++             result = renderScreenImplLocked(*renderArea, traverseLayers, buffer,
++                                             canCaptureBlackoutContent, regionSampling, grayscale,
++                                             captureResults);
++         });
+  
+-                     status_t result = NO_ERROR;
+-                     int fd = -1;
++         captureResults.result = result;
++         captureListener->onScreenCaptureCompleted(captureResults);
++     }));
+  
+-                     Mutex::Autolock lock(mStateLock);
+-                     renderArea.render([&] {
+-                         result = captureScreenImplLocked(renderArea, traverseLayers, buffer.get(),
+-                                                          useIdentityTransform, forSystem, &fd,
+-                                                          regionSampling, outCapturedSecureLayers);
+-                     });
++     return NO_ERROR;
++ }
+  
+-                     return std::make_pair(result, fd);
+-                 }).get();
+-     } while (result == EAGAIN);
++ status_t SurfaceFlinger::renderScreenImplLocked(
++         const RenderArea& renderArea, TraverseLayersFunction traverseLayers,
++         const std::shared_ptr<renderengine::ExternalTexture>& buffer,
++         bool canCaptureBlackoutContent, bool regionSampling, bool grayscale,
++         ScreenCaptureResults& captureResults) {
++     ATRACE_CALL();
+  
+-     if (result == NO_ERROR) {
+-         sync_wait(syncFd, -1);
+-         close(syncFd);
+-     }
++     traverseLayers([&](Layer* layer) {
++         captureResults.capturedSecureLayers =
++                 captureResults.capturedSecureLayers || (layer->isVisible() && layer->isSecure());
++     });
+  
+-     return result;
+- }
++     const bool useProtected = buffer->getBuffer()->getUsage() & GRALLOC_USAGE_PROTECTED;
+  
+- void SurfaceFlinger::renderScreenImplLocked(const RenderArea& renderArea,
+-                                             TraverseLayersFunction traverseLayers,
+-                                             ANativeWindowBuffer* buffer, bool useIdentityTransform,
+-                                             bool regionSampling, int* outSyncFd) {
+-     ATRACE_CALL();
++     // We allow the system server to take screenshots of secure layers for
++     // use in situations like the Screen-rotation animation and place
++     // the impetus on WindowManager to not persist them.
++     if (captureResults.capturedSecureLayers && !canCaptureBlackoutContent) {
++         ALOGW("FB is protected: PERMISSION_DENIED");
++         return PERMISSION_DENIED;
++     }
++ 
++     captureResults.buffer = buffer->getBuffer();
++     captureResults.capturedDataspace = renderArea.getReqDataSpace();
+  
+      const auto reqWidth = renderArea.getReqWidth();
+      const auto reqHeight = renderArea.getReqHeight();
+diff --cc services/surfaceflinger/SurfaceFlinger.h
+index 5ee773ae14,c3d837e86c..ade6eb947c
+--- a/services/surfaceflinger/SurfaceFlinger.h
++++ b/services/surfaceflinger/SurfaceFlinger.h
+@@@ -1071,10 -1281,13 +1282,18 @@@ private
+      // this may only be written from the main thread with mStateLock held
+      // it may be read from other threads with mStateLock held
+      std::map<wp<IBinder>, sp<DisplayDevice>> mDisplays GUARDED_BY(mStateLock);
+++<<<<<<< HEAD
+ +    std::unordered_map<DisplayId, sp<IBinder>> mPhysicalDisplayTokens GUARDED_BY(mStateLock);
+ +    std::list<PhysicalDisplayId> mPhysicalDisplayIdList GUARDED_BY(mStateLock);
+++=======
++     std::unordered_map<PhysicalDisplayId, sp<IBinder>> mPhysicalDisplayTokens
++             GUARDED_BY(mStateLock);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+-     std::unordered_map<BBinder*, wp<Layer>> mLayersByLocalBinderToken GUARDED_BY(mStateLock);
++     struct {
++         DisplayIdGenerator<GpuVirtualDisplayId> gpu;
++         std::optional<DisplayIdGenerator<HalVirtualDisplayId>> hal;
++     } mVirtualDisplayIdGenerators;
+  
+      // don't use a lock for these, we don't care
+      int mDebugRegion = 0;

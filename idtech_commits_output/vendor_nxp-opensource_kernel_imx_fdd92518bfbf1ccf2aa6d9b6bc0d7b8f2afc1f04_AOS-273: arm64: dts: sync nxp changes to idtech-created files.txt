@@ -1,0 +1,95 @@
+fdd92518bfbf George.Huang 2020-07-24
+
+AOS-273: arm64: dts: sync nxp changes to idtech-created files
+
+Change-Id: I0012d72728b6db3e349a6dd9f8f77a8f14fa0e04
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 3277e2515e65..341552191651 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -170,6 +170,7 @@ reg_audio_board: regulator-audio-board {
+ 			enable-active-high;
+ 			startup-delay-us = <300000>;
+ 			gpio = <&pca6416 1 GPIO_ACTIVE_HIGH>;
++			regulator-always-on;
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -285,6 +286,10 @@ pwm_4 {
+ 	};
+ };
+ 
++&A53_0 {
++	cpu-supply = <&buck2_reg>;
++};
++
+ &clk {
+ 	assigned-clocks = <&clk IMX8MN_AUDIO_PLL1>, <&clk IMX8MN_AUDIO_PLL2>;
+ 	assigned-clock-rates = <393216000>, <361267200>;
+@@ -848,17 +853,18 @@ &i2c2 {
+ 	status = "okay";
+ 
+ 	ov5640: ov5640_mipi@3c {
+-		compatible = "ovti,ov5640_mipi_v3";
++		compatible = "ovti,ov5640";
+ 		reg = <0x3c>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_csi_pwn>, <&pinctrl_csi_rst>;
+ 		clocks = <&clk IMX8MN_CLK_CLKO1>;
+-		clock-names = "csi_mclk";
++		clock-names = "xclk";
+ 		assigned-clocks = <&clk IMX8MN_CLK_CLKO1>;
+ 		assigned-clock-parents = <&clk IMX8MN_CLK_24M>;
+ 		assigned-clock-rates = <24000000>;
+ 		csi_id = <0>;
+-		pwn-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		powerdown-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+ 		mclk = <24000000>;
+ 		mclk_source = <0>;
+ 		mipi_csi;
+@@ -867,6 +873,8 @@ ov5640: ov5640_mipi@3c {
+ 		port {
+ 			ov5640_ep: endpoint {
+ 				remote-endpoint = <&mipi1_sensor_ep>;
++				data-lanes = <1 2>;
++				clocks-lanes = <0>;
+ 			};
+ 		};
+ 	};
+@@ -1039,6 +1047,10 @@ &sai2 {
+ 	status = "okay";
+ };
+ 
++&snvs_pwrkey {
++	status = "okay";
++};
++
+ &uart2 { /* console */
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart2>;
+@@ -1140,13 +1152,6 @@ &wdog1 {
+ 	status = "okay";
+ };
+ 
+-&A53_0 {
+-	operating-points = <
+-		/* kHz    uV */
+-		1200000 950000
+-	>;
+-};
+-
+ &usbotg1 {
+ 	picophy,pre-emp-curr-control = <3>;
+ 	picophy,dc-vol-level-adjust = <7>;
+@@ -1181,6 +1186,9 @@ mipi1_sensor_ep: endpoint {
+ 
+ &isi_0 {
+ 	status = "okay";
++	cap_device {
++		status = "okay";
++	};
+ };
+ 
+ &cameradev {

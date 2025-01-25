@@ -1,0 +1,65 @@
+28be23fda29f tonyshih 2022-01-10
+
+AOS-832: The Back button close the app on the main screen if there is no active app on 2nd one
+
+Scenario: "Back" action sent from 2nd display close app on main display.
+Root Causes: Taskbar trigger event through AccessibilityService which does not contain valid display id.
+Solutions: Enable KeyEvent#setDisplayId() and Call InputManager#injectInputEvent() to trigger event.
+Note:
+KeyEvent#setDisplayId() is set to testApi and is invisible to Taskbar.
+Need to call KeyEvent#setDisplayId() to set valid display id.
+Open KeyEvent#setDisplayId() to let this API be visible to Taskbar.
+
+Miss non-updatable-api/current.txt, commit it to fix compiler faled.
+
+Change-Id: Ifeff19fb0f443f456ef4e53ca85f396b95432014
+
+diff --git a/api/current.txt b/api/current.txt
+index 952ccdad992c..0855d935b059 100644
+--- a/api/current.txt
++++ b/api/current.txt
+@@ -52644,6 +52644,7 @@ package android.view {
+     method public static boolean metaStateHasModifiers(int, int);
+     method public static boolean metaStateHasNoModifiers(int);
+     method public static int normalizeMetaState(int);
++    method public final void setDisplayId(int);
+     method public final void setSource(int);
+     method public final void startTracking();
+     method public void writeToParcel(android.os.Parcel, int);
+diff --git a/api/test-current.txt b/api/test-current.txt
+index cf97b848e80b..423ccbad6a7d 100644
+--- a/api/test-current.txt
++++ b/api/test-current.txt
+@@ -5125,7 +5125,6 @@ package android.view {
+ 
+   public class KeyEvent extends android.view.InputEvent implements android.os.Parcelable {
+     method public static String actionToString(int);
+-    method public final void setDisplayId(int);
+     field public static final int LAST_KEYCODE = 288; // 0x120
+   }
+ 
+diff --git a/core/java/android/view/KeyEvent.java b/core/java/android/view/KeyEvent.java
+index e249c777caf6..7e069da45579 100644
+--- a/core/java/android/view/KeyEvent.java
++++ b/core/java/android/view/KeyEvent.java
+@@ -2020,8 +2020,6 @@ public class KeyEvent extends InputEvent implements Parcelable {
+         return mDisplayId;
+     }
+ 
+-    /** @hide */
+-    @TestApi
+     @Override
+     public final void setDisplayId(int displayId) {
+         mDisplayId = displayId;
+diff --git a/non-updatable-api/current.txt b/non-updatable-api/current.txt
+index 5f15216e8400..cacc864b8868 100644
+--- a/non-updatable-api/current.txt
++++ b/non-updatable-api/current.txt
+@@ -50805,6 +50805,7 @@ package android.view {
+     method public static boolean metaStateHasModifiers(int, int);
+     method public static boolean metaStateHasNoModifiers(int);
+     method public static int normalizeMetaState(int);
++    method public final void setDisplayId(int);
+     method public final void setSource(int);
+     method public final void startTracking();
+     method public void writeToParcel(android.os.Parcel, int);

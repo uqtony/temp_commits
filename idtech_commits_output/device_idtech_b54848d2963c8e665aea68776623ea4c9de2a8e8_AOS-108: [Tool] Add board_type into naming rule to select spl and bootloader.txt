@@ -1,0 +1,101 @@
+b54848d2 max.yang 2020-03-23
+
+AOS-108: [Tool] Add board_type into naming rule to select spl and bootloader
+
+  1. Add into uuu scripts, fastboot flash script already changed
+  2. Fix nxp's bug, the fastboot flashing script/bat not sync
+     *********************************************************************
+      if [ ${support_dual_bootloader} -eq 1 ]; then
+          if [ "${slot}" != "" ]; then              # this line is "NOT EQUAL"
+              dual_bootloader_partition="bootloader"${slot}
+              flash_partition ${dual_bootloader_partition}
+              ${fastboot_tool} set_active ${slot#_}
+          else
+              dual_bootloader_partition="bootloader_a"
+              flash_partition ${dual_bootloader_partition}
+              dual_bootloader_partition="bootloader_b"
+              flash_partition ${dual_bootloader_partition}
+              ${fastboot_tool} set_active a
+          fi
+      fi
+     *** ISSUE: flash spl to bootloader_a, reboot bootloader and dead ********
+     flash the file of partition-table-dual.img to the partition of gpt
+     Sending 'gpt' (33 KB) OKAY [ 0.016s]
+     Writing 'gpt' OKAY [ 0.348s]
+     Finished. Total time: 0.402s
+     flash the file of spl-imx8mq-evk-dual.bin to the partition of bootloader0
+     Sending 'bootloader0' (298 KB) OKAY [ 0.031s]
+     Writing 'bootloader0' OKAY [ 0.116s]
+     Finished. Total time: 0.185s
+     flash the file of spl-imx8mq-evk-dual.bin to the partition of bootloader1
+     Sending 'bootloader1' (298 KB) OKAY [ 0.031s]
+     Writing 'bootloader1' OKAY [ 0.132s]
+     Finished. Total time: 0.185s
+     flash the file of spl-imx8mq-evk-dual.bin to the partition of bootloader
+     Sending 'bootloader_a' (298 KB) OKAY [ 0.031s]
+     Writing 'bootloader_a' OKAY [ 0.123s]
+     Finished. Total time: 0.185s
+     Slot ~-1 does not exist. supported slots are:
+
+Change-Id: I67dd0acff2d09518fe270a495d2ec52332bd0df5
+
+diff --git a/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt b/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
+index 3da38083..f7a14cf4 100644
+--- a/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
++++ b/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
+@@ -5,6 +5,12 @@
+         "first_partition_offset": 8388608
+     },
+     "partitions": [
++        {
++            "label": "board_info",
++            "size": "1 MiB",
++            "guid": "auto",
++            "type_guid": "brillo_vendor_specific"
++        },
+         {
+             "ab": true,
+             "label": "bootloader",
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 7ecdb3d9..40d67f5e 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -549,7 +549,7 @@ if %support_idt_dual_bootloader% == 1 (
+ 
+ :: if dual-bootloader feature is supported, we need to flash the u-boot proper then reboot to get hard-coded partition info
+ if %support_dual_bootloader% == 1 (
+-    if [%slot%] == [] (
++    if not [%slot%] == [] (
+         call :flash_partition bootloader%slot% || set /A error_level=1 && goto :exit
+         %fastboot_tool% set_active %slot:~-1%
+     ) else (
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 0f648b3f..f025af48 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -825,8 +825,8 @@ goto :eof
+ :flash_android
+ :: if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+ if %support_dual_bootloader% == 1 (
+-    set bootloader_flashed_to_board=spl-%soc_name%%uboot_feature%.bin
+-    set uboot_proper_to_be_flashed=bootloader-%soc_name%%uboot_feature%.img
++    set bootloader_flashed_to_board=spl-%soc_name%%board_type%%uboot_feature%.bin
++    set uboot_proper_to_be_flashed=bootloader-%soc_name%%board_type%%uboot_feature%.img
+     :: # specially handle xen related condition
+     if [%dtb_feature%] == [xen] (
+         if [%soc_name%] == [imx8qm] (
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 95a54c7e..9d206446 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -292,8 +292,8 @@ function flash_android
+ {
+     # if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+-        bootloader_flashed_to_board=spl-${soc_name}${uboot_feature}.bin
+-        uboot_proper_to_be_flashed=bootloader-${soc_name}${uboot_feature}.img
++        bootloader_flashed_to_board=spl-${soc_name}${board_type}${uboot_feature}.bin
++        uboot_proper_to_be_flashed=bootloader-${soc_name}${board_type}${uboot_feature}.img
+         # specially handle xen related condition
+         if [[ "${soc_name}" = imx8qm ]] && [[ "${dtb_feature}" = xen ]]; then
+             uboot_proper_to_be_flashed=bootloader-${soc_name}-${dtb_feature}.img

@@ -1,0 +1,167 @@
+3a1c84ac max.yang 2020-03-04
+
+AOS-99: [Serial] Modify uuu script to support write serial number as an option
+
+  1. It's safe to put this command everywhere during flashing process.
+     Because below patch will handle serial number's backup and restore.
+     https://gerrit.idtechproducts.com/c/android-imx/uboot-imx/+/1901
+  2. Put command at the end of flash images because there are A/B slots
+     (flash twice), for secure build, this command could only execute once.
+
+Change-Id: I3351e185fc5f817feaf4e3f7380c059567c34b3d
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index a5318ad1..79a3a4dd 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -40,6 +40,7 @@ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_dual_bootloader=0
+ set /A support_board_info=0
++set /A write_bdinfo_serial=0
+ set /A support_idt_dual_bootloader=0
+ set dual_bootloader_partition=
+ set bootloader_flashed_to_board=
+@@ -112,6 +113,7 @@ if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+ if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+ if %1 == -tos set /A support_trusty=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
++if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+ echo %1 is an illegal option
+ call :help & goto :eof
+ :parse_end
+@@ -297,6 +299,7 @@ echo  -s ser_num        the serial number of board
+ echo                        If only one board connected to computer, no need to use this option
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo                               If not set, use naming from current board_info partition
++echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ goto :eof
+ 
+ :: this function checks whether the value of first parameter is in the array value of second parameter.
+@@ -575,6 +578,9 @@ if %support_dualslot% == 0 (
+     call :flash_partition_name %slot% || set /A error_level=1 && goto :exit
+     call :flash_userpartitions || set /A error_level=1 && goto :exit
+ )
++if %write_bdinfo_serial% == 1 (
++    %fastboot_tool% oem setvar dev-serial %serialno_str%
++)
+ 
+ del fastboot_var.log
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index ca700204..3a52a0c4 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -77,6 +77,7 @@ options:
+   -R                with this option used, choose the u-boot about 1GB RAM setting.
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
++  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ EOF
+ 
+ }
+@@ -314,6 +315,10 @@ function flash_android
+             ${fastboot_tool} set_active ${slot#_}
+         fi
+     fi
++
++    if [ ${write_bdinfo_serial} -eq 1 ]; then
++        ${fastboot_tool} oem setvar dev-serial ${serialno_str}
++    fi
+ }
+ 
+ # parse command line
+@@ -341,6 +346,7 @@ support_dualslot=0
+ support_mcu_os=0
+ support_dual_bootloader=0
+ support_board_info=0
++write_bdinfo_serial=0
+ support_idt_dual_bootloader=0
+ dual_bootloader_partition=""
+ bootloader_flashed_to_board=""
+@@ -407,6 +413,7 @@ while [ $# -gt 0 ]; do
+         -s) ser_num=$2; shift;;
+         -R) ramsizetest=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
++        -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+             help; exit;;
+     esac
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 87fb2d8e..a5b4d7e9 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -41,6 +41,7 @@ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_trusty=0
+ set /A support_board_info=0
++set /A write_bdinfo_serial=0
+ set /A support_idt_dual_bootloader=1
+ set boot_partition=boot
+ set recovery_partition=recovery
+@@ -124,6 +125,7 @@ if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
++if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+ echo unknown option "%1", please check it.
+ call :help & set /A error_level=1 && goto :exit
+ :parse_end
+@@ -543,6 +545,7 @@ echo                        This option is for users to manually flash the image
+ echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
++echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ goto :eof
+ 
+ 
+@@ -887,6 +890,10 @@ if not [%slot%] == [] (
+     call :flash_userpartitions || set /A error_level=1 && goto :exit
+ )
+ 
++if %write_bdinfo_serial% == 1 (
++    echo FB: oem setvar dev-serial %serialno_str% >> uuu.lst
++)
++
+ goto :eof
+ 
+ :dec_to_hex
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 0ece354a..7a3c4dde 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -86,6 +86,7 @@ options:
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
++  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ EOF
+ 
+ }
+@@ -352,6 +353,10 @@ function flash_android
+         flash_partition_name ${slot}
+         flash_userpartitions
+     fi
++
++    if [ ${write_bdinfo_serial} -eq 1 ]; then
++        echo FB: oem setvar dev-serial ${serialno_str} >> /tmp/uuu.lst
++    fi
+ }
+ 
+ 
+@@ -380,6 +385,7 @@ support_dualslot=0
+ support_mcu_os=0
+ support_trusty=0
+ support_board_info=0
++write_bdinfo_serial=0
+ support_idt_dual_bootloader=0
+ boot_partition="boot"
+ recovery_partition="recovery"
+@@ -468,6 +474,7 @@ while [ $# -gt 0 ]; do
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
++        -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+             help; exit;;
+     esac

@@ -1,0 +1,66 @@
+3f0dde00 AndrewS 2020-08-05
+
+AOS-277: Block wifi connection if this is secure build and unsecure ap selected
+
+Change-Id: I3c011001108b3c1d91e20f37e831fa00fda47a7a
+
+diff --git a/wpa_supplicant/Android.mk b/wpa_supplicant/Android.mk
+index 553302cd..e5f2c4c6 100644
+--- a/wpa_supplicant/Android.mk
++++ b/wpa_supplicant/Android.mk
+@@ -8,6 +8,10 @@
+ LOCAL_PATH := $(call my-dir)
+ PKG_CONFIG ?= pkg-config
+ 
++ifneq ($(BOARD_PCI_SECURE),)
++  CONFIG_PCI_SECURE=y
++endif
++
+ ifneq ($(BOARD_WPA_SUPPLICANT_DRIVER),)
+   CONFIG_DRIVER_$(BOARD_WPA_SUPPLICANT_DRIVER) := y
+ endif
+@@ -177,6 +181,10 @@ LIBS_c += -lbfd
+ endif
+ endif
+ 
++ifdef CONFIG_PCI_SECURE
++L_CFLAGS += -DCONFIG_PCI_SECURE
++endif
++
+ ifndef CONFIG_ELOOP
+ CONFIG_ELOOP=eloop
+ endif
+diff --git a/wpa_supplicant/wpa_supplicant.c b/wpa_supplicant/wpa_supplicant.c
+index 3471b995..e5d312bc 100644
+--- a/wpa_supplicant/wpa_supplicant.c
++++ b/wpa_supplicant/wpa_supplicant.c
+@@ -3522,6 +3522,14 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
+ 		wpas_connect_work_done(wpa_s);
+ 		return;
+ 	}
++#ifdef CONFIG_PCI_SECURE
++	/* if this is secure build, key_mgmt == NONE is not allowed*/
++	if ((wpa_s->key_mgmt == WPA_KEY_MGMT_NONE) ||
++	    (wpa_s->key_mgmt == WPA_KEY_MGMT_WPA_NONE)) {
++		wpas_connect_work_done(wpa_s);
++		return;
++	}
++#endif /* CONFIG_PCI_SECURE */
+ 
+ 	os_memcpy(prev_bssid, wpa_s->bssid, ETH_ALEN);
+ 	os_memset(&params, 0, sizeof(params));
+@@ -3589,6 +3597,14 @@ static void wpas_start_assoc_cb(struct wpa_radio_work *work, int deinit)
+ 
+ 	wpa_supplicant_cancel_scan(wpa_s);
+ 
++#ifdef CONFIG_PCI_SECURE
++	/* if this is secure build, open protocol is not allowed*/
++	if (wpa_s->wpa_proto == 0) {
++		wpas_connect_work_done(wpa_s);
++		return;
++	}
++#endif /* CONFIG_PCI_SECURE */
++
+ 	wpa_clear_keys(wpa_s, bss ? bss->bssid : NULL);
+ 	use_crypt = 1;
+ 	cipher_pairwise = wpa_s->pairwise_cipher;

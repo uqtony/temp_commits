@@ -1,0 +1,39 @@
+05948c2c max.yang 2019-11-05
+
+AOS-20: [Feature] Support to bring "SECURE_BOOT=1" to build bootloader
+
+1. find "secure" in TARGET_PRODUCT for secure-user build (vp6820_8mq_secure)
+2. To enable anthenticate process in spl/uboot when building uboot.imx
+Test:
+  1. build pass in user/userdebug/secure-user build
+
+Change-Id: Ib9a73e6e37889de84bdb425f6593a5425ac12405
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index 234edfc5..e7171c3d 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -121,8 +121,13 @@ $(UBOOTENVSH): | $(UBOOT_OUT)
+ 	fi
+ 
+ ifneq (user,$(filter user, $(TARGET_BUILD_VARIANT)))
+-USERDEBUG := USERDEBUG=1
++IDTECH_BUILD := USERDEBUG=1
+ endif
++
++ifeq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++IDTECH_BUILD += SECURE_BOOT=1
++endif
++
+ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 	$(hide) echo "Building $(UBOOT_ARCH) $(UBOOT_VERSION) U-Boot ..."
+ 	$(hide) $(call build_m4_image)
+@@ -131,7 +136,7 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		UBOOT_CONFIG=`echo $$ubootplat | cut -d':' -f2`; \
+ 		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) mrproper; \
+ 		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) $$UBOOT_CONFIG; \
+-		$(MAKE) -s -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" $(USERDEBUG) O=$(realpath $(UBOOT_OUT)) 1>/dev/null || exit 1; \
++		$(MAKE) -s -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" $(IDTECH_BUILD) O=$(realpath $(UBOOT_OUT)) 1>/dev/null || exit 1; \
+ 		if [ "$(UBOOT_POST_PROCESS)" = "true" ]; then \
+ 			echo "build post process" ; \
+ 			. $(UBOOTENVSH); \

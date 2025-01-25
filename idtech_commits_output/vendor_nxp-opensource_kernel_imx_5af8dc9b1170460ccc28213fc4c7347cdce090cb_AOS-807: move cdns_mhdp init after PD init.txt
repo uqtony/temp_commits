@@ -1,0 +1,29 @@
+5af8dc9b1170 AndrewS 2022-03-24
+
+AOS-807: move cdns_mhdp init after PD init
+
+Change-Id: I76d9bc76909cc9b1e6bcee589c514879975cf093
+
+diff --git a/drivers/gpu/drm/imx/mhdp/cdns-mhdp-imxdrv.c b/drivers/gpu/drm/imx/mhdp/cdns-mhdp-imxdrv.c
+index 109c210eb5ad..e1de28c2cb58 100644
+--- a/drivers/gpu/drm/imx/mhdp/cdns-mhdp-imxdrv.c
++++ b/drivers/gpu/drm/imx/mhdp/cdns-mhdp-imxdrv.c
+@@ -265,7 +265,17 @@ static struct platform_driver cdns_mhdp_imx_platform_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(cdns_mhdp_imx_platform_driver);
++static int __init cdns_mhdp_init(void)
++{
++	return platform_driver_register(&cdns_mhdp_imx_platform_driver);
++}
++late_initcall(cdns_mhdp_init);
++
++static void __exit cdns_mhdp_exit(void)
++{
++	platform_driver_unregister(&cdns_mhdp_imx_platform_driver);
++}
++module_exit(cdns_mhdp_exit);
+ 
+ MODULE_AUTHOR("Sandor YU <sandor.yu@nxp.com>");
+ MODULE_LICENSE("GPL");

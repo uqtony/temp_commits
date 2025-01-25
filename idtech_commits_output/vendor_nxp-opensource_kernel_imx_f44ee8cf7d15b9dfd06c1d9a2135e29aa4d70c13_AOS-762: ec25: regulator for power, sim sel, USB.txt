@@ -1,0 +1,130 @@
+f44ee8cf7d15 owen.wen 2021-10-18
+
+AOS-762: ec25: regulator for power, sim sel, USB
+
+LTE_PWRKEY:
+pull high GPIO3 15, then MOSFET(unit Q892) will be connected to ground
+then PWRKEY(on EC25) will be pull low, then EC25 turned on
+And also add 30ms delay on vradio, 30ms is based on EC25 hardware design V2.3
+
+LTE_USIM_SEL:
+pull high GPIO1 28, then SIM1 slot will be selected
+pull low  GPIO1 28, then SIM2 slot will be selected
+
+LTE_USB_VBUS:
+EC25 now consume power from VBAT_BB and VBAT_RF
+no need to setup USB_VBUS
+
+Change-Id: Ie5438fe9feba7220485804d2d7834e81f3265e6d
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 101c560e76f7..f46aeadf11c8 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -245,8 +245,6 @@ sound-tlv320aic31xx {
+ 	modem_reset: modem-reset {
+ 		compatible = "gpio-reset";
+ 		reset-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+-		/* set active_high, default voltage will be low, then SIM1 will be selected */
+-		usim-select-gpios = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+ 		reset-delay-us = <2000>;
+ 		reset-post-delay-ms = <40>;
+ 		#reset-cells = <0>;
+@@ -276,19 +274,6 @@ epdev_on: fixed-regulator-wifi-bt-1v8-vdd {
+ 		enable-active-high;
+ 	};
+ 
+-	reg_vradio_1v8_vdd: fixed-regulator-vradio-1v8-vdd {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_reg_vradio>;
+-		compatible = "regulator-fixed";
+-		regulator-name = "RADIO_PWR_ON";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		gpio = <&gpio3 3 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+ 	reg_usdhc2_vmmc: regulator-vsd-3v3 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_reg_usdhc2>;
+@@ -351,6 +336,46 @@ front-camera-flash {
+ 			max-brightness = <255>;
+ 		};
+ 	};
++
++	reg_vradio_1v8_vdd: fixed-regulator-vradio-1v8-vdd {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_vradio>;
++		compatible = "regulator-fixed";
++		regulator-name = "RADIO_PWR_ON";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio3 3 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <30000>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_lte_pwrkey_1v8_vdd: fixed-regulator-lte-pwrkey-1v8-vdd {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_ltepwrkey>;
++		compatible = "regulator-fixed";
++		regulator-name = "LTE_PWRKEY";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++	};
++
++	reg_lte_simsel_1v8_vdd: fixed-regulator-lte-simsel-1v8-vdd {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_ltesimsel>;
++		compatible = "regulator-fixed";
++		regulator-name = "LTE_SIM_SEL";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		/* set active_high, default voltage will be low, then SIM1 will be selected */
++		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
+ };
+ 
+ &csi1_bridge {
+@@ -941,11 +966,9 @@ &iomuxc {
+ 
+ 	pinctrl_hog: hoggrp {
+ 		fsl,pins = <
+-			MX8MQ_IOMUXC_ENET_RD2_GPIO1_IO28			0x51  //LTE_USIM_SEL
+ 			MX8MQ_IOMUXC_ENET_RD3_GPIO1_IO29			0x51  //LTE_AP_READY
+ 			MX8MQ_IOMUXC_ENET_TD3_GPIO1_IO18			0x19  //LTE_RESET
+ 			MX8MQ_IOMUXC_NAND_DATA05_GPIO3_IO11			0x16  //LTE_WAKE
+-			MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15			0x19  //LTE_PWRKEY
+ 			MX8MQ_IOMUXC_SAI1_RXFS_GPIO4_IO0			0x19  //LTE_VBUS_ON
+ 			MX8MQ_IOMUXC_SAI3_RXFS_GPIO4_IO28			0x19  //LTE_RI
+ 			MX8MQ_IOMUXC_SAI3_RXC_GPIO4_IO29			0x19  //HUB_RESET
+@@ -961,6 +984,18 @@ MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x16
+ 		>;
+ 	};
+ 
++	pinctrl_reg_ltesimsel: regltesimselgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_ENET_RD2_GPIO1_IO28			0x51  //LTE_USIM_SEL
++		>;
++	};
++
++	pinctrl_reg_ltepwrkey: regltepwrkeygrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15			0x19  //LTE_PWRKEY
++		>;
++	};
++
+ 	pinctrl_buck2: vddarmgrp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13			0x19

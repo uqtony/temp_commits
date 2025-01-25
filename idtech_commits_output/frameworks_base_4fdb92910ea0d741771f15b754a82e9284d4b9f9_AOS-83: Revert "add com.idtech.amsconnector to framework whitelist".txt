@@ -1,0 +1,128 @@
+4fdb92910ea0 Kent Lu 2021-10-04
+
+AOS-83: Revert "add com.idtech.amsconnector to framework whitelist"
+
+Change-Id: I5377cde847d3051c44489f7c9cb1ffe09491b8ca
+
+diff --git a/Android.bp b/Android.bp
+index 3a4dbccac882..f80e72d3a78d 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -386,7 +386,6 @@ java_library {
+         "com.android.sysprop.apex",
+         "com.android.sysprop.init",
+         "PlatformProperties",
+-        "amsaar",
+     ],
+     sdk_version: "core_platform",
+     installable: false,
+diff --git a/ams/Android.bp b/ams/Android.bp
+deleted file mode 100644
+index 49d65fb877c6..000000000000
+--- a/ams/Android.bp
++++ /dev/null
+@@ -1,5 +0,0 @@
+-android_library_import {
+-    name: "amsaar",
+-    aars: ["aar/com.idtech.amsconnector.aar"],
+-    sdk_version: "current",
+-}
+diff --git a/ams/aar/com.idtech.amsconnector.aar b/ams/aar/com.idtech.amsconnector.aar
+deleted file mode 100644
+index 53adf35f4404..000000000000
+Binary files a/ams/aar/com.idtech.amsconnector.aar and /dev/null differ
+diff --git a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+index bdfb2c306d82..040727c47891 100644
+--- a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
++++ b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+@@ -69,9 +69,6 @@ import java.io.File;
+ import java.io.FileInputStream;
+ import java.util.HashMap;
+ import java.util.Iterator;
+-import com.idtech.amsconnector.framework.*;
+-import java.util.concurrent.CountDownLatch;
+-import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * APK Signature Scheme v2 verifier.
+@@ -93,7 +90,6 @@ public class ApkSignatureSchemeV2Verifier {
+ 
+     private static final int APK_SIGNATURE_SCHEME_V2_BLOCK_ID = 0x7109871a;
+ 
+-    private static boolean onlineCheckResult = false;
+     /**
+      * Returns {@code true} if the provided APK contains an APK Signature Scheme V2 signature.
+      *
+@@ -311,47 +307,6 @@ public class ApkSignatureSchemeV2Verifier {
+                 throw new SignatureNotFoundException("IDtech signature of signature not found");
+             }
+         }
+-        if (SystemProperties.get("ro.idt.signature_online_check").contains("true")) {
+-            // the latch is used waiting for validateFingerprint return
+-            CountDownLatch latch = new CountDownLatch(1);
+-            String digestOfSignature = "";
+-            try {
+-                MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+-                digest.update(v2_signature);
+-                byte messageDigest[] = digest.digest();
+-                digestOfSignature = getHexString(messageDigest);
+-            } catch (NoSuchAlgorithmException e) {
+-                throw new RuntimeException("Error no such algorithm" + e.getMessage(), e);
+-            }
+-            try {
+-                AMS4FConnector.shared().validateFingerprint(digestOfSignature, new AMS4FCallback<FingerprintValidationResult>() {
+-                    @Override
+-                    public void onResult(FingerprintValidationResult result) {
+-                        if (result.isValid()) {
+-                            onlineCheckResult = true;
+-                        } else {
+-                            onlineCheckResult = false;
+-                        }
+-                        latch.countDown();
+-                    }
+-                    @Override
+-                    public void onFailure(int errCode, String errMessage) {
+-                        onlineCheckResult = false;
+-                        latch.countDown();
+-                    }
+-                });
+-                // validateFingerprint has default 15 seconds timeout
+-                // we can set any number greater than 15 here to wait the result from AMS
+-                latch.await(60, TimeUnit.SECONDS);
+-            } catch (InterruptedException e) {
+-                throw new RuntimeException("Error interrupted" + e.getMessage(), e);
+-            } catch (RemoteException e) {
+-                throw new RuntimeException("Error communicating with remote host: " + e.getMessage(), e);
+-            }
+-            if (!onlineCheckResult) {
+-                throw new SignatureNotFoundException("IDtech signature online check failed");
+-            }
+-        }
+     }
+ 
+     public static PublicKey LoadPublicKey(String path, String algorithm)
+diff --git a/services/core/java/com/android/server/pm/PackageManagerService.java b/services/core/java/com/android/server/pm/PackageManagerService.java
+index c09b625d4b44..7a8d1f9fec5d 100644
+--- a/services/core/java/com/android/server/pm/PackageManagerService.java
++++ b/services/core/java/com/android/server/pm/PackageManagerService.java
+@@ -434,7 +434,6 @@ import java.util.function.Consumer;
+ import java.util.function.Predicate;
+ import java.util.function.Supplier;
+ 
+-import com.idtech.amsconnector.framework.*;
+ /**
+  * Keep track of all those APKs everywhere.
+  * <p>
+@@ -3660,12 +3659,6 @@ public class PackageManagerService extends IPackageManager.Stub
+ 
+         mServiceStartWithDelay = SystemClock.uptimeMillis() + (60 * 1000L);
+ 
+-        try {
+-            AMS4FConnector.shared().start(mContext, mHandler);
+-        } catch (Exception e) {
+-            logCriticalInfo(Log.ERROR, "AMS4FConnector start failed");
+-        }
+-
+         Slog.i(TAG, "Fix for b/169414761 is applied");
+     }
+ 

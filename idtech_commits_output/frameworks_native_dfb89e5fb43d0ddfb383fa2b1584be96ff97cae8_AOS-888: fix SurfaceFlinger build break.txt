@@ -1,0 +1,28 @@
+dfb89e5fb4 AndrewS 2022-03-10
+
+AOS-888: fix SurfaceFlinger build break
+
+Change-Id: I7604b2a16cb7a90b83f289bd263228be894e2f12
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 2e6c4c135b..8a713376ec 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -2603,7 +2603,7 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
+                 sp<IBinder> token = new BBinder();
+                 mCurrentState.displays.add(token, state);
+                 mPhysicalDisplayTokens.emplace(displayId, std::move(token));
+-                mPhysicalDisplayIdList.push_back(displayId.value);
++                mPhysicalDisplayIdList.push_back(displayId);
+ 
+                 if (event.hwcDisplayId == getHwComposer().getInternalHwcDisplayId()) {
+                     initScheduler(state);
+@@ -2646,7 +2646,7 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
+                 mInterceptor->saveDisplayDeletion(state.sequenceId);
+                 mCurrentState.displays.removeItemsAt(index);
+             }
+-            mPhysicalDisplayIdList.remove(displayId.value);
++            mPhysicalDisplayIdList.remove(displayId);
+             mPhysicalDisplayTokens.erase(it);
+         }
+ 

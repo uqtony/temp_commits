@@ -1,0 +1,3401 @@
+147683b jenkins 2020-10-22
+
+Download imx-android-10.0.0_2.5.0.tar.gz from nxp.com
+
+Change-Id: I7c2e9125afc93a278f62f1ddfef12ef3b60d5f70
+
+diff --git a/CactusPlayer/Android.mk b/CactusPlayer/Android.mk
+index a28d852..19884ce 100755
+--- a/CactusPlayer/Android.mk
++++ b/CactusPlayer/Android.mk
+@@ -1,4 +1,4 @@
+-ifeq ($(PRODUCT_MANUFACTURER),freescale)
++ifeq ($(PRODUCT_MANUFACTURER), $(filter $(PRODUCT_MANUFACTURER), freescale nxp))
+ LOCAL_PATH:= $(call my-dir)
+ 
+ include $(CLEAR_VARS)
+diff --git a/codec2/Android.bp b/codec2/Android.bp
+index 6414d40..628966b 100644
+--- a/codec2/Android.bp
++++ b/codec2/Android.bp
+@@ -27,6 +27,27 @@ cc_defaults {
+     vendor: true
+ }
+ 
++imx_codec2_defaults {
++    name: "imx_codec2_default",
++}
++
++bootstrap_go_package {
++    name: "soong-codec2",
++    pkgPath: "android/soong/vendor/nxp/imx_android_mm/codec2",
++    deps: [
++        "blueprint",
++        "blueprint-pathtools",
++        "soong",
++        "soong-android",
++        "soong-cc",
++        "soong-genrule",
++    ],
++    srcs: [
++        "imx_codec2.go",
++    ],
++    pluginFor: ["soong_build"],
++}
++
+ subdirs = [
+     "base",
+     "tsm",
+diff --git a/codec2/audio_dec/aac_dec/AacDecodeUtil.cpp b/codec2/audio_dec/aac_dec/AacDecodeUtil.cpp
+index b81822f..faba2b6 100755
+--- a/codec2/audio_dec/aac_dec/AacDecodeUtil.cpp
++++ b/codec2/audio_dec/aac_dec/AacDecodeUtil.cpp
+@@ -117,7 +117,7 @@ public:
+         noTimeStretch();
+ 
+         addParameter(
+-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
++                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
+                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
+                 .withFields({C2F(mSampleRate, value).oneOf({
+                     7350, 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000, 96000
+@@ -126,15 +126,15 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
++                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
+                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
+                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
+-                .withDefault(new C2BitrateTuning::input(0u, 64000))
++                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
++                .withDefault(new C2StreamBitrateInfo::input(0u, 64000))
+                 .withFields({C2F(mBitrate, value).inRange(8000, 960000)})
+                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
+                 .build());
+@@ -145,10 +145,10 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mAacFormat, C2_NAME_STREAM_AAC_FORMAT_SETTING)
+-                .withDefault(new C2StreamAacFormatInfo::input(0u, C2AacStreamFormatRaw))
++                DefineParam(mAacFormat, C2_PARAMKEY_AAC_PACKAGING)
++                .withDefault(new C2StreamAacFormatInfo::input(0u, C2Config::AAC_PACKAGING_RAW))
+                 .withFields({C2F(mAacFormat, value).oneOf({
+-                    C2AacStreamFormatRaw, C2AacStreamFormatAdts, C2AacStreamFormatAdif
++                    C2Config::AAC_PACKAGING_RAW, C2Config::AAC_PACKAGING_ADTS, (C2Config::aac_packaging_t)AAC_PACKAGING_ADIF
+                 })})
+                 .withSetter(Setter<decltype(*mAacFormat)>::StrictValueWithNoDeps)
+                 .build());
+@@ -197,7 +197,7 @@ public:
+ private:
+     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
+     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
+-    std::shared_ptr<C2BitrateTuning::input> mBitrate;
++    std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
+     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+     std::shared_ptr<C2StreamAacFormatInfo::input> mAacFormat;
+     std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
+@@ -264,11 +264,11 @@ c2_status_t AacDecodeUtil::checkFrameHeader(unsigned char * pBuffer, size_t leng
+     if(bFrameChecked){
+         return C2_OK;
+     } else if (mIntf->isLowLatency()) {
+-        if (mIntf->getAacFormat() == C2AacStreamFormatRaw) {
++        if (mIntf->getAacFormat() == C2Config::AAC_PACKAGING_RAW) {
+             mFrameInput = true;
+         }
+         bFrameChecked = true;
+-        LOGV("low latency mode, mFrameInput %d", mFrameInput);
++        LOGI("low latency mode, mFrameInput %d", mFrameInput);
+         return C2_OK;
+     }
+ 
+@@ -278,30 +278,30 @@ c2_status_t AacDecodeUtil::checkFrameHeader(unsigned char * pBuffer, size_t leng
+         nVal = *pBuffer<<24|*(pBuffer+1)<<16|*(pBuffer+2)<<8|*(pBuffer+3);
+ 
+         if(nVal == ADIF_FILE){
+-            LOGD("ADIF_FILE");
++            LOGI("ADIF_FILE");
+             mFrameInput = false;
+             bFrameChecked = true;
+-            mIntf->setAacFormat((C2Config::aac_packaging_t)C2AacStreamFormatAdif);
++            mIntf->setAacFormat((C2Config::aac_packaging_t)AAC_PACKAGING_ADIF);
+             break;
+         }
+ 
+         if(AFP_SUCCESS != AacCheckFrame(&FrameInfo, pBuffer, length)){
+-            LOGD("CHECK FAILED");
++            LOGE("CHECK FAILED");
+             break;
+         }
+ 
+         if(FrameInfo.bGotOneFrame){
+-            LOGD("ADTS_FILE");
+-            mIntf->setAacFormat(C2AacStreamFormatAdts);
++            LOGI("ADTS_FILE");
++            mIntf->setAacFormat(C2Config::AAC_PACKAGING_ADTS);
+             mFrameInput = false;
+             bFrameChecked = true;
+             break;
+         }
+ 
+-        mIntf->setAacFormat(C2AacStreamFormatRaw);
++        mIntf->setAacFormat(C2Config::AAC_PACKAGING_RAW);
+         mFrameInput = true;
+         bFrameChecked = true;
+-        LOGD("AacFormat Raw");
++        LOGI("AacFormat Raw");
+     }while(0);
+ 
+     return C2_OK;
+@@ -317,7 +317,7 @@ c2_status_t AacDecodeUtil::parseFrame(uint8_t * pBuffer, int len, UniaDecFrameIn
+ 
+     memset(&FrameInfo, 0, sizeof(AUDIO_FRAME_INFO));
+ 
+-    if(mIntf->getAacFormat() !=  C2AacStreamFormatRaw){
++    if(mIntf->getAacFormat() !=  C2Config::AAC_PACKAGING_RAW){
+         if(AFP_SUCCESS == AacCheckFrame(&FrameInfo, pBuffer, len)){
+             info->bGotOneFrame = FrameInfo.bGotOneFrame;
+             info->nConsumedOffset = FrameInfo.nConsumedOffset;
+@@ -344,8 +344,6 @@ c2_status_t AacDecodeUtil::getDecoderProp(AUDIOFORMAT *formatType, int *isHwBase
+     if (isHwBased)
+         *isHwBased = !strcmp(wrapperLibName, DSP_WRAPPER_LIB_NAME);
+ 
+-    if(*isHwBased)
+-        *formatType = AAC_PLUS;
+     return C2_OK;
+ }
+ 
+@@ -438,17 +436,17 @@ c2_status_t AacDecodeUtil::getParameter(UA_ParaType index,int32_t * value)
+         case UNIA_STREAM_TYPE:
+         {
+             C2Config::aac_packaging_t fmt = mIntf->getAacFormat();
+-            if(fmt == C2AacStreamFormatAdts){
++            if(fmt == C2Config::AAC_PACKAGING_ADTS){
+                 *value = STREAM_ADTS;
+-            }else if(fmt == (C2Config::aac_packaging_t)C2AacStreamFormatAdif){
++            }else if(fmt == (C2Config::aac_packaging_t)AAC_PACKAGING_ADIF){
+                 *value = STREAM_ADIF;
+-            }else if(fmt == C2AacStreamFormatRaw){
++            }else if(fmt == C2Config::AAC_PACKAGING_RAW){
+                 *value = STREAM_RAW;
+                 mFrameInput = true;
+             }else{
+                 *value = STREAM_UNKNOW;
+             }
+-            LOGV("stream type %s",*value == STREAM_RAW ?"RAW":(*value == STREAM_ADTS?"ADTS"\
++            LOGI("stream type %s",*value == STREAM_RAW ?"RAW":(*value == STREAM_ADTS?"ADTS"\
+                 :(*value == STREAM_ADIF?"ADIF":"UNKNOWN")));
+             break;
+         }
+@@ -470,7 +468,7 @@ c2_status_t AacDecodeUtil::getParameter(UA_ParaType index,int32_t * value)
+         }
+         default:
+         {
+-            LOGV("unknown index!");
++            LOGV("unknown index %d", index);
+             ret = C2_OMITTED;
+             break;
+         }
+@@ -531,22 +529,10 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2AacDecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+-/*
+-extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
+-    LOGV("entry");
+-    return new ::android::IMXC2AacDecFactory(nullptr);
+-}
+ 
+-extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+-    delete factory;
+-}
+-*/
+diff --git a/codec2/audio_dec/aac_dec/Android.bp b/codec2/audio_dec/aac_dec/Android.bp
+index e39fc4e..b0ca94a 100644
+--- a/codec2/audio_dec/aac_dec/Android.bp
++++ b/codec2/audio_dec/aac_dec/Android.bp
+@@ -9,10 +9,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+     ],
+ 
+     local_include_dirs: [
+@@ -32,8 +32,10 @@ cc_library_shared {
+         "lib_imx_c2_componentbase",
+         "liblog",
+         "libcodec2_vndk",
++        "libcodec2",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/ac3_dec/Ac3DecodeUtil.cpp b/codec2/audio_dec/ac3_dec/Ac3DecodeUtil.cpp
+index e6a5aa0..5b14900 100755
+--- a/codec2/audio_dec/ac3_dec/Ac3DecodeUtil.cpp
++++ b/codec2/audio_dec/ac3_dec/Ac3DecodeUtil.cpp
+@@ -47,7 +47,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
++                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
+                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
+                 .withFields({C2F(mSampleRate, value).oneOf({
+                     32000, 44100, 48000
+@@ -56,15 +56,15 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
++                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
+                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
+                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
+-                .withDefault(new C2BitrateTuning::input(0u, 64000))
++                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
++                .withDefault(new C2StreamBitrateInfo::input(0u, 64000))
+                 .withFields({C2F(mBitrate, value).inRange(8000, 960000)})
+                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
+                 .build());
+@@ -86,7 +86,7 @@ public:
+ private:
+     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
+     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
+-    std::shared_ptr<C2BitrateTuning::input> mBitrate;
++    std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
+     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+ };
+ 
+@@ -335,22 +335,10 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2Ac3DecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+-/*
+-extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
+-    LOGV("entry");
+-    return new ::android::IMXC2AacDecFactory(nullptr);
+-}
+ 
+-extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+-    delete factory;
+-}
+-*/
+diff --git a/codec2/audio_dec/ac3_dec/Android.bp b/codec2/audio_dec/ac3_dec/Android.bp
+index 4b75e59..1c5a554 100644
+--- a/codec2/audio_dec/ac3_dec/Android.bp
++++ b/codec2/audio_dec/ac3_dec/Android.bp
+@@ -9,10 +9,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+     ],
+ 
+     local_include_dirs: [
+@@ -34,6 +34,7 @@ cc_library_shared {
+         "libcodec2_vndk",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/audio_dec.go b/codec2/audio_dec/audio_dec.go
+index 51f93bc..46551c7 100644
+--- a/codec2/audio_dec/audio_dec.go
++++ b/codec2/audio_dec/audio_dec.go
+@@ -18,6 +18,7 @@ import (
+         "android/soong/android"
+         "android/soong/cc"
+         "github.com/google/blueprint/proptools"
++        "strings"
+ )
+ 
+ func init() {
+@@ -39,7 +40,13 @@ func audio_decDefaults(ctx android.LoadHookContext) {
+         }
+     }
+     p := &props{}
+-    p.Target.Android.Enabled = proptools.BoolPtr(true)
++    p.Target.Android.Enabled = proptools.BoolPtr(false)
++
++    var board string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_PLATFORM")
++    if strings.Contains(board, "imx") {
++        p.Target.Android.Enabled = proptools.BoolPtr(true)
++    }
++
+     if ctx.Config().VendorConfig("IMXPLUGIN").Bool("BOARD_VPU_ONLY") {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+     }
+diff --git a/codec2/audio_dec/common/Android.bp b/codec2/audio_dec/common/Android.bp
+index 355afbf..aea896e 100644
+--- a/codec2/audio_dec/common/Android.bp
++++ b/codec2/audio_dec/common/Android.bp
+@@ -16,10 +16,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+     ],
+ 
+     //local_include_dirs: [
+@@ -32,10 +32,15 @@ cc_library_shared {
+         "audio_frame_parser",
+     ],
+ 
++    header_libs: ["libcodec2_headers"],
++
+     shared_libs: [
+         "liblog",
+         "lib_imx_c2_componentbase",
+         "libcodec2_vndk",
++        "libcutils",
++        "libcodec2",
++        "libstagefright_foundation",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/common/AudioDecodeUtil.h b/codec2/audio_dec/common/AudioDecodeUtil.h
+index 3c1c72f..3d9c243 100755
+--- a/codec2/audio_dec/common/AudioDecodeUtil.h
++++ b/codec2/audio_dec/common/AudioDecodeUtil.h
+@@ -12,6 +12,7 @@
+ #include <C2.h>
+ #include <C2_imx.h>
+ #include <fsl_unia.h>
++#include <cutils/properties.h>
+ 
+ namespace android {
+ 
+@@ -19,7 +20,9 @@ struct UniaDecFrameInfo;
+ 
+ class AudioDecodeUtil {
+     public:
+-        AudioDecodeUtil():mFrameInput(false){};
++        AudioDecodeUtil():mFrameInput(false){
++            logLevel = property_get_int32("media.log.level", 0);
++        };
+         virtual c2_status_t getLibName(const char ** lib, const char ** optionalLib) = 0;
+         virtual uint32_t getFrameHdrBufLen(){ return 0;};
+         virtual uint32_t getOutBufferLen() = 0;
+@@ -44,6 +47,8 @@ class AudioDecodeUtil {
+         const char * wrapperLibName;
+         const char * optionalWrapperLibName;
+         bool mFrameInput;
++        int32_t logLevel;
++
+ 
+ };
+ 
+diff --git a/codec2/audio_dec/common/AudioTSManager.cpp b/codec2/audio_dec/common/AudioTSManager.cpp
+old mode 100755
+new mode 100644
+index 46c747b..3065d71
+--- a/codec2/audio_dec/common/AudioTSManager.cpp
++++ b/codec2/audio_dec/common/AudioTSManager.cpp
+@@ -17,6 +17,7 @@
+ #include <malloc.h>
+ #include "AudioTSManager.h"
+ #include <C2_imx.h>
++#include <cutils/properties.h>
+ 
+ AudioTSManager::AudioTSManager()
+ {
+@@ -27,6 +28,7 @@ AudioTSManager::AudioTSManager()
+     TotalConsumeLen = 0;
+     TotalReceivedLen = 0;
+     nOneByteTime = 0;
++    logLevel = property_get_int32("media.log.level", 0);
+ }
+ 
+ AUDIO_TS_MANAGER_ERRORTYPE AudioTSManager::Create()
+@@ -87,7 +89,7 @@ AUDIO_TS_MANAGER_ERRORTYPE AudioTSManager::Free()
+ {
+     AUDIO_TS_MANAGER_ERRORTYPE ret = AUDIO_TS_MANAGER_SUCCESS;
+ 
+-    if(TS_Queue){
++    if(TS_Queue != nullptr){
+         delete TS_Queue;
+         TS_Queue = nullptr;
+     }
+@@ -197,7 +199,7 @@ AUDIO_TS_MANAGER_ERRORTYPE AudioTSManager::Consumed(uint32_t ConsumedLen)
+         LOGV("len %d, TotalConsumeLen %lld", ConsumedLen, (long long)TotalConsumeLen);
+ 
+ 	if (TS_Queue->GetNodeCnt() < 1){
+-            LOGW("no ts item!");
++            LOGV("no ts item!");
+             return ret;
+        }
+ 
+diff --git a/codec2/audio_dec/common/AudioTSManager.h b/codec2/audio_dec/common/AudioTSManager.h
+index d41ce89..d30f56c 100755
+--- a/codec2/audio_dec/common/AudioTSManager.h
++++ b/codec2/audio_dec/common/AudioTSManager.h
+@@ -55,7 +55,8 @@ class AudioTSManager {
+ 		bool bHaveTS;
+ 		int64_t TotalConsumeLen;
+ 		int64_t TotalReceivedLen;
+-               uint32_t nOneByteTime;
++		uint32_t nOneByteTime;
++		int32_t logLevel;
+ };
+ 
+ #endif
+diff --git a/codec2/audio_dec/common/IMXAudioDecComponent.cpp b/codec2/audio_dec/common/IMXAudioDecComponent.cpp
+old mode 100755
+new mode 100644
+index f37d444..62713e0
+--- a/codec2/audio_dec/common/IMXAudioDecComponent.cpp
++++ b/codec2/audio_dec/common/IMXAudioDecComponent.cpp
+@@ -6,13 +6,14 @@
+  *  and contain its proprietary and confidential information.
+  */
+ 
+-//#define LOG_NDEBUG 0
++#define LOG_NDEBUG 0
+ #define LOG_TAG "AudDecComp"
+ #include "IMXAudioDecComponent.h"
+ #include <C2Buffer.h>
+ #include <sys/stat.h>
+ #include <stdio.h>
+ #include <numeric>
++#include <cutils/properties.h>
+ 
+ #define MAX(a,b) ((a)>=(b)?(a):(b))
+ 
+@@ -22,11 +23,14 @@ IMXAudioDecComponent::IMXAudioDecComponent(const std::shared_ptr<C2ComponentInte
+ : IMXC2ComponentBase(intf),
+     bConvertEnable(true),
+     ePlayMode(DEC_FILE_MODE),
++    pConvertBuffer(nullptr),
+     bFirstOutput(true),
+     fpOutput(nullptr),
+-    frameIndex(0)
++    frameIndex(0),
++    bInitFlag(false)
+ {
+     LOGV("entry %p", this);
++    logLevel = property_get_int32("media.log.level", 0);
+ }
+ 
+ IMXAudioDecComponent::~IMXAudioDecComponent()
+@@ -39,6 +43,9 @@ IMXAudioDecComponent::~IMXAudioDecComponent()
+ c2_status_t IMXAudioDecComponent::onInit()
+ {
+     LOGV("entry");
++    if(bInitFlag) // avoid init twice
++        return C2_OK;
++
+     RINGBUFFER_ERRORTYPE BufferRet = RINGBUFFER_SUCCESS;
+     BufferRet = AudioRingBuffer.BufferCreate(nPushModeInputLen, nRingBufferScale);
+     if (BufferRet != RINGBUFFER_SUCCESS)
+@@ -64,7 +71,7 @@ c2_status_t IMXAudioDecComponent::onInit()
+     bFirstOutput = true;
+     nRequiredSize = 0;
+     nOutputBitPerSample = 16;
+-    pConvertBuffer = nullptr;
++
+     nConvertBufferSize = 200000;
+     bCheckFrameHeader = false;
+     mTimestampDelta = 0;
+@@ -77,7 +84,8 @@ c2_status_t IMXAudioDecComponent::onInit()
+         LOGE("doInit fail!");
+         return C2_NO_MEMORY;
+     }
+-    
++
++    bInitFlag = true;
+     return C2_OK;
+ }
+ 
+@@ -91,6 +99,7 @@ c2_status_t IMXAudioDecComponent::onStop()
+ void IMXAudioDecComponent::onReset()
+ {
+     LOGV("entry");
++
+     (void) onStop();
+ }
+ 
+@@ -110,24 +119,31 @@ void IMXAudioDecComponent::onRelease()
+     AudioRingBuffer.BufferFree();
+     TS_Manager.Free();
+ 
+-    free(pConvertBuffer);
+-    pConvertBuffer = nullptr;
++    if(pConvertBuffer != nullptr){
++        free(pConvertBuffer);
++        pConvertBuffer = nullptr;
++    }
+ 
++    bInitFlag = false;
+     return;
+ }
+ 
+ c2_status_t IMXAudioDecComponent::onFlush_sm()
+ {
+     LOGV("entry");
++
+     bReceivedEOS = false;
+     bDecoderEOS = false;
+     bFirstOutput = true;
+     bCheckFrameHeader = false;
+-    mDecodeEachInput = 0;
+     mTimestampDelta = 0;
+     AudioRingBuffer.BufferReset();
+     TS_Manager.Reset();
+ 
++    while (!mFrameLenQueue.empty()) {
++        mFrameLenQueue.pop();
++    }
++
+     doReset();
+     LOGD("Clear ring buffer.
+");
+     return C2_OK;
+@@ -288,6 +304,9 @@ c2_status_t IMXAudioDecComponent::_processInputFlag(const std::unique_ptr<C2Work
+ 
+     TS_Manager.TS_Add(timestamp, size);
+ 
++    if (size > 0)
++        mFrameLenQueue.push(size);
++
+     return C2_OK;
+ }
+ 
+@@ -327,11 +346,18 @@ c2_status_t IMXAudioDecComponent::_processInputData(const std::unique_ptr<C2Work
+         work->workletsProcessed = 1u;
+     }
+ 
++    //if(nActualLen > 0)
++    //    _fileDump(&fpOutput, pBuffer, nActualLen);
++
+     if (nActualLen < size)
+     {
+-        LOGW("ringbuffer full !added %d, expect %zu, total %d", nActualLen, size, AudioRingBuffer.AudioDataLen());
++        LOGW("ringbuffer full! added %d, expect %zu, total %d", nActualLen, size, AudioRingBuffer.AudioDataLen());
+         uint32_t left = size - nActualLen;
+         uint32_t newLen = MAX(AudioRingBuffer.AudioDataLen() * 2, size+1024);
++        if(newLen > 10*1024*1024 /*max buffer size*/){
++            LOGE("ringbuffer size reaches upper limit!");
++            return C2_OK;
++        }
+         AudioRingBuffer.Resize(newLen);
+         AudioRingBuffer.BufferAdd(pBuffer + nActualLen, left, &nActualLen);
+         if (nActualLen < left){
+@@ -444,7 +470,7 @@ c2_status_t IMXAudioDecComponent::_processOutput(const std::unique_ptr<C2Work> &
+     }
+ 
+     if(pOutBuffer == nullptr || nOutBufferLen == 0){
+-        LOGW("No valid output for this decoding");
++        LOGV("No valid output for this decoding");
+         return C2_OK;
+     }
+ 
+@@ -459,6 +485,10 @@ c2_status_t IMXAudioDecComponent::_processOutput(const std::unique_ptr<C2Work> &
+         handleEOS(&pOutBuffer, &nOutBufferLen);
+     }
+ 
++    if(nOutBufferLen <= nOutBufferOffset){
++        LOGV("No valid output for this decoding because of nOutBufferOffset %d", nOutBufferOffset);
++        return C2_OK;
++    }
+ 
+     //
+     // Convert to 16 bits if necessary, result is in pData/dataLen
+diff --git a/codec2/audio_dec/common/IMXAudioDecComponent.h b/codec2/audio_dec/common/IMXAudioDecComponent.h
+old mode 100755
+new mode 100644
+index a3e9b18..8ef1fd5
+--- a/codec2/audio_dec/common/IMXAudioDecComponent.h
++++ b/codec2/audio_dec/common/IMXAudioDecComponent.h
+@@ -9,6 +9,7 @@
+ #ifndef IMX_AUDIO_DEC_COMPONENT_H_
+ #define IMX_AUDIO_DEC_COMPONENT_H_
+ 
++#include <queue>
+ #include <IMXC2ComponentBase.h>
+ 
+ #include "RingBuffer.h"
+@@ -95,6 +96,9 @@ protected:
+     bool bReceivedEOS;
+     int64_t mTimestampDelta;
+     uint32_t mDecodeEachInput;
++    int32_t logLevel;
++
++    std::queue<int> mFrameLenQueue;
+ 
+ private:
+ 
+@@ -108,6 +112,7 @@ private:
+     bool  bFirstOutput;
+     FILE* fpOutput;
+     uint32_t frameIndex;
++    bool bInitFlag;
+ 
+     c2_status_t _processInputFlag(const std::unique_ptr<C2Work> &work);
+     c2_status_t _processInputData(const std::unique_ptr<C2Work> &work);
+diff --git a/codec2/audio_dec/common/RingBuffer.cpp b/codec2/audio_dec/common/RingBuffer.cpp
+old mode 100755
+new mode 100644
+index 11bc96c..72df359
+--- a/codec2/audio_dec/common/RingBuffer.cpp
++++ b/codec2/audio_dec/common/RingBuffer.cpp
+@@ -16,6 +16,7 @@
+ #include <malloc.h>
+ #include <string.h>
+ #include <C2_imx.h>
++#include <cutils/properties.h>
+ 
+ RingBuffer::RingBuffer()
+ {
+@@ -30,6 +31,7 @@ RingBuffer::RingBuffer()
+ 	Begin = NULL;
+ 	End = NULL;
+ 	Consumered = NULL;
++	logLevel = property_get_int32("media.log.level", 0);
+ }
+ 
+ RINGBUFFER_ERRORTYPE RingBuffer::BufferCreate(uint32_t nPushModeLen, uint32_t nRingBufferScale)
+@@ -113,11 +115,15 @@ RINGBUFFER_ERRORTYPE RingBuffer::BufferFree()
+ {
+ 	RINGBUFFER_ERRORTYPE ret = RINGBUFFER_SUCCESS;
+ 
+-    free(RingBufferPtr);
+-    RingBufferPtr = NULL;
++    if(RingBufferPtr != NULL){
++        free(RingBufferPtr);
++        RingBufferPtr = NULL;
++    }
+ 
+-    free(Reserved);
+-    Reserved = NULL;
++    if(Reserved != NULL){
++        free(Reserved);
++        Reserved = NULL;
++    }
+ 
+ 	return ret;
+ }
+diff --git a/codec2/audio_dec/common/RingBuffer.h b/codec2/audio_dec/common/RingBuffer.h
+index 0f42279..0e54630 100755
+--- a/codec2/audio_dec/common/RingBuffer.h
++++ b/codec2/audio_dec/common/RingBuffer.h
+@@ -51,6 +51,7 @@ class RingBuffer {
+ 		uint8_t *Begin;
+ 		uint8_t *End;
+ 		uint8_t *Consumered;
++		int32_t logLevel;
+ };
+ 
+ #endif
+diff --git a/codec2/audio_dec/common/UniaDecoder.cpp b/codec2/audio_dec/common/UniaDecoder.cpp
+index a65f1f7..df40f4e 100755
+--- a/codec2/audio_dec/common/UniaDecoder.cpp
++++ b/codec2/audio_dec/common/UniaDecoder.cpp
+@@ -6,7 +6,7 @@
+  *  and contain its proprietary and confidential information.
+  */
+ 
+-//#define LOG_NDEBUG 0
++#define LOG_NDEBUG 0
+ #define LOG_TAG "UniaDecodr"
+ #include <log/log.h>
+ #include "UniaDecoder.h"
+@@ -16,9 +16,37 @@
+ 
+ #define MAX_PROFILE_ERROR_COUNT 1500 //about 1 second decoding time, 30 seconds' audio data length
+ #define TICKS_PER_SECOND 1000000
++#define IS_ERROR(ret) ret == ACODEC_ERROR_STREAM \
++                  || ret == ACODEC_PARA_ERROR \
++                  || ret == ACODEC_INSUFFICIENT_MEM \
++                  || ret == ACODEC_ERR_UNKNOWN \
++                  || ret == ACODEC_PROFILE_NOT_SUPPORT \
++                  || ret == ACODEC_INIT_ERR
++#define LOG_RET(ret, FMT, ...) {if(IS_ERROR(ret))LOGE(FMT, ##__VA_ARGS__); \
++                                else LOGV(FMT, ##__VA_ARGS__);}
+ 
+ namespace android {
+ 
++static std::unordered_map<UA_ParaType, const char *> gUniaParam2StringMap = {
++    {UNIA_SAMPLERATE,           "UNIA_SAMPLERATE"},
++    {UNIA_CHANNEL,              "UNIA_CHANNEL"},
++    {UNIA_FRAMED,               "UNIA_FRAMED"},
++    {UNIA_DEPTH,                "UNIA_DEPTH"},
++    {UNIA_CODEC_DATA,           "UNIA_CODEC_DATA"},
++    {UNIA_BITRATE,              "UNIA_BITRATE"},
++    {UNIA_DOWNMIX_STEREO,       "UNIA_DOWNMIX_STEREO"},
++    {UNIA_STREAM_TYPE,          "UNIA_STREAM_TYPE"},
++    {UNIA_CHAN_MAP_TABLE,       "UNIA_CHAN_MAP_TABLE"},
++    {UNIA_WMA_BlOCKALIGN,       "UNIA_WMA_BlOCKALIGN"},
++    {UNIA_WMA_VERSION,          "UNIA_WMA_VERSION"},
++    {UNIA_RA_FLAVOR_INDEX,      "UNIA_RA_FLAVOR_INDEX"},
++    {UNIA_RA_FRAME_BITS,        "UNIA_RA_FRAME_BITS"},
++    {UNIA_MP3_DEC_CRC_CHECK,    "UNIA_MP3_DEC_CRC_CHECK"},
++    {UNIA_MP3_DEC_MCH_ENABLE,   "UNIA_MP3_DEC_MCH_ENABLE"},
++    {UNIA_OUTPUT_PCM_FORMAT,    "UNIA_OUTPUT_PCM_FORMAT"},
++    {UNIA_CONSUMED_LENGTH,      "UNIA_CONSUMED_LENGTH"},
++};
++
+ /*****************************************************************************
+  * Function:    appLocalMalloc
+  *
+@@ -152,15 +180,15 @@ c2_status_t UniaDecoder::doInit()
+         LOGE("audio decoder param not inited!");
+         return C2_BAD_VALUE;
+     }
+-    LOGD("nPushModeInputLen=%d" ,nPushModeInputLen);
+-
+     PcmMode.nChannels = 2;
+     PcmMode.nBitPerSample = 16;
+     PcmMode.nSamplingRate = 44100;
+ 
+     ret = _createWrapperInterface();
+-    if(ret != C2_OK)
++    if(ret != C2_OK){
++        LOGE("_createWrapperInterface fail");
+         return ret;
++    }
+ 
+     // from AudioFilterInstanceInit
+     codecConfig.buf = nullptr;
+@@ -183,13 +211,14 @@ c2_status_t UniaDecoder::doInit()
+             ret = C2_OK;
+ 
+         if(mWrapperHandle == nullptr){
++            LOGE("create decoder fail");
+             ret = C2_OMITTED;
+             break;
+         }
+ 
+         _initWrapperWithParam();
+     }while(0);
+-
++    LOGD("doInit success");
+     return ret;
+ }
+ 
+@@ -243,8 +272,10 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::doDecode(const std::unique_ptr<C2Work> &wo
+         }
+         if(ret == AUDIO_DECODE_NEEDMORE
+             && AudioRingBuffer.AudioDataLen() > 0
+-            && retry++ < maxRetryCount)
++            && retry++ < maxRetryCount){
++            LOGV("retry for NEEDMORE");
+             continue;
++        }
+ 
+         if(ret == AUDIO_DECODE_FATAL_ERROR || ret == AUDIO_DECODE_EOS)
+             break;
+@@ -276,16 +307,11 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+     uint32_t InputLen = 0;;
+     uint32_t InputOffset = 0;
+     uint8_t * pInputBuffer = nullptr;
+-    AUDIOFORMAT format = FORMAT_UNKNOW;
+-    bool hwBased = false, swBased = true;
+     *ppOutputBuffer = nullptr;
+     *pOutputSize = 0;
+     UniaDecFrameInfo FrameInfo;
+     memset(&FrameInfo, 0, sizeof(UniaDecFrameInfo));
+ 
+-    mUtil->getDecoderProp(&format, &hwBased);
+-    swBased = !hwBased;
+-
+     AudioRingBuffer.BufferGet(&pInputBuffer, nPushModeInputLen, &InputLen);
+     LOGV("nPushModeInputLen %d,InputLen %d,isFrameInput %d",
+               nPushModeInputLen, InputLen, mUtil->isFrameInput());
+@@ -313,15 +339,18 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+             LOGI("can't get one frame,size=%d",FrameInfo.nFrameSize);
+             return ret;
+         }
+-    }else if(mUtil->isFrameInput() && InputLen != 0){
+-        uint32_t nFrameLen;
+-        nFrameLen = TS_Manager.GetFrameLen();
+-        LOGV("nFrameLen from tsm %d",   nFrameLen);
++    } else if (mUtil->isFrameInput() && InputLen != 0) {
++        uint32_t nFrameLen = 0;
++
++        if (mFrameLenQueue.size() > 0)
++            nFrameLen = mFrameLenQueue.front();
++
+         if (nFrameLen == 0)
+-            nFrameLen = nPushModeInputLen;
++            nFrameLen = nPushModeInputLen;;
+ 
+         AudioRingBuffer.BufferGet(&pInputBuffer, nFrameLen, &InputLen);
+     }
++
+     //struct timeval tv, tv1;
+     //gettimeofday (&tv, nullptr);
+     //InputOffsetBegin = InputOffset;
+@@ -338,18 +367,28 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+     if(pInputBuffer && InputLen > 0){
+         decoderRet = mWrapper->DecodeFrame(mWrapperHandle,pInputBuffer,InputLen,
+             &InputOffset,&pOutputBuffer,&nActualOutLen);
+-        if(!(mUtil->isFrameInput() && swBased)){
+-            if(decoderRet == ACODEC_ERR_UNKNOWN && InputOffset == 0)
+-                InputOffset = InputLen; // skip this block of data, avoid dead loop in doDecode
+-            LOGV("ringbuffer consumed InputOffset %d", InputOffset);
+-            AudioRingBuffer.BufferConsumed(InputOffset);
+-            LOGV("ringbuffer left %d", AudioRingBuffer.AudioDataLen());
++        if(decoderRet == ACODEC_ERR_UNKNOWN && InputOffset == 0)
++            InputOffset = InputLen; // skip this block of data, avoid dead loop in doDecode
++        AudioRingBuffer.BufferConsumed(InputOffset);
++        if (InputOffset > 0) {
++            uint32_t tempSize = 0;
++            while (mFrameLenQueue.size() > 0) {
++                tempSize += mFrameLenQueue.front();
++                if (InputOffset >= tempSize)
++                    mFrameLenQueue.pop();
++                if (InputOffset <= tempSize)
++                    break;
++            }
+         }
++        LOGV("ringbuffer consumed InputOffset %d, left %d",InputOffset, AudioRingBuffer.AudioDataLen());
+         inputFrameCount += InputOffset;
+     }else{
+         decoderRet = mWrapper->DecodeFrame(mWrapperHandle,nullptr,0,&InputOffset,&pOutputBuffer,&nActualOutLen);
+     }
+-    LOGV("wrapperRet \"%s\", InputOffset=%d, nActualOutLen=%d",  _wrapperRet2string(decoderRet),InputOffset,nActualOutLen);
++    mWrapper->GetParameter(mWrapperHandle,UNIA_CONSUMED_LENGTH,(UniACodecParameter*)&consumeLen);
++
++    LOG_RET(decoderRet, "wrapperRet \"%s\", InputOffset %d, consumeLen %d, nActualOutLen %d",
++                    _wrapperRet2string(decoderRet),InputOffset,consumeLen, nActualOutLen);
+     //gettimeofday (&tv1, nullptr);
+     //LOGD("AudioFilterFrame decode cost: %d
+", (tv1.tv_sec-tv.tv_sec)*1000+(tv1.tv_usec-tv.tv_usec)/1000);
+ 
+@@ -367,17 +406,8 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+         TS_PerFrame = (int64_t)nActualOutLen*8*TICKS_PER_SECOND/PcmMode.nChannels \
+                 /PcmMode.nSamplingRate/nOutputBitPerSample;//PcmMode.nBitPerSample;
+ 
+-        mWrapper->GetParameter(mWrapperHandle,UNIA_CONSUMED_LENGTH,(UniACodecParameter*)&consumeLen);
+-
+-        if(!mUtil->isFrameInput() || (mUtil->isFrameInput() && swBased)){
+-            LOGV("TSM Consumed consumeLen %d",consumeLen);
+-            TS_Manager.Consumed(consumeLen);
+-        }
+-        else{
+-            LOGV("TSM Consumed inputOffset %d",InputOffset);
+-            TS_Manager.Consumed(InputOffset);
+-        }
+-
++        LOGV("TSM Consumed consumeLen %d",consumeLen);
++        TS_Manager.Consumed(consumeLen);
+         TS_Manager.TS_SetIncrease(TS_PerFrame);
+ 
+         // finetune ts with total output len to match with vts
+@@ -390,12 +420,6 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+             TS_Manager.TS_SetIncrease(1);
+ 
+         consumeFrameCount += consumeLen;
+-        if(mUtil->isFrameInput() && swBased){
+-            //more than one frames could be in a frame buffer, so consume one frame's length.
+-            LOGV("ringbuffer consumed consumeLen %d", consumeLen);
+-            AudioRingBuffer.BufferConsumed(consumeLen);
+-            LOGV("ringbuffer left %d", AudioRingBuffer.AudioDataLen());
+-        }
+ 
+         if(nActualOutLen == 0){
+             ret = AUDIO_DECODE_NEEDMORE;
+@@ -419,16 +443,9 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+     }else if(decoderRet == ACODEC_NOT_ENOUGH_DATA){
+         ret = AUDIO_DECODE_NEEDMORE;
+     }else if((decoderRet == ACODEC_ERROR_STREAM || decoderRet == ACODEC_ERR_UNKNOWN) && pInputBuffer){
+-        mWrapper->GetParameter(mWrapperHandle,UNIA_CONSUMED_LENGTH,(UniACodecParameter*)&consumeLen);
+         mWrapper->ResetDecoder(mWrapperHandle);
+-        if(mUtil->isFrameInput() && swBased){
+-            LOGV("ringbuffer consumed InputOffset %d", InputOffset);
+-            AudioRingBuffer.BufferConsumed(InputOffset);
+-            LOGV("ringbuffer left %d", AudioRingBuffer.AudioDataLen());
+-        }
+-        TS_Manager.Consumed(InputOffset);
++        TS_Manager.Consumed(consumeLen);
+         consumeFrameCount += InputOffset;
+-        LOGD("consumeLen=%d,InputOffset=%d",consumeLen,InputOffset);
+         ret = AUDIO_DECODE_FAILURE;
+         errorCount ++;
+     }else if((decoderRet == ACODEC_ERROR_STREAM || decoderRet == ACODEC_ERR_UNKNOWN) && !pInputBuffer){
+@@ -460,7 +477,7 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+     if(profileErrorCount > MAX_PROFILE_ERROR_COUNT){
+         ret = AUDIO_DECODE_FATAL_ERROR;
+         profileErrorCount = 0;
+-        LOGD("return AUDIO_DECODE_FATAL_ERROR instead of ACODEC_PROFILE_NOT_SUPPORT");
++        LOGE("return AUDIO_DECODE_FATAL_ERROR instead of ACODEC_PROFILE_NOT_SUPPORT");
+     }
+ 
+     // outputbuffer doesn't contain valid data, free it here
+@@ -476,11 +493,9 @@ c2_status_t UniaDecoder::checkFrameHeader()
+     LOGV("entry");
+     uint8_t *pBuffer;
+     uint32_t nActualLen = 0;
+-    uint32_t nVal = 0;
+     uint32_t nOffset = 0;
+     c2_status_t ret = C2_OK;
+-    //AUDIO_FRAME_INFO FrameInfo;
+-    //memset(&FrameInfo, 0, sizeof(AUDIO_FRAME_INFO));
++    int32_t value;
+ 
+     size_t pushModeLen = mUtil->getFrameHdrBufLen();
+     if(pushModeLen <= 0)
+@@ -490,7 +505,7 @@ c2_status_t UniaDecoder::checkFrameHeader()
+     LOGV("Get stream length: %d, pushModeLen %zu
+", nActualLen, pushModeLen);
+ 
+     if (nActualLen < pushModeLen && ePlayMode == DEC_FILE_MODE){
+-        LOGW("no enough data to check frame header");
++        LOGV("no enough data to check frame header");
+         return C2_OK;
+     }
+ 
+@@ -500,8 +515,9 @@ c2_status_t UniaDecoder::checkFrameHeader()
+         TS_Manager.Consumed(nOffset);
+     }
+ 
+-    mDecodeEachInput = mUtil->isFrameInput();
+-    LOGI("isFrameInput %d", mUtil->isFrameInput());
++    // raw aac format && low latency mode
++    mDecodeEachInput = mUtil->isFrameInput() && mUtil->getFrameHdrBufLen()==1;
++    LOGI("mDecodeEachInput %d", mDecodeEachInput);
+ 
+     return ret;
+ }
+@@ -513,7 +529,7 @@ c2_status_t UniaDecoder::codecInit()
+     int32_t value = 0;
+     //set stream type here for aac type after got from frame header
+     if(C2_OK == mUtil->getParameter(UNIA_STREAM_TYPE,&value)){
+-        LOGV("mWrapper SetParameter UNIA_STREAM_TYPE=%d",value);
++        LOGV("mWrapper SetParameter UNIA_STREAM_TYPE %d",value);
+         mWrapper->SetParameter(mWrapperHandle,UNIA_STREAM_TYPE,(UniACodecParameter*)&value);
+     }
+     return ret;
+@@ -584,19 +600,25 @@ c2_status_t UniaDecoder::checkCodecConfig(const uint8 * data, size_t size)
+ c2_status_t UniaDecoder::unInit()
+ {
+     LOGV("entry");
+-    free(codecConfig.buf);
+-    codecConfig.buf = nullptr;
++    if(codecConfig.buf != nullptr){
++        free(codecConfig.buf);
++        codecConfig.buf = nullptr;
++    }
+ 
+     if(mWrapper != nullptr && mWrapperHandle != nullptr){
+         mWrapper->DeleteDecoder(mWrapperHandle);
+         mWrapperHandle = nullptr;
+     }
+ 
+-    if (mLibHandle)
++    if (mLibHandle){
+         dlclose(mLibHandle);
+-    mLibHandle = nullptr;
+-    free(mWrapper);
+-    mWrapper = nullptr;
++        mLibHandle = nullptr;
++    }
++
++    if(mWrapper != nullptr){
++        free(mWrapper);
++        mWrapper = nullptr;
++    }
+     LOGV("UniaDec::DeInitComponent inputFrameCount=%d,consumeFrameCount=%d",inputFrameCount,consumeFrameCount);
+     return C2_OK;
+ }
+@@ -630,7 +652,7 @@ c2_status_t UniaDecoder::_initWrapperWithParam()
+ 
+         value = 0;
+         if(C2_OK == mUtil->getParameter((UA_ParaType)i,&value)){
+-            LOGV("mWrapper SetParameter %d=%d, SetParameterToDecoder",i, value);
++            LOGI("mWrapper SetParameter %s %d",_uniaParam2string((UA_ParaType)i), value);
+             mWrapper->SetParameter(mWrapperHandle,(UA_ParaType)i,(UniACodecParameter*)&value);
+         }
+     }
+@@ -766,12 +788,14 @@ c2_status_t UniaDecoder::_createWrapperInterface()
+         }
+         if(optionalWrapperLibName != nullptr){
+             mLibHandle = dlopen(optionalWrapperLibName, RTLD_NOW);
+-            LOGD("Audio Decoder library name 1: %s
+", optionalWrapperLibName);
++            if(mLibHandle != nullptr)
++                LOGI("optionalWrapperLibName: %s
+", optionalWrapperLibName);
+         }
+ 
+         if(mLibHandle == nullptr){
+             mLibHandle = dlopen(wrapperLibName, RTLD_NOW);
+-            LOGD("Audio Decoder library name 2: %s
+", wrapperLibName);
++            if(mLibHandle != nullptr)
++                LOGI("wrapperLibName: %s
+", wrapperLibName);
+         }
+ 
+         if(mLibHandle == nullptr){
+@@ -848,6 +872,15 @@ const char * UniaDecoder::_wrapperRet2string(uint32_t uniaDecodeRet){
+     }
+ }
+ 
++const char * UniaDecoder::_uniaParam2string(UA_ParaType param){
++    std::unordered_map<UA_ParaType, const char *>::const_iterator got = gUniaParam2StringMap.find (param);
++
++    if(got == gUniaParam2StringMap.end())
++        return "unknown";
++    else
++        return got->second;
++}
++
+ void UniaDecoder::_calcCheckSum(uint8_t *pBuffer, uint32_t size)
+ {
+     uint32_t sum = 0;
+diff --git a/codec2/audio_dec/common/UniaDecoder.h b/codec2/audio_dec/common/UniaDecoder.h
+index 34af94e..7908c9d 100755
+--- a/codec2/audio_dec/common/UniaDecoder.h
++++ b/codec2/audio_dec/common/UniaDecoder.h
+@@ -79,6 +79,7 @@ class UniaDecoder : public IMXAudioDecComponent {
+         c2_status_t _initWrapperWithParam();
+         void _updateParamFromWrapper(std::vector<std::unique_ptr<C2Param>> *configUpdate);
+         const char * _wrapperRet2string(uint32_t uniaDecodeRet);
++        const char * _uniaParam2string(UA_ParaType param);
+         void _calcCheckSum(uint8_t *pBuffer, uint32_t size);
+ 
+ };
+diff --git a/codec2/audio_dec/common/audio_frame_parser/AacFrameParser.c b/codec2/audio_dec/common/audio_frame_parser/AacFrameParser.c
+index a710fa4..ca9a4b7 100755
+--- a/codec2/audio_dec/common/audio_frame_parser/AacFrameParser.c
++++ b/codec2/audio_dec/common/audio_frame_parser/AacFrameParser.c
+@@ -85,7 +85,7 @@ static eimx_linux_bool IsADTSFrameHeader(uint8_t * pHeader,FRAME_INFO * Info)
+     }
+ 
+     Info->sample_per_fr = AAC_FRAME_SIZE;
+-    Info->b_rate = (frame_length << 3) * Info->sampling_rate / Info->sample_per_fr; // / 1000;
++    Info->b_rate = Info->sampling_rate / Info->sample_per_fr * (frame_length << 3);
+ 
+     Info->frm_size = frame_length;
+ 
+diff --git a/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c b/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
+index 07852d3..1c9f79b 100755
+--- a/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
++++ b/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
+@@ -1,12 +1,14 @@
+ /**
+- *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
++ *  Copyright 2020 NXP
+  *  All Rights Reserved.
+  *
+- *  The following programs are the sole property of Freescale Semiconductor Inc.,
++ *  The following programs are the sole property of NXP,
+  *  and contain its proprietary and confidential information.
+- *
+  */
+ 
++//#define LOG_NDEBUG 0
++#define LOG_TAG "AudFrmPars"
++
+ #include "AudioFrameParser.h"
+ #include <malloc.h>
+ #include <log/log.h>
+@@ -38,7 +40,7 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+     pFrameInfo->nSamplesPerFrame = 0;
+ 
+     memset(&Info, 0x0, sizeof(FRAME_INFO));
+-    ALOGI("CheckFrame start nBufferLen=%d",nBufferLen);
++    ALOGV("CheckFrame start nBufferLen=%d",nBufferLen);
+ 
+     while(nOffset + nHeadSize <= nBufferLen){
+ 
+@@ -59,7 +61,7 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+         nFirstFrameSize = Info.frm_size;
+         nFirstHeaderSize = Info.header_size;
+ 
+-        ALOGI("CheckFrame nOffset=%d,frm_size=%d",nOffset,Info.frm_size);
++        ALOGV("CheckFrame nOffset=%d,frm_size=%d",nOffset,Info.frm_size);
+ 
+         if(Info.frm_size + nOffset == nBufferLen){
+             printf("CheckFrame frame size=%d,buffer len=%d",Info.frm_size,nBufferLen);
+@@ -107,7 +109,7 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+     pFrameInfo->nSamplingRate = Info.sampling_rate;
+     pFrameInfo->nChannels = Info.channels;
+     pFrameInfo->nHeaderCount = nHeaderCount;
+-    ALOGD("CheckFrame parse one frame,bGotOneFrame=%d,nFrameCount=%d,nConsumedOffset=%d,nFrameSize=%d,\
++    ALOGI("CheckFrame bGotOneFrame=%d,nFrameCount=%d,Consumed=%d,nFrameSize=%d,\
+ samplerate=%d,bitrate=%d,channel=%d,samplePerFrame=%d",
+         pFrameInfo->bGotOneFrame,
+         pFrameInfo->nHeaderCount,
+diff --git a/codec2/audio_dec/eac3_dec/Android.bp b/codec2/audio_dec/eac3_dec/Android.bp
+index 5269b72..0ae7ba3 100644
+--- a/codec2/audio_dec/eac3_dec/Android.bp
++++ b/codec2/audio_dec/eac3_dec/Android.bp
+@@ -9,7 +9,6 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
+@@ -32,8 +31,10 @@ cc_library_shared {
+         "lib_imx_c2_componentbase",
+         "liblog",
+         "libcodec2_vndk",
++        "libcodec2",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/eac3_dec/Eac3DecodeUtil.cpp b/codec2/audio_dec/eac3_dec/Eac3DecodeUtil.cpp
+index 7ca3f75..ccabca2 100755
+--- a/codec2/audio_dec/eac3_dec/Eac3DecodeUtil.cpp
++++ b/codec2/audio_dec/eac3_dec/Eac3DecodeUtil.cpp
+@@ -109,7 +109,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
++                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
+                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
+                 .withFields({C2F(mSampleRate, value).oneOf({
+                     32000, 44100, 48000
+@@ -118,15 +118,15 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
++                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
+                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
+                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mBitrate, C2_NAME_STREAM_BITRATE_SETTING)
+-                .withDefault(new C2BitrateTuning::input(0u, 64000))
++                DefineParam(mBitrate, C2_PARAMKEY_BITRATE)
++                .withDefault(new C2StreamBitrateInfo::input(0u, 64000))
+                 .withFields({C2F(mBitrate, value).inRange(8000, 960000)})
+                 .withSetter(Setter<decltype(*mBitrate)>::NonStrictValueWithNoDeps)
+                 .build());
+@@ -148,7 +148,7 @@ public:
+ private:
+     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
+     std::shared_ptr<C2StreamChannelCountInfo::output> mChannelCount;
+-    std::shared_ptr<C2BitrateTuning::input> mBitrate;
++    std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
+     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
+ };
+ 
+@@ -366,12 +366,10 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2Eac3DecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+ 
+diff --git a/codec2/audio_dec/mp3_dec/Android.bp b/codec2/audio_dec/mp3_dec/Android.bp
+index 8e084f7..ac90ed8 100644
+--- a/codec2/audio_dec/mp3_dec/Android.bp
++++ b/codec2/audio_dec/mp3_dec/Android.bp
+@@ -9,10 +9,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+     ],
+ 
+     local_include_dirs: [
+@@ -34,6 +34,7 @@ cc_library_shared {
+         "libcodec2_vndk",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
+index 6fb1cda..5811e89 100755
+--- a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
++++ b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
+@@ -22,7 +22,7 @@
+ namespace android {
+ 
+ #define MP3D_FRAME_SIZE  1152
+-#define MP3_PUSH_MODE_LEN   (2048*3)
++#define MP3_PUSH_MODE_LEN   (1024*3)
+ #define MP3_DECODER_DELAY 529 //samples
+ 
+ #define DSP_WRAPPER_LIB_NAME "lib_dsp_wrap_arm12_android.so"
+@@ -49,7 +49,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
++                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
+                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
+                 .withFields({C2F(mSampleRate, value).oneOf({
+                     8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
+@@ -58,7 +58,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
++                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
+                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
+                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+@@ -128,59 +128,12 @@ c2_status_t Mp3DecodeUtil::getLibName(const char ** lib, const char ** optionalL
+     return C2_OK;
+ }
+ 
+-uint32_t Mp3DecodeUtil::getFrameHdrBufLen()
+-{
+-    LOGV("entry");
+-    return MP3_PUSH_MODE_LEN;
+-}
+-
+ uint32_t Mp3DecodeUtil::getOutBufferLen()
+ {
+     LOGV("entry");
+     return MP3D_FRAME_SIZE* 2*2;
+ }
+ 
+-c2_status_t Mp3DecodeUtil::checkFrameHeader(unsigned char * pBuffer, size_t length, uint32_t *pOffset)
+-{
+-    LOGV("entry");
+-    uint32_t nVal = 0;
+-    AUDIO_FRAME_INFO FrameInfo;
+-    bool bFound = false;
+-    memset(&FrameInfo, 0, sizeof(AUDIO_FRAME_INFO));
+-
+-    if(bFrameChecked){
+-        return C2_OK;
+-    }
+-
+-    do{
+-        LOGI("Get stream length: %zu
+", length);
+-
+-        if(AFP_SUCCESS != Mp3CheckFrame(&FrameInfo, pBuffer, length)){
+-            LOGD("check fail");
+-            break;
+-        }
+-
+-        if(FrameInfo.bGotOneFrame){
+-            bFound = true;
+-            LOGD("get one frame");
+-        }
+-
+-        uint32_t nOffset = FrameInfo.nConsumedOffset;
+-        LOGV("nOffset is %d", nOffset);
+-
+-        //if(nOffset < length)
+-        //    LOGD("buffer=%02x%02x%02x%02x",pBuffer[nOffset],pBuffer[nOffset+1],pBuffer[nOffset+2],pBuffer[nOffset+1]);
+-        *pOffset = nOffset;
+-
+-        if(bFound) {
+-            bFrameChecked = true;
+-            return C2_OK;
+-        }
+-    }while(0);
+-
+-    return C2_NOT_FOUND;
+-
+-}
+ c2_status_t Mp3DecodeUtil::parseFrame(uint8_t * pBuffer, int len, UniaDecFrameInfo *info)
+ {
+     LOGV("entry");
+@@ -391,22 +344,9 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2Mp3DecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+-    delete factory;
+-}
+-/*
+-extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
+-    LOGV("entry");
+-    return new ::android::IMXC2AacDecFactory(nullptr);
+-}
+-
+-extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+-*/
+diff --git a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
+index e375a43..162503f 100755
+--- a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
++++ b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
+@@ -20,9 +20,7 @@ class Mp3DecodeUtil  : public AudioDecodeUtil {
+         Mp3DecodeUtil(std::string & codecName, const std::shared_ptr<IntfImpl> &intfImpl);
+ 	virtual ~Mp3DecodeUtil();
+ 	virtual c2_status_t getLibName(const char ** lib, const char ** optionalLib) override;
+-	virtual uint32_t getFrameHdrBufLen() override;
+         virtual uint32_t getOutBufferLen() override;
+-	virtual c2_status_t checkFrameHeader(unsigned char * pBuffer, size_t length, uint32_t *pOffset) override;
+         virtual c2_status_t parseFrame(uint8_t * pBuffer, int len, UniaDecFrameInfo *info) override;
+         virtual c2_status_t getDecoderProp(AUDIOFORMAT *formatType, bool *isHwBased) override;
+         virtual c2_status_t handleBOS(uint32_t* offset, uint32_t length) override;
+diff --git a/codec2/audio_dec/realaudio_dec/Android.bp b/codec2/audio_dec/realaudio_dec/Android.bp
+index d6e1515..0989c6f 100644
+--- a/codec2/audio_dec/realaudio_dec/Android.bp
++++ b/codec2/audio_dec/realaudio_dec/Android.bp
+@@ -9,10 +9,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+         "vendor/nxp/imx_android_mm/extractor",
+     ],
+ 
+@@ -35,6 +35,7 @@ cc_library_shared {
+         "libcodec2_vndk",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/realaudio_dec/RealAudioDecodeUtil.cpp b/codec2/audio_dec/realaudio_dec/RealAudioDecodeUtil.cpp
+index fb76bef..e9089e6 100755
+--- a/codec2/audio_dec/realaudio_dec/RealAudioDecodeUtil.cpp
++++ b/codec2/audio_dec/realaudio_dec/RealAudioDecodeUtil.cpp
+@@ -45,7 +45,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mSampleRate, C2_NAME_STREAM_SAMPLE_RATE_SETTING)
++                DefineParam(mSampleRate, C2_PARAMKEY_SAMPLE_RATE)
+                 .withDefault(new C2StreamSampleRateInfo::output(0u, 44100))
+                 .withFields({C2F(mSampleRate, value).oneOf({
+                     32000, 44100, 48000
+@@ -54,7 +54,7 @@ public:
+                 .build());
+ 
+         addParameter(
+-                DefineParam(mChannelCount, C2_NAME_STREAM_CHANNEL_COUNT_SETTING)
++                DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
+                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
+                 .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+@@ -286,12 +286,10 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2RaDecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+ 
+diff --git a/codec2/audio_dec/wma_dec/Android.bp b/codec2/audio_dec/wma_dec/Android.bp
+index 34ca4c6..6d4fa11 100644
+--- a/codec2/audio_dec/wma_dec/Android.bp
++++ b/codec2/audio_dec/wma_dec/Android.bp
+@@ -9,10 +9,10 @@ cc_library_shared {
+         "vendor/nxp/imx_android_mm/codec2/base/include",
+         "vendor/nxp/imx_android_mm/codec2/include",
+         "vendor/nxp/fsl-codec/ghdr/common",
+-        "hardware/google/av/codec2/include",
+         "system/core/include",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
++        "frameworks/av/media/codec2/core/include",
+     ],
+ 
+     local_include_dirs: [
+@@ -34,6 +34,7 @@ cc_library_shared {
+         "libcodec2_vndk",
+         "libstagefright_foundation",
+         "lib_c2_imx_store",
++        "libcutils",
+     ],
+ 
+     ldflags: ["-Wl,-Bsymbolic"],
+diff --git a/codec2/audio_dec/wma_dec/WmaDecodeUtil.cpp b/codec2/audio_dec/wma_dec/WmaDecodeUtil.cpp
+index 04827bd..1f7052e 100755
+--- a/codec2/audio_dec/wma_dec/WmaDecodeUtil.cpp
++++ b/codec2/audio_dec/wma_dec/WmaDecodeUtil.cpp
+@@ -5,7 +5,7 @@
+  *  The following programs are the sole property of NXP,
+  *  and contain its proprietary and confidential information.
+  */
+-#define LOG_NDEBUG 0
++//#define LOG_NDEBUG 0
+ #define LOG_TAG "WmaDecUtil"
+ #include <log/log.h>
+ 
+@@ -413,22 +413,10 @@ private:
+ }  // namespace android
+ 
+ extern "C" ::C2ComponentFactory* IMXCreateCodec2Factory(C2String name) {
+-    LOGV("entry codecName %s", name.c_str());
+     return new ::android::IMXC2WmaDecFactory(name);
+ }
+ 
+ extern "C" void IMXDestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+     delete factory;
+ }
+-/*
+-extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
+-    LOGV("entry");
+-    return new ::android::IMXC2AacDecFactory(nullptr);
+-}
+ 
+-extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
+-    LOGV("entry");
+-    delete factory;
+-}
+-*/
+diff --git a/codec2/base/Android.bp b/codec2/base/Android.bp
+index 3f08818..7a2429c 100644
+--- a/codec2/base/Android.bp
++++ b/codec2/base/Android.bp
+@@ -9,6 +9,7 @@ cc_library_shared {
+ 
+     include_dirs: [
+         "hardware/libhardware/include",
++        "frameworks/av/media/libstagefright",
+         "frameworks/av/media/codec2/core/include",
+         "frameworks/av/media/codec2/vndk/include",
+         "frameworks/av/media/codec2/components/base/include",    
+diff --git a/codec2/base/IMXUtils.cpp b/codec2/base/IMXUtils.cpp
+old mode 100644
+new mode 100755
+index a335146..dd1ab4d
+--- a/codec2/base/IMXUtils.cpp
++++ b/codec2/base/IMXUtils.cpp
+@@ -10,6 +10,7 @@
+ #include <string.h>
+ #include <graphics.h>
+ #include <media/stagefright/MediaDefs.h>
++#include <C2Config.h>
+ #include "Imx_ext.h"
+ #include "IMXUtils.h"
+ #include "graphics_ext.h"
+diff --git a/codec2/base/include/IMXUtils.h b/codec2/base/include/IMXUtils.h
+index 2009568..363916a 100755
+--- a/codec2/base/include/IMXUtils.h
++++ b/codec2/base/include/IMXUtils.h
+@@ -9,13 +9,16 @@
+ #ifndef IMX_UUTILS_H_
+ #define IMX_UUTILS_H_
+ 
++#include <media/stagefright/foundation/ColorUtils.h>
+ 
+ namespace android {
+ 
++
+ const char* Name2MimeType(const char* name);
+ int pxlfmt2bpp(int pxlfmt);
+ 
+ int GetSocId(char* socId, int size);
++
+ }
+ 
+ #endif // IMX_UUTILS_H_
+diff --git a/codec2/imx_codec2.go b/codec2/imx_codec2.go
+new file mode 100644
+index 0000000..e7cfe87
+--- /dev/null
++++ b/codec2/imx_codec2.go
+@@ -0,0 +1,49 @@
++// Copyright 2020 NXP
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package codec2
++
++import (
++        "android/soong/android"
++        "android/soong/cc"
++        "strings"
++        "github.com/google/blueprint/proptools"
++)
++
++func init() {
++    android.RegisterModuleType("imx_codec2_defaults", imx_codec2DefaultsFactory)
++}
++
++func imx_codec2DefaultsFactory() (android.Module) {
++    module := cc.DefaultsFactory()
++    android.AddLoadHook(module, imx_codec2Defaults)
++    return module
++}
++
++func imx_codec2Defaults(ctx android.LoadHookContext) {
++    type props struct {
++        Target struct {
++                Android struct {
++                        Enabled *bool
++                }
++        }
++    }
++    p := &props{}
++    p.Target.Android.Enabled = proptools.BoolPtr(false)
++    var board string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_PLATFORM")
++    if strings.Contains(board, "imx") {
++        p.Target.Android.Enabled = proptools.BoolPtr(true)
++    }
++    ctx.AppendProperties(p)
++}
+diff --git a/codec2/include/C2Config_imx.h b/codec2/include/C2Config_imx.h
+index f571580..7ee9ee5 100755
+--- a/codec2/include/C2Config_imx.h
++++ b/codec2/include/C2Config_imx.h
+@@ -30,22 +30,22 @@ constexpr imx_aac_packaging_t C2AacStreamFormatAdif = AAC_PACKAGING_ADIF;
+ #define kParamIndexVendorLowLatency (C2_PARAM_INDEX_VENDOR_START + 5)
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexVendorSubFormat> C2StreamVendorSubFormat;
+-constexpr char C2_PARAMKEY_VENDOR_SUB_FORMAT[] = "vendor.sub-format";
++constexpr char C2_PARAMKEY_VENDOR_SUB_FORMAT[] = "sub-format";
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexVendorHalPixelFormat> C2StreamVendorHalPixelFormat;
+-constexpr char C2_PARAMKEY_VENDOR_HAL_PIXEL_FORMAT[] = "vendor.hal-pixel-format";
++constexpr char C2_PARAMKEY_VENDOR_HAL_PIXEL_FORMAT[] = "hal-pixel-format";
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexAudioBlockAlgin> C2StreamAudioBlockAlign;
+-constexpr char C2_PARAMKEY_AUDIO_BLOCK_ALIGN[] = "vendor.audio-block-align";
++constexpr char C2_PARAMKEY_AUDIO_BLOCK_ALIGN[] = "audio-block-align";
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexBitsPerFrame> C2StreamBitsPerFrame;
+-constexpr char C2_PARAMKEY_BITS_PER_FRAME[] = "vendor.bits-per-frame";
++constexpr char C2_PARAMKEY_BITS_PER_FRAME[] = "bits-per-frame";
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexBitsPerSample> C2StreamBitsPerSample;
+-constexpr char C2_PARAMKEY_BITS_PER_SAMPLE[] = "vendor.bits-per-sample";
++constexpr char C2_PARAMKEY_BITS_PER_SAMPLE[] = "bits-per-sample";
+ 
+ typedef C2StreamParam<C2Info, C2Uint32Value, kParamIndexVendorLowLatency> C2StreamVendorLowLatency;
+-constexpr char C2_PARAMKEY_VENDOR_LOW_LATENCY[] = "vendor.low-latency";
++constexpr char C2_PARAMKEY_VENDOR_LOW_LATENCY[] = "low-latency";
+ 
+ #endif
+ 
+diff --git a/codec2/include/C2_imx.h b/codec2/include/C2_imx.h
+index cbae91e..d616b0e 100644
+--- a/codec2/include/C2_imx.h
++++ b/codec2/include/C2_imx.h
+@@ -20,8 +20,8 @@ enum decode_mode_t : uint32_t {
+     DEC_FILE_MODE,
+ };
+ 
+-#define LOGV(FMT, ...) ALOGV("%s " FMT, __FUNCTION__, ##__VA_ARGS__)
+-#define LOGD(FMT, ...) ALOGD("%s " FMT, __FUNCTION__, ##__VA_ARGS__)
++#define LOGV(FMT, ...) do{if(this->logLevel) ALOGV("%s " FMT, __FUNCTION__, ##__VA_ARGS__);} while(0)
++#define LOGD(FMT, ...) do{if(this->logLevel) ALOGD("%s " FMT, __FUNCTION__, ##__VA_ARGS__);} while(0)
+ #define LOGE(FMT, ...) ALOGE("%s " FMT, __FUNCTION__, ##__VA_ARGS__)
+ #define LOGI(FMT, ...) ALOGI("%s " FMT, __FUNCTION__, ##__VA_ARGS__)
+ #define LOGW(FMT, ...) ALOGW("%s " FMT, __FUNCTION__, ##__VA_ARGS__)
+diff --git a/codec2/process/common/Android.bp b/codec2/process/common/Android.bp
+index 8c1e997..c804545 100644
+--- a/codec2/process/common/Android.bp
++++ b/codec2/process/common/Android.bp
+@@ -37,6 +37,11 @@ cc_library_shared {
+         "lib_c2_imx_store",
+     ],
+ 
++     defaults: [
++        "imx_codec2_default",
++     ],
++
++
+     whole_static_libs: ["libionallocator"],
+ 
+     sanitize: {
+diff --git a/codec2/process/common/ProcessBase.cpp b/codec2/process/common/ProcessBase.cpp
+index d806d90..4ffc7b0 100755
+--- a/codec2/process/common/ProcessBase.cpp
++++ b/codec2/process/common/ProcessBase.cpp
+@@ -732,9 +732,8 @@ status_t ProcessBase::NotifyProcessEos() {
+ }
+ 
+ status_t ProcessBase::FetchProcessBuffer(int *bufferId, unsigned long *phys) {
+-    //return mClient->fetchProcessBuffer(bufferId, phys);
+     uint32_t i;
+-    C2MemoryUsage usage(C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE);
++    C2MemoryUsage usage(0);
+     std::shared_ptr<C2GraphicBlock> outBlock;
+ 
+     ALOGV("%s, res(%d x %d), pixel fmt %d", __FUNCTION__, sOutFormat.width, sOutFormat.height, sOutFormat.format);
+diff --git a/codec2/process/dummy_post/imx_process_dummy_post.go b/codec2/process/dummy_post/imx_process_dummy_post.go
+index 86fc511..83a956a 100755
+--- a/codec2/process/dummy_post/imx_process_dummy_post.go
++++ b/codec2/process/dummy_post/imx_process_dummy_post.go
+@@ -43,11 +43,17 @@ func process_dummy_postDefaults(ctx android.LoadHookContext) {
+         }
+     }
+     p := &props{}
++
++    var platform string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_PLATFORM")
++    if strings.Contains(platform, "imx") {
++        p.Target.Android.Enabled = proptools.BoolPtr(true)
++    } else {
++        p.Target.Android.Enabled = proptools.BoolPtr(false)
++    }
++
+     var board string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_SOC_TYPE")
+     if strings.Contains(board, "IMX8Q") {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+-    } else {
+-        p.Target.Android.Enabled = proptools.BoolPtr(true)
+     }
+ 
+     p.Target.Android.Cflags = Cflags
+diff --git a/codec2/store/Android.bp b/codec2/store/Android.bp
+index 15f373a..3072c85 100644
+--- a/codec2/store/Android.bp
++++ b/codec2/store/Android.bp
+@@ -41,11 +41,11 @@ cc_binary {
+         "libbinder",
+         "libcodec2_hidl@1.0",
+         "libhidlbase",
+-        "libhidltransport",
+         "liblog",
+         "libstagefright_omx",
+         "libutils",
+         "lib_c2_imx_store",
++        "libstagefright_xmlparser",
+     ],
+ 
+     include_dirs: [
+@@ -61,5 +61,5 @@ cc_binary {
+         },
+     },
+ 
+-    compile_multilib: "64",
++    compile_multilib: "first",
+ }
+diff --git a/codec2/store/ImxC2Store.cpp b/codec2/store/ImxC2Store.cpp
+index bb4b085..b461b43 100755
+--- a/codec2/store/ImxC2Store.cpp
++++ b/codec2/store/ImxC2Store.cpp
+@@ -24,8 +24,6 @@
+ 
+ namespace android {
+ 
+-#define IMX_EXTRACTOR_PATH "/system/lib64/extractors/libimxextractor.so"
+-
+ typedef ::C2ComponentFactory* (*IMXCreateCodec2FactoryFunc)(C2String name);
+ typedef void (*IMXDestroyCodec2FactoryFunc)(::C2ComponentFactory*);
+ 
+@@ -269,7 +267,11 @@ c2_status_t ImxC2Store::ComponentBox::init()
+ 
+             // for CTS-on-GSI, as there is no imx extractors, set imx audio decoder the lowest priority.
+             if (traits->domain == C2Component::DOMAIN_AUDIO) {
+-                if (access(IMX_EXTRACTOR_PATH, 0) != 0) {
++                if (access("/system/lib"
++#ifdef __LP64__
++                            "64"
++#endif
++                            "/extractors/libimxextractor.so", 0) != 0) {
+                     traits->rank = 0x400;
+                 }
+             }
+diff --git a/codec2/store/registry/Android.mk b/codec2/store/registry/Android.mk
+index 50ee1e4..2a25f11 100644
+--- a/codec2/store/registry/Android.mk
++++ b/codec2/store/registry/Android.mk
+@@ -17,6 +17,10 @@ endif
+ ifeq ($(BOARD_SOC_TYPE),IMX8Q)
+ LOCAL_SRC_FILES := c2_component_register_8q
+ endif
++ifeq ($(BOARD_SOC_TYPE),IMX7ULP)
++LOCAL_SRC_FILES := c2_component_register_7ulp
++endif
++
+ LOCAL_MODULE := c2_component_register
+ LOCAL_MODULE_CLASS := ETC
+ LOCAL_VENDOR_MODULE := true
+diff --git a/codec2/store/registry/c2_component_register_7ulp b/codec2/store/registry/c2_component_register_7ulp
+new file mode 100644
+index 0000000..bc5b7da
+--- /dev/null
++++ b/codec2/store/registry/c2_component_register_7ulp
+@@ -0,0 +1,23 @@
++# Register component to ImxC2Score.
++#
++# Usage:
++# @ means the begin of one component.
++# # means comments.
++# $ means the end of one component.
++# ; means finish of one tag value.
++# envirenment value should be set: COMPONENT_REGISTER_FILE=../registry/component_register
++
++@
++include_file=/vendor/etc/c2_component_register_ms;
++include_file=/vendor/etc/c2_component_register_ra;
++$
++
++@
++component_name=c2.imx.aac.decoder.sw;
++library_path=lib_c2_imx_aac_dec.so;
++$
++
++@
++component_name=c2.imx.mp3.decoder.sw;
++library_path=lib_c2_imx_mp3_dec.so;
++$
+diff --git a/codec2/tsm/mfw_gst_ts.c b/codec2/tsm/mfw_gst_ts.c
+index 8bbf8c1..f15c704 100644
+--- a/codec2/tsm/mfw_gst_ts.c
++++ b/codec2/tsm/mfw_gst_ts.c
+@@ -111,7 +111,6 @@ typedef struct _TSMReceivedEntry
+   TSM_TIMESTAMP ts;
+   struct _TSMReceivedEntry *next;
+   unsigned int used:1;
+-  unsigned int subentry:1;
+   int size;
+ } TSMReceivedEntry;
+ 
+@@ -200,7 +199,6 @@ TSManagerReceive2 (void *handle, TSM_TIMESTAMP timestamp, int size)
+ #define CLEAR_TSM_RENTRY(entry)\
+   do { \
+     (entry)->used = 0; \
+-    (entry)->subentry = 0; \
+     (entry)->next = NULL; \
+   } while (0)
+   TSManager *tsm = (TSManager *) handle;
+@@ -214,9 +212,6 @@ TSManagerReceive2 (void *handle, TSM_TIMESTAMP timestamp, int size)
+       TSMReceivedEntry *e = tsm_new_received_entry (rctl);
+       if (e) {
+         CLEAR_TSM_RENTRY (e);
+-        if ((rctl->tail) && (rctl->tail->ts == timestamp)) {
+-          e->subentry = 1;
+-        }
+         e->ts = timestamp;
+         e->size = size;
+         if (rctl->tail) {
+@@ -247,10 +242,6 @@ TSManagerGetLastTimeStamp (TSMRecivedCtl * rctl, int size, int use)
+       rctl->head = e->next;
+       if (rctl->head == NULL) {
+         rctl->tail = NULL;
+-      } else {
+-        if (rctl->head->subentry) {
+-          rctl->head->used = e->used;
+-        }
+       }
+       size -= e->size;
+       rctl->cnt--;
+diff --git a/codec2/v4l2_dev/V4l2Dev.cpp b/codec2/v4l2_dev/V4l2Dev.cpp
+index 981a9c0..2e86ecd 100644
+--- a/codec2/v4l2_dev/V4l2Dev.cpp
++++ b/codec2/v4l2_dev/V4l2Dev.cpp
+@@ -517,61 +517,6 @@ status_t V4l2Dev::StopEncoder()
+     ALOGV("V4l2Dev::StopEncoder SUCCESS
+");
+     return OK;
+ }
+-status_t V4l2Dev::GetColorDesc(VideoColorAspect * desc)
+-{
+-    int ret = 0;
+-    struct v4l2_control control;
+-
+-    if (nFd < 0 || desc == NULL)
+-        return UNKNOWN_ERROR;
+-
+-    control.id =  V4L2_CID_USER_FRAME_FULLRANGE;
+-    control.value = 0;
+-
+-    ret = ioctl(nFd, VIDIOC_G_CTRL, &control);
+-    if (ret) {
+-        ALOGE("GetColourDesc V4L2_CID_USER_FRAME_FULLRANGE OMX_ErrorUndefined
+");
+-        return UNKNOWN_ERROR;
+-    }
+-
+-    desc->fullRange = control.value;
+-
+-
+-    control.id =  V4L2_CID_USER_FRAME_COLORDESC;
+-    control.value = 0;
+-
+-    ret = ioctl(nFd, VIDIOC_G_CTRL, &control);
+-    if (ret) {
+-        ALOGE("GetColourDesc V4L2_CID_USER_FRAME_COLORDESC OMX_ErrorUndefined
+");
+-        return UNKNOWN_ERROR;
+-    }
+-    desc->colourPrimaries = control.value;
+-
+-
+-    control.id =  V4L2_CID_USER_FRAME_TRANSFERCHARS;
+-    control.value = 0;
+-    ret = ioctl(nFd, VIDIOC_G_CTRL, &control);
+-    if (ret) {
+-        ALOGE("GetColourDesc V4L2_CID_USER_FRAME_TRANSFERCHARS OMX_ErrorUndefined
+");
+-        return UNKNOWN_ERROR;
+-    }
+-    desc->transferCharacteristics = control.value;
+-
+-
+-    control.id =  V4L2_CID_USER_FRAME_MATRIXCOEFFS;
+-    control.value = 0;
+-    ret = ioctl(nFd, VIDIOC_G_CTRL, &control);
+-    if (ret) {
+-        ALOGE("GetColourDesc V4L2_CID_USER_FRAME_MATRIXCOEFFS OMX_ErrorUndefined
+");
+-        return UNKNOWN_ERROR;
+-    }
+-    desc->matrixCoeffs = control.value;
+-
+-    ALOGV("GetColourDesc success, p=%d,t=%d,m=%d,r=%d
+",
+-        desc->colourPrimaries,desc->transferCharacteristics,desc->matrixCoeffs,desc->fullRange);
+-
+-    return OK;
+-}
+ status_t V4l2Dev::SetEncoderParam(V4l2EncInputParam *param)
+ {
+     int ret = 0;
+@@ -727,6 +672,12 @@ status_t V4l2Dev::SetFrameRate(uint32_t framerate)
+     }
+     return OK;
+ }
++
++status_t V4l2Dev::SetForceKeyFrame()
++{
++    return SetCtrl(V4L2_CID_MPEG_VIDEO_FORCE_KEY_FRAME, 1);
++}
++
+ status_t V4l2Dev::SetCtrl(uint32_t id, int32_t value)
+ {
+     int ret = 0;
+@@ -738,4 +689,79 @@ status_t V4l2Dev::SetCtrl(uint32_t id, int32_t value)
+     return (status_t)ret;
+ }
+ 
++typedef struct{
++    uint32_t iso_value;
++    uint32_t v4l2_value;
++}V4L2_ISO_MAP;
++
++static const V4L2_ISO_MAP v4l2_color_table[]={
++    { 1, V4L2_COLORSPACE_REC709 },
++    { 4, V4L2_COLORSPACE_470_SYSTEM_M },
++    { 5, V4L2_COLORSPACE_470_SYSTEM_BG },
++    { 6, V4L2_COLORSPACE_SMPTE170M },
++    { 7, V4L2_COLORSPACE_SMPTE240M },
++    { 8, V4L2_COLORSPACE_GENERIC_FILM },
++    { 9, V4L2_COLORSPACE_BT2020 },
++    { 10, V4L2_COLORSPACE_BT2020 },
++};
++static const V4L2_ISO_MAP v4l2_xfer_table[]={
++    { 1, V4L2_XFER_FUNC_709 },
++    { 4, V4L2_XFER_FUNC_GAMMA22 },
++    { 5, V4L2_XFER_FUNC_GAMMA28 },
++    { 6, V4L2_XFER_FUNC_709 },
++    { 7, V4L2_XFER_FUNC_SMPTE240M },
++    { 8, V4L2_XFER_FUNC_LINEAR },
++    { 11, V4L2_XFER_FUNC_XVYCC },
++    { 12, V4L2_XFER_FUNC_BT1361 },
++    { 13, V4L2_XFER_FUNC_SRGB },
++    { 14, V4L2_XFER_FUNC_709 },
++    { 16, V4L2_XFER_FUNC_SMPTE2084 },
++    { 17, V4L2_XFER_FUNC_ST428 },
++    { 18, V4L2_XFER_FUNC_HLG },
++};
++static const V4L2_ISO_MAP v4l2_ycbcr_table[]={
++    { 1, V4L2_YCBCR_ENC_709 },
++    { 4, V4L2_YCBCR_ENC_BT470_6M },
++    { 5, V4L2_YCBCR_ENC_601 },
++    { 7, V4L2_YCBCR_ENC_SMPTE240M },
++    { 9, V4L2_YCBCR_ENC_BT2020 },
++    { 10, V4L2_YCBCR_ENC_BT2020_CONST_LUM },
++};
++status_t V4l2Dev::GetColorAspectsInfo(struct v4l2_pix_format_mplane * pixel_fmt, VideoColorAspect * desc){
++
++    if(pixel_fmt == NULL || desc == NULL)
++        return UNKNOWN_ERROR;
++
++    desc->colourPrimaries = 0;
++    for( size_t i = 0; i < sizeof(v4l2_color_table)/sizeof(V4L2_ISO_MAP); i++){
++        if (pixel_fmt->colorspace == v4l2_color_table[i].v4l2_value) {
++            desc->colourPrimaries = v4l2_color_table[i].iso_value;
++            break;
++        }
++    }
++
++    desc->transferCharacteristics = 0;
++    for( size_t i = 0; i < sizeof(v4l2_xfer_table)/sizeof(V4L2_ISO_MAP); i++){
++        if (pixel_fmt->xfer_func == v4l2_xfer_table[i].v4l2_value) {
++            desc->transferCharacteristics = v4l2_xfer_table[i].iso_value;
++            break;
++        }
++    }
++
++    //2, ColorAspects::MatrixUnspecified
++    desc->matrixCoeffs = 2;
++    for( size_t i = 0; i < sizeof(v4l2_ycbcr_table)/sizeof(V4L2_ISO_MAP); i++){
++        if (pixel_fmt->ycbcr_enc == v4l2_ycbcr_table[i].v4l2_value) {
++            desc->matrixCoeffs = v4l2_ycbcr_table[i].iso_value;
++            break;
++        }
++    }
++
++    desc->fullRange = (pixel_fmt->quantization == V4L2_QUANTIZATION_FULL_RANGE) ? 1:0;
++
++    ALOGV("getColorAspectsInfo success, p=%d,t=%d,m=%d,r=%d
+",
++        desc->colourPrimaries,desc->transferCharacteristics,desc->matrixCoeffs,desc->fullRange);
++
++    return OK;
++}
+ }
+diff --git a/codec2/v4l2_dev/V4l2Dev.h b/codec2/v4l2_dev/V4l2Dev.h
+index 7739235..4b3f4be 100644
+--- a/codec2/v4l2_dev/V4l2Dev.h
++++ b/codec2/v4l2_dev/V4l2Dev.h
+@@ -34,6 +34,7 @@ V4L2_DEV_ISI,
+ #define V4L2_EVENT_SKIP                        (V4L2_EVENT_PRIVATE_START + 2)
+ 
+ #define MAX_DEV_NAME_LEN (16)
++
+ typedef struct {
+     uint32_t colourPrimaries;
+     uint32_t transferCharacteristics;
+@@ -78,14 +79,14 @@ public:
+     status_t ResetDecoder();
+     status_t StopDecoder();
+ 
+-    status_t GetColorDesc(VideoColorAspect * desc);
+-
++    status_t GetColorAspectsInfo(struct v4l2_pix_format_mplane * pixel_fmt, VideoColorAspect * desc);
+ 
+     //encoder functions
+     status_t StopEncoder();
+     status_t SetEncoderParam(V4l2EncInputParam *param);
+     status_t SetH264EncoderProfileAndLevel(uint32_t profile, uint32_t level);
+     status_t SetFrameRate(uint32_t framerate);
++    status_t SetForceKeyFrame();
+     
+ private:
+     status_t SearchName(V4l2DEV_TYPE type);
+diff --git a/codec2/v4l2_dev/v4l2_dev.go b/codec2/v4l2_dev/v4l2_dev.go
+index ab14dca..1938053 100644
+--- a/codec2/v4l2_dev/v4l2_dev.go
++++ b/codec2/v4l2_dev/v4l2_dev.go
+@@ -34,11 +34,13 @@ func v4l2DefaultsFactory() (android.Module) {
+ 
+ func v4l2Defaults(ctx android.LoadHookContext) {
+     var Cflags []string
++    var Include_dirs []string
+     type props struct {
+         Target struct {
+                 Android struct {
+                         Enabled *bool
+                         Cflags []string
++                        Include_dirs []string
+                 }
+         }
+     }
+@@ -46,9 +48,16 @@ func v4l2Defaults(ctx android.LoadHookContext) {
+     var board string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_SOC_TYPE")
+     if strings.Contains(board, "IMX8Q") {
+         p.Target.Android.Enabled = proptools.BoolPtr(true)
++        if ctx.AConfig().PlatformVersionName() == "10" {
++            Include_dirs = append(Include_dirs, "device/fsl/common/kernel-headers")
++        }else{
++            //for android 11
++            Include_dirs = append(Include_dirs, "device/nxp/common/kernel-headers")
++        }
+     } else {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+     }
+     p.Target.Android.Cflags = Cflags
++    p.Target.Android.Include_dirs = Include_dirs
+     ctx.AppendProperties(p)
+ }
+diff --git a/codec2/video_dec/common/Android.bp b/codec2/video_dec/common/Android.bp
+index f5512e1..6a16e99 100644
+--- a/codec2/video_dec/common/Android.bp
++++ b/codec2/video_dec/common/Android.bp
+@@ -36,6 +36,7 @@ cc_library_shared {
+ 
+     defaults: [
+         "imx_defaults",
++        "imx_codec2_default",
+     ],
+ }
+ 
+@@ -79,6 +80,7 @@ cc_library_shared {
+         "libcodec2_vndk",
+         "lib_c2_imx_store",
+         "lib_imx_c2_process",
++        "libsfplugin_ccodec_utils",
+     ],
+ 
+ 
+diff --git a/codec2/video_dec/common/IMXC2VideoDecoder.cpp b/codec2/video_dec/common/IMXC2VideoDecoder.cpp
+index 4b9fd02..9321cb0 100644
+--- a/codec2/video_dec/common/IMXC2VideoDecoder.cpp
++++ b/codec2/video_dec/common/IMXC2VideoDecoder.cpp
+@@ -12,6 +12,7 @@
+ 
+ #include <media/stagefright/MediaDefs.h>
+ #include <string.h>
++#include <Codec2Mapper.h>
+ 
+ #include "IMXC2VideoDecoder.h"
+ #include "C2_imx.h"
+@@ -276,76 +277,81 @@ public:
+                 .calculatedAs(MaxInputSizeSetter, mMaxSize)
+                 .build());
+ 
+-        C2ChromaOffsetStruct locations[1] = { C2ChromaOffsetStruct::ITU_YUV_420_0() };
+-        std::shared_ptr<C2StreamColorInfo::output> defaultColorInfo =
+-            C2StreamColorInfo::output::AllocShared(
+-                    1u, 0u, 8u /* bitDepth */, C2Color::YUV_420);
+-        memcpy(defaultColorInfo->m.locations, locations, sizeof(locations));
++        if (mimeType == MEDIA_MIMETYPE_VIDEO_AVC
++                || mimeType == MEDIA_MIMETYPE_VIDEO_HEVC
++                || mimeType == MEDIA_MIMETYPE_VIDEO_MPEG2) {
+ 
+-        defaultColorInfo =
+-            C2StreamColorInfo::output::AllocShared(
+-                    { C2ChromaOffsetStruct::ITU_YUV_420_0() },
+-                    0u, 8u /* bitDepth */, C2Color::YUV_420);
+-        helper->addStructDescriptors<C2ChromaOffsetStruct>();
++            C2ChromaOffsetStruct locations[1] = { C2ChromaOffsetStruct::ITU_YUV_420_0() };
++            std::shared_ptr<C2StreamColorInfo::output> defaultColorInfo =
++                C2StreamColorInfo::output::AllocShared(
++                        1u, 0u, 8u /* bitDepth */, C2Color::YUV_420);
++            memcpy(defaultColorInfo->m.locations, locations, sizeof(locations));
+ 
+-        addParameter(
+-                DefineParam(mColorInfo, C2_PARAMKEY_CODED_COLOR_INFO)
+-                .withConstValue(defaultColorInfo)
+-                .build());
++            defaultColorInfo =
++                C2StreamColorInfo::output::AllocShared(
++                        { C2ChromaOffsetStruct::ITU_YUV_420_0() },
++                        0u, 8u /* bitDepth */, C2Color::YUV_420);
++            helper->addStructDescriptors<C2ChromaOffsetStruct>();
+ 
+-        addParameter(
+-                DefineParam(mDefaultColorAspects, C2_PARAMKEY_DEFAULT_COLOR_ASPECTS)
+-                .withDefault(new C2StreamColorAspectsTuning::output(
+-                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+-                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+-                .withFields({
+-                    C2F(mDefaultColorAspects, range).inRange(
+-                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+-                    C2F(mDefaultColorAspects, primaries).inRange(
+-                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+-                    C2F(mDefaultColorAspects, transfer).inRange(
+-                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+-                    C2F(mDefaultColorAspects, matrix).inRange(
+-                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+-                })
+-                .withSetter(DefaultColorAspectsSetter)
+-                .build());
++            addParameter(
++                    DefineParam(mColorInfo, C2_PARAMKEY_CODED_COLOR_INFO)
++                    .withConstValue(defaultColorInfo)
++                    .build());
+ 
+-        addParameter(
+-                DefineParam(mCodedColorAspects, C2_PARAMKEY_VUI_COLOR_ASPECTS)
+-                .withDefault(new C2StreamColorAspectsInfo::input(
+-                        0u, C2Color::RANGE_LIMITED, C2Color::PRIMARIES_UNSPECIFIED,
+-                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+-                .withFields({
+-                    C2F(mCodedColorAspects, range).inRange(
+-                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+-                    C2F(mCodedColorAspects, primaries).inRange(
+-                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+-                    C2F(mCodedColorAspects, transfer).inRange(
+-                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+-                    C2F(mCodedColorAspects, matrix).inRange(
+-                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+-                })
+-                .withSetter(CodedColorAspectsSetter)
+-                .build());
++            addParameter(
++                    DefineParam(mDefaultColorAspects, C2_PARAMKEY_DEFAULT_COLOR_ASPECTS)
++                    .withDefault(new C2StreamColorAspectsTuning::output(
++                            0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
++                            C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
++                    .withFields({
++                        C2F(mDefaultColorAspects, range).inRange(
++                                    C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
++                        C2F(mDefaultColorAspects, primaries).inRange(
++                                    C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
++                        C2F(mDefaultColorAspects, transfer).inRange(
++                                    C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
++                        C2F(mDefaultColorAspects, matrix).inRange(
++                                    C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
++                    })
++                    .withSetter(DefaultColorAspectsSetter)
++                    .build());
+ 
+-        addParameter(
+-                DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
+-                .withDefault(new C2StreamColorAspectsInfo::output(
+-                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+-                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+-                .withFields({
+-                    C2F(mColorAspects, range).inRange(
+-                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+-                    C2F(mColorAspects, primaries).inRange(
+-                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+-                    C2F(mColorAspects, transfer).inRange(
+-                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+-                    C2F(mColorAspects, matrix).inRange(
+-                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+-                })
+-                .withSetter(ColorAspectsSetter, mDefaultColorAspects, mCodedColorAspects)
+-                .build());
++            addParameter(
++                    DefineParam(mCodedColorAspects, C2_PARAMKEY_VUI_COLOR_ASPECTS)
++                    .withDefault(new C2StreamColorAspectsInfo::input(
++                            0u, C2Color::RANGE_LIMITED, C2Color::PRIMARIES_UNSPECIFIED,
++                            C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
++                    .withFields({
++                        C2F(mCodedColorAspects, range).inRange(
++                                    C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
++                        C2F(mCodedColorAspects, primaries).inRange(
++                                    C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
++                        C2F(mCodedColorAspects, transfer).inRange(
++                                    C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
++                        C2F(mCodedColorAspects, matrix).inRange(
++                                    C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
++                    })
++                    .withSetter(CodedColorAspectsSetter)
++                    .build());
++
++            addParameter(
++                    DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
++                    .withDefault(new C2StreamColorAspectsInfo::output(
++                            0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
++                            C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
++                    .withFields({
++                        C2F(mColorAspects, range).inRange(
++                                    C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
++                        C2F(mColorAspects, primaries).inRange(
++                                    C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
++                        C2F(mColorAspects, transfer).inRange(
++                                    C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
++                        C2F(mColorAspects, matrix).inRange(
++                                    C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
++                    })
++                    .withSetter(ColorAspectsSetter, mDefaultColorAspects, mCodedColorAspects)
++                    .build());
++        }
+ 
+         // TODO: support more formats?
+         addParameter(
+@@ -523,61 +529,6 @@ private:
+     std::shared_ptr<C2StreamVendorHalPixelFormat::output> mVendorHalPixelFormat;
+ };
+ 
+-static void convertCodecColorAspectsToCodec2Aspects(
+-                DecColorAspects * pCodecAspects,
+-                C2StreamColorAspectsInfo::input * pCodec2Aspects) {
+-
+-    std::unordered_map<int, C2Color::primaries_t> sColorPrimariesSf = {
+-        { 0/*ColorAspects::PrimariesUnspecified*/, C2Color::PRIMARIES_UNSPECIFIED },
+-        { 1/*ColorAspects::PrimariesBT709_5*/,     C2Color::PRIMARIES_BT709 },
+-        { 2/*ColorAspects::PrimariesBT470_6M*/,    C2Color::PRIMARIES_BT470_M },
+-        { 3/*ColorAspects::PrimariesBT601_6_625*/, C2Color::PRIMARIES_BT601_625 },
+-        { 4/*ColorAspects::PrimariesBT601_6_525*/, C2Color::PRIMARIES_BT601_525 },
+-        { 5/*ColorAspects::PrimariesGenericFilm*/, C2Color::PRIMARIES_GENERIC_FILM },
+-        { 6/*ColorAspects::PrimariesBT2020*/,      C2Color::PRIMARIES_BT2020 },
+-        { 0xff/*ColorAspects::PrimariesOther*/,    C2Color::PRIMARIES_OTHER },
+-    };
+-
+-    std::unordered_map<int, C2Color::range_t> sColorRangesSf = {
+-        { 0/*ColorAspects::RangeUnspecified*/, C2Color::RANGE_UNSPECIFIED },
+-        { 1/*ColorAspects::RangeFull*/,        C2Color::RANGE_FULL },
+-        { 2/*ColorAspects::RangeLimited*/,     C2Color::RANGE_LIMITED },
+-        { 0xff/*ColorAspects::RangeOther*/,    C2Color::RANGE_OTHER },
+-    };
+-
+-    std::unordered_map<int, C2Color::matrix_t> sColorMatricesSf = {
+-        { 0/*ColorAspects::MatrixUnspecified*/,    C2Color::MATRIX_UNSPECIFIED },
+-        { 1/*ColorAspects::MatrixBT709_5*/,        C2Color::MATRIX_BT709 },
+-        { 2/*ColorAspects::MatrixBT470_6M*/,       C2Color::MATRIX_FCC47_73_682 },
+-        { 3/*ColorAspects::MatrixBT601_6*/,        C2Color::MATRIX_BT601 },
+-        { 4/*ColorAspects::MatrixSMPTE240M*/,      C2Color::MATRIX_240M },
+-        { 5/*ColorAspects::MatrixBT2020*/,         C2Color::MATRIX_BT2020 },
+-        { 6/*ColorAspects::MatrixBT2020Constant*/, C2Color::MATRIX_BT2020_CONSTANT },
+-        { 0xff/*ColorAspects::MatrixOther*/,       C2Color::MATRIX_OTHER },
+-    };
+-
+-    std::unordered_map<int, C2Color::transfer_t> sColorTransfersSf = {
+-        { 0/*ColorAspects::TransferUnspecified*/,  C2Color::TRANSFER_UNSPECIFIED },
+-        { 1/*ColorAspects::TransferLinear*/,       C2Color::TRANSFER_LINEAR },
+-        { 2/*ColorAspects::TransferSRGB*/,         C2Color::TRANSFER_SRGB },
+-        { 3/*ColorAspects::TransferSMPTE170M*/,    C2Color::TRANSFER_170M },
+-        { 4/*ColorAspects::TransferGamma22*/,      C2Color::TRANSFER_GAMMA22 },
+-        { 5/*ColorAspects::TransferGamma28*/,      C2Color::TRANSFER_GAMMA28 },
+-        { 6/*ColorAspects::TransferST2084*/,       C2Color::TRANSFER_ST2084 },
+-        { 7/*ColorAspects::TransferHLG*/,          C2Color::TRANSFER_HLG },
+-        { 0x40/*ColorAspects::TransferSMPTE240M*/, C2Color::TRANSFER_240M },
+-        { 0x41/*ColorAspects::TransferXvYCC*/,     C2Color::TRANSFER_XVYCC },
+-        { 0x42/*ColorAspects::TransferBT1361*/,    C2Color::TRANSFER_BT1361 },
+-        { 0x43/*ColorAspects::TransferST428*/,     C2Color::TRANSFER_ST428 },
+-        { 0xff/*ColorAspects::TransferOther*/,     C2Color::TRANSFER_OTHER },
+-    };
+-
+-    pCodec2Aspects->primaries = sColorPrimariesSf.at(pCodecAspects->colourPrimaries);
+-    pCodec2Aspects->range = sColorRangesSf.at(pCodecAspects->fullRange);
+-    pCodec2Aspects->matrix = sColorMatricesSf.at(pCodecAspects->matrixCoeffs);
+-    pCodec2Aspects->transfer = sColorTransfersSf.at(pCodecAspects->transferCharacteristics);
+-};
+-
+ 
+ IMXC2VideoDecoder::IMXC2VideoDecoder(const char* name, c2_node_id_t id, const std::shared_ptr<IntfImpl> &intfImpl)
+     : IMXC2ComponentBase(std::make_shared<IMXInterface<IntfImpl>>(name, id, intfImpl)),
+@@ -593,7 +544,8 @@ IMXC2VideoDecoder::IMXC2VideoDecoder(const char* name, c2_node_id_t id, const st
+       bSignalOutputEos(false),
+       bSignalledError(false),
+       bFlushDone(false),
+-      bPPEnabled(false){
++      bPPEnabled(false),
++      bSupportColorAspects(false){
+ }
+ 
+ IMXC2VideoDecoder::~IMXC2VideoDecoder() {
+@@ -609,6 +561,12 @@ c2_status_t IMXC2VideoDecoder::onInit() {
+         return C2_BAD_VALUE;
+     }
+     ALOGV("onInit mime=%s",mime);
++
++    if (!strcmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)
++            || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)
++            || !strcmp(mime, MEDIA_MIMETYPE_VIDEO_MPEG2))
++        bSupportColorAspects = true;
++
+     mDecoder = CreateVideoDecoderInstance(mime);
+     if (!mDecoder) {
+         ALOGE("CreateVideoDecoderInstance for mime(%s) failed 
+", mime);
+@@ -652,6 +610,9 @@ c2_status_t IMXC2VideoDecoder::onStop() {
+             ALOGE("post process stop return err %d", err);
+     }
+ 
++    bSignalledError = false;
++    bSignalOutputEos = false;
++
+     err = initInternalParam();
+     return C2ERR(err);
+ }
+@@ -880,7 +841,7 @@ void IMXC2VideoDecoder::handleOutputPicture(GraphicBlockInfo* info, uint64_t tim
+     C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+     C2StreamPixelFormatInfo::output fmt(0u, HAL_PIXEL_FORMAT_YCBCR_420_888);
+ 
+-    {
++    if (bSupportColorAspects) {
+         IntfImpl::Lock lock = mIntf->lock();
+         buffer->setInfo(mIntf->getColorAspects_l());
+     }
+@@ -1079,10 +1040,29 @@ void IMXC2VideoDecoder::notifyVideoInfo(VideoFormat *pFormat) {
+         ALOGV("config C2StreamVendorHalPixelFormat fmt=0x%x",fmt.value);
+     }
+ 
+-    DecColorAspects colorAspects;
++    DecIsoColorAspects colorAspects;
+     if (OK == mDecoder->getConfig(DEC_CONFIG_COLOR_ASPECTS, &colorAspects)) {
++        ColorAspects aspects;
+         C2StreamColorAspectsInfo::input codedAspects = { 0u };
+-        convertCodecColorAspectsToCodec2Aspects(&colorAspects, &codedAspects);
++        uint32_t primaries = colorAspects.colourPrimaries;
++        uint32_t transfer = colorAspects.transferCharacteristics;
++        uint32_t matrix = colorAspects.matrixCoeffs;
++        bool range = colorAspects.fullRange;
++
++        memset(&aspects, 0, sizeof(aspects));
++        ColorUtils::convertIsoColorAspectsToCodecAspects(primaries, transfer, matrix, range, aspects);
++        if (!C2Mapper::map(aspects.mPrimaries, &codedAspects.primaries)) {
++            codedAspects.primaries = C2Color::PRIMARIES_UNSPECIFIED;
++        }
++        if (!C2Mapper::map(aspects.mTransfer, &codedAspects.transfer)) {
++            codedAspects.transfer = C2Color::TRANSFER_UNSPECIFIED;
++        }
++        if (!C2Mapper::map(aspects.mMatrixCoeffs, &codedAspects.matrix)) {
++            codedAspects.matrix = C2Color::MATRIX_UNSPECIFIED;
++        }
++        if (!C2Mapper::map(aspects.mRange, &codedAspects.range)) {
++            codedAspects.range = C2Color::RANGE_UNSPECIFIED;
++        }
+         ALOGD("C2 color aspect p %d t %d m %d r %d",
+             codedAspects.primaries, codedAspects.range,
+             codedAspects.matrix, codedAspects.transfer);
+diff --git a/codec2/video_dec/common/IMXC2VideoDecoder.h b/codec2/video_dec/common/IMXC2VideoDecoder.h
+index a559954..6a12f38 100755
+--- a/codec2/video_dec/common/IMXC2VideoDecoder.h
++++ b/codec2/video_dec/common/IMXC2VideoDecoder.h
+@@ -88,6 +88,7 @@ private:
+     bool bFlushDone;
+     bool bPPEnabled;
+     bool bReleasingDecoder;
++    bool bSupportColorAspects;
+ 
+     status_t initInternalParam();    // init internel paramters
+     void releaseDecoder();    // release decoder instance
+diff --git a/codec2/video_dec/common/VideoDecoderBase.cpp b/codec2/video_dec/common/VideoDecoderBase.cpp
+index 5157c46..c231ce5 100755
+--- a/codec2/video_dec/common/VideoDecoderBase.cpp
++++ b/codec2/video_dec/common/VideoDecoderBase.cpp
+@@ -612,73 +612,7 @@ void VideoDecoderBase::NotifyEOS() {
+ void VideoDecoderBase::NotifyError(status_t err) {
+     mClient->notifyError(err);
+ }
+-status_t VideoDecoderBase::convertIsoColorAspectsToCodecAspects(DecColorAspects * pIsoColorAspects, DecColorAspects * pCodecAspects)
+-{
+-
+-    static const int sPrimariesMap[] = {
+-        0/* ColorAspects::PrimariesUnspecified */,
+-        1/* ColorAspects::PrimariesBT709_5 */,
+-        0/* ColorAspects::PrimariesUnspecified */,
+-        0/* ColorAspects::PrimariesUnspecified */,
+-        2/* ColorAspects::PrimariesBT470_6M */,
+-        3/* ColorAspects::PrimariesBT601_6_625 */,
+-        4/* ColorAspects::PrimariesBT601_6_525 main */,
+-        4/* ColorAspects::PrimariesBT601_6_525 */,
+-        // ITU T.832 201201 ends here
+-        5/* ColorAspects::PrimariesGenericFilm */,
+-        6/* ColorAspects::PrimariesBT2020 */,
+-        0xff/* ColorAspects::PrimariesOther XYZ */,
+-    };
+-
+-    static const int sTransfersMap[] = {
+-        0/* ColorAspects::TransferUnspecified */,
+-        3/* ColorAspects::TransferSMPTE170M main */,
+-        0/* ColorAspects::TransferUnspecified */,
+-        0/* ColorAspects::TransferUnspecified */,
+-        4/* ColorAspects::TransferGamma22 */,
+-        5/* ColorAspects::TransferGamma28 */,
+-        3/* ColorAspects::TransferSMPTE170M */,
+-        0x40/* ColorAspects::TransferSMPTE240M */,
+-        1/* ColorAspects::TransferLinear */,
+-        0xff/* ColorAspects::TransferOther log 100:1 */,
+-        0xff/* ColorAspects::TransferOther log 316:1 */,
+-        0x41/* ColorAspects::TransferXvYCC */,
+-        0x42/* ColorAspects::TransferBT1361 */,
+-        2/* ColorAspects::TransferSRGB */,
+-        // ITU T.832 201201 ends here
+-        3/* ColorAspects::TransferSMPTE170M */,
+-        3/* ColorAspects::TransferSMPTE170M */,
+-        6/* ColorAspects::TransferST2084 */,
+-        0x43/* ColorAspects::TransferST428 */,
+-        7/* ColorAspects::TransferHLG */,
+-    };
+-
+-    static const int sMatrixCoeffsMap[] = {
+-        //change the first value from 0xff to 0
+-        0/* ColorAspects::MatrixOther */,
+-        1/* ColorAspects::MatrixBT709_5 */,
+-        0/* ColorAspects::MatrixUnspecified */,
+-        0/* ColorAspects::MatrixUnspecified */,
+-        2/* ColorAspects::MatrixBT470_6M */,
+-        3/* ColorAspects::MatrixBT601_6 */,
+-        3/* ColorAspects::MatrixBT601_6 main */,
+-        4/* ColorAspects::MatrixSMPTE240M */,
+-        0xff/* ColorAspects::MatrixOther YCgCo */,
+-        // -- ITU T.832 201201 ends here
+-        5/* ColorAspects::MatrixBT2020 */,
+-        6/* ColorAspects::MatrixBT2020Constant */,
+-    };
+-
+-    if(pIsoColorAspects->colourPrimaries < sizeof(sPrimariesMap))
+-        pCodecAspects->colourPrimaries = sPrimariesMap[pIsoColorAspects->colourPrimaries];
+-    if(pIsoColorAspects->transferCharacteristics < sizeof(sTransfersMap))
+-        pCodecAspects->transferCharacteristics = sTransfersMap[pIsoColorAspects->transferCharacteristics];
+-    if(pIsoColorAspects->matrixCoeffs < sizeof(sMatrixCoeffsMap))
+-        pCodecAspects->matrixCoeffs = sMatrixCoeffsMap[pIsoColorAspects->matrixCoeffs];
+-    pCodecAspects->fullRange = (pIsoColorAspects->fullRange ? 1 /* RangeFull */: 2 /* RangeLimited */);
+ 
+-    return OK;
+-}
+ int VideoDecoderBase::getBlockPoolAllocatorId()
+ {
+     if(mBlockPool != nullptr)
+diff --git a/codec2/video_dec/common/VideoDecoderBase.h b/codec2/video_dec/common/VideoDecoderBase.h
+old mode 100644
+new mode 100755
+index 42c4201..a099fbb
+--- a/codec2/video_dec/common/VideoDecoderBase.h
++++ b/codec2/video_dec/common/VideoDecoderBase.h
+@@ -44,11 +44,11 @@ typedef struct {
+ } DecStaticHDRInfo;
+ 
+ typedef struct {
+-    unsigned int colourPrimaries;
+-    unsigned int transferCharacteristics;
+-    unsigned int matrixCoeffs;
+-    unsigned int fullRange;
+-} DecColorAspects;
++    uint32_t colourPrimaries;
++    uint32_t transferCharacteristics;
++    uint32_t matrixCoeffs;
++    uint32_t fullRange;
++} DecIsoColorAspects;
+ 
+ struct GraphicBlockInfo {
+     enum class State {
+@@ -226,7 +226,6 @@ protected:
+     void NotifyResetDone();
+     void NotifyEOS();
+     void NotifyError(status_t err);
+-    status_t convertIsoColorAspectsToCodecAspects(DecColorAspects * pIsoColorAspects, DecColorAspects * pCodecAspects);
+ 
+ private:
+     enum {
+diff --git a/codec2/video_dec/v4l2_dec/V4l2Dec.cpp b/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
+index f4afa4b..3978c8f 100644
+--- a/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
++++ b/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
+@@ -1243,13 +1243,15 @@ status_t V4l2Dec::DoGetConfig(DecConfig index, void* pConfig) {
+                 *pOutputDelayValue,mOutputFormat.bufferNum);
+             break;
+         }
+-        case DEC_CONFIG_COLOR_ASPECTS:
+-            VideoColorAspect isocolor;
+-            ret = getVideoColorAspect(&isocolor);
+-            if(ret != OK)
+-                break;
+-            ret = convertIsoColorAspectsToCodecAspects((DecColorAspects*)&isocolor, (DecColorAspects*)pConfig);
++        case DEC_CONFIG_COLOR_ASPECTS:{
++            DecIsoColorAspects* isocolor = (DecIsoColorAspects*)pConfig;
++
++            isocolor->colourPrimaries = mIsoColorAspect.colourPrimaries;
++            isocolor->transferCharacteristics = mIsoColorAspect.transferCharacteristics;
++            isocolor->matrixCoeffs = mIsoColorAspect.matrixCoeffs;
++            isocolor->fullRange = mIsoColorAspect.fullRange;
+             break;
++        }
+         default:
+             ret = BAD_VALUE;
+             break;
+@@ -1402,6 +1404,8 @@ status_t V4l2Dec::handleFormatChanged() {
+         mOutputPlaneSize[0] = format.fmt.pix_mp.plane_fmt[0].sizeimage;
+         mOutputPlaneSize[1] = format.fmt.pix_mp.plane_fmt[1].sizeimage;
+ 
++        pDev->GetColorAspectsInfo( &format.fmt.pix_mp, &mIsoColorAspect);
++
+         struct v4l2_control ctl;
+         memset(&ctl, 0, sizeof(struct v4l2_control));
+ 
+@@ -1444,6 +1448,7 @@ status_t V4l2Dec::handleFormatChanged() {
+     ALOGV("outputFormatChanged w=%d,h=%d,buf cnt=%d, buffer size[0]=%d,size[1]=%d",
+         mOutputFormat.width, mOutputFormat.height, mOutputFormat.minBufferNum, mOutputPlaneSize[0], mOutputPlaneSize[1]);
+ 
++    ALOGV("mIsoColorAspect c=%d,t=%d,m=%d,f=%d",mIsoColorAspect.colourPrimaries, mIsoColorAspect.transferCharacteristics,mIsoColorAspect.matrixCoeffs, mIsoColorAspect.fullRange);
+     if(pre_state == STOPPING || pre_state == FLUSHING){
+         ALOGI("do not handle resolution while flushing or stopping");
+         return OK;
+@@ -1467,15 +1472,6 @@ status_t V4l2Dec::handleFormatChanged() {
+     return OK;
+ }
+ 
+-status_t V4l2Dec::getVideoColorAspect(VideoColorAspect *info)
+-{
+-
+-    if(info == NULL)
+-        return UNKNOWN_ERROR;
+-
+-    return pDev->GetColorDesc(info);
+-}
+-
+ status_t V4l2Dec::stopStreaming() {
+     status_t ret = UNKNOWN_ERROR;
+ 
+@@ -1694,6 +1690,7 @@ void V4l2Dec::dumpOutputBuffer(void* inBuf, uint32_t size)
+         ALOGV("dumpOutputBuffer failed to open %s",DUMP_DEC_OUTPUT_FILE);
+     return;
+ }
++
+ VideoDecoderBase * CreateVideoDecoderInstance(const char* mime) {
+     return static_cast<VideoDecoderBase *>(new V4l2Dec(mime));
+ }
+diff --git a/codec2/video_dec/v4l2_dec/V4l2Dec.h b/codec2/video_dec/v4l2_dec/V4l2Dec.h
+index a87931e..28249e2 100644
+--- a/codec2/video_dec/v4l2_dec/V4l2Dec.h
++++ b/codec2/video_dec/v4l2_dec/V4l2Dec.h
+@@ -35,7 +35,6 @@ public:
+     status_t dequeueOutputBuffer();
+ 
+     status_t importOutputBuffers(std::vector<GraphicBlockInfo> buffers) override;
+-    status_t getVideoColorAspect(VideoColorAspect *info);
+ 
+ protected:
+     virtual ~V4l2Dec();
+@@ -135,6 +134,8 @@ private:
+     uint32_t mOutCnt;
+     uint32_t nDebugFlag;
+ 
++    VideoColorAspect mIsoColorAspect;
++
+     status_t prepareInputParams();
+     status_t SetInputFormats();
+     status_t prepareOutputParams();
+diff --git a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
+index 9e8a0f0..995242b 100755
+--- a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
++++ b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
+@@ -136,7 +136,8 @@ int ConvertMjpg2PixelFormat(int sourceFormat, int oriColorFmt) {
+ }
+ 
+ // frame pool functions
+-int32_t FramePoolRegisterBuf(unsigned long pInVirtAddr, unsigned long pInPhyAddr, int32_t bufferId, VpuDecoderFrmPoolInfo * pOutFrmPool) {
++int32_t FramePoolRegisterBuf(unsigned long pInVirtAddr, unsigned long pInPhyAddr,
++                                        int fd, int32_t bufferId, VpuDecoderFrmPoolInfo * pOutFrmPool) {
+ 	int32_t i;
+ 	for (i = 0; i < VPU_DEC_MAX_NUM_MEM; i++) {
+ 		//insert into empty node
+@@ -145,6 +146,7 @@ int32_t FramePoolRegisterBuf(unsigned long pInVirtAddr, unsigned long pInPhyAddr
+ 			pOutFrmPool->nFrm_phyAddr[i] = pInPhyAddr;
+ 			pOutFrmPool->nFrm_virtAddr[i] = pInVirtAddr;
+             pOutFrmPool->nFrm_bufferId[i] = bufferId;
++            pOutFrmPool->nFrm_ionFd[i] = fd;
+ 			pOutFrmPool->nFrmNum++;
+ 			return pOutFrmPool->nFrmNum;
+ 		}
+@@ -178,11 +180,18 @@ int32_t FramePoolBufNum(VpuDecoderFrmPoolInfo* pInFrmPool) {
+ }
+ 
+ void FramePoolClear(VpuDecoderFrmPoolInfo* pOutFrmPool) {
++    int i;
++    for(i = 0; i < VPU_DEC_MAX_NUM_MEM; i++) {
++        if (pOutFrmPool->nFrm_ionFd[i] >= 0) {
++            close(pOutFrmPool->nFrm_ionFd[i]);
++        }
++    }
++
+ 	memset(pOutFrmPool, 0, sizeof(VpuDecoderFrmPoolInfo));
+ 
+-    int i;
+     for(i = 0; i < VPU_DEC_MAX_NUM_MEM; i++) {
+         pOutFrmPool->nFrm_bufferId[i] = -1;
++        pOutFrmPool->nFrm_ionFd[i] = -1;
+ 	}
+ }
+ 
+@@ -429,6 +438,7 @@ void VpuWrapperDec::SetDefaultSetting() {
+     int i;
+     for(i = 0; i < VPU_DEC_MAX_NUM_MEM; i++) {
+         sFramePoolInfo.nFrm_bufferId[i] = -1;
++        sFramePoolInfo.nFrm_ionFd[i] = -1;
+     }
+ 
+     mOutputFormat.pixelFormat = HAL_PIXEL_FORMAT_YCbCr_420_SP;
+@@ -471,8 +481,8 @@ void VpuWrapperDec::SetDefaultSetting() {
+ 	bReorderDisabled = false;
+     bHasCodecColorDesc = false;
+     bHasHdr10StaticInfo = false;
+-    memset(&sDecoderColorDesc,0,sizeof(DecColorAspects));
+-    memset(&sParserColorDesc,0,sizeof(DecColorAspects));
++    memset(&sDecoderColorDesc,0,sizeof(DecIsoColorAspects));
++    memset(&sParserColorDesc,0,sizeof(DecIsoColorAspects));
+     memset(&sHdr10StaticInfo,0,sizeof(DecStaticHDRInfo));
+ 
+     nYOffset = 0;
+@@ -598,7 +608,10 @@ status_t VpuWrapperDec::ProcessVpuInitInfo() {
+     VPU_COMP_LOG("mOutputFormat.bufferNumDec:%d ,nPadWidth: %d, nPadHeight: %d 
+", mOutputFormat.bufferNum, mOutputFormat.width, mOutputFormat.height);
+ 
+     if(sInitInfo.hasColorDesc){
+-        convertIsoColorAspectsToCodecAspects((DecColorAspects*)&sInitInfo.ColourDesc, &sDecoderColorDesc);
++        sDecoderColorDesc.colourPrimaries = sInitInfo.ColourDesc.colourPrimaries;
++        sDecoderColorDesc.transferCharacteristics = sInitInfo.ColourDesc.transferCharacteristics;
++        sDecoderColorDesc.matrixCoeffs = sInitInfo.ColourDesc.matrixCoeffs;
++        sDecoderColorDesc.fullRange = sInitInfo.ColourDesc.fullRange;
+         bHasCodecColorDesc = true;
+ 
+         VPU_COMP_INFO("hasColorDesc, colourPrimaries %d transferCharacteristics %d matrixCoeffs %d fullRange %d",
+@@ -910,7 +923,8 @@ decode_one_frame:
+ 	InData.sCodecData.pData = pCodecDataBuf;
+ 	InData.sCodecData.nSize = nCodecDataLen;
+ 
+-    if (pCodecDataBuf && nCodecDataLen > 0) {
++    // MA-17685: don't send codecdata again for vc1, otherwise it will cause mosaic after seek
++    if (pCodecDataBuf && nCodecDataLen > 0 && !(eCodingFormat == VPU_V_VC1 || eCodingFormat == VPU_V_VC1_AP)) {
+         int reset = 0;
+         VPU_DecConfig(nHandle, VPU_DEC_CONF_RESET_CODECDATA, &reset);
+     }
+@@ -1092,7 +1106,7 @@ status_t VpuWrapperDec::DoGetConfig(DecConfig index, void* pConfig) {
+         }
+         case DEC_CONFIG_COLOR_ASPECTS: {
+             if (bHasCodecColorDesc)
+-                memcpy(pConfig, &sDecoderColorDesc, sizeof(DecColorAspects));
++                memcpy(pConfig, &sDecoderColorDesc, sizeof(DecIsoColorAspects));
+             else
+                 ret = BAD_VALUE;
+             break;
+@@ -1445,11 +1459,17 @@ status_t VpuWrapperDec::OpenVpu() {
+ status_t VpuWrapperDec::CreateOneRegisterFrameBuffer(GraphicBlockInfo* info, VpuFrameBuffer * pFrameBuf) {
+     status_t err = OK;
+     int32_t frameNum;
++    int ionFd = -1;
++    bool cacheable = (nOutBufferUsage & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE));
+ 
+     memset(pFrameBuf, 0, sizeof(VpuFrameBuffer));
+ 
++    // if framebuffer is cacheable, need to register ion fd to vpu to flush.
++    if (cacheable)
++        ionFd = dup(info->mDMABufFd);
++
+     // register output frame buffer to frame pool/vpu
+-    frameNum = FramePoolRegisterBuf(info->mVirtAddr, info->mPhysAddr, info->mBlockId, &sFramePoolInfo);
++    frameNum = FramePoolRegisterBuf(info->mVirtAddr, info->mPhysAddr, ionFd, info->mBlockId, &sFramePoolInfo);
+     if (frameNum == -1) {
+         VPU_COMP_ERR_LOG("%s: register frame failure: frame pool is full ! 
+", __FUNCTION__);
+         return BAD_VALUE;
+@@ -1458,6 +1478,7 @@ status_t VpuWrapperDec::CreateOneRegisterFrameBuffer(GraphicBlockInfo* info, Vpu
+     pFrameBuf->pbufY = (unsigned char*)info->mPhysAddr;
+ 	pFrameBuf->pbufVirtY = (unsigned char*)info->mVirtAddr;
+     pFrameBuf->nBufferId = info->mBlockId;
++    pFrameBuf->nIonFd = ionFd;
+ 
+     info->mState = GraphicBlockInfo::State::OWNED_BY_VPU;
+ 
+diff --git a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.h b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.h
+index 6440e42..00b1337 100755
+--- a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.h
++++ b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.h
+@@ -45,6 +45,7 @@ typedef struct
+ 	VpuDecoderFrmState eFrmState[VPU_DEC_MAX_NUM_MEM];
+ 	unsigned long nFrm_virtAddr[VPU_DEC_MAX_NUM_MEM];
+ 	unsigned long nFrm_phyAddr[VPU_DEC_MAX_NUM_MEM];
++    int nFrm_ionFd[VPU_DEC_MAX_NUM_MEM];
+     int32_t nFrm_bufferId[VPU_DEC_MAX_NUM_MEM];
+ 	VpuDecOutFrameInfo outFrameInfo[VPU_DEC_MAX_NUM_MEM];
+ }VpuDecoderFrmPoolInfo;
+@@ -129,8 +130,8 @@ private:
+ 	bool bReorderDisabled;
+ 
+     bool bHasCodecColorDesc;
+-    DecColorAspects sDecoderColorDesc;
+-    DecColorAspects sParserColorDesc;
++    DecIsoColorAspects sDecoderColorDesc;
++    DecIsoColorAspects sParserColorDesc;
+ 
+     bool bHasHdr10StaticInfo;
+     DecStaticHDRInfo sHdr10StaticInfo;
+diff --git a/codec2/video_enc/common/Android.bp b/codec2/video_enc/common/Android.bp
+index 2e4dfcb..7ca265b 100644
+--- a/codec2/video_enc/common/Android.bp
++++ b/codec2/video_enc/common/Android.bp
+@@ -36,6 +36,7 @@ cc_library_shared {
+ 
+     defaults: [
+         "imx_defaults",
++        "imx_codec2_default",
+     ],
+ }
+ 
+@@ -77,6 +78,7 @@ cc_library_shared {
+         "lib_imx_c2_process",
+         "libcodec2_vndk",
+         "lib_c2_imx_store",
++        "libsfplugin_ccodec_utils",
+     ],
+ 
+ 
+diff --git a/codec2/video_enc/common/IMXC2VideoEncoder.cpp b/codec2/video_enc/common/IMXC2VideoEncoder.cpp
+old mode 100755
+new mode 100644
+index 38f6502..38385bc
+--- a/codec2/video_enc/common/IMXC2VideoEncoder.cpp
++++ b/codec2/video_enc/common/IMXC2VideoEncoder.cpp
+@@ -8,6 +8,7 @@
+ 
+ //#define LOG_NDEBUG 0
+ #define LOG_TAG "IMXC2VideoEncoder"
++#include <atomic>
+ #include <log/log.h>
+ #include <utils/misc.h>
+ 
+@@ -20,6 +21,7 @@
+ #include <C2Debug.h>
+ #include <C2PlatformSupport.h>
+ #include <util/C2InterfaceHelper.h>
++#include <Codec2Mapper.h>
+ 
+ #include "IMXC2Interface.h"
+ #include "IMXC2VideoEncoder.h"
+@@ -32,6 +34,9 @@
+ 
+ namespace android {
+ 
++static std::atomic<std::int32_t> gEncoderInstance = 0;
++
++
+ #define CHECK_AND_RETURN_C2_ERR(err) if((err) != OK) {ALOGE("%s, line %d", __FUNCTION__, __LINE__); return (((err) == OK) ? C2_OK : C2_CORRUPTED);}
+ #define C2ERR(err) ((err) == OK ? C2_OK : C2_CORRUPTED)
+ 
+@@ -115,6 +120,24 @@ public:
+                     Setter<decltype(*mPixelFormat)>::StrictValueWithNoDeps)
+                 .build());
+ 
++        addParameter(
++                DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
++                .withDefault(new C2StreamColorAspectsInfo::output(
++                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
++                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
++                .withFields({
++                    C2F(mColorAspects, range).inRange(
++                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
++                    C2F(mColorAspects, primaries).inRange(
++                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
++                    C2F(mColorAspects, transfer).inRange(
++                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
++                    C2F(mColorAspects, matrix).inRange(
++                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
++                })
++                .withSetter(ColorAspectsSetter)
++                .build());
++
+         addParameter(
+                 DefineParam(mGop, C2_PARAMKEY_GOP)
+                 .withDefault(C2StreamGopTuning::output::AllocShared(
+@@ -160,36 +183,53 @@ public:
+                 .withSetter(IntraRefreshSetter)
+                 .build());
+ 
+-        addParameter(
+-            DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
+-            .withDefault(new C2StreamProfileLevelInfo::output(
+-                    0u, PROFILE_AVC_CONSTRAINED_BASELINE, LEVEL_AVC_4_1))
+-            .withFields({
+-                C2F(mProfileLevel, profile).oneOf({
+-                    PROFILE_AVC_BASELINE,
+-                    PROFILE_AVC_CONSTRAINED_BASELINE,
+-                    PROFILE_AVC_MAIN,
+-                }),
+-                C2F(mProfileLevel, level).oneOf({
+-                    LEVEL_AVC_1,
+-                    LEVEL_AVC_1B,
+-                    LEVEL_AVC_1_1,
+-                    LEVEL_AVC_1_2,
+-                    LEVEL_AVC_1_3,
+-                    LEVEL_AVC_2,
+-                    LEVEL_AVC_2_1,
+-                    LEVEL_AVC_2_2,
+-                    LEVEL_AVC_3,
+-                    LEVEL_AVC_3_1,
+-                    LEVEL_AVC_3_2,
+-                    LEVEL_AVC_4,
+-                    LEVEL_AVC_4_1,
+-                    LEVEL_AVC_4_2,
+-                    LEVEL_AVC_5,
+-                }),
+-            })
+-            .withSetter(ProfileLevelSetter, mSize, mFrameRate, mBitrate)
+-            .build());
++        if (mimeType ==  MEDIA_MIMETYPE_VIDEO_AVC) {
++            addParameter(
++                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                .withDefault(new C2StreamProfileLevelInfo::output(
++                        0u, PROFILE_AVC_CONSTRAINED_BASELINE, LEVEL_AVC_4_1))
++                .withFields({
++                    C2F(mProfileLevel, profile).oneOf({
++                        PROFILE_AVC_BASELINE,
++                        PROFILE_AVC_CONSTRAINED_BASELINE,
++                        PROFILE_AVC_MAIN,
++                        PROFILE_AVC_HIGH
++                    }),
++                    C2F(mProfileLevel, level).oneOf({
++                        LEVEL_AVC_1, LEVEL_AVC_1B,
++                        LEVEL_AVC_1_1, LEVEL_AVC_1_2,
++                        LEVEL_AVC_1_3, LEVEL_AVC_2,
++                        LEVEL_AVC_2_1, LEVEL_AVC_2_2,
++                        LEVEL_AVC_3, LEVEL_AVC_3_1,
++                        LEVEL_AVC_3_2, LEVEL_AVC_4,
++                        LEVEL_AVC_4_1, LEVEL_AVC_4_2,
++                        LEVEL_AVC_5, LEVEL_AVC_5_1
++                    }),
++                })
++                .withSetter(AvcProfileLevelSetter, mSize, mFrameRate, mBitrate)
++                .build());
++        } else if (mimeType ==  MEDIA_MIMETYPE_VIDEO_HEVC) {
++            addParameter(
++                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
++                .withDefault(new C2StreamProfileLevelInfo::output(
++                        0u, PROFILE_HEVC_MAIN, LEVEL_HEVC_MAIN_1))
++                .withFields({
++                    C2F(mProfileLevel, profile).oneOf({
++                        C2Config::PROFILE_HEVC_MAIN,
++                        C2Config::PROFILE_HEVC_MAIN_10,
++                        C2Config::PROFILE_HEVC_MAIN_STILL
++                    }),
++                    C2F(mProfileLevel, level).oneOf({
++                        LEVEL_HEVC_MAIN_1, LEVEL_HEVC_MAIN_2,
++                        LEVEL_HEVC_MAIN_2_1, LEVEL_HEVC_MAIN_3,
++                        LEVEL_HEVC_MAIN_3_1, LEVEL_HEVC_MAIN_4,
++                        LEVEL_HEVC_MAIN_4_1, LEVEL_HEVC_MAIN_5,
++                        LEVEL_HEVC_MAIN_5_1
++                    }),
++                })
++                .withSetter(HevcProfileLevelSetter, mSize, mFrameRate, mBitrate)
++                .build());
++        }
+ 
+         addParameter(
+                 DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
+@@ -242,7 +282,12 @@ public:
+         return res;
+     }
+ 
+-    static C2R ProfileLevelSetter(
++    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me) {
++        (void)mayBlock;
++        return C2R::Ok();
++    }
++
++    static C2R AvcProfileLevelSetter(
+             bool mayBlock,
+             C2P<C2StreamProfileLevelInfo::output> &me,
+             const C2P<C2StreamPictureSizeInfo::input> &size,
+@@ -318,6 +363,78 @@ public:
+         return C2R::Ok();
+     }
+ 
++    static C2R HevcProfileLevelSetter(
++            bool mayBlock,
++            C2P<C2StreamProfileLevelInfo::output> &me,
++            const C2P<C2StreamPictureSizeInfo::input> &size,
++            const C2P<C2StreamFrameRateInfo::output> &frameRate,
++            const C2P<C2StreamBitrateInfo::output> &bitrate) {
++        (void)mayBlock;
++        if (!me.F(me.v.profile).supportsAtAll(me.v.profile)) {
++            me.set().profile = PROFILE_HEVC_MAIN;
++        }
++
++        struct LevelLimits {
++            C2Config::level_t level;
++            uint64_t samplesPerSec;
++            uint64_t samples;
++            uint32_t bitrate;
++        };
++
++        constexpr LevelLimits kLimits[] = {
++            { LEVEL_HEVC_MAIN_1,       552960,    36864,    128000 },
++            { LEVEL_HEVC_MAIN_2,      3686400,   122880,   1500000 },
++            { LEVEL_HEVC_MAIN_2_1,    7372800,   245760,   3000000 },
++            { LEVEL_HEVC_MAIN_3,     16588800,   552960,   6000000 },
++            { LEVEL_HEVC_MAIN_3_1,   33177600,   983040,  10000000 },
++            { LEVEL_HEVC_MAIN_4,     66846720,  2228224,  12000000 },
++            { LEVEL_HEVC_MAIN_4_1,  133693440,  2228224,  20000000 },
++            { LEVEL_HEVC_MAIN_5,    267386880,  8912896,  25000000 },
++            { LEVEL_HEVC_MAIN_5_1,  534773760,  8912896,  40000000 },
++            { LEVEL_HEVC_MAIN_5_2, 1069547520,  8912896,  60000000 },
++            { LEVEL_HEVC_MAIN_6,   1069547520, 35651584,  60000000 },
++            { LEVEL_HEVC_MAIN_6_1, 2139095040, 35651584, 120000000 },
++            { LEVEL_HEVC_MAIN_6_2, 4278190080, 35651584, 240000000 },
++        };
++
++        uint64_t samples = size.v.width * size.v.height;
++        uint64_t samplesPerSec = samples * frameRate.v.value;
++
++        // Check if the supplied level meets the MB / bitrate requirements. If
++        // not, update the level with the lowest level meeting the requirements.
++
++        bool found = false;
++        // By default needsUpdate = false in case the supplied level does meet
++        // the requirements.
++        bool needsUpdate = false;
++        for (const LevelLimits &limit : kLimits) {
++            if (samples <= limit.samples && samplesPerSec <= limit.samplesPerSec &&
++                    bitrate.v.value <= limit.bitrate) {
++                // This is the lowest level that meets the requirements, and if
++                // we haven't seen the supplied level yet, that means we don't
++                // need the update.
++                if (needsUpdate) {
++                    ALOGD("Given level %x does not cover current configuration: "
++                          "adjusting to %x", me.v.level, limit.level);
++                    me.set().level = limit.level;
++                }
++                found = true;
++                break;
++            }
++            if (me.v.level == limit.level) {
++                // We break out of the loop when the lowest feasible level is
++                // found. The fact that we're here means that our level doesn't
++                // meet the requirement and needs to be updated.
++                needsUpdate = true;
++            }
++        }
++        if (!found) {
++            // We set to the highest supported level.
++            me.set().level = LEVEL_HEVC_MAIN_5_2;
++        }
++        return C2R::Ok();
++    }
++
+     static C2R IntraRefreshSetter(bool mayBlock, C2P<C2StreamIntraRefreshTuning::output> &me) {
+         (void)mayBlock;
+         C2R res = C2R::Ok();
+@@ -386,6 +503,10 @@ public:
+         return (uint32_t)c2_max(c2_min(period + 0.5, double(UINT32_MAX)), 1.);
+     }
+ 
++    std::shared_ptr<C2StreamColorAspectsInfo::output> getColorAspects_l() {
++        return mColorAspects;
++    }
++
+     // unsafe getters
+     std::shared_ptr<C2StreamPictureSizeInfo::input> getSize_l() const { return mSize; }
+     std::shared_ptr<C2StreamPixelFormatInfo::input> getPixelFormat_l() const { return mPixelFormat; }
+@@ -400,6 +521,7 @@ private:
+     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
+     std::shared_ptr<C2StreamPictureSizeInfo::input> mSize;
+     std::shared_ptr<C2StreamPixelFormatInfo::input> mPixelFormat;
++    std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
+     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
+     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+     std::shared_ptr<C2StreamIntraRefreshTuning::output> mIntraRefresh;
+@@ -409,6 +531,7 @@ private:
+     std::shared_ptr<C2StreamGopTuning::output> mGop;
+ };
+ 
++
+ static void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
+     ALOGD("fillEmptyWork");
+ 
+@@ -443,9 +566,12 @@ IMXC2VideoEncoder::IMXC2VideoEncoder(
+ 
+       mPreProcess = nullptr;
+       mEncoder = nullptr;
++      gEncoderInstance++;
+ }
+ 
+ IMXC2VideoEncoder::~IMXC2VideoEncoder() {
++    if(gEncoderInstance > 0)
++        gEncoderInstance--;
+ }
+ 
+ c2_status_t IMXC2VideoEncoder::onInit() {
+@@ -461,6 +587,24 @@ c2_status_t IMXC2VideoEncoder::onInit() {
+         mPixelFormat = mIntf->getPixelFormat_l();
+     }
+ 
++    int32_t max_count = 32;
++    {
++        FILE *f = fopen("/sys/devices/soc0/soc_id", "r");
++        if(f != NULL){
++            char inputBuf[20];
++            if(fgets(inputBuf, sizeof(inputBuf), f) != NULL){
++                if(!strncmp(inputBuf, "i.MX8QM", 7)){
++                    max_count = 16;
++                }else if(!strncmp(inputBuf, "i.MX8QXP", 8)){
++                    max_count = 8;
++                }
++            }
++            fclose(f);
++        }
++    }
++    if(gEncoderInstance > max_count)
++        return C2_NO_MEMORY;
++
+     return C2_OK;
+ }
+ 
+@@ -504,8 +648,10 @@ c2_status_t IMXC2VideoEncoder::onFlush_sm() {
+         CHECK_AND_RETURN_C2_ERR(err);
+     }
+ 
+-    err = mEncoder->flush();
+-    CHECK_AND_RETURN_C2_ERR(err);
++    if (mEncoder) {
++        err = mEncoder->flush();
++        CHECK_AND_RETURN_C2_ERR(err);
++    }
+ 
+     return C2ERR(err);
+ }
+@@ -685,10 +831,12 @@ c2_status_t IMXC2VideoEncoder::drainInternal(uint32_t drainMode) {
+ 
+ status_t IMXC2VideoEncoder::initComponent() {
+     status_t err = OK;
+-    int profile, level;
++    int profile = 0, level = 0;
+     int IDRInterval;
+     int pixelFmt = mPixelFormat->value; //default value
+     std::shared_ptr<C2StreamGopTuning::output> gop;
++    std::shared_ptr<C2StreamColorAspectsInfo::output> c2Aspects;
++    EncIsoColorAspects colorAspects;
+ 
+     IMX_VIDEO_ENC_API_TRACE("%s, line %d 
+", __FUNCTION__, __LINE__);
+ 
+@@ -714,8 +862,45 @@ status_t IMXC2VideoEncoder::initComponent() {
+         IntfImpl::Lock lock = mIntf->lock();
+         IDRInterval = (int)mIntf->getSyncFramePeriod_l();
+         gop = mIntf->getGop_l();
+-        profile = mIntf->getProfile_l();
+-        level = mIntf->getLevel_l();
++        c2Aspects = mIntf->getColorAspects_l();
++
++        if (mime == MEDIA_MIMETYPE_VIDEO_HEVC || mime == MEDIA_MIMETYPE_VIDEO_AVC) {
++            profile = mIntf->getProfile_l();
++            level = mIntf->getLevel_l();
++        }
++    }
++
++    ColorAspects aspects;
++    bool range = false;
++    int primaries = 0, matrix = 0, transfer = 0;
++
++    memset(&aspects, 0, sizeof(aspects));
++    memset(&colorAspects, 0, sizeof(EncIsoColorAspects));
++
++    if (!C2Mapper::map(c2Aspects.get()->primaries, &aspects.mPrimaries)) {
++        aspects.mPrimaries = ColorAspects::PrimariesUnspecified;
++    }
++    if (!C2Mapper::map(c2Aspects.get()->transfer, &aspects.mTransfer)) {
++        aspects.mTransfer = ColorAspects::TransferUnspecified;
++    }
++    if (!C2Mapper::map(c2Aspects.get()->matrix, &aspects.mMatrixCoeffs)) {
++        aspects.mMatrixCoeffs = ColorAspects::MatrixUnspecified;
++    }
++    if (!C2Mapper::map(c2Aspects.get()->range, &aspects.mRange)) {
++        aspects.mRange = ColorAspects::RangeUnspecified;
++    }
++
++    ColorUtils::convertCodecColorAspectsToIsoAspects(aspects, &primaries, &transfer, &matrix, &range);
++
++    if (aspects.mRange > 0) {
++        colorAspects.videoSignalTypePresentFlag = 1;
++        colorAspects.fullRange = (uint32_t)range;
++        if (aspects.mPrimaries || aspects.mMatrixCoeffs || aspects.mTransfer) {
++            colorAspects.colourDescriptionPresentFlag = 1;
++            colorAspects.primaries = primaries;
++            colorAspects.matrixCoeffs = matrix;
++            colorAspects.transfer = transfer;
++        }
+     }
+ 
+     bPPEnabled = mEncoder->checkIfPreProcessNeeded(pixelFmt);
+@@ -735,7 +920,7 @@ status_t IMXC2VideoEncoder::initComponent() {
+         inFmt.stride = mSize->width;
+         inFmt.bufferSize = inFmt.width * inFmt.height * pxlfmt2bpp(inFmt.format) / 8;
+ 
+-        ALOGE("PROCESS_CONFIG_INPUT_FORMAT w=%d,h=%d,pixelFmt=%x,bufferSize=%d",mSize->width,mSize->height, pixelFmt, inFmt.bufferSize);
++        ALOGI("init preprocess w=%d,h=%d,pixelFmt=%x,bufferSize=%d",mSize->width,mSize->height, pixelFmt, inFmt.bufferSize);
+         err = mPreProcess->setConfig(PROCESS_CONFIG_INPUT_FORMAT, &inFmt);
+         if (err) {
+             goto RELEASE_ENCODER;
+@@ -772,10 +957,17 @@ status_t IMXC2VideoEncoder::initComponent() {
+     inPara.nProfile = profile;
+     inPara.nLevel = level;
+ 
++    memcpy(&inPara.sColorAspects, &colorAspects, sizeof(EncIsoColorAspects));
++
+     ALOGI("initComponent: res=(%d x %d) fps=%d bitrate=%d GOP=%d pixelFormat %x",
+         inPara.nPicWidth, inPara.nPicHeight, inPara.nFrameRate, inPara.nBitRate, inPara.nGOPSize, pixelFmt);
+     ALOGI("initComponent: IDRInterval=%d RefreshIntra=%d profile=0x%x level=0x%x",
+         inPara.nIDRPeriod, inPara.nRefreshIntra, inPara.nProfile, inPara.nLevel);
++    ALOGI("initComponent: sColorAspects: flag %d flag %d rang %d primaries %d transfer %d matrix %d",
++        inPara.sColorAspects.videoSignalTypePresentFlag,
++        inPara.sColorAspects.colourDescriptionPresentFlag,
++        inPara.sColorAspects.fullRange, inPara.sColorAspects.primaries,
++        inPara.sColorAspects.transfer, inPara.sColorAspects.matrixCoeffs);
+ 
+     mEncoder->initEncInputParamter(&inPara);
+ 
+diff --git a/codec2/video_enc/common/VideoEncoderBase.cpp b/codec2/video_enc/common/VideoEncoderBase.cpp
+index 1c81b57..f83dcc7 100755
+--- a/codec2/video_enc/common/VideoEncoderBase.cpp
++++ b/codec2/video_enc/common/VideoEncoderBase.cpp
+@@ -73,6 +73,7 @@ IMXInputBuffer::IMXInputBuffer(IMXInputBuffer* pInput)
+       id(pInput->id),
+       size(pInput->size),
+       timestamp(pInput->timestamp),
++      flag(pInput->flag),
+       eos(pInput->eos){
+ 
+ }
+diff --git a/codec2/video_enc/common/VideoEncoderBase.h b/codec2/video_enc/common/VideoEncoderBase.h
+index f79d53c..39a5929 100755
+--- a/codec2/video_enc/common/VideoEncoderBase.h
++++ b/codec2/video_enc/common/VideoEncoderBase.h
+@@ -28,6 +28,15 @@ typedef enum {
+     ENC_CONFIG_COLOR_FORMAT,
+ } EncConfig;
+ 
++typedef struct {
++    uint32_t videoSignalTypePresentFlag;
++    uint32_t fullRange;
++    uint32_t colourDescriptionPresentFlag;
++    uint32_t primaries;
++    uint32_t transfer;
++    uint32_t matrixCoeffs;
++} EncIsoColorAspects;
++
+ struct LinearBlockInfo {
+     enum class State {
+         OWNED_BY_COMPONENT = 0,    // Owned by this component.
+@@ -72,6 +81,8 @@ typedef struct {
+ 	int nRcIntraQP;		//0: auto; >0: qp value
+ 	int nProfile;
+     int nLevel;
++
++    EncIsoColorAspects sColorAspects;
+ } EncInputParam;
+ 
+ 
+diff --git a/codec2/video_enc/v4l2_enc/V4l2Enc.cpp b/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
+index b8c4b68..3b1b62b 100644
+--- a/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
++++ b/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
+@@ -694,7 +694,9 @@ status_t V4l2Enc::encodeInternal(std::unique_ptr<IMXInputBuffer> input)
+         ALOGE("onQueueInputBuffer index=%d, at_device",index);
+     }
+ 
+-
++    if (v4l2_flags & V4L2_BUF_FLAG_KEYFRAME) {
++        pDev->SetForceKeyFrame();
++    }
+ 
+     struct v4l2_buffer stV4lBuf;
+     struct v4l2_plane planes[kInputBufferPlaneNum];
+@@ -1278,8 +1280,7 @@ void V4l2Enc::initEncInputParamter(EncInputParam *pInPara) {
+     mTargetFps = pInPara->nFrameRate;
+     mEncParam.nRotAngle = pInPara->nRotAngle;
+     mEncParam.nBitRate = pInPara->nBitRate;
+-    //TODO: set bitrate mode
+-    mEncParam.nBitRateMode = V4L2_MPEG_VIDEO_BITRATE_MODE_VBR;
++    mEncParam.nBitRateMode = V4L2_MPEG_VIDEO_BITRATE_MODE_CBR;
+     mEncParam.nGOPSize = pInPara->nGOPSize;
+     mEncParam.nIntraFreshNum = pInPara->nRefreshIntra;
+     mEncParam.nProfile = pInPara->nProfile;
+diff --git a/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.cpp b/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.cpp
+index 811de24..7d3de5b 100755
+--- a/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.cpp
++++ b/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.cpp
+@@ -818,6 +818,8 @@ void VpuWrapperEnc::initEncInputParamter(EncInputParam *pInPara) {
+     sVpuEncInputPara.nQuantParam = pInPara->nQuantParam;
+     sVpuEncInputPara.ePixelFormat = pInPara->eColorFormat;
+ 
++    memcpy(&sVpuEncInputPara.sColorInfo, &pInPara->sColorAspects, sizeof(EncIsoColorAspects));
++
+     if (pInPara->eColorFormat == HAL_PIXEL_FORMAT_YCbCr_420_SP ||
+             pInPara->eColorFormat == HAL_PIXEL_FORMAT_YCBCR_420_888) {
+         sVpuEncInputPara.nChromaInterleave = 1;
+@@ -997,6 +999,12 @@ status_t VpuWrapperEnc::OpenVpu() {
+ 	sEncOpenParam.nChromaInterleave = sVpuEncInputPara.nChromaInterleave;
+ 	sEncOpenParam.sMirror = sVpuEncInputPara.sMirror;
+     sEncOpenParam.eColorFormat = VPUCom_ConvertPixelFmt2Vpu(sVpuEncInputPara.ePixelFormat);
++    sEncOpenParam.sColorAspects.nColourDescPresentFlag = sVpuEncInputPara.sColorInfo.colourDescriptionPresentFlag;
++    sEncOpenParam.sColorAspects.nPrimaries = sVpuEncInputPara.sColorInfo.primaries;
++    sEncOpenParam.sColorAspects.nMatrixCoeffs = sVpuEncInputPara.sColorInfo.matrixCoeffs;
++    sEncOpenParam.sColorAspects.nTransfer = sVpuEncInputPara.sColorInfo.transfer;
++    sEncOpenParam.sColorAspects.nVideoSignalPresentFlag = sVpuEncInputPara.sColorInfo.videoSignalTypePresentFlag;
++    sEncOpenParam.sColorAspects.nFullRange = sVpuEncInputPara.sColorInfo.fullRange;
+ 
+ 	if (1 == sEncOpenParam.nChromaInterleave) {
+ 		//for reduce the bus loading, we set tile format for vpu internal frame buffers.
+diff --git a/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.h b/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.h
+index d4566c3..5cb93f3 100755
+--- a/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.h
++++ b/codec2/video_enc/vpuwrapper_enc/VpuWrapperEnc.h
+@@ -60,6 +60,8 @@ typedef struct {
+     int nIntraFreshNum;
+     bool bEnabledSPSIDR; //SPS/PPS is added for every IDR frame
+     int nRcIntraQP;     //0: auto; >0: qp value
++
++    EncIsoColorAspects sColorInfo;
+ } VpuEncInputParam;
+ 
+ 
+diff --git a/extractor/Android.bp b/extractor/Android.bp
+index 332bcae..21896d8 100755
+--- a/extractor/Android.bp
++++ b/extractor/Android.bp
+@@ -40,7 +40,6 @@ cc_library_shared {
+     ],
+ 	
+     include_dirs: [
+-        "frameworks/av/include/media/stagefright",
+         "frameworks/av/include/media",
+ 		"frameworks/av/include",
+ 		"frameworks/av/media/libstagefright/include",
+diff --git a/extractor/ImxExtractor.cpp b/extractor/ImxExtractor.cpp
+old mode 100755
+new mode 100644
+index 2a22b32..5e2a07a
+--- a/extractor/ImxExtractor.cpp
++++ b/extractor/ImxExtractor.cpp
+@@ -14,7 +14,7 @@
+ #include "ImxExtractor.h"
+ #include "Imx_ext.h"
+ 
+-#include <media/DataSourceBase.h>
++#include <media/stagefright/DataSourceBase.h>
+ #include <media/MediaTrack.h>
+ #include <media/stagefright/foundation/ADebug.h>
+ #include <media/stagefright/foundation/AUtils.h>
+@@ -49,6 +49,7 @@ namespace android {
+ #define MAX_FRAME_BUFFER_LENGTH 10000000
+ #define MAX_FRAME_BUFFER_LENGTH_4K 50000000
+ #define MAX_VIDEO_BUFFER_SIZE (512*1024)
++#define MIN_VIDEO_BUFFER_SIZE (52*1024)
+ #define MAX_AUDIO_BUFFER_SIZE (16*1024)
+ #define MAX_TEXT_BUFFER_SIZE (1024)
+ #define MAX_TRACK_COUNT 32
+@@ -1252,7 +1253,11 @@ status_t ImxExtractor::GetLibraryName()
+         return NAME_NOT_FOUND;
+ 
+ 
+-    strcpy(mLibName, "/system/lib64/extractors/lib_");
++    strcpy(mLibName, "/system/lib"
++#ifdef __LP64__
++            "64"
++#endif
++            "/extractors/lib_");
+     strcat(mLibName,name);
+     strcat(mLibName,"_parser_arm11_elinux.3.0.so");
+ 
+@@ -1452,6 +1457,12 @@ status_t ImxExtractor::CreateParserInterface()
+             err = PARSER_SUCCESS;
+         }
+ 
++        err = myQueryInterface(PARSER_API_GET_VIDEO_FRAME_THUMBNAIL_TIME, (void **)&IParser->getVideoThumbnailTime);
++        if(err){
++            IParser->getVideoThumbnailTime = NULL;
++            err = PARSER_SUCCESS;
++        }
++
+         //audio properties
+         err = myQueryInterface(PARSER_API_GET_AUDIO_NUM_CHANNELS, (void **)&IParser->getAudioNumChannels);
+         if(err)
+@@ -1890,7 +1901,7 @@ status_t ImxExtractor::ParseVideo(uint32 index, uint32 type,uint32 subtype)
+     if(mime == NULL)
+         return UNKNOWN_ERROR;
+ 
+-    err = IParser->getTrackDuration(parserHandle, index,(uint64 *)&duration);
++    err = IParser->getTrackDuration(parserHandle, index, (uint64 *)&duration);
+     if(err)
+         return UNKNOWN_ERROR;
+ 
+@@ -1952,7 +1963,14 @@ status_t ImxExtractor::ParseVideo(uint32 index, uint32 type,uint32 subtype)
+         }
+     }
+ 
+-    ALOGI("ParseVideo width=%u,height=%u,fps=%u,rotate=%u",width,height,fps,rotation);
++    if(IParser->getVideoThumbnailTime){
++        err = IParser->getVideoThumbnailTime(parserHandle, index, (uint64 *)&thumbnail_ts);
++        if(err){
++            return UNKNOWN_ERROR;
++        }
++    }
++    ALOGI("ParseVideo width=%u,height=%u,fps=%u,rotate=%u,duration=%lld,thumbnail_ts=%lld",
++        width,height,fps,rotation,(long long)duration,(long long)thumbnail_ts);
+ 
+     AMediaFormat *meta = AMediaFormat_new();
+ 
+@@ -2012,6 +2030,10 @@ status_t ImxExtractor::ParseVideo(uint32 index, uint32 type,uint32 subtype)
+ 
+     if(0 == max_size)
+         max_size = MAX_VIDEO_BUFFER_SIZE;
++
++    if(max_size < MIN_VIDEO_BUFFER_SIZE)
++        max_size = MIN_VIDEO_BUFFER_SIZE;
++
+     //max_size += 20;
+     max_size += max_size / 10;
+ 
+@@ -2297,7 +2319,7 @@ status_t ImxExtractor::ParseAudio(uint32 index, uint32 type,uint32 subtype)
+                     memcpy(&codecDelay, ptr, sizeof(codecDelay));
+                     ptr += sizeof(codecDelay);
+                     memcpy(&kSeekPreRollNs, ptr, sizeof(kSeekPreRollNs));
+-                    ALOGI("opus csd codecDelay %ld, kSeekPreRollNs %ld", codecDelay, kSeekPreRollNs);
++                    ALOGI("opus csd codecDelay %lld, kSeekPreRollNs %lld", (long long)codecDelay, (long long)kSeekPreRollNs);
+                     decoderSpecificInfoSize -= AOPUS_CSD1_CSD2_SIZE;
+                 }
+             }
+diff --git a/extractor/ImxExtractor.h b/extractor/ImxExtractor.h
+old mode 100755
+new mode 100644
+index 1ced3c7..1623b40
+--- a/extractor/ImxExtractor.h
++++ b/extractor/ImxExtractor.h
+@@ -81,6 +81,7 @@ typedef struct
+     FslParserGetVideoDisplayWidth       getVideoDisplayWidth;
+     FslParserGetVideoDisplayHeight      getVideoDisplayHeight;
+     FslParserGetVideoFrameCount         getVideoFrameCount;
++    FslParserGetVideoThumbnailTime      getVideoThumbnailTime;
+ 
+     /* audio properties */
+     FslParserGetAudioNumChannels        getAudioNumChannels;

@@ -1,0 +1,82 @@
+a0e133285 George.Huang 2021-04-27
+
+AOS-592: Fix conflicts from merging android_11.0.0_2.0.0
+
+Change-Id: I5698f15c6c189a8438d1549c0765f22654573fd5
+
+diff --git a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+index 5bc77ace4..d28b6e872 100644
+--- a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
++++ b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+@@ -288,11 +288,7 @@ void ExternalCameraProviderImpl_2_4::deviceRemoved(const char* devName) {
+     }
+ }
+ 
+-<<<<<<< HEAD
+-bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName) {
+-=======
+ bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName, const char* sysClassName) {
+->>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+     int32_t ret = -1;
+     struct v4l2_capability vidCap;
+ 
+@@ -318,8 +314,6 @@ bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName, const
+             return true;
+         }
+         ALOGE("Although %s driver name has uvc, but it's a uvc meta device", devName);
+-<<<<<<< HEAD
+-=======
+     } else if(strstr((const char*)vidCap.driver, "cap")) {
+         //HDMI RX for mek_8qm
+         std::string buffer;
+@@ -333,7 +327,6 @@ bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName, const
+         if (propName.compare(0,propName.length(),buffer,0,propName.length()) == 0) {
+             return true;
+         }
+->>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+     }
+     return false;
+ }
+@@ -367,12 +360,8 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
+                 char mCamDevice[kMaxDevicePathLen];
+                 snprintf(v4l2DevicePath, kMaxDevicePathLen,
+                         "%s%s", kDevicePath, de->d_name);
+-<<<<<<< HEAD
+-                if(mParent->isExternalDevice(v4l2DevicePath))
+-=======
+                 sprintf(mCamDevice, "/sys/class/video4linux/%s/name", de->d_name);
+                 if(mParent->isExternalDevice(v4l2DevicePath, mCamDevice))
+->>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+                     mParent->deviceAdded(v4l2DevicePath);
+             }
+         }
+@@ -412,13 +401,9 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
+                                     "%s%s", kDevicePath, event->name);
+                             sprintf(mCamDevice, "/sys/class/video4linux/%s/name", de->d_name);
+                             if (event->mask & IN_CREATE) {
+-<<<<<<< HEAD
+-                                if(mParent->isExternalDevice(v4l2DevicePath))
+-=======
+                                 // usb camera is not ready until 100ms.
+                                 usleep(100000);
+                                 if(mParent->isExternalDevice(v4l2DevicePath, mCamDevice))
+->>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+                                     mParent->deviceAdded(v4l2DevicePath);
+                             }
+                             if (event->mask & IN_DELETE) {
+diff --git a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
+index c9417b57e..6113142bd 100644
+--- a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
++++ b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
+@@ -83,11 +83,7 @@ private:
+ 
+     void deviceRemoved(const char* devName);
+ 
+-<<<<<<< HEAD
+-    bool isExternalDevice(const char* devName);
+-=======
+     bool isExternalDevice(const char* devName, const char* sysClassName);
+->>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+ 
+     class HotplugThread : public android::Thread {
+     public:

@@ -1,0 +1,55 @@
+1ae78d313a10 George.Huang 2020-06-03
+
+Fix build breaks of deprecated apis on 5.4 kernel
+
+Change-Id: I3bd21f8f5210c3b5a5261dd3cbfd0788190d5e9e
+
+diff --git a/sound/soc/fsl/imx-rt5640.c b/sound/soc/fsl/imx-rt5640.c
+index 8223930228fd..d719a089a199 100644
+--- a/sound/soc/fsl/imx-rt5640.c
++++ b/sound/soc/fsl/imx-rt5640.c
+@@ -337,11 +337,11 @@ static int imx_rt5640_probe(struct platform_device *pdev)
+ 
+ 	priv->dai[0].name = "rt5640",
+ 	priv->dai[0].stream_name = "Audio",
+-	priv->dai[0].codec_dai_name = "rt5640-aif1",
++	priv->dai[0].codecs->dai_name = "rt5640-aif1",
+ 	priv->dai[0].ops = &imx_aif_ops,
+-	priv->dai[0].codec_of_node = codec_np;
+-	priv->dai[0].cpu_dai_name = dev_name(&cpu_pdev->dev);
+-	priv->dai[0].platform_of_node = cpu_np;
++	priv->dai[0].codecs->of_node = codec_np;
++	priv->dai[0].cpus->dai_name = dev_name(&cpu_pdev->dev);
++	priv->dai[0].platforms->of_node = cpu_np;
+ 	priv->dai[0].dpcm_playback = 1;
+ 	priv->dai[0].dpcm_capture = 1;
+ 	priv->card.dai_link = &priv->dai[0];
+@@ -353,20 +353,20 @@ static int imx_rt5640_probe(struct platform_device *pdev)
+ 	if (asrc_pdev) {
+ 		priv->dai[1].name = "HiFi-ASRC-FE";
+ 		priv->dai[1].stream_name = "HiFi-ASRC-FE";
+-		priv->dai[1].codec_dai_name = "snd-soc-dummy-dai";
+-		priv->dai[1].codec_name = "snd-soc-dummy";
+-		priv->dai[1].cpu_of_node    = asrc_np;
+-		priv->dai[1].platform_of_node   = asrc_np;
++		priv->dai[1].codecs->dai_name = "snd-soc-dummy-dai";
++		priv->dai[1].codecs->name = "snd-soc-dummy";
++		priv->dai[1].cpus->of_node    = asrc_np;
++		priv->dai[1].platforms->of_node   = asrc_np;
+ 		priv->dai[1].dynamic   = 1;
+ 		priv->dai[1].dpcm_playback  = 1;
+ 		priv->dai[1].dpcm_capture   = 1;
+ 
+ 		priv->dai[2].name = "HiFi-ASRC-BE";
+ 		priv->dai[2].stream_name = "HiFi-ASRC-BE";
+-		priv->dai[2].codec_dai_name  = "rt5640-aif1";
+-		priv->dai[2].codec_of_node   = codec_np;
+-		priv->dai[2].cpu_of_node     = cpu_np;
+-		priv->dai[2].platform_name   = "snd-soc-dummy";
++		priv->dai[2].codecs->dai_name  = "rt5640-aif1";
++		priv->dai[2].codecs->of_node   = codec_np;
++		priv->dai[2].cpus->of_node     = cpu_np;
++		priv->dai[2].platforms->name   = "snd-soc-dummy";
+ 		priv->dai[2].no_pcm          = 1;
+ 		priv->dai[2].dpcm_playback  = 1;
+ 		priv->dai[2].dpcm_capture   = 1;

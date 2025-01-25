@@ -1,0 +1,97 @@
+5bdc3a172a61 George.Huang 2021-11-05
+
+AOS-767: pcie: redwood: reassign power pin and disable pin
+
+Symptom: PCIE_DISn is not controlled and at tristate
+
+Solution:
+- assign PCIE_DISn as disable-gpio
+  set it from Low to High
+
+- reassign WIFI_BT_PM_ENn as pmicen-gpio not disable-gpio
+  set it from High to Low
+
+- list redwood pcie power on sequence
+             _________________
+  __________|                  (WL_BT_PWR 3.8V) (VBAT/VIO)
+
+     |<50ms>|<  200ms   >|
+      ___________________
+  ___|                   |____ (WIFI_BT_PM_ENn 1.8V)
+
+                          ____
+  _______________________|     (PCIE_DISn 1.8V)
+
+                          ____
+  _______________________|     (PMIC_EN_1YM 3.8V) (PMIC_EN)
+
+Change-Id: Ib9e7edb9267d2710d445464792a0ecfa22a8b018
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 5b9d963af073..ba1b49c96fef 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -821,9 +821,9 @@ opt3001: opt3001@45 {
+ &pcie0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie0>;
+-	disable-gpio = <&gpio4 20 GPIO_ACTIVE_LOW>;
++	pmicen-gpio = <&gpio4 20 GPIO_ACTIVE_LOW>;
++	disable-gpio = <&gpio3 23 GPIO_ACTIVE_LOW>;
+ 	reset-gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
+-	disable-gpio-active-high;
+ 	clocks = <&clk IMX8MQ_CLK_PCIE1_ROOT>,
+ 		 <&clk IMX8MQ_CLK_PCIE1_AUX>,
+ 		 <&clk IMX8MQ_CLK_PCIE1_PHY>,
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index fc6a3c3f137c..5453db4cda71 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -114,6 +114,7 @@ struct imx6_pcie_drvdata {
+ struct imx6_pcie {
+ 	struct dw_pcie		*pci;
+ 	int			clkreq_gpio;
++	int			pmicen_gpio;
+ 	int			dis_gpio;
+ 	int			reset_gpio;
+ 	bool			gpio_active_high;
+@@ -1895,6 +1896,8 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 			regulator_disable(imx6_pcie->epdev_on);
+ 		if (gpio_is_valid(imx6_pcie->dis_gpio))
+ 			gpio_set_value_cansleep(imx6_pcie->dis_gpio, 0);
++		if (gpio_is_valid(imx6_pcie->pmicen_gpio))
++			gpio_set_value_cansleep(imx6_pcie->pmicen_gpio, 0);
+ 	}
+ 
+ 	return ret;
+@@ -2481,6 +2484,17 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		return imx6_pcie->clkreq_gpio;
+ 	}
+ 
++	imx6_pcie->pmicen_gpio = of_get_named_gpio(node, "pmicen-gpio", 0);
++	if (gpio_is_valid(imx6_pcie->pmicen_gpio)) {
++		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->pmicen_gpio,
++					GPIOF_OUT_INIT_HIGH, "PCIe PMIC_EN");
++		if (ret) {
++			dev_err(&pdev->dev, "unable to get pmicen gpio
+");
++			return ret;
++		}
++	} else if (imx6_pcie->pmicen_gpio == -EPROBE_DEFER) {
++		return imx6_pcie->pmicen_gpio;
++	}
+ 	imx6_pcie->dis_gpio = of_get_named_gpio(node, "disable-gpio", 0);
+ 	imx6_pcie->dis_gpio_active_high = of_property_read_bool(node,
+ 						"disable-gpio-active-high");
+@@ -2723,8 +2737,10 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		goto err_ret;
+ 	}
+ 	msleep(imx6_pcie->reserved_time_after_reg);
++	if (gpio_is_valid(imx6_pcie->pmicen_gpio))
++		gpio_set_value_cansleep(imx6_pcie->pmicen_gpio, 0);
+ 	if (gpio_is_valid(imx6_pcie->dis_gpio))
+-		gpio_set_value_cansleep(imx6_pcie->dis_gpio, !imx6_pcie->dis_gpio_active_high);
++		gpio_set_value_cansleep(imx6_pcie->dis_gpio, 1);
+ 
+ 	imx6_pcie_assert_core_reset(imx6_pcie);
+ 	imx6_pcie_init_phy(imx6_pcie);

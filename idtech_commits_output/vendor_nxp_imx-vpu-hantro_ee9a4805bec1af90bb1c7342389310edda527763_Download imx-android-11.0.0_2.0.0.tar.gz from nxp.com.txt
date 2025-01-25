@@ -1,0 +1,497 @@
+ee9a480 jenkins 2021-04-23
+
+Download imx-android-11.0.0_2.0.0.tar.gz from nxp.com
+
+Change-Id: I3516748b9142b61962fee6772656442eb38041df
+
+diff --git a/decoder_sw/software/source/h264high/h264decapi.c b/decoder_sw/software/source/h264high/h264decapi.c
+index 312bb60..fff374b 100755
+--- a/decoder_sw/software/source/h264high/h264decapi.c
++++ b/decoder_sw/software/source/h264high/h264decapi.c
+@@ -549,9 +549,6 @@ u32 IsDpbRealloc(decContainer_t *dec_cont) {
+ 
+   new_pic_size_in_mbs = 0;
+ 
+-  if (!dec_cont->use_adaptive_buffers)
+-    return 1;
+-
+   if(dec_cont->b_mvc == 0)
+     new_pic_size_in_mbs = p_sps->pic_width_in_mbs * p_sps->pic_height_in_mbs;
+   else if(dec_cont->b_mvc == 1) {
+@@ -652,8 +649,14 @@ u32 IsDpbRealloc(decContainer_t *dec_cont) {
+   }
+ 
+   if ((dpb->n_new_pic_size <= dec_cont->n_ext_buf_size) &&
+-      new_tot_buffers + dpb->n_guard_size <= dpb->tot_buffers)
++      new_tot_buffers + dpb->n_guard_size <= dpb->tot_buffers &&
++      dec_cont->use_adaptive_buffers)
++    return 0;
++
++  if ((dpb->pic_size_in_mbs == dpb_params.pic_size_in_mbs) &&
++      dpb->dpb_size == dpb_size && !dec_cont->use_adaptive_buffers)
+     return 0;
++
+   return 1;
+ }
+ #endif
+diff --git a/decoder_sw/software/source/h264high/h264hwd_dpb_lock.c b/decoder_sw/software/source/h264high/h264hwd_dpb_lock.c
+index 573c2b9..81c4548 100755
+--- a/decoder_sw/software/source/h264high/h264hwd_dpb_lock.c
++++ b/decoder_sw/software/source/h264high/h264hwd_dpb_lock.c
+@@ -208,8 +208,8 @@ void DecrementRefUsage(FrameBufferList *fb_list, u32 id) {
+   FrameBufferStatus *bs = fb_list->fb_stat + id;
+ 
+   pthread_mutex_lock(&fb_list->ref_count_mutex);
+-  assert(bs->n_ref_count > 0);
+-  bs->n_ref_count--;
++  if (bs->n_ref_count > 0)
++    bs->n_ref_count--;
+ 
+   if (bs->n_ref_count == 0) {
+     if (bs->b_used == FB_FREE) {
+@@ -248,7 +248,8 @@ void ClearHWOutput(FrameBufferList *fb_list, u32 id, u32 type) {
+ 
+   assert(bs->b_used & (FB_HW_ONGOING | FB_ALLOCATED));
+ 
+-  bs->n_ref_count--;
++  if (bs->n_ref_count > 0)
++    bs->n_ref_count--;
+   bs->b_used &= ~type;
+ 
+   if (bs->n_ref_count == 0) {
+diff --git a/decoder_sw/software/source/h264high/legacy/h264hwd_sei.c b/decoder_sw/software/source/h264high/legacy/h264hwd_sei.c
+index e10629d..f5c062c 100755
+--- a/decoder_sw/software/source/h264high/legacy/h264hwd_sei.c
++++ b/decoder_sw/software/source/h264high/legacy/h264hwd_sei.c
+@@ -120,7 +120,7 @@ u32 h264bsdDecodeSeiParameters(seqParamSet_t **sps, strmData_t *p_strm_data,
+     tmp_strm_data = *p_strm_data;
+     switch (pay_load_type) {
+     case SEI_BUFFERING_PERIOD:
+-      h264bsdDecodeBufferingPeriodInfo(sps, &tmp_strm_data,
++      tmp = h264bsdDecodeBufferingPeriodInfo(sps, &tmp_strm_data,
+                                        &p_sei_parameters->buffering_period_info);
+       if(tmp == HANTRO_NOK) {
+         p_sei_parameters->buffering_period_info.exist_flag = 0;
+@@ -130,7 +130,7 @@ u32 h264bsdDecodeSeiParameters(seqParamSet_t **sps, strmData_t *p_strm_data,
+       break;
+ 
+     case SEI_PIC_TIMING:
+-      h264bsdDecodePicTimingInfo(sps,
++      tmp = h264bsdDecodePicTimingInfo(sps,
+                                  &tmp_strm_data, &p_sei_parameters->pic_timing_info,
+                                  &p_sei_parameters->buffering_period_info);
+       if(tmp == HANTRO_NOK) {
+@@ -243,12 +243,14 @@ u32 h264bsdDecodeBufferingPeriodInfo(seqParamSet_t **sps,
+   seqParamSet_t *p_seq_param_set;
+   (void) DWLmemset(p_buffering_period_info, 0, sizeof(bufferingPeriodInfo_t));
+ 
+-  p_buffering_period_info->seq_parameter_set_id =
+-    tmp = h264bsdDecodeExpGolombUnsigned(p_strm_data,
+-                                         &p_buffering_period_info->seq_parameter_set_id);
++  tmp = h264bsdDecodeExpGolombUnsigned(p_strm_data,
++                                       &p_buffering_period_info->seq_parameter_set_id);
+   if (tmp != HANTRO_OK)
+     return(tmp);
+ 
++  if (p_buffering_period_info->seq_parameter_set_id >= MAX_NUM_SEQ_PARAM_SETS)
++    return HANTRO_NOK;
++
+   p_seq_param_set = sps[p_buffering_period_info->seq_parameter_set_id];
+   if (p_seq_param_set == NULL || p_seq_param_set->vui_parameters == NULL)
+     return (HANTRO_NOK);
+@@ -529,7 +531,8 @@ u32 h264bsdComputeTimes(seqParamSet_t *sps,
+   u32 bit_rate_value = 0;
+   u32 bit_rate_scale = 0;
+   u32 bit_rate;
+-
++  if (p_seq_param_set == NULL)
++    return HANTRO_NOK;
+   // compute tc
+   if(p_seq_param_set->vui_parameters == NULL)
+     return(HANTRO_NOK);
+diff --git a/decoder_sw/software/source/hevc/hevc_sei.c b/decoder_sw/software/source/hevc/hevc_sei.c
+index 4954269..9f9a57f 100755
+--- a/decoder_sw/software/source/hevc/hevc_sei.c
++++ b/decoder_sw/software/source/hevc/hevc_sei.c
+@@ -55,6 +55,10 @@ u32 buffering_period(int layerid, struct StrmData *stream,
+ 
+   tmp = HevcDecodeExpGolombUnsigned(stream, &value);
+   if (tmp == END_OF_STREAM) return (END_OF_STREAM);
++
++  if (value >= MAX_NUM_SEQ_PARAM_SETS)
++    return HANTRO_NOK;
++
+   buf_parameter->bp_seq_parameter_set_id = value;
+   if (sps[value] == NULL)
+     return HANTRO_NOK;
+diff --git a/decoder_sw/software/source/hevc/hevc_storage.c b/decoder_sw/software/source/hevc/hevc_storage.c
+index e2f601a..a4e663a 100755
+--- a/decoder_sw/software/source/hevc/hevc_storage.c
++++ b/decoder_sw/software/source/hevc/hevc_storage.c
+@@ -595,8 +595,13 @@ u32 IsExternalBuffersRealloc(void *dec_inst, struct Storage *storage) {
+   else
+     dec_cont->reset_ext_buffer = 1;
+ 
+-  if (!dec_cont->use_adaptive_buffers)
+-    dec_cont->reset_ext_buffer = 1;
++  if (!dec_cont->use_adaptive_buffers) {
++    if ((storage->dpb->pic_size == pic_size) &&
++        (storage->dpb->dpb_size == dpb_size))
++      dec_cont->reset_ext_buffer = 0;
++    else
++      dec_cont->reset_ext_buffer = 1;
++  }
+ 
+   (void)buf_type;
+ 
+diff --git a/decoder_sw/software/source/inc/decapicommon.h b/decoder_sw/software/source/inc/decapicommon.h
+index 0f02092..fc8cccf 100755
+--- a/decoder_sw/software/source/inc/decapicommon.h
++++ b/decoder_sw/software/source/inc/decapicommon.h
+@@ -269,7 +269,7 @@ enum DecPicCodingType {
+   DEC_PIC_TYPE_D           = 3,
+   DEC_PIC_TYPE_FI          = 4,
+   DEC_PIC_TYPE_BI          = 5
+-} DecPicCodingType;
++};
+ 
+ /* Output picture pixel format types for raster scan or down scale output */
+ enum DecPicturePixelFormat {
+diff --git a/decoder_sw/software/source/inc/dwl.h b/decoder_sw/software/source/inc/dwl.h
+index 0e05dee..4f17338 100755
+--- a/decoder_sw/software/source/inc/dwl.h
++++ b/decoder_sw/software/source/inc/dwl.h
+@@ -91,7 +91,7 @@ struct DWLLinearMem {
+ /* DWLInitParam is used to pass parameters when initializing the DWL */
+ struct DWLInitParam {
+   u32 client_type;
+-} DWLInitParam;
++};
+ 
+ /* Hardware configuration description, same as in top API */
+ typedef struct DecHwConfig DWLHwConfig;
+diff --git a/decoder_sw/software/source/rv/rvdecapi.c b/decoder_sw/software/source/rv/rvdecapi.c
+index 1b0d89b..e31b277 100755
+--- a/decoder_sw/software/source/rv/rvdecapi.c
++++ b/decoder_sw/software/source/rv/rvdecapi.c
+@@ -621,6 +621,9 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+       dec_cont->StrmStorage.p_rpr_buf = dec_cont->StrmStorage.p_pic_buf[rpr_buf_idx];
+ 
+ #ifndef DISABLE_CPU_ACCESS
++      if (DWLFlushCache(dec_cont->dwl, &p_ref_pic->data))
++        return RVDEC_MEMFAIL;
++
+       rvRpr( p_ref_pic,
+              &dec_cont->StrmStorage.p_rpr_buf,
+              &dec_cont->StrmStorage.rpr_work_buffer,
+@@ -628,6 +631,11 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+              new_width,
+              new_height,
+              dec_cont->tiled_reference_enable);
++
++      if (DWLFlushCache(dec_cont->dwl,
++          &dec_cont->StrmStorage.p_rpr_buf.data))
++        return RVDEC_MEMFAIL;
++
+ #endif
+ 
+       p_ref_pic->coded_width = new_width;
+@@ -2202,8 +2210,8 @@ u32 RvSetRegs(DecContainer * dec_container, addr_t strm_bus_address) {
+                    dec_container->StrmDesc.bit_pos_in_word + 8 * (tmp & 0x7));
+   else
+ #endif
+-    SetDecRegister(dec_container->rv_regs, HWIF_STRM_START_BIT, 0);
+-
++    SetDecRegister(dec_container->rv_regs, HWIF_STRM_START_BIT,
++                   ((addr_t)tmp & 0x7) * 8);
+   /* swReg13 */
+   SET_ADDR_REG(dec_container->rv_regs, HWIF_DEC_OUT_BASE,
+                dec_container->StrmStorage.p_pic_buf[dec_container->StrmStorage.work_out].
+diff --git a/decoder_sw/software/source/vp6/vp6hwd_api.c b/decoder_sw/software/source/vp6/vp6hwd_api.c
+index d394a9f..6910449 100755
+--- a/decoder_sw/software/source/vp6/vp6hwd_api.c
++++ b/decoder_sw/software/source/vp6/vp6hwd_api.c
+@@ -243,6 +243,7 @@ VP6DecRet VP6DecInit(VP6DecInst * dec_inst,
+   DWLReadAsicConfig(&config,DWL_CLIENT_TYPE_VP6_DEC);
+ 
+   if(!config.addr64_support && sizeof(void *) == 8) {
++    DWLfree(dec_cont);
+     DEC_API_TRC("VP6DecInit# ERROR: HW not support 64bit address!
+");
+     return (VP6DEC_PARAM_ERROR);
+   }
+@@ -255,6 +256,7 @@ VP6DecRet VP6DecInit(VP6DecInst * dec_inst,
+   if(reference_frame_format == DEC_REF_FRM_TILED_DEFAULT) {
+     /* Assert support in HW before enabling.. */
+     if(!config.tiled_mode_support) {
++      DWLfree(dec_cont);
+       return VP6DEC_FORMAT_NOT_SUPPORTED;
+     }
+     dec_cont->tiled_mode_support = config.tiled_mode_support;
+@@ -269,8 +271,10 @@ VP6DecRet VP6DecInit(VP6DecInst * dec_inst,
+   dec_cont->picture_broken = 0;
+ 
+ #ifdef USE_OUTPUT_RELEASE
+-  if (FifoInit(16, &dec_cont->fifo_display) != FIFO_OK)
++  if (FifoInit(16, &dec_cont->fifo_display) != FIFO_OK){
++    DWLfree(dec_cont);
+     return VP6DEC_MEMFAIL;
++  }
+ #endif
+ #ifdef USE_EXTERNAL_BUFFER
+   dec_cont->no_reallocation = 1;
+diff --git a/decoder_sw/software/source/vp8/vp8decapi.c b/decoder_sw/software/source/vp8/vp8decapi.c
+index 59ee534..a05087c 100755
+--- a/decoder_sw/software/source/vp8/vp8decapi.c
++++ b/decoder_sw/software/source/vp8/vp8decapi.c
+@@ -279,6 +279,7 @@ VP8DecRet VP8DecInit(VP8DecInst * dec_inst,
+   VP8HwdAsicInit(dec_cont);   /* Init ASIC */
+ 
+   if(!DWLReadAsicCoreCount()) {
++    DWLfree(dec_cont);
+     return (VP8DEC_DWL_ERROR);
+   }
+   dec_cont->num_cores = 1;
+@@ -288,6 +289,7 @@ VP8DecRet VP8DecInit(VP8DecInst * dec_inst,
+   DWLReadAsicConfig(&config,DWL_CLIENT_TYPE_VP8_DEC);
+ 
+   if(!config.addr64_support && sizeof(void *) == 8) {
++    DWLfree(dec_cont);
+     DEC_API_TRC("VP8DecInit# ERROR: HW not support 64bit address!
+");
+     return (VP8DEC_PARAM_ERROR);
+   }
+@@ -324,8 +326,10 @@ VP8DecRet VP8DecInit(VP8DecInst * dec_inst,
+   if ((dec_format == VP8DEC_VP8) || (dec_format == VP8DEC_WEBP))
+     dec_cont->stride_support = config.stride_support;
+ #ifdef USE_OUTPUT_RELEASE
+-  if (FifoInit(VP8DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK)
++  if (FifoInit(VP8DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK){
++    DWLfree(dec_cont);
+     return VP8DEC_MEMFAIL;
++  }
+ #endif
+ #ifdef USE_EXTERNAL_BUFFER
+   dec_cont->no_reallocation = 1;
+diff --git a/decoder_sw/software/source/vp9/vp9decapi.c b/decoder_sw/software/source/vp9/vp9decapi.c
+index 367c743..2853823 100755
+--- a/decoder_sw/software/source/vp9/vp9decapi.c
++++ b/decoder_sw/software/source/vp9/vp9decapi.c
+@@ -84,6 +84,7 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+   u32 is_legacy = 0;
+ 
+   (void)dec_cfg->dpb_flags;
++  enum DecRet ret=DEC_OK;
+ 
+   /* check that right shift on negative numbers is performed signed */
+ #if (((-1) >> 1) != (-1))
+@@ -216,17 +217,22 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+ #endif
+   dec_cont->decoder.refbu_pred_hits = 0;
+ 
+-  if (FifoInit(VP9DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK)
+-    return DEC_MEMFAIL;
+-
+-  if (FifoInit(VP9DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_display) != FIFO_OK)
+-    return DEC_MEMFAIL;
++  if (FifoInit(VP9DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK){
++    ret = DEC_MEMFAIL;
++    goto fail;
++  }
++  if (FifoInit(VP9DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_display) != FIFO_OK){
++    ret = DEC_MEMFAIL;
++    goto fail;
++  }
+ 
+-  if (pthread_mutex_init(&dec_cont->sync_out, NULL))
+-    return DEC_SYSTEM_ERROR;
++  if (pthread_mutex_init(&dec_cont->sync_out, NULL)){
++    ret = DEC_SYSTEM_ERROR;
++    goto fail;
++  }
+   if(pthread_cond_init(&dec_cont->sync_out_cv, NULL)) {
+-    pthread_mutex_destroy(&dec_cont->sync_out);
+-    return DEC_SYSTEM_ERROR;
++    ret = DEC_SYSTEM_ERROR;
++    goto fail;
+   }
+ 
+   DWLmemcpy(&dec_cont->hw_cfg, &hw_cfg, sizeof(DWLHwConfig));
+@@ -272,7 +278,8 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+ #ifdef USE_EXTERNAL_BUFFER
+   dec_cont->bq = Vp9BufferQueueInitialize(dec_cont->num_buffers);
+   if (dec_cont->bq == NULL) {
+-    return DEC_MEMFAIL;
++    ret = DEC_MEMFAIL;
++    goto fail;
+   }
+ 
+   dec_cont->pp_bq = NULL;
+@@ -280,8 +287,8 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+       IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
+     dec_cont->pp_bq = Vp9BufferQueueInitialize(0);
+     if (dec_cont->pp_bq == NULL) {
+-      Vp9BufferQueueRelease(dec_cont->pp_bq, 1);
+-      return DEC_MEMFAIL;
++      ret =  DEC_MEMFAIL;
++      goto fail;
+     }
+   }
+ #endif
+@@ -344,6 +351,17 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+   (void)dwl_init;
+   (void)is_legacy;
+   return DEC_OK;
++
++fail:
++  if (dec_cont->fifo_out) FifoRelease(dec_cont->fifo_out);
++  if (dec_cont->fifo_display) FifoRelease(dec_cont->fifo_display);
++  pthread_mutex_destroy(&dec_cont->sync_out);
++  pthread_cond_destroy(&dec_cont->sync_out_cv);
++  if (dec_cont->bq) Vp9BufferQueueRelease(dec_cont->bq, 1);
++  if (dec_cont->pp_bq) Vp9BufferQueueRelease(dec_cont->pp_bq, 1);
++  DWLfree(dec_cont);
++
++  return ret;
+ }
+ 
+ void Vp9DecRelease(Vp9DecInst dec_inst) {
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_asic.c b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+index 70ecadc..49b1a3d 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_asic.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+@@ -2314,6 +2314,9 @@ i32 Vp9GetBuffer4ShowExisting(struct Vp9DecContainer *dec_cont) {
+     else if (asic_buff->show_existing_buffer_i == EMPTY_MARKER)
+       return DEC_NO_DECODING_BUFFER;
+ #endif
++    /* Just to fix coverity issue, should never called into */
++    else if (asic_buff->show_existing_buffer_i < 0)
++      return DEC_WAITING_FOR_BUFFER;
+   }
+ 
+   if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
+diff --git a/h1_encoder/software/linux_reference/test/h264/H264TestBench.c b/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
+index 93b6b58..2286b9e 100755
+--- a/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
++++ b/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
+@@ -512,7 +512,8 @@ i32 Encode(i32 argc, char **argv, H264EncInst encoder, commandLine_s * cml)
+         if(fmv == NULL)
+         {
+             fprintf(H264ERR_OUTPUT, "Failed to create mv.txt output file.
+");
+-            return -1;
++            encodeFail = -1;
++            goto exit;
+         }
+     }
+ 
+@@ -522,7 +523,8 @@ i32 Encode(i32 argc, char **argv, H264EncInst encoder, commandLine_s * cml)
+         if(fscaled == NULL)
+         {
+             fprintf(H264ERR_OUTPUT, "Failed to create scaled.yuv output file.
+");
+-            return -1;
++            encodeFail = -1;
++            goto exit;
+         }
+     }
+ 
+@@ -546,7 +548,8 @@ i32 Encode(i32 argc, char **argv, H264EncInst encoder, commandLine_s * cml)
+         if (pRoiMap == NULL)
+         {
+             fprintf(H264ERR_OUTPUT, "Fail to open config file %s
+", cml->roiMapIndexFile);
+-            return -1;
++            encodeFail = -1;
++            goto exit;
+         }
+     }
+ 
+@@ -571,7 +574,8 @@ i32 Encode(i32 argc, char **argv, H264EncInst encoder, commandLine_s * cml)
+         {
+            fprintf(H264ERR_OUTPUT, "Fail to Init Input Line Buffer: virt_addr=%08x, bus_addr=%08x
+",
+                    (u32)(inputMbLineBuf.buf), (u32)(inputMbLineBuf.busAddress));
+-           return -1;
++           encodeFail = -1;
++           goto exit;
+         }
+     }
+ 
+@@ -788,6 +792,8 @@ i32 Encode(i32 argc, char **argv, H264EncInst encoder, commandLine_s * cml)
+             (psnrSum/psnrCnt)/100, (psnrSum/psnrCnt)%100,ssimSum/psnrCnt);
+     }
+ 
++exit:
++
+     if (pRoiMap != NULL)
+         free(pRoiMap);
+ 
+@@ -2172,6 +2178,8 @@ u8* ReadRoiMap(H264EncInst encoder, char *filename, i32 width, i32 height)
+                 if (qpdelta < 0||qpdelta > 3)
+                 {
+                     printf("ROI index out of range.
+");
++                    fclose(fIn);
++                    free(ptr);
+                     return NULL;
+                 }
+                 *(data++) = (char)qpdelta;
+diff --git a/h1_encoder/software/linux_reference/test/vp8/VP8TestBench.c b/h1_encoder/software/linux_reference/test/vp8/VP8TestBench.c
+index 9725139..df976df 100755
+--- a/h1_encoder/software/linux_reference/test/vp8/VP8TestBench.c
++++ b/h1_encoder/software/linux_reference/test/vp8/VP8TestBench.c
+@@ -575,7 +575,8 @@ i32 Encode(i32 argc, char **argv, VP8EncInst encoder, testbench_s * cml)
+         if(fmv == NULL)
+         {
+             fprintf(VP8ERR_OUTPUT, "Failed to create mv.txt output file.
+");
+-            return -1;
++            encodeFail = -1;
++            goto exit;
+         }
+     }
+ 
+@@ -585,7 +586,8 @@ i32 Encode(i32 argc, char **argv, VP8EncInst encoder, testbench_s * cml)
+         if(fscaled == NULL)
+         {
+             fprintf(VP8ERR_OUTPUT, "Failed to create scaled.yuv output file.
+");
+-            return -1;
++            encodeFail = -1;
++            goto exit;
+         }
+     }
+ 
+@@ -783,6 +785,7 @@ i32 Encode(i32 argc, char **argv, VP8EncInst encoder, testbench_s * cml)
+         printf("Average PSNR %d.%02d
+",
+             (cml->psnrSum/cml->psnrCnt)/100, (cml->psnrSum/cml->psnrCnt)%100);
+ 
++exit:
+ 
+     /* Free all resources */
+     if(fout != NULL)
+diff --git a/h1_encoder/software/source/h264/H264Init.c b/h1_encoder/software/source/h264/H264Init.c
+index 8ef17ce..e38b86b 100755
+--- a/h1_encoder/software/source/h264/H264Init.c
++++ b/h1_encoder/software/source/h264/H264Init.c
+@@ -291,12 +291,15 @@ H264EncRet H264Init(const H264EncConfig *pEncCfg, h264Instance_s **instAddr)
+ 
+     if (H264InitRc(&inst->rateControl, 1) != ENCHW_OK)
+     {
+-        return H264ENC_INVALID_ARGUMENT;
++        ret = H264ENC_INVALID_ARGUMENT;
++        goto err;
+     }
+ 
+     if (EncPreProcessAlloc(&inst->preProcess,
+-                           inst->mbPerRow * inst->mbPerCol) != ENCHW_OK)
+-        return ENCHW_NOK;
++                           inst->mbPerRow * inst->mbPerCol) != ENCHW_OK){
++        ret = ENCHW_NOK;
++        goto err;
++    }
+ 
+     /* Initialize ASIC */
+     inst->asic.ewl = ewl;

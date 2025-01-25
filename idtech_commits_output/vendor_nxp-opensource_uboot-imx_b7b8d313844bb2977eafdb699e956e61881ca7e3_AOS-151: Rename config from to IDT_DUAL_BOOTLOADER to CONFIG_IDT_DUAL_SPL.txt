@@ -1,0 +1,131 @@
+b7b8d31384 George.Huang 2020-04-16
+
+AOS-151: Rename config from to IDT_DUAL_BOOTLOADER to CONFIG_IDT_DUAL_SPL
+
+This is for uboot to support bootloader1 hardware partition
+
+Change-Id: I068b3da28cd8c5a2e5d7ec9bd08df550d57539f9
+
+diff --git a/board/freescale/imx8mq_a300/Kconfig b/board/freescale/imx8mq_a300/Kconfig
+index 794f7af761..76cc02f6e0 100644
+--- a/board/freescale/imx8mq_a300/Kconfig
++++ b/board/freescale/imx8mq_a300/Kconfig
+@@ -20,6 +20,13 @@ config IDT_VALID_AVBKEY
+ 	  should validate this key with build-in public key before
+ 	  booting into kernel.
+ 
++config IDT_DUAL_SPL
++	bool "IDT dual spl feature"
++	help
++	  This option should be enable when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will help switch to new spl/bootloader
++	  pair even if SRK key set is changed.
++
+ source "board/freescale/common/Kconfig"
+ 
+ endif
+diff --git a/board/freescale/imx8mq_evk/Kconfig b/board/freescale/imx8mq_evk/Kconfig
+index f43acc29d9..4dfd3c0a8d 100644
+--- a/board/freescale/imx8mq_evk/Kconfig
++++ b/board/freescale/imx8mq_evk/Kconfig
+@@ -20,6 +20,13 @@ config IDT_VALID_AVBKEY
+ 	  should validate this key with build-in public key before
+ 	  booting into kernel.
+ 
++config IDT_DUAL_SPL
++	bool "IDT dual spl feature"
++	help
++	  This option should be enable when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will help switch to new spl/bootloader
++	  pair even if SRK key set is changed.
++
+ source "board/freescale/common/Kconfig"
+ 
+ endif
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index aa8923dd52..e56665b159 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -46,7 +46,7 @@ enum {
+ #endif
+ 	PTN_ALL_INDEX,
+ 	PTN_BOOTLOADER_INDEX,
+-#ifdef IDT_DUAL_BOOTLOADER
++#ifdef CONFIG_IDT_DUAL_SPL
+ 	PTN_BOOTLOADER1_INDEX,
+ #endif
+ };
+@@ -242,7 +242,7 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	ptable[PTN_BOOTLOADER_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 	strcpy(ptable[PTN_BOOTLOADER_INDEX].fstype, "raw");
+ 
+-#ifdef IDT_DUAL_BOOTLOADER
++#ifdef CONFIG_IDT_DUAL_SPL
+ 	/* Bootloader1 */
+ 	strcpy(ptable[PTN_BOOTLOADER1_INDEX].name, FASTBOOT_PARTITION_BOOTLOADER1);
+ 	ptable[PTN_BOOTLOADER1_INDEX].start =
+@@ -257,7 +257,7 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	int tbl_idx;
+ 	int part_idx = 1;
+ 	int ret;
+-#ifdef IDT_DUAL_BOOTLOADER
++#ifdef CONFIG_IDT_DUAL_SPL
+ 	for (tbl_idx = PTN_BOOTLOADER1_INDEX + 1; tbl_idx < MAX_PTN; tbl_idx++) {
+ #else
+ 	for (tbl_idx = PTN_BOOTLOADER_INDEX + 1; tbl_idx < MAX_PTN; tbl_idx++) {
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+index 8dabaecab9..82a364f1b8 100644
+--- a/include/configs/imx8mq_a300.h
++++ b/include/configs/imx8mq_a300.h
+@@ -296,4 +296,3 @@
+ #include "imx8mq_a300_android.h"
+ #endif
+ #endif
+-#define IDT_DUAL_BOOTLOADER
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+index ce50c2492e..41ae7e868e 100644
+--- a/include/configs/imx8mq_a300_android.h
++++ b/include/configs/imx8mq_a300_android.h
+@@ -72,6 +72,7 @@
+ #define BOOTLOADER_RBIDX_INITVAL 0
+ #endif
+ 
++#define CONFIG_IDT_DUAL_SPL
+ #endif
+ 
+ #ifdef CONFIG_IMX_TRUSTY_OS
+diff --git a/include/configs/imx8mq_evk.h b/include/configs/imx8mq_evk.h
+index 0caa0f1553..f3b777de5a 100644
+--- a/include/configs/imx8mq_evk.h
++++ b/include/configs/imx8mq_evk.h
+@@ -301,4 +301,3 @@
+ #include "imx8mq_evk_android.h"
+ #endif
+ #endif
+-#define IDT_DUAL_BOOTLOADER
+diff --git a/include/configs/imx8mq_evk_android.h b/include/configs/imx8mq_evk_android.h
+index f86a1e685d..a139e6166a 100644
+--- a/include/configs/imx8mq_evk_android.h
++++ b/include/configs/imx8mq_evk_android.h
+@@ -72,6 +72,7 @@
+ #define BOOTLOADER_RBIDX_INITVAL 0
+ #endif
+ 
++#define CONFIG_IDT_DUAL_SPL
+ #endif
+ 
+ #ifdef CONFIG_IMX_TRUSTY_OS
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index 356d840c45..8efc44a435 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -1181,7 +1181,7 @@ AvbABFlowResult avb_ab_flow_fast(AvbABOps* ab_ops,
+ 		/* No bootable slots! */
+ 		avb_error("No bootable slots found.
+");
+ 		ret = AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS;
+-#ifdef IDT_DUAL_BOOTLOADER
++#ifdef CONFIG_IDT_DUAL_SPL
+ 		fsl_avb_ab_data_init(&ab_data);
+ #endif
+ 		goto out;

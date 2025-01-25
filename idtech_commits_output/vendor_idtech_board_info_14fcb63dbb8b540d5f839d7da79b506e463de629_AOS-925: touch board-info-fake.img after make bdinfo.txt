@@ -1,0 +1,30 @@
+14fcb63 George.Huang 2022-04-11
+
+AOS-925: touch board-info-fake.img after make bdinfo
+
+Symptom: vendor.img crc32 keeps changing after rebuild
+
+Root Cause:
+- board-info-* will be regenerated after rebuild since
+  board-info-fake.img is never created
+- then build system will keep regenerating below files after rebuild
+  target_vendor_notice_file_txt := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR.txt
+  target_vendor_notice_file_xml := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR.xml
+  target_vendor_notice_file_xml_gz := $(TARGET_OUT_INTERMEDIATES)/NOTICE_VENDOR.xml.gz
+
+Solution: touch board-info-fake.img after make bdinfo
+
+Change-Id: I9fd96ae243ff5782e002b2ffa4e7e511b8b49f20
+
+diff --git a/Android.mk b/Android.mk
+index 8676c2a..1924a8b 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -10,6 +10,7 @@ endef
+ 
+ define copy_imgs
+   cp -f $(BASE_PATH)/*.img $(PRODUCT_OUT)/
++  touch $(PRODUCT_OUT)/board_info-fake.img
+ endef
+ 
+ define cleanup

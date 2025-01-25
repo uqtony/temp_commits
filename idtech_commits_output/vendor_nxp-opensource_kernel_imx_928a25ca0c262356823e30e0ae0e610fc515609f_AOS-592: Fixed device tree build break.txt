@@ -1,0 +1,111 @@
+928a25ca0c26 jay deng 2021-05-14
+
+AOS-592: Fixed device tree build break
+
+Change-Id: I93cbd8754aaa4034e4d2a01fe199673ad8bed945
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index 44a95f9b34d2..5762e859a34f 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -1191,31 +1191,65 @@ throttle_devfreq: devfreq {
+ 	};
+ };
+ 
+-&cpu_thermal {
+-	trips {
+-		cpu_alert1: trip1 {
+-			temperature = <82000>;
+-			hysteresis = <2000>;
+-			type = "passive";
++&thermal_zones {
++	cpu-thermal {
++		polling-delay-passive = <250>;
++		polling-delay = <2000>;
++		thermal-sensors = <&tmu 0>;
++		trips {
++			cpu_alert0: trip0 {
++				temperature = <80000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++			cpu_alert1: trip1 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++			cpu-crit {
++				temperature = <90000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
+ 		};
+-		cpu_alert2: trip2 {
+-			temperature = <86000>;
+-			hysteresis = <2000>;
+-			type = "passive";
++		cooling-maps {
++			map0 {
++				trip = <&cpu_alert0>;
++				cooling-device =
++					<&throttle_devfreq 0 1>,
++					<&A53_0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++					<&A53_1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++					<&A53_2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++					<&A53_3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++			};
++			map1 {
++				trip = <&cpu_alert1>;
++				cooling-device =
++					<&throttle_devfreq 0 2>;
++			};
+ 		};
+ 	};
+-
+-	cooling-maps {
+-		map0 {
+-			trip = <&cpu_alert1>;
+-			cooling-device =
+-				<&throttle_devfreq 0 1>;
+-		};
+-		map1 {
+-			trip = <&cpu_alert2>;
+-			cooling-device =
+-				<&throttle_devfreq 0 2>;
++	tcn75-thermal {
++		polling-delay-passive = <250>;
++		polling-delay = <2000>;
++		thermal-sensors = <&tcn75 0>;
++		trips {
++			tcn75_alert0: trip0 {
++				temperature = <80000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++			tcn75_alert1: trip1 {
++				temperature = <85000>;
++				hysteresis = <2000>;
++				type = "passive";
++			};
++			tcn75-crit {
++				temperature = <90000>;
++				hysteresis = <2000>;
++				type = "critical";
++			};
+ 		};
+ 	};
+ };
+-
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+index f39f1bf00c56..6bd3c6980db6 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+@@ -221,7 +221,7 @@ psci {
+ 		method = "smc";
+ 	};
+ 
+-	thermal-zones {
++	thermal_zones: thermal-zones {
+ 		cpu_thermal: cpu-thermal {
+ 			polling-delay-passive = <250>;
+ 			polling-delay = <2000>;

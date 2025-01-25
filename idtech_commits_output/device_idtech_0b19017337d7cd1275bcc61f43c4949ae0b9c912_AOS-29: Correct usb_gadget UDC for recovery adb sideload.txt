@@ -1,0 +1,59 @@
+0b190173 George.Huang 2019-12-02
+
+AOS-29: Correct usb_gadget UDC for recovery adb sideload
+
+1. Correct usb_gadget UDC (Usb Device Controller) naming to $(sys.usb.controller)
+2. Also add 2 menu items for debug
+   Mount /system
+   View recovery logs
+
+Change-Id: I7cab4ad408a4c709ec01d3cf2b5a068510817eb1
+
+diff --git a/common/recovery/Android.mk b/common/recovery/Android.mk
+index 1d1b8806..17dbdd4d 100644
+--- a/common/recovery/Android.mk
++++ b/common/recovery/Android.mk
+@@ -1,9 +1,14 @@
+ LOCAL_PATH := $(call my-dir)
+ include $(CLEAR_VARS)
+ 
++ifneq (,$(filter userdebug eng, $(TARGET_BUILD_VARIANT)))
++LOCAL_CFLAGS += -DUSERDEBUG=1
++endif
++
+ LOCAL_C_INCLUDES += \
+     bootable/recovery \
+     bootable/recovery/recovery_ui/include
++
+ LOCAL_SRC_FILES := recovery_ui.cpp
+ 
+ # should match TARGET_RECOVERY_UI_LIB set in BoardConfigCommon.mk
+diff --git a/common/recovery/recovery_ui.cpp b/common/recovery/recovery_ui.cpp
+index a7a9a560..20ff1e09 100644
+--- a/common/recovery/recovery_ui.cpp
++++ b/common/recovery/recovery_ui.cpp
+@@ -32,7 +32,12 @@ const char* HEADERS[] = { "Volume up/down to move highlight;",
+ const std::vector<std::string> ITEMS{ "reboot system now",
+                         "apply update from ADB",
+                         "wipe data/factory reset",
+-                        "wipe cache partition",};
++                        "wipe cache partition",
++#ifdef USERDEBUG
++                        "View recovery logs",
++                        "Mount /system",
++#endif
++                        NULL };
+ 
+ class ImxDevice : public Device {
+   public:
+@@ -46,6 +51,10 @@ class ImxDevice : public Device {
+           case 1: return APPLY_ADB_SIDELOAD;
+           case 2: return WIPE_DATA;
+           case 3: return WIPE_CACHE;
++#ifdef USERDEBUG
++          case 4: return VIEW_RECOVERY_LOGS;
++          case 5: return MOUNT_SYSTEM;
++#endif
+           default: return NO_ACTION;
+         }
+     }

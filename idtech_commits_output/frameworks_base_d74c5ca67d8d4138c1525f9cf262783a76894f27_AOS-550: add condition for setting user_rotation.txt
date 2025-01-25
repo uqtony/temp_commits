@@ -1,0 +1,21 @@
+d74c5ca67d8d AndrewS 2021-05-25
+
+AOS-550: add condition for setting user_rotation
+
+not allow to set user_rotation while lock_orientation enabled.
+
+Change-Id: Idc4bebde8af66725f3c5d619bac13d635d3067fd
+
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index 31ee61a0062e..056e5678b334 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -1593,6 +1593,8 @@ public class DisplayRotation {
+ 
+         @Override
+         public void onChange(boolean selfChange) {
++            boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
++            if (lock_orientation) return;
+             if (updateSettings()) {
+                 mService.updateRotation(true /* alwaysSendConfiguration */,
+                         false /* forceRelayout */);

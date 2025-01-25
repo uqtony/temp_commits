@@ -1,0 +1,32 @@
+a3113e36003a George.Huang 2021-05-11
+
+AOS-592: net: qcacld-2.0: convert to dma_alloc_noncoherent
+
+Change-Id: I47cde623082d7e1581c9c43ad9056b62b31800c1
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_dma_pvt.h b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_dma_pvt.h
+index 4fba5c58a696..a2e2ab93890a 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_dma_pvt.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_dma_pvt.h
+@@ -74,8 +74,8 @@ __adf_os_dmamem_alloc(adf_os_device_t     osdev,
+        vaddr = dma_alloc_coherent(osdev->dev, size, &lmap->seg[0].daddr,
+                                   GFP_ATOMIC);
+    else
+-       vaddr = dma_alloc_attrs(osdev->dev, size, &lmap->seg[0].daddr,
+-				GFP_ATOMIC, DMA_ATTR_NON_CONSISTENT);
++       vaddr = dma_alloc_noncoherent(osdev->dev, size, &lmap->seg[0].daddr,
++                        DMA_BIDIRECTIONAL, GFP_ATOMIC);
+ 
+    adf_os_assert(vaddr);
+ 
+@@ -100,8 +100,8 @@ __adf_os_dmamem_free(adf_os_device_t    osdev, __adf_os_size_t size,
+     if(coherent)
+         dma_free_coherent(osdev->dev, size, vaddr, dmap->seg[0].daddr);
+     else
+-	dma_free_attrs(osdev->dev, size, vaddr, dmap->seg[0].daddr,
+-			DMA_ATTR_NON_CONSISTENT);
++        dma_free_noncoherent(osdev->dev, size, vaddr, dmap->seg[0].daddr,
++                        DMA_BIDIRECTIONAL);
+ 
+     kfree(dmap);
+ }

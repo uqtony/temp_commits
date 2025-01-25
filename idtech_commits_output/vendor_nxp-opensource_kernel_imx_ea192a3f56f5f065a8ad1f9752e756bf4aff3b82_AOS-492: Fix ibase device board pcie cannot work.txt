@@ -1,0 +1,105 @@
+ea192a3f56f5 jay deng 2021-02-05
+
+AOS-492: Fix ibase device board pcie cannot work
+
+In Android 11, imx8mq will enable L1 substatus feature.
+This feature need add circuit into clock related circuit, otherwise
+cannot control clock to met requirement of L1 substatus feature.
+
+Ibase device board does not support L1 substatus feature in schemetic.
+So, we add property "l1ss-support-disabled" into ibase device tree.
+PCIe driver will skip L1 substatus process.
+
+Change-Id: I0eff7b5b67eeb327f221c05d417185a66e8c9885
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index e2175e12dc42..5a59afe48957 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -649,13 +649,16 @@ synaptics_dsx_ts: synaptics_dsx_ts@20 {
+ &pcie0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie0>;
+-	clkreq-gpio = <&gpio3 7 GPIO_ACTIVE_LOW>;
+ 	disable-gpio = <&gpio3 17 GPIO_ACTIVE_LOW>;
+ 	reset-gpio = <&gpio3 0 GPIO_ACTIVE_LOW>;
+-	ext_osc = <1>;
+ 	epdev_on-supply=<&reg_pcie>;
+-	hard-wired = <1>;
++	clocks = <&clk IMX8MQ_CLK_PCIE1_ROOT>,
++		 <&clk IMX8MQ_CLK_PCIE1_AUX>,
++		 <&clk IMX8MQ_CLK_PCIE1_PHY>,
++		 <&pcie0_refclk>;
++	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
+ 	status = "okay";
++	l1ss-support-disabled;
+ };
+ 
+ &pgc_gpu {
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index e05a9d0165ea..3a00fdfe837f 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -161,6 +161,8 @@ struct imx6_pcie {
+ 	const struct imx6_pcie_drvdata *drvdata;
+ 	struct regulator	*epdev_on;
+ 	struct phy		*phy;
++
++	bool			l1ss_support_disabled;
+ };
+ 
+ /* Parameters for the waiting for PCIe PHY PLL to lock on i.MX7 */
+@@ -1243,14 +1245,14 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 		reset_control_deassert(imx6_pcie->pciephy_reset);
+ 
+ 		imx8_pcie_wait_for_phy_pll_lock(imx6_pcie);
+-
+-		if (imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS)
++		if ((imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS) && !imx6_pcie->l1ss_support_disabled) {
+ 			/*
+ 			 * Configure the CLK_REQ# high, let the L1SS
+ 			 * automatically controlled by HW later.
+ 			 */
+ 			reset_control_deassert(imx6_pcie->clkreq_reset);
+-		imx6_pcie_set_l1_latency(imx6_pcie);
++			imx6_pcie_set_l1_latency(imx6_pcie);
++		}
+ 		break;
+ 	case IMX8MP:
+ 	case IMX8MP_EP:
+@@ -1310,13 +1312,14 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
+ 
+ 		imx8_pcie_wait_for_phy_pll_lock(imx6_pcie);
+ 
+-		if (imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS)
++		if ((imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS) && !imx6_pcie->l1ss_support_disabled) {
+ 			/*
+ 			 * Configure the CLK_REQ# high, let the L1SS
+ 			 * automatically controlled by HW later.
+ 			 */
+ 			reset_control_deassert(imx6_pcie->clkreq_reset);
+-		imx6_pcie_set_l1_latency(imx6_pcie);
++			imx6_pcie_set_l1_latency(imx6_pcie);
++		}
+ 		break;
+ 	case IMX7D:
+ 	case IMX7D_EP:
+@@ -2353,6 +2356,9 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	imx6_pcie->pci = pci;
+ 	imx6_pcie->drvdata = of_device_get_match_data(dev);
+ 
++	/* Find schematic is support l1 ss or not*/
++	imx6_pcie->l1ss_support_disabled = of_property_read_bool(node, "l1ss-support-disabled");
++
+ 	/* Find the PHY if one is defined, only imx7d uses it */
+ 	np = of_parse_phandle(node, "fsl,imx7d-pcie-phy", 0);
+ 	if (np) {
+@@ -2677,7 +2683,7 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		 * If the L1SS is enabled, disable the over ride after link up.
+ 		 * Let the the CLK_REQ# controlled by HW L1SS automatically.
+ 		 */
+-		ret = imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS;
++		ret = ((imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS) && !imx6_pcie->l1ss_support_disabled);
+ 		if (IS_ENABLED(CONFIG_PCIEASPM_POWER_SUPERSAVE) && (ret > 0)) {
+ 			switch (imx6_pcie->drvdata->variant) {
+ 			case IMX8MQ:

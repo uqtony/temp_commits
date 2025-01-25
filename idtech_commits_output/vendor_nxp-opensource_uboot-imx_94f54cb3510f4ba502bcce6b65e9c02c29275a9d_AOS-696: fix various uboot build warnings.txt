@@ -1,0 +1,402 @@
+94f54cb351 George.Huang 2021-08-10
+
+AOS-696: fix various uboot build warnings
+
+Error Logs:
+- common/splash.c:44:31: warning: ‘default_splash_locations’ defined but not used
+  static struct splash_location default_splash_locations[] = {
+                                ^~~~~~~~~~~~~~~~~~~~~~~~
+- common/splash_source.c:326:15: warning: cast to pointer from integer of different size
+  img_header = (struct image_header *)bmp_load_addr;
+               ^
+- common/splash_source.c:336:42: warning: cast from pointer to integer of different size
+  res = splash_storage_read_raw(location, (u32)fit_header, fit_size);
+                                          ^
+- common/splash_source.c:361:11: warning: cast to pointer from integer of different size
+  memmove((void *)bmp_load_addr, internal_splash_data, internal_splash_size);
+          ^
+- common/spl/spl_fit.c:39:1: warning: control reaches end of non-void function
+  }
+  ^
+- drivers/video/mxsfb.c:55:13: warning: ‘imx8mq_lcdif_init’ defined but not used
+  static void imx8mq_lcdif_init(phys_addr_t reg_base, u32 fb_addr,
+              ^~~~~~~~~~~~~~~~~
+- drivers/video/mxsfb.c:63:8: warning: format ‘%u’ expects argument of type
+  ‘unsigned int’, but argument 3 has type ‘long unsigned int’
+  debug("timings->pixelclock.typ: %u, PS2KHZ(timings->pixelclock.typ): %u
+",
+        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- drivers/video/nxp/imx/sec_mipi_dsim.c:841:39: warning: initialization
+  discards ‘const’ qualifier from pointer target type
+  struct sec_mipi_dsim_range *prange = &pll_1432x.p;
+                                       ^
+- drivers/video/nxp/imx/mipi_dsi_northwest.c:666:76: warning:
+  cast from pointer to integer of different size
+  debug("mipi_dsi_pkt_write data_type 0x%x, buf 0x%x, len %u
+", data_type, (u32)buf, len);
+
+- drivers/video/nxp/imx/mipi_dsi_northwest.c:797:8: warning:
+  format ‘%u’ expects argument of type ‘unsigned int’,
+  but argument 2 has type ‘uint64_t’ {aka ‘long long unsigned int’}
+  debug("req_bit_clk %u
+", req_bit_clk);
+        ^~~~~~~~~~~~~~~~~~
+- drivers/video/nxp/imx/mipi_dsi_northwest.c:767:33: warning: unused variable ‘split_denom’
+  uint64_t norm_denom, norm_num, split_denom;
+                                 ^~~~~~~~~~~
+- drivers/video/nxp/imx/mipi_dsi_northwest.c:1100:2: warning:
+  implicit declaration of function ‘reset_dsi_domains’; did you mean ‘set_domain’?
+  reset_dsi_domains(mipi_dsi, false);
+  ^~~~~~~~~~~~~~~~~
+- drivers/video/nxp/imx/mipi_dsi_northwest.c:1160:6: warning: unused variable ‘ret’
+  int ret;
+      ^~~
+- drivers/video/nxp/imx/nw_dsi_imx.c:110:2: warning:
+  implicit declaration of function ‘init_mipi_clk’; did you mean ‘init_stack’?
+  init_mipi_clk();
+  ^~~~~~~~~~~~~
+- drivers/video/video-uclass.c:77:14: warning: unused variable ‘align’
+  ulong base, align, size;
+              ^~~~~
+- board/freescale/imx8mq_evk/spl.c:39:13: warning: ‘spl_dram_init’ defined but not used
+  static void spl_dram_init(void)
+              ^~~~~~~~~~~~~
+
+Change-Id: I80c6824ed7a5cf529482aae38e82259858c51322
+
+diff --git a/board/freescale/imx8mn_evk/spl.c b/board/freescale/imx8mn_evk/spl.c
+index c2c52dffa3..d24ad44887 100644
+--- a/board/freescale/imx8mn_evk/spl.c
++++ b/board/freescale/imx8mn_evk/spl.c
+@@ -62,10 +62,14 @@ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ #endif
+ }
+ 
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++extern void idt_spl_dram_init(void);
++#else
+ void spl_dram_init(void)
+ {
+ 	ddr_init(&dram_timing);
+ }
++#endif
+ 
+ #if CONFIG_IS_ENABLED(DM_PMIC_BD71837)
+ int power_init_board(void)
+diff --git a/board/freescale/imx8mp_a200/spl.c b/board/freescale/imx8mp_a200/spl.c
+index 9bfd9a7f85..1631ebac26 100644
+--- a/board/freescale/imx8mp_a200/spl.c
++++ b/board/freescale/imx8mp_a200/spl.c
+@@ -63,10 +63,14 @@ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ #endif
+ }
+ 
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++extern void idt_spl_dram_init(void);
++#else
+ void spl_dram_init(void)
+ {
+ 	ddr_init(&dram_timing);
+ }
++#endif
+ 
+ #if CONFIG_IS_ENABLED(DM_PMIC_PCA9450)
+ int power_init_board(void)
+diff --git a/board/freescale/imx8mp_evk/spl.c b/board/freescale/imx8mp_evk/spl.c
+index 9bfd9a7f85..c8517792e5 100644
+--- a/board/freescale/imx8mp_evk/spl.c
++++ b/board/freescale/imx8mp_evk/spl.c
+@@ -35,7 +35,6 @@
+ #include <asm/arch/ddr.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+-extern void idt_spl_dram_init(void);
+ 
+ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ {
+@@ -63,10 +62,14 @@ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ #endif
+ }
+ 
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++extern void idt_spl_dram_init(void);
++#else
+ void spl_dram_init(void)
+ {
+ 	ddr_init(&dram_timing);
+ }
++#endif
+ 
+ #if CONFIG_IS_ENABLED(DM_PMIC_PCA9450)
+ int power_init_board(void)
+diff --git a/board/freescale/imx8mq_evk/spl.c b/board/freescale/imx8mq_evk/spl.c
+index 7d5e25ab28..f4a778c8ab 100644
+--- a/board/freescale/imx8mq_evk/spl.c
++++ b/board/freescale/imx8mq_evk/spl.c
+@@ -34,8 +34,9 @@
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ extern struct dram_timing_info dram_timing_b0;
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ extern void idt_spl_dram_init(void);
+-
++#else
+ static void spl_dram_init(void)
+ {
+ 	/* ddr init */
+@@ -44,6 +45,7 @@ static void spl_dram_init(void)
+ 	else
+ 		ddr_init(&dram_timing_b0);
+ }
++#endif
+ 
+ #define I2C_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE)
+ #define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
+diff --git a/common/spl/spl_fit.c b/common/spl/spl_fit.c
+index 4705613079..fcd00819ec 100644
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@ -36,6 +36,7 @@ struct spl_fit_info {
+ 
+ __weak int board_spl_fit_post_load(const void *fit)
+ {
++	return 0;
+ }
+ 
+ __weak ulong board_spl_fit_size_align(ulong size)
+diff --git a/common/splash.c b/common/splash.c
+index e12efbddd9..dbf22d247a 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -41,6 +41,7 @@
+ #define SPLASH_PARTITION_NAME	"idtechdata"
+ #endif
+ 
++#ifndef CONFIG_IDT_SPLASH_SUPPORT
+ static struct splash_location default_splash_locations[] = {
+ 	{
+ 		.name = "sf",
+@@ -67,6 +68,7 @@ static struct splash_location default_splash_locations[] = {
+ 		.devpart = "0:1",
+ 	},
+ };
++#endif
+ 
+ #if defined(CONFIG_DM_VIDEO) && defined(CONFIG_VIDEO_LOGO)
+ 
+diff --git a/common/splash_source.c b/common/splash_source.c
+index 3cf926d91a..f46f212ce8 100644
+--- a/common/splash_source.c
++++ b/common/splash_source.c
+@@ -323,7 +323,7 @@ static int splash_load_fit(struct splash_location *location, u32 bmp_load_addr)
+ 	if (res < 0)
+ 		return res;
+ 
+-	img_header = (struct image_header *)bmp_load_addr;
++	img_header = (struct image_header *)(uintptr_t)bmp_load_addr;
+ 	if (image_get_magic(img_header) != FDT_MAGIC) {
+ 		printf("Could not find FDT magic
+");
+ 		return -EINVAL;
+@@ -333,7 +333,7 @@ static int splash_load_fit(struct splash_location *location, u32 bmp_load_addr)
+ 
+ 	/* Read in entire FIT */
+ 	fit_header = (const u32 *)(bmp_load_addr + header_size);
+-	res = splash_storage_read_raw(location, (u32)fit_header, fit_size);
++	res = splash_storage_read_raw(location, (u32)(uintptr_t)fit_header, fit_size);
+ 	if (res < 0)
+ 		return res;
+ 
+@@ -358,7 +358,7 @@ static int splash_load_fit(struct splash_location *location, u32 bmp_load_addr)
+ 	/* Extract the splash data from FIT */
+ 	/* 1. Test if splash is in FIT internal data. */
+ 	if (!fit_image_get_data(fit_header, node_offset, &internal_splash_data, &internal_splash_size))
+-		memmove((void *)bmp_load_addr, internal_splash_data, internal_splash_size);
++		memmove((void *)(uintptr_t)bmp_load_addr, internal_splash_data, internal_splash_size);
+ 	/* 2. Test if splash is in FIT external data with fixed position. */
+ 	else if (!fit_image_get_data_position(fit_header, node_offset, &external_splash_addr))
+ 		is_splash_external = true;
+diff --git a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+index 464865b3ee..c8467b7f6b 100644
+--- a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+@@ -183,4 +183,3 @@ CONFIG_IMX_TRUSTY_OS=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+-CONFIG_VIRTUAL_AB_SUPPORT=y
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 45d2d8d511..61c6779d67 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -52,6 +52,7 @@
+ 
+ struct mxs_dma_desc desc;
+ 
++#ifdef CONFIG_IMX8MQ
+ static void imx8mq_lcdif_init(phys_addr_t reg_base, u32 fb_addr,
+ 			 struct display_timing *timings, int bpp, bool bridge)
+ {
+@@ -60,7 +61,7 @@ static void imx8mq_lcdif_init(phys_addr_t reg_base, u32 fb_addr,
+ 	uint8_t valid_data = 0;
+ 
+ 	/* Kick in the LCDIF clock */
+-	debug("timings->pixelclock.typ: %u, PS2KHZ(timings->pixelclock.typ): %u
+",
++	debug("timings->pixelclock.typ: %u, PS2KHZ(timings->pixelclock.typ): %lu
+",
+ 			 timings->pixelclock.typ, PS2KHZ(timings->pixelclock.typ));
+ 
+ 	/* Restart the LCDIF block */
+@@ -142,6 +143,7 @@ static void imx8mq_lcdif_init(phys_addr_t reg_base, u32 fb_addr,
+ 	/* RUN! */
+ 	writel(LCDIF_CTRL_RUN, &regs->hw_lcdif_ctrl_set);
+ }
++#endif /* CONFIG_IMX8MQ */
+ 
+ /**
+  * mxsfb_system_setup() - Fine-tune LCDIF configuration
+@@ -166,6 +168,7 @@ __weak void mxsfb_system_setup(void)
+  * 	 le:89,ri:164,up:23,lo:10,hs:10,vs:10,sync:0,vmode:0
+  */
+ 
++#ifndef CONFIG_IMX8MQ
+ static void mxs_lcd_init(phys_addr_t reg_base, u32 fb_addr,
+ 			 struct display_timing *timings, int bpp, bool bridge)
+ {
+@@ -267,6 +270,7 @@ static void mxs_lcd_init(phys_addr_t reg_base, u32 fb_addr,
+ 	/* RUN! */
+ 	writel(LCDIF_CTRL_RUN, &regs->hw_lcdif_ctrl_set);
+ }
++#endif /* !CONFIG_IMX8MQ */
+ 
+ static int mxs_probe_common(phys_addr_t reg_base, struct display_timing *timings,
+ 			    int bpp, u32 fb, bool bridge)
+diff --git a/drivers/video/nxp/imx/mipi_dsi_northwest.c b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+index b6fa90a445..aec53ecb64 100644
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest.c
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+@@ -26,6 +26,7 @@
+ #include <dm/device_compat.h>
+ #include <regmap.h>
+ #include <syscon.h>
++#include <inttypes.h>
+ 
+ #define CN_BUF	0xcb7a89c0
+ #define CO_BUF	0x63
+@@ -663,7 +664,7 @@ static int mipi_dsi_pkt_write(struct mipi_dsi_northwest_info *mipi_dsi,
+ 	int ret = 0;
+ 	const uint8_t *data = (const uint8_t *)buf;
+ 
+-	debug("mipi_dsi_pkt_write data_type 0x%x, buf 0x%x, len %u
+", data_type, (u32)buf, len);
++	debug("mipi_dsi_pkt_write data_type 0x%x, buf 0x%x, len %u
+", data_type, (u32)(uintptr_t)buf, len);
+ 
+ 	if (len == 0)
+ 		/* handle generic long write command */
+@@ -759,12 +760,7 @@ static int imx8mq_mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	uint64_t div_rate;
+ 	int hs_reg;
+ 
+-	int i, best_div = -1;
+-	int64_t delta;
+-	uint64_t least_delta = ~0U;
+-	uint64_t limit, div_result;
+-	uint64_t denominator, numerator, divisor;
+-	uint64_t norm_denom, norm_num, split_denom;
++	uint64_t denominator, numerator;
+ 	struct pll_divider div = { 0 };
+ 
+ 	bpp = mipi_dsi_pixel_format_to_bpp(mipi_dsi->device->format);
+@@ -794,7 +790,7 @@ static int imx8mq_mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 		return -EINVAL;
+ 	}
+ 
+-	debug("req_bit_clk %u
+", req_bit_clk);
++	debug("req_bit_clk %" PRIu64 "
+", req_bit_clk);
+ 
+ 	/* calc CM, CN and CO according to PHY PLL formula:
+ 	 *
+@@ -1096,8 +1092,10 @@ static int mipi_dsi_northwest_host_attach(struct mipi_dsi_host *host,
+ 	if (ret < 0)
+ 		return ret;
+ 
++#ifndef CONFIG_IMX8MQ
+ 	/* Deassert resets */
+ 	reset_dsi_domains(mipi_dsi, false);
++#endif /* !CONFIG_IMX8MQ */
+ 
+ 	/* display_en */
+ 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG, DSI_SD, 0);
+@@ -1157,7 +1155,6 @@ static int mipi_dsi_northwest_init(struct udevice *dev,
+ 			    const struct mipi_dsi_phy_ops *phy_ops)
+ {
+ 	struct mipi_dsi_northwest_info *dsi = dev_get_priv(dev);
+-	int ret;
+ 
+ 	dsi->max_data_lanes = max_data_lanes;
+ 	dsi->device = device;
+@@ -1172,7 +1169,7 @@ static int mipi_dsi_northwest_init(struct udevice *dev,
+ 	}
+ 
+ #ifndef CONFIG_IMX8MQ
+-	ret = dev_read_u32(device->dev, "max-data-rate", &dsi->max_data_rate);
++	int ret = dev_read_u32(device->dev, "max-data-rate", &dsi->max_data_rate);
+ 	if (ret) {
+ 		dev_err(device->dev, "fail to get max-data-rate
+");
+ 		return -EINVAL;
+diff --git a/drivers/video/nxp/imx/nw_dsi_imx.c b/drivers/video/nxp/imx/nw_dsi_imx.c
+index 05e70b6e26..7a38124821 100644
+--- a/drivers/video/nxp/imx/nw_dsi_imx.c
++++ b/drivers/video/nxp/imx/nw_dsi_imx.c
+@@ -24,6 +24,11 @@
+ #include <regmap.h>
+ #include <syscon.h>
+ 
++
++#ifdef CONFIG_IMX8MQ
++extern void init_mipi_clk(void);
++#endif /* CONFIG_IMX8MQ */
++
+ struct nw_dsi_imx_priv {
+ 	struct mipi_dsi_device device;
+ 	struct udevice *panel;
+diff --git a/drivers/video/nxp/imx/sec_mipi_dsim.c b/drivers/video/nxp/imx/sec_mipi_dsim.c
+index 643d2bf350..7541074f5d 100644
+--- a/drivers/video/nxp/imx/sec_mipi_dsim.c
++++ b/drivers/video/nxp/imx/sec_mipi_dsim.c
+@@ -305,7 +305,7 @@ struct sec_mipi_dsim_pll {
+ 	struct sec_mipi_dsim_range fvco;
+ };
+ 
+-const struct sec_mipi_dsim_pll pll_1432x = {
++struct sec_mipi_dsim_pll pll_1432x = {
+ 	.p	= { .min = 1,		.max = 63,	},
+ 	.m	= { .min = 64,		.max = 1023,	},
+ 	.s	= { .min = 0,		.max = 5,	},
+diff --git a/drivers/video/video-uclass.c b/drivers/video/video-uclass.c
+index d5a06d733b..9d29fa6bd1 100644
+--- a/drivers/video/video-uclass.c
++++ b/drivers/video/video-uclass.c
+@@ -74,7 +74,7 @@ void video_set_flush_dcache(struct udevice *dev, bool flush)
+ static ulong alloc_fb(struct udevice *dev, ulong *addrp)
+ {
+ 	struct video_uc_plat *plat = dev_get_uclass_plat(dev);
+-	ulong base, align, size;
++	ulong base, size;
+ 
+ 	if (!plat->size)
+ 		return 0;
+@@ -86,7 +86,7 @@ static ulong alloc_fb(struct udevice *dev, ulong *addrp)
+ 	plat->base = base;
+ 	size = plat->size;
+ #else
+-	align = plat->align ? plat->align : 1 << 20;
++	ulong align = plat->align ? plat->align : 1 << 20;
+ 	base = *addrp - plat->size;
+ 	base &= ~(align - 1);
+ 	plat->base = base;

@@ -1,0 +1,107 @@
+f02735d0 AndrewS 2022-03-04
+
+AOS-910: disable WiFi WEP on PCI build
+
+In PCI DTR document, DTR D13 Wi-Fi Security:
+TD13.2 Using a test system, the tester will confirm that
+the device does not support WEP.
+
+Change-Id: I1d55f3d9c5bb796becf3fb47dfd91e51713690be
+
+diff --git a/hostapd/Android.mk b/hostapd/Android.mk
+index f2b15d3b..b2bc9b90 100644
+--- a/hostapd/Android.mk
++++ b/hostapd/Android.mk
+@@ -325,9 +325,11 @@ OBJS += src/fst/fst_ctrl_iface.c
+ endif
+ endif
+ 
++ifeq ($(BOARD_PCI_SECURE),)
+ ifdef CONFIG_WEP
+ L_CFLAGS += -DCONFIG_WEP
+ endif
++endif
+ 
+ ifdef CONFIG_NO_TKIP
+ L_CFLAGS += -DCONFIG_NO_TKIP
+diff --git a/wpa_supplicant/Android.mk b/wpa_supplicant/Android.mk
+index 2017f884..affeceaa 100644
+--- a/wpa_supplicant/Android.mk
++++ b/wpa_supplicant/Android.mk
+@@ -431,9 +431,11 @@ OBJS += src/fst/fst_ctrl_iface.c
+ endif
+ endif
+ 
++ifeq ($(BOARD_PCI_SECURE),)
+ ifdef CONFIG_WEP
+ L_CFLAGS += -DCONFIG_WEP
+ endif
++endif
+ 
+ ifdef CONFIG_NO_TKIP
+ L_CFLAGS += -DCONFIG_NO_TKIP
+diff --git a/wpa_supplicant/hidl/1.3/sta_network.cpp b/wpa_supplicant/hidl/1.3/sta_network.cpp
+index 9716b6ee..3de941e7 100644
+--- a/wpa_supplicant/hidl/1.3/sta_network.cpp
++++ b/wpa_supplicant/hidl/1.3/sta_network.cpp
+@@ -1099,6 +1099,7 @@ SupplicantStatus StaNetwork::setPskInternal(const std::array<uint8_t, 32> &psk)
+ SupplicantStatus StaNetwork::setWepKeyInternal(
+     uint32_t key_idx, const std::vector<uint8_t> &wep_key)
+ {
++#ifdef CONFIG_WEP
+ 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+ 	if (key_idx >=
+ 	    static_cast<uint32_t>(
+@@ -1121,10 +1122,14 @@ SupplicantStatus StaNetwork::setWepKeyInternal(
+ 	    wpa_ssid->wep_key_len[key_idx]);
+ 	resetInternalStateAfterParamsUpdate();
+ 	return {SupplicantStatusCode::SUCCESS, ""};
++#else
++	return {SupplicantStatusCode::FAILURE_IFACE_INVALID, ""};
++#endif
+ }
+ 
+ SupplicantStatus StaNetwork::setWepTxKeyIdxInternal(uint32_t key_idx)
+ {
++#ifdef CONFIG_WEP
+ 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+ 	if (key_idx >=
+ 	    static_cast<uint32_t>(
+@@ -1134,6 +1139,9 @@ SupplicantStatus StaNetwork::setWepTxKeyIdxInternal(uint32_t key_idx)
+ 	wpa_ssid->wep_tx_keyidx = key_idx;
+ 	resetInternalStateAfterParamsUpdate();
+ 	return {SupplicantStatusCode::SUCCESS, ""};
++#else
++	return {SupplicantStatusCode::FAILURE_IFACE_INVALID, ""};
++#endif
+ }
+ 
+ SupplicantStatus StaNetwork::setRequirePmfInternal(bool enable)
+@@ -1567,6 +1575,7 @@ std::pair<SupplicantStatus, std::string> StaNetwork::getSaePasswordIdInternal()
+ std::pair<SupplicantStatus, std::vector<uint8_t>> StaNetwork::getWepKeyInternal(
+     uint32_t key_idx)
+ {
++#ifdef CONFIG_WEP
+ 	std::vector<uint8_t> wep_key;
+ 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+ 	if (key_idx >=
+@@ -1579,12 +1588,19 @@ std::pair<SupplicantStatus, std::vector<uint8_t>> StaNetwork::getWepKeyInternal(
+ 	    wpa_ssid->wep_key[key_idx],
+ 	    wpa_ssid->wep_key[key_idx] + wpa_ssid->wep_key_len[key_idx]);
+ 	return {{SupplicantStatusCode::SUCCESS, ""}, std::move(wep_key)};
++#else
++	return {{SupplicantStatusCode::FAILURE_IFACE_INVALID, ""}, std::vector<uint8_t>()};
++#endif
+ }
+ 
+ std::pair<SupplicantStatus, uint32_t> StaNetwork::getWepTxKeyIdxInternal()
+ {
++#ifdef CONFIG_WEP
+ 	struct wpa_ssid *wpa_ssid = retrieveNetworkPtr();
+ 	return {{SupplicantStatusCode::SUCCESS, ""}, wpa_ssid->wep_tx_keyidx};
++#else
++	return {{SupplicantStatusCode::FAILURE_IFACE_INVALID, ""}, 0};
++#endif
+ }
+ 
+ std::pair<SupplicantStatus, bool> StaNetwork::getRequirePmfInternal()

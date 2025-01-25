@@ -1,0 +1,22 @@
+cae10d28 max.yang 2021-01-04
+
+AOS-477: Fix Android 11 vp6820_8mq boot fail
+
+Symptom: vp6820_8mq kept in boot animation
+Root cause: Android ui permission denied to list/read cable.* under extcon
+            and then zygote kept re-launch due to above exceptions
+Solution: Make sure extcon file-nodes have sysfs_extcon permissions
+
+Change-Id: I936f0c9d58adb1674205a47c83da8ebf2498157d
+
+diff --git a/imx8m/vp6820_8mq/sepolicy/genfs_contexts b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+index 2f5e1478..40a7f087 100644
+--- a/imx8m/vp6820_8mq/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+@@ -23,3 +23,6 @@ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
++
++# vp6820 chip as external connection
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a40000.i2c/i2c-2/2-0067/extcon   u:object_r:sysfs_extcon:s0

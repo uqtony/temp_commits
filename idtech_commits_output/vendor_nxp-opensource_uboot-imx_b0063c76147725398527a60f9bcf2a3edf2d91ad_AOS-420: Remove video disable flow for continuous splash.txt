@@ -1,0 +1,64 @@
+b0063c7614 jay deng 2020-12-09
+
+AOS-420: Remove video disable flow for continuous splash
+
+Add configuration CONFIG_IDT_SPLASH_PREENABLE_SUPPORT.
+According this config to shutdown display output or not.
+
+Change-Id: I309ea22441ad50c5f4b47b392e14c348bd88cba0
+
+diff --git a/arch/arm/lib/bootm.c b/arch/arm/lib/bootm.c
+index 1640307c74..ef59255f08 100644
+--- a/arch/arm/lib/bootm.c
++++ b/arch/arm/lib/bootm.c
+@@ -104,7 +104,7 @@ static void announce_and_cleanup(int fake)
+ 	udc_disconnect();
+ #endif
+ 
+-#if defined(CONFIG_VIDEO_LINK)
++#if defined(CONFIG_VIDEO_LINK) && !defined(CONFIG_IDT_SPLASH_PREENABLE_SUPPORT)
+ 	video_link_shut_down();
+ #endif
+ 
+diff --git a/configs/vp6820_8mq_evk_android_defconfig b/configs/vp6820_8mq_evk_android_defconfig
+index d90373d3f0..3e8b42974f 100644
+--- a/configs/vp6820_8mq_evk_android_defconfig
++++ b/configs/vp6820_8mq_evk_android_defconfig
+@@ -134,6 +134,7 @@ CONFIG_SYS_WHITE_ON_BLACK=y
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_IDT_ROTATION=y
++CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/vp6820_8mq_evk_android_dual_defconfig b/configs/vp6820_8mq_evk_android_dual_defconfig
+index f024d5b415..c79a7d87a7 100644
+--- a/configs/vp6820_8mq_evk_android_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_dual_defconfig
+@@ -134,6 +134,7 @@ CONFIG_SYS_WHITE_ON_BLACK=y
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_IDT_ROTATION=y
++CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index eafad9549f..51174647a8 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -847,4 +847,13 @@ config IDT_SPLASH_SUPPORT
+ 	indicate which file want to use (etc setenv splashfile idtech/splash.bmp).
+ 	You also can modify CONFIG_EXTRA_ENV_SETTINGS.
+ 
++config IDT_SPLASH_PREENABLE_SUPPORT
++	bool "Enable IDTech splash pre-enable support"
++	depends on IDT_SPLASH_SUPPORT
++	default n
++	help
++	Say Y here if you want to enable splash pre-enable function.
++	When enable this config, will skip video disable flow and keep splash
++	output until android boot animation.
++
+ endmenu

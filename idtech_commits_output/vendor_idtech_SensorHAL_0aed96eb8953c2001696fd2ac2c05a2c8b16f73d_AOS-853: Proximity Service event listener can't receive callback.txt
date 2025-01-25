@@ -1,0 +1,27 @@
+0aed96e tonyshih 2022-01-07
+
+AOS-853: Proximity Service event listener can't receive callback
+
+root causes:
+1. writeDelay() return error
+2. writeEnable() return error
+
+solutions:
+1. Since setdelay() is not support, bypass writeDelay().
+2. Since Vcnl4200 is enabled by others, bypass writeEnable().
+
+Change-Id: If2f919379f759fd26fd6a8417aced43b6687845d
+
+diff --git a/ProximitySensor.h b/ProximitySensor.h
+index addbfd3..f8794a7 100644
+--- a/ProximitySensor.h
++++ b/ProximitySensor.h
+@@ -53,6 +53,8 @@ public:
+ 	int setFullScale(int32_t handle, int value);
+ 	int enable(int32_t handle, int enabled, int type);
+ 	int getWhatFromHandle(int32_t handle);
++	virtual int writeEnable(int32_t handle, int enable)  { return 0; } // Not support
++	virtual int writeDelay(int32_t handle, int64_t delay_ms) { return 0; } // Not support
+ };
+ #endif /* ANDROID_PROXIMITY_SENSOR_H */
+ #endif /* SENSORS_PROXIMITY_ENABLE */

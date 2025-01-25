@@ -1,0 +1,26 @@
+c08c592a owen.wen 2022-01-19
+
+AOS-426: video rotation fix, disable 3D composition overlay
+
+Symptom: video didn't rotate as expectation when display rotate 90 or 270 degrees
+Root Cause: NXP 3D composition problem
+Solution: disable 3D composition
+
+below is the thread about this symptom
+https://community.nxp.com/t5/NXP-ID-Tech-Qisda-Portal-190925/IMX8MQ-rotate-video-via-user-rotation-got-some-problem/m-p/1193448#M408
+
+Change-Id: Ie9832b3fd421fc856a5100bc79cd9becc64bbc12
+
+diff --git a/imx8m/redwood_8mq/init.imx8mq.rc b/imx8m/redwood_8mq/init.imx8mq.rc
+index 44613aae..40aa0f45 100755
+--- a/imx8m/redwood_8mq/init.imx8mq.rc
++++ b/imx8m/redwood_8mq/init.imx8mq.rc
+@@ -23,6 +23,8 @@ on early-boot
+     chmod 0664 /sys/devices/system/cpu/cpu2/online
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
++    # disable 3D composition overlay to fix video rotate problem
++    setprop vendor.hwc.enable.overlay 0
+ 
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor

@@ -1,0 +1,105 @@
+8aa6795729 Jay 2021-07-30
+
+AOS-688: uboot: Modify video device tree to meet Android 11 2.2.0
+
+In new version, uboot change video link format.
+Must modify device tree to meet this change.
+Currently, format is similar with linux.
+
+Change-Id: I3650a4c502dd810ea4a43762926cd79ade35bf0b
+
+diff --git a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+index 81826f94b6..da18597d43 100644
+--- a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+@@ -93,28 +93,6 @@
+ 		compatible = "gpio-backlight";
+ 		gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+ 	};
+-
+-	hx8394f_panel {
+-		compatible = "himax,hx8394f";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+-		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+-		backlight = <&panel_backlight>;
+-		dsi-lanes = <4>;
+-		video-mode = <2>;	/* 0: burst mode
+-					 * 1: non-burst mode with sync event
+-					 * 2: non-burst mode with sync pulse
+-					 */
+-		panel-width-mm = <68>;
+-		panel-height-mm = <121>;
+-		status = "okay";
+-
+-		port {
+-			hx8394f_from_dsim: endpoint {
+-				remote-endpoint = <&dsim_to_hx8394f>;
+-			};
+-		};
+-	};
+ };
+ 
+ &A53_0 {
+@@ -428,31 +406,46 @@
+ 		bits-per-pixel = <24>;
+ 		bus-width = <24>;
+ 	};
+-
+-	port@0 {
+-		lcdif_out: endpoint {
+-			remote-endpoint = <&dsim_to_hx8394f>;
+-		};
+-	};
+ };
+ 
+ &dphy {
+ 	status = "okay";
+-
+-	port@0 {
+-		dphy_out: endpoint {
+-			remote-endpoint = <&dsim_to_hx8394f>;
+-		};
+-	};
+ };
+ 
+ &mipi_dsi {
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	status = "okay";
+ 	data-lanes-num = <4>;
+ 
+-	port@1 {
+-		dsim_to_hx8394f: endpoint {
+-			remote-endpoint = <&hx8394f_from_dsim>;
++	hx8394f@0 {
++		compatible = "himax,hx8394f";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		backlight = <&panel_backlight>;
++		dsi-lanes = <4>;
++		video-mode = <2>;	/* 0: burst mode
++					 * 1: non-burst mode with sync event
++					 * 2: non-burst mode with sync pulse
++					 */
++		panel-width-mm = <68>;
++		panel-height-mm = <121>;
++		status = "okay";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&mipi_dsi_out>;
++			};
++		};
++	};
++
++	ports {
++		port@1 {
++			reg = <1>;
++			mipi_dsi_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
+ 		};
+ 	};
+ };

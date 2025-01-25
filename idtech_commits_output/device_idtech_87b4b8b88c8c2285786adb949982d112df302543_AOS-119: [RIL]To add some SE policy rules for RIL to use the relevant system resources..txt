@@ -1,0 +1,183 @@
+87b4b8b8 George.Huang 2020-03-12
+
+AOS-119: [RIL]To add some SE policy rules for RIL to use the relevant system resources.
+
+Copy system/sepolicy/vendor/rild.te from Qisda
+  https://gerrit.idtechproducts.com/c/android-imx/platform/system/sepolicy/+/1898
+
+Change-Id: Ic7440ddccbf9f3b74c8c23608a5accf55b69e231
+
+diff --git a/imx8m/evk_a300/sepolicy/rild.te b/imx8m/evk_a300/sepolicy/rild.te
+new file mode 100644
+index 00000000..c98c4c22
+--- /dev/null
++++ b/imx8m/evk_a300/sepolicy/rild.te
+@@ -0,0 +1,80 @@
++# rild - radio interface layer daemon
++# type rild, domain;
++hal_server_domain(rild, hal_telephony)
++net_domain(rild)
++
++# type_transition must be private policy the domain_trans rules could stay
++# public, but conceptually should go with this
++# type rild_exec, exec_type, vendor_file_type, file_type;
++init_daemon_domain(rild)
++
++allow rild init:dir { search read open };
++allow rild init:lnk_file read;
++allow rild init:file read;
++allow rild kernel:dir search;
++allow rild kernel:system module_request;
++allow rild kernel:lnk_file read;
++allow rild kernel:file read;
++allow rild device:chr_file { read write ioctl open getattr create };
++#allow rild net_radio_prop:property_service set;
++allow rild ppp_device:chr_file { read write ioctl open };
++allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
++allow rild radio_prop:property_service set;
++allow rild self:capability { net_admin setuid dac_override dac_read_search mknod };   #sys_ptrace  removed
++allow rild shell_exec:file { read execute open execute_no_trans getattr map };
++allow rild sysfs_wake_lock:file { open read write };
++allow rild system_file:file execute_no_trans;
++allow rild system_prop:property_service set;
++allow rild sysfs:file write;
++allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
++allow rild system_data_file:dir { add_name create getattr read write };
++allow rild system_data_file:file { create open write read };
++allow rild default_prop:property_service set;
++allow rild default_prop:file { read open };
++allow rild device:dir { write add_name };
++allow rild rootfs:dir { read open };
++allow rild hwservicemanager:dir search;
++allow rild hwservicemanager:file read;
++allow rild hwservicemanager:lnk_file read;
++allow rild logd:dir { search read open };
++allow rild logd:file read;
++allow rild logd:lnk_file read;
++allow rild servicemanager:dir { search read };
++allow rild servicemanager:file read;
++allow rild servicemanager:lnk_file read;
++allow rild ueventd:dir { search read open };
++allow rild ueventd:file read;
++allow rild ueventd:lnk_file read;
++allow rild vendor_init:dir { search read open };
++allow rild vendor_init:lnk_file read;
++allow rild vendor_init:file read;
++allow rild vndservicemanager:dir search;
++allow rild vndservicemanager:file read;
++allow rild vndservicemanager:lnk_file read;
++allow rild watchdogd:dir search;
++allow rild watchdogd:lnk_file read;
++allow rild watchdogd:file read;
++allow rild watchdogd:dir { read open };
++allow rild hal_bootctl_default:dir search;
++allow rild hal_bootctl_default:lnk_file read;
++allow rild hal_keymaster_default:dir search;
++allow rild vold:dir search;
++
++# property service
++set_prop(rild, radio_prop)
++set_prop(rild, net_radio_prop)
++set_prop(rild, system_radio_prop)
++auditallow rild net_radio_prop:property_service set;
++auditallow rild system_radio_prop:property_service set;
++
++allow rild tty_device:chr_file rw_file_perms;
++
++# Allow rild to create and use netlink sockets.
++allow rild self:netlink_socket create_socket_perms;
++allow rild self:netlink_generic_socket create_socket_perms;
++allow rild self:netlink_kobject_uevent_socket create_socket_perms;
++
++# Access to wake locks
++wakelock_use(rild)
++
++allow rild self:socket create_socket_perms;
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mq/sepolicy/rild.te b/imx8m/vp6820_8mq/sepolicy/rild.te
+new file mode 100644
+index 00000000..c98c4c22
+--- /dev/null
++++ b/imx8m/vp6820_8mq/sepolicy/rild.te
+@@ -0,0 +1,80 @@
++# rild - radio interface layer daemon
++# type rild, domain;
++hal_server_domain(rild, hal_telephony)
++net_domain(rild)
++
++# type_transition must be private policy the domain_trans rules could stay
++# public, but conceptually should go with this
++# type rild_exec, exec_type, vendor_file_type, file_type;
++init_daemon_domain(rild)
++
++allow rild init:dir { search read open };
++allow rild init:lnk_file read;
++allow rild init:file read;
++allow rild kernel:dir search;
++allow rild kernel:system module_request;
++allow rild kernel:lnk_file read;
++allow rild kernel:file read;
++allow rild device:chr_file { read write ioctl open getattr create };
++#allow rild net_radio_prop:property_service set;
++allow rild ppp_device:chr_file { read write ioctl open };
++allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
++allow rild radio_prop:property_service set;
++allow rild self:capability { net_admin setuid dac_override dac_read_search mknod };   #sys_ptrace  removed
++allow rild shell_exec:file { read execute open execute_no_trans getattr map };
++allow rild sysfs_wake_lock:file { open read write };
++allow rild system_file:file execute_no_trans;
++allow rild system_prop:property_service set;
++allow rild sysfs:file write;
++allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
++allow rild system_data_file:dir { add_name create getattr read write };
++allow rild system_data_file:file { create open write read };
++allow rild default_prop:property_service set;
++allow rild default_prop:file { read open };
++allow rild device:dir { write add_name };
++allow rild rootfs:dir { read open };
++allow rild hwservicemanager:dir search;
++allow rild hwservicemanager:file read;
++allow rild hwservicemanager:lnk_file read;
++allow rild logd:dir { search read open };
++allow rild logd:file read;
++allow rild logd:lnk_file read;
++allow rild servicemanager:dir { search read };
++allow rild servicemanager:file read;
++allow rild servicemanager:lnk_file read;
++allow rild ueventd:dir { search read open };
++allow rild ueventd:file read;
++allow rild ueventd:lnk_file read;
++allow rild vendor_init:dir { search read open };
++allow rild vendor_init:lnk_file read;
++allow rild vendor_init:file read;
++allow rild vndservicemanager:dir search;
++allow rild vndservicemanager:file read;
++allow rild vndservicemanager:lnk_file read;
++allow rild watchdogd:dir search;
++allow rild watchdogd:lnk_file read;
++allow rild watchdogd:file read;
++allow rild watchdogd:dir { read open };
++allow rild hal_bootctl_default:dir search;
++allow rild hal_bootctl_default:lnk_file read;
++allow rild hal_keymaster_default:dir search;
++allow rild vold:dir search;
++
++# property service
++set_prop(rild, radio_prop)
++set_prop(rild, net_radio_prop)
++set_prop(rild, system_radio_prop)
++auditallow rild net_radio_prop:property_service set;
++auditallow rild system_radio_prop:property_service set;
++
++allow rild tty_device:chr_file rw_file_perms;
++
++# Allow rild to create and use netlink sockets.
++allow rild self:netlink_socket create_socket_perms;
++allow rild self:netlink_generic_socket create_socket_perms;
++allow rild self:netlink_kobject_uevent_socket create_socket_perms;
++
++# Access to wake locks
++wakelock_use(rild)
++
++allow rild self:socket create_socket_perms;
+\ No newline at end of file

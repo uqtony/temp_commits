@@ -1,0 +1,47 @@
+a73349ec4 max.yang 2021-03-10
+
+AOS-531: [Sign] Signing requests should go to web service instead of CA server
+
+  1. By PCI review, tools are not allow to connect to HSM directly;
+     instead, request should go to web_service which is already audited
+  2. Preliminary version of implementation, the json's key-value format
+     and error message format might changed for better debugging
+
+Change-Id: I9079511262c9db1c650981bb816dea9bf456d826
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 2971da14d..b1010a355 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -12,9 +12,10 @@ import shutil
+ import add_img_to_target_files
+ import sign_target_files_apks
+ import post_sign_vbmeta
+-import CA_sign_data
++import idt_web_service
+ from xml.etree import ElementTree
+ 
++WS = idt_web_service.web_service()
+ idt_key_map = {}
+ #TODO: replace cert path once we get it
+ idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING/"
+@@ -60,8 +61,7 @@ def IDTBuildKeyMap(misc_info):
+       })
+ 
+ def sign_by_ca(data, key):
+-  new_args = ["-k", key, "-d", data.encode('hex'), "-p", idt_cert_dir + "CAserver.pem"]
+-  sig_hex = CA_sign_data.main(new_args)
++  sig_hex = WS.doSign(key, data.encode('hex'))
+   sig = sig_hex.decode('hex')
+   assert len(sig) == 256
+ 
+@@ -282,6 +282,9 @@ def main(argv):
+   os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
+   print('PATH: {}'.format(os.environ["PATH"]))
+ 
++  WS.dual_login()
++  WS.regist_socket()
++
+   # Initial
+   input_zip = zipfile.ZipFile(argv[0], "r")
+   output_zip = zipfile.ZipFile(argv[1], "w",

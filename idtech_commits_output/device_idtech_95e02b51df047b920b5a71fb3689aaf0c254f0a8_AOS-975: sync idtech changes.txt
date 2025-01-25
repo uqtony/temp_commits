@@ -1,0 +1,1473 @@
+95e02b51 AndrewS 2022-04-13
+
+AOS-975: sync idtech changes
+
+Change-Id: Ib46de19294825145bdc2fca6ebafdb3dc6c5bd95
+
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index ba60bec3..13cc77c2 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -44,7 +44,9 @@ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/redwood_8mq/redwood_8mq_pcidev.mk \
+   $(LOCAL_DIR)/redwood_8mq/redwood_8mq_go.mk \
+   $(LOCAL_DIR)/redwood_8mm/redwood_8mm.mk \
+-  $(LOCAL_DIR)/redwood_8mm/redwood_8mm_drm.mk
++  $(LOCAL_DIR)/redwood_8mm/redwood_8mm_drm.mk \
++  $(LOCAL_DIR)/redwood_8mm/redwood_8mm_pci.mk \
++  $(LOCAL_DIR)/redwood_8mm/redwood_8mm_pcidev.mk \
+ 
+ COMMON_LUNCH_CHOICES := \
+   bigcypress_8mq-user \
+@@ -63,6 +65,8 @@ COMMON_LUNCH_CHOICES := \
+   redwood_8mq_go-userdebug \
+   redwood_8mm-user \
+   redwood_8mm-userdebug \
++  redwood_8mm_pci-user \
++  redwood_8mm_pcidev-user \
+   vp6820_8mq-user \
+   vp6820_8mq-userdebug \
+   vp6820_8mq_pci-user \
+diff --git a/imx8m/redwood_8mm/BoardConfig.mk b/imx8m/redwood_8mm/BoardConfig.mk
+index 9458eaf6..cfc677cd 100644
+--- a/imx8m/redwood_8mm/BoardConfig.mk
++++ b/imx8m/redwood_8mm/BoardConfig.mk
+@@ -13,6 +13,9 @@ include $(CONFIG_REPO_PATH)/imx8m/BoardConfigCommon.mk
+ # value assigned in this part should be fixed for an SoC, right?
+ 
+ BOARD_SOC_TYPE := IMX8MM
++BOARD_SOM_TYPE := a100
++BOARD_TYPE := redwood
++BOARD_MAIN_DISPLAY_ROTATION := 90
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+ FSL_VPU_OMX_ONLY := true
+@@ -44,9 +47,9 @@ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+ 
+ # Support gpt
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab_super.bpt
++  BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-14.4GB-ab_super.bpt
+   ADDITION_BPT_PARTITION = partition-table-28GB:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt \
+                            partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+@@ -55,14 +58,17 @@ else
+                              partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+                              partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab.bpt
++    BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-14.4GB-ab.bpt
+     ADDITION_BPT_PARTITION = partition-table-28GB:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                             partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
+                              partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+ endif
+ 
+-BOARD_PREBUILT_DTBOIMAGE := $(OUT_DIR)/target/product/$(PRODUCT_DEVICE)/dtbo-imx8mm.img
++AB_OTA_PARTITIONS += spl_bak
++LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
++LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
++BOARD_PREBUILT_DTBOIMAGE := $(OUT_DIR)/target/product/$(PRODUCT_DEVICE)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+ BOARD_USES_METADATA_PARTITION := true
+ BOARD_ROOT_EXTRA_FOLDERS += metadata
+@@ -71,9 +77,9 @@ BOARD_ROOT_EXTRA_FOLDERS += metadata
+ ENABLE_CFI=false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ # The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/idt_testkey_rsa2048.pem
+ 
+ BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+@@ -82,6 +88,9 @@ BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ # -------@block_treble-------
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ DEVICE_FRAMEWORK_COMPATIBILITY_MATRIX_FILE := $(IMX_DEVICE_PATH)/device_framework_matrix.xml
+ 
+diff --git a/imx8m/redwood_8mm/SharedBoardConfig.mk b/imx8m/redwood_8mm/SharedBoardConfig.mk
+index 0415d634..bdd13579 100644
+--- a/imx8m/redwood_8mm/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mm/SharedBoardConfig.mk
+@@ -3,7 +3,7 @@
+ KERNEL_NAME := Image.lz4
+ TARGET_KERNEL_ARCH := arm64
+ 
+-IMX8MM_USES_GKI ?= true
++IMX8MM_USES_GKI := true
+ 
+ # CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_I2C: synaptics_dsx_i2c.ko, mipi-panel touch driver module
+ # CONFIG_VIDEO_MXC_CSI_CAMERA: mx6s_capture.ko, it's csi adapt driver which is the input of v4l2 framework
+diff --git a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+index 7973c12d..242d7fdb 100644
+--- a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
++++ b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+@@ -1,28 +1,21 @@
+ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+-# u-boot target for imx8mm_evk with DDR4 on board
+-TARGET_BOOTLOADER_CONFIG := imx8mm-ddr4:imx8mm_ddr4_evk_android_defconfig
+ # u-boot target for imx8mm_evk with LPDDR4 on board
+ ifeq ($(LOW_MEMORY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mm:imx8mm_evk_1g_ddr_android_defconfig
+ else
+-  TARGET_BOOTLOADER_CONFIG += imx8mm:imx8mm_evk_android_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mm-dual:imx8mm_evk_android_dual_defconfig
++  TARGET_BOOTLOADER_CONFIG := imx8mm-lpddr4:redwood_8mm_evk_android_defconfig:signed
++  TARGET_BOOTLOADER_CONFIG := imx8mm-lpddr4-dual:redwood_8mm_evk_android_dual_defconfig:signed
+ endif
+-TARGET_BOOTLOADER_CONFIG += imx8mm-4g:imx8mm_evk_4g_android_defconfig
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty:imx8mm_evk_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-secure-unlock:imx8mm_evk_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-dual:imx8mm_evk_android_trusty_dual_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-4g:imx8mm_evk_4g_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-trusty:redwood_8mm_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-trusty-dual:redwood_8mm_evk_android_trusty_dual_defconfig
+ endif
+ 
+-# u-boot target used by uuu for imx8mm_evk with DDR4 on board
+-TARGET_BOOTLOADER_CONFIG += imx8mm-ddr4-evk-uuu:imx8mm_ddr4_evk_android_uuu_defconfig
+ # u-boot target used by uuu for imx8mm_evk with LPDDR4 on board
+-TARGET_BOOTLOADER_CONFIG += imx8mm-evk-uuu:imx8mm_evk_android_uuu_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mm-4g-evk-uuu:imx8mm_evk_4g_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-mic2g:redwood_8mm_evk_android_uuu_mic2g_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-ktc2g:redwood_8mm_evk_android_uuu_ktc2g_defconfig
+ 
+ # imx8mm kernel defconfig
+ ifeq ($(IMX8MM_USES_GKI),true)
+@@ -32,6 +25,7 @@ else
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ endif
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+ TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+diff --git a/imx8m/redwood_8mm/android_addition_defconfig b/imx8m/redwood_8mm/android_addition_defconfig
+index e69de29b..b34970b7 100644
+--- a/imx8m/redwood_8mm/android_addition_defconfig
++++ b/imx8m/redwood_8mm/android_addition_defconfig
+@@ -0,0 +1,253 @@
++CONFIG_IDG_SPI=y
++# CONFIG_USB_NET_QMI_WWAN is not set
++CONFIG_SINGLE_LOGO=y
++CONFIG_SPLASH_SCREEN_CENTERED=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_OPTION=y
++CONFIG_SND_SOC_IMX_TLV320AIC31XX=y
++CONFIG_SND_SOC_TLV320AIC31XX=y
++CONFIG_INPUT_ST=y
++CONFIG_DEBUG_FS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
++CONFIG_TASKSTATS=y
++CONFIG_DEVMEM=y
++CONFIG_DRM_CHIPONE_ICN6211=y
++CONFIG_DRM_PANEL_SITRONIX_ST7262=y
++CONFIG_LEDS_TI_LMU_COMMON=y
++CONFIG_LEDS_LM3697=y
++CONFIG_TOUCHSCREEN_ST1232=y
++CONFIG_TOUCHSCREEN_ST_FW_UPDATE=y
++CONFIG_BACKLIGHT_LED=y
++CONFIG_TYPEC_TPS65994=y
++CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100
++CONFIG_DP83822_PHY=y
++CONFIG_OPT3001=y
++
++CONFIG_PARAVIRT=y
++CONFIG_NETFILTER_XT_TARGET_CT=y
++CONFIG_MVMDIO=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_I2C_SLAVE=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_POWER_RESET_BRCMSTB=y
++CONFIG_REGULATOR=y
++CONFIG_DRM_I2C_CH7006=m
++CONFIG_DRM_I2C_SIL164=m
++CONFIG_TMPFS=y
++CONFIG_BCM_FLEXRM_MBOX=y
++CONFIG_PHY_SAMSUNG_USB2=y
++CONFIG_ARM_TIMER_SP804=y
++CONFIG_COMMON_CLK_VERSATILE=y
++CONFIG_CLK_SP810=y
++CONFIG_USB_SNP_UDC_PLAT=y
++CONFIG_USB_BDC_UDC=y
++CONFIG_BCM_SBA_RAID=m
++CONFIG_PINCTRL=y
++
++# CONFIG_KVM is not set
++# CONFIG_MTD_UBI is not set
++# CONFIG_VGA_ARB is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_ALPINE is not set
++# CONFIG_ARCH_BCM2835 is not set
++# CONFIG_ARCH_BCM_IPROC is not set
++# CONFIG_ARCH_BERLIN is not set
++# CONFIG_ARCH_BRCMSTB is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_LAYERSCAPE is not set
++# CONFIG_ARCH_LG1K is not set
++# CONFIG_ARCH_HISI is not set
++# CONFIG_ARCH_MEDIATEK is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_ARCH_QCOM is not set
++# CONFIG_ARCH_ROCKCHIP is not set
++# CONFIG_ARCH_SEATTLE is not set
++# CONFIG_ARCH_RENESAS is not set
++# CONFIG_ARCH_R8A7795 is not set
++# CONFIG_ARCH_R8A7796 is not set
++# CONFIG_ARCH_STRATIX10 is not set
++# CONFIG_ARCH_TEGRA is not set
++# CONFIG_ARCH_SPRD is not set
++# CONFIG_ARCH_THUNDER is not set
++# CONFIG_ARCH_THUNDER2 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_ARCH_VEXPRESS is not set
++# CONFIG_ARCH_XGENE is not set
++# CONFIG_ARCH_ZX is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_PCI_HISI is not set
++# CONFIG_PCIE_KIRIN is not set
++# CONFIG_PCI_AARDVARK is not set
++# CONFIG_PCIE_RCAR is not set
++# CONFIG_PCIE_ROCKCHIP is not set
++# CONFIG_XEN is not set
++# CONFIG_XEN_BLKDEV_BACKEND is not set
++# CONFIG_AHCI_MVEBU is not set
++# CONFIG_SATA_RCAR is not set
++# CONFIG_NET_XGENE is not set
++# CONFIG_MVNETA is not set
++# CONFIG_MVPP2 is not set
++# CONFIG_RAVB is not set
++# CONFIG_MESON_GXL_PHY is not set
++# CONFIG_XEN_NETDEV_BACKEND is not set
++# CONFIG_INPUT_PM8941_PWRKEY is not set
++# CONFIG_INPUT_HISI_POWERKEY is not set
++# CONFIG_SERIAL_8250_BCM2835AUX is not set
++# CONFIG_SERIAL_8250_MT6577 is not set
++# CONFIG_SERIAL_8250_UNIPHIER is not set
++# CONFIG_SERIAL_MESON is not set
++# CONFIG_SERIAL_MESON_CONSOLE is not set
++# CONFIG_SERIAL_SAMSUNG is not set
++# CONFIG_SERIAL_SAMSUNG_CONSOLE is not set
++# CONFIG_SERIAL_TEGRA is not set
++# CONFIG_SERIAL_SH_SCI is not set
++# CONFIG_SERIAL_SH_SCI_NR_UARTS is not set
++# CONFIG_SERIAL_SH_SCI_CONSOLE is not set
++# CONFIG_SERIAL_MSM is not set
++# CONFIG_SERIAL_MSM_CONSOLE is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_XILINX_PS_UART_CONSOLE is not set
++# CONFIG_SERIAL_MVEBU_UART is not set
++# CONFIG_I2C_BCM2835 is not set
++# CONFIG_I2C_MESON is not set
++# CONFIG_I2C_MV64XXX is not set
++# CONFIG_I2C_PXA is not set
++# CONFIG_I2C_QUP is not set
++# CONFIG_I2C_SH_MOBILE is not set
++# CONFIG_I2C_TEGRA is not set
++# CONFIG_I2C_UNIPHIER_F is not set
++# CONFIG_I2C_RCAR is not set
++# CONFIG_SPI_BCM2835 is not set
++# CONFIG_SPI_BCM2835AUX is not set
++# CONFIG_SPI_MESON_SPICC is not set
++# CONFIG_SPI_ORION is not set
++# CONFIG_SPI_ROCKCHIP is not set
++# CONFIG_SPI_QUP is not set
++# CONFIG_SPI_S3C64XX is not set
++# CONFIG_PINCTRL_MAX77620 is not set
++# CONFIG_PINCTRL_IPQ8074 is not set
++# CONFIG_PINCTRL_MSM8916 is not set
++# CONFIG_PINCTRL_MSM8994 is not set
++# CONFIG_PINCTRL_MSM8996 is not set
++# CONFIG_PINCTRL_QDF2XXX is not set
++# CONFIG_PINCTRL_QCOM_SPMI_PMIC is not set
++# CONFIG_GPIO_RCAR is not set
++# CONFIG_GPIO_XGENE_SB is not set
++# CONFIG_POWER_RESET_MSM is not set
++# CONFIG_ROCKCHIP_THERMAL is not set
++# CONFIG_EXYNOS_THERMAL is not set
++# CONFIG_S3C2410_WATCHDOG is not set
++# CONFIG_MESON_GXBB_WATCHDOG is not set
++# CONFIG_MESON_WATCHDOG is not set
++# CONFIG_RENESAS_WDT is not set
++# CONFIG_UNIPHIER_WATCHDOG is not set
++# CONFIG_BCM2835_WDT is not set
++# CONFIG_MFD_AXP20X_RSB is not set
++# CONFIG_MFD_EXYNOS_LPASS is not set
++# CONFIG_MFD_HI655X_PMIC is not set
++# CONFIG_MFD_SPMI_PMIC is not set
++# CONFIG_REGULATOR_AXP20X is not set
++# CONFIG_REGULATOR_HI655X is not set
++# CONFIG_REGULATOR_QCOM_SMD_RPM is not set
++# CONFIG_RPMSG is not set
++# CONFIG_IR_MESON is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_JPEG is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_MFC is not set
++# CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC is not set
++# CONFIG_VIDEO_RENESAS_FCP is not set
++# CONFIG_VIDEO_RENESAS_VSP1 is not set
++# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
++# CONFIG_ROCKCHIP_CDN_DP is not set
++# CONFIG_ROCKCHIP_DW_HDMI is not set
++# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
++# CONFIG_ROCKCHIP_INNO_HDMI is not set
++# CONFIG_SND_BCM2835_SOC_I2S is not set
++# CONFIG_SND_SOC_SAMSUNG is not set
++# CONFIG_SND_SOC_RCAR is not set
++# CONFIG_DRM_NOUVEAU is not set
++# CONFIG_DRM_EXYNOS is not set
++# CONFIG_DRM_EXYNOS5433_DECON is not set
++# CONFIG_DRM_EXYNOS7_DECON is not set
++# CONFIG_DRM_EXYNOS_DSI is not set
++# CONFIG_DRM_EXYNOS_DP is not set
++# CONFIG_DRM_EXYNOS_HDMI is not set
++# CONFIG_DRM_EXYNOS_MIC is not set
++# CONFIG_DRM_ROCKCHIP is not set
++# CONFIG_DRM_RCAR_DU is not set
++# CONFIG_DRM_RCAR_LVDS is not set
++# CONFIG_DRM_RCAR_VSP is not set
++# CONFIG_DRM_TEGRA is not set
++# CONFIG_DRM_VC4 is not set
++# CONFIG_DRM_MESON is not set
++# CONFIG_USB_XHCI_TEGRA is not set
++# CONFIG_USB_EHCI_MSM is not set
++# CONFIG_USB_EHCI_EXYNOS is not set
++# CONFIG_USB_OHCI_EXYNOS is not set
++# CONFIG_USB_RENESAS_USBHS is not set
++# CONFIG_USB_QCOM_8X16_PHY is not set
++# CONFIG_RASPBERRYPI_FIRMWARE is not set
++# CONFIG_PHY_SUN4I_USB is not set
++# CONFIG_PHY_HI6220_USB is not set
++# CONFIG_PHY_RCAR_GEN3_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_EMMC is not set
++# CONFIG_PHY_ROCKCHIP_INNO_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_PCIE is not set
++# CONFIG_PHY_TEGRA_XUSB is not set
++# CONFIG_QCOM_L2_PMU is not set
++# CONFIG_QCOM_L3_PMU is not set
++# CONFIG_PWM_MESON is not set
++# CONFIG_PWM_ROCKCHIP is not set
++# CONFIG_PWM_SAMSUNG is not set
++# CONFIG_PWM_TEGRA is not set
++# CONFIG_QCOM_SMEM is not set
++# CONFIG_QCOM_SMD_RPM is not set
++# CONFIG_QCOM_SMP2P is not set
++# CONFIG_QCOM_SMSM is not set
++# CONFIG_ROCKCHIP_PM_DOMAINS is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_EXYNOS_ADC is not set
++# CONFIG_ROCKCHIP_SARADC is not set
++# CONFIG_PWM_BCM2835 is not set
++# CONFIG_RPMSG_QCOM_SMD is not set
++# CONFIG_RASPBERRYPI_POWER is not set
++# CONFIG_BCM2835_MBOX is not set
++# CONFIG_HI6220_MBOX is not set
++# CONFIG_ROCKCHIP_IOMMU is not set
++# CONFIG_HWSPINLOCK_QCOM is not set
++# CONFIG_COMMON_CLK_QCOM is not set
++# CONFIG_QCOM_CLK_SMD_RPM is not set
++# CONFIG_IPQ_GCC_8074 is not set
++# CONFIG_MSM_GCC_8916 is not set
++# CONFIG_MSM_GCC_8994 is not set
++# CONFIG_MSM_MMCC_8996 is not set
++# CONFIG_USB_RENESAS_USBHS_UDC is not set
++# CONFIG_MMC_SDHCI_OF_ESDHC is not set
++# CONFIG_XEN_GNTDEV is not set
++# CONFIG_XEN_GRANT_DEV_ALLOC is not set
++# CONFIG_RCAR_DMAC is not set
++# CONFIG_TEGRA20_APB_DMA is not set
++# CONFIG_QCOM_BAM_DMA is not set
++# CONFIG_K3_DMA is not set
++# CONFIG_DMA_BCM2835 is not set
++# CONFIG_RTC_DRV_XGENE is not set
++# CONFIG_RTC_DRV_TEGRA is not set
++# CONFIG_RTC_DRV_S3C is not set
++# CONFIG_MMC_DW_ROCKCHIP is not set
++# CONFIG_MMC_SUNXI is not set
++# CONFIG_MMC_BCM2835 is not set
++# CONFIG_MMC_SDHCI_TEGRA is not set
++# CONFIG_MMC_MESON_GX is not set
++# CONFIG_MMC_SDHCI_MSM is not set
++# CONFIG_MMC_SDHI is not set
++# CONFIG_MMC_DW_EXYNOS is not set
++# CONFIG_FRAMEBUFFER_CONSOLE is not set
++# CONFIG_LOGO is not set
+diff --git a/imx8m/redwood_8mm/android_secure_defconfig b/imx8m/redwood_8mm/android_secure_defconfig
+new file mode 100644
+index 00000000..b576dfc0
+--- /dev/null
++++ b/imx8m/redwood_8mm/android_secure_defconfig
+@@ -0,0 +1,3 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
++# CONFIG_DEBUG_FS is not set
++# CONFIG_DEVMEM is not set
+diff --git a/imx8m/redwood_8mm/audio-json/tlv320aic3110_config.json b/imx8m/redwood_8mm/audio-json/tlv320aic3110_config.json
+new file mode 100644
+index 00000000..0878c33c
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio-json/tlv320aic3110_config.json
+@@ -0,0 +1,50 @@
++{
++  "driver_name": "tlv320aic3110-a",
++  "supported_out_devices": ["speaker", "wired_headphone", "wired_headset"],
++  "supported_in_devices": ["builtin_mic", "wired_headset"],
++
++  "init_ctl": [
++    {"name": "DAC Playback Volume", "type": "int", "val": 127},
++    {"name": "Output Left From Left DAC", "type": "int", "val": 1},
++    {"name": "Output Left From MIC1LP", "type": "int", "val": 1},
++    {"name": "Output Right From Right DAC", "type": "int", "val": 1}
++  ],
++
++  "speaker_ctl": [
++    {"name": "Speaker Driver Playback Switch", "type": "int", "val": 1, "type": "int", "val": 1},
++    {"name": "Speaker Driver Playback Volume", "type": "int", "val": 1, "type": "int", "val": 1},
++    {"name": "Speaker Analog Playback Volume", "type": "int", "val": 127, "type": "int", "val": 127},
++    {"name": "Speaker Left Switch", "type": "int", "val": 1},
++    {"name": "Speaker Right Switch", "type": "int", "val": 1}
++  ],
++
++  "headphone_ctl": [
++    {"name": "HP Driver Playback Switch", "type": "int", "val": 1, "type": "int", "val": 1},
++    {"name": "HP Driver Playback Volume", "type": "int", "val": 3, "type": "int", "val": 3},
++    {"name": "HP Analog Playback Volume", "type": "int", "val": 127, "type": "int", "val": 127},
++    {"name": "HP Left Switch", "type": "int", "val": 1},
++    {"name": "HP Right Switch", "type": "int", "val": 1},
++    {"name": "HPL Driver Switch", "type": "int", "val": 1},
++    {"name": "HPR Driver Switch", "type": "int", "val": 1}
++  ],
++
++  "out_volume_ctl": [
++    "DAC Playback Volume"
++  ],
++
++  "headset_mic_ctl": [
++    {"name": "ADC Fine Capture Volume", "type": "int", "val": 4},
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 64},
++    {"name": "Mic PGA Capture Volume", "type": "int", "val": 119},
++    {"name": "MIC1RP P-Terminal", "type": "str", "val": "FFR 20 Ohm"}
++  ],
++
++  "builtin_mic_ctl": [
++    {"name": "ADC Fine Capture Volume", "type": "int", "val": 4},
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 64},
++    {"name": "Mic PGA Capture Volume", "type": "int", "val": 119},
++    {"name": "MIC1RP P-Terminal", "type": "str", "val": "FFR 20 Ohm"}
++  ]
++}
+diff --git a/imx8m/redwood_8mm/audio_policy_engine_configuration.xml b/imx8m/redwood_8mm/audio_policy_engine_configuration.xml
+new file mode 100644
+index 00000000..4ca33b45
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_policy_engine_configuration.xml
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<!-- Copyright (C) 2018 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++     -->
++
++<configuration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
++
++    <xi:include href="audio_policy_engine_product_strategies.xml"/>
++    <xi:include href="audio_policy_engine_stream_volumes.xml"/>
++    <xi:include href="audio_policy_engine_default_stream_volumes.xml"/>
++
++</configuration>
++
+diff --git a/imx8m/redwood_8mm/audio_policy_engine_default_stream_volumes.xml b/imx8m/redwood_8mm/audio_policy_engine_default_stream_volumes.xml
+new file mode 100644
+index 00000000..21e6dd58
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_policy_engine_default_stream_volumes.xml
+@@ -0,0 +1,136 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Copyright (C) 2015 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<!-- Default Volume Tables included by Audio Policy Configuration file -->
++<!-- Full Default Volume table for all device category -->
++<volumes>
++    <reference name="FULL_SCALE_VOLUME_CURVE">
++    <!-- Full Scale reference Volume Curve -->
++        <point>0,0</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="SILENT_VOLUME_CURVE">
++        <point>0,-9600</point>
++        <point>100,-9600</point>
++    </reference>
++    <reference name="DEFAULT_SYSTEM_VOLUME_CURVE">
++    <!-- Default System reference Volume Curve -->
++        <point>1,-2400</point>
++        <point>33,-1800</point>
++        <point>66,-1200</point>
++        <point>100,-600</point>
++    </reference>
++    <reference name="DEFAULT_MEDIA_VOLUME_CURVE">
++    <!-- Default Media reference Volume Curve -->
++        <point>1,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE">
++    <!--Default Volume Curve -->
++        <point>1,-4950</point>
++        <point>33,-3350</point>
++        <point>66,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_DEVICE_CATEGORY_SPEAKER_VOLUME_CURVE">
++    <!-- Default is Speaker Media Volume Curve -->
++        <point>1,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_DEVICE_CATEGORY_SPEAKER_SYSTEM_VOLUME_CURVE">
++    <!-- Default is Speaker System Volume Curve -->
++        <point>1,-4680</point>
++        <point>42,-2070</point>
++        <point>85,-540</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_DEVICE_CATEGORY_EARPIECE_VOLUME_CURVE">
++    <!--Default Volume Curve -->
++        <point>1,-4950</point>
++        <point>33,-3350</point>
++        <point>66,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE">
++    <!-- Default is Ext Media System Volume Curve -->
++        <point>1,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-2100</point>
++        <point>100,-1000</point>
++    </reference>
++    <reference name="DEFAULT_HEARING_AID_VOLUME_CURVE">
++    <!-- Default Hearing Aid Volume Curve -->
++        <point>1,-12700</point>
++        <point>20,-8000</point>
++        <point>60,-4000</point>
++        <point>100,0</point>
++    </reference>
++    <!-- **************************************************************** -->
++    <!-- Non-mutable default volume curves:                               -->
++    <!--     * first point is always for index 0                          -->
++    <!--     * attenuation is small enough that stream can still be heard -->
++    <reference name="DEFAULT_NON_MUTABLE_VOLUME_CURVE">
++    <!-- Default non-mutable reference Volume Curve -->
++    <!--        based on DEFAULT_MEDIA_VOLUME_CURVE -->
++        <point>0,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_NON_MUTABLE_HEADSET_VOLUME_CURVE">
++    <!--Default non-mutable Volume Curve for headset -->
++    <!--    based on DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE -->
++        <point>0,-4950</point>
++        <point>33,-3350</point>
++        <point>66,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_NON_MUTABLE_SPEAKER_VOLUME_CURVE">
++    <!-- Default non-mutable Speaker Volume Curve -->
++    <!--    based on DEFAULT_DEVICE_CATEGORY_SPEAKER_VOLUME_CURVE -->
++        <point>0,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_NON_MUTABLE_EARPIECE_VOLUME_CURVE">
++    <!--Default non-mutable Volume Curve -->
++    <!--    based on DEFAULT_DEVICE_CATEGORY_EARPIECE_VOLUME_CURVE -->
++        <point>0,-4950</point>
++        <point>33,-3350</point>
++        <point>66,-1700</point>
++        <point>100,0</point>
++    </reference>
++    <reference name="DEFAULT_NON_MUTABLE_EXT_VOLUME_CURVE">
++    <!-- Default non-mutable Ext Media System Volume Curve -->
++    <!--     based on DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE -->
++        <point>0,-5800</point>
++        <point>20,-4000</point>
++        <point>60,-2100</point>
++        <point>100,-1000</point>
++    </reference>
++    <reference name="DEFAULT_NON_MUTABLE_HEARING_AID_VOLUME_CURVE">
++    <!-- Default non-mutable Hearing Aid Volume Curve -->
++    <!--     based on DEFAULT_HEARING_AID_VOLUME_CURVE -->
++        <point>0,-12700</point>
++        <point>20,-8000</point>
++        <point>60,-4000</point>
++        <point>100,0</point>
++    </reference>
++</volumes>
+diff --git a/imx8m/redwood_8mm/audio_policy_engine_product_strategies.xml b/imx8m/redwood_8mm/audio_policy_engine_product_strategies.xml
+new file mode 100644
+index 00000000..a7388da4
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_policy_engine_product_strategies.xml
+@@ -0,0 +1,101 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<!-- Copyright (C) 2018 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++     -->
++
++<ProductStrategies>
++
++    <!-- "hidden strategies" like TTS, enforced audible:
++            Shall we expose them here or keep it hard coded -->
++
++    <!-- Used to identify the volume of audio streams for enforced system sounds in certain
++         countries (e.g. camera in Japan)
++         This strategy will only have higher priority than phone if force for system is set to
++         enforced. -->
++
++    <ProductStrategy name="STRATEGY_PHONE">
++        <AttributesGroup streamType="AUDIO_STREAM_VOICE_CALL" volumeGroup="voice_call">
++            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION"/> </Attributes>
++        </AttributesGroup>
++        <AttributesGroup streamType="AUDIO_STREAM_BLUETOOTH_SCO" volumeGroup="bluetooth_sco">
++            <Attributes> <Flags value="AUDIO_FLAG_SCO"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_SONIFICATION">
++        <AttributesGroup streamType="AUDIO_STREAM_RING" volumeGroup="ring">
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE"/> </Attributes>
++        </AttributesGroup>
++        <AttributesGroup streamType="AUDIO_STREAM_ALARM" volumeGroup="alarm">
++            <Attributes> <Usage value="AUDIO_USAGE_ALARM"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_ENFORCED_AUDIBLE">
++        <AttributesGroup streamType="AUDIO_STREAM_ENFORCED_AUDIBLE" volumeGroup="enforced_audible">
++            <Attributes> <Flags value="AUDIO_FLAG_AUDIBILITY_ENFORCED"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_ACCESSIBILITY">
++        <AttributesGroup streamType="AUDIO_STREAM_ACCESSIBILITY" volumeGroup="accessibility">
++            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_SONIFICATION_RESPECTFUL">
++        <AttributesGroup streamType="AUDIO_STREAM_NOTIFICATION" volumeGroup="notification">
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_INSTANT"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_EVENT"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_MEDIA">
++         <AttributesGroup streamType="AUDIO_STREAM_MUSIC" volumeGroup="music">
++            <Attributes> <Usage value="AUDIO_USAGE_MEDIA"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_GAME"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANT"/> </Attributes>
++            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE"/> </Attributes>
++            <Attributes></Attributes>
++        </AttributesGroup>
++        <AttributesGroup streamType="AUDIO_STREAM_ASSISTANT" volumeGroup="assistant">
++            <Attributes>
++                <ContentType value="AUDIO_CONTENT_TYPE_SPEECH"/>
++                <Usage value="AUDIO_USAGE_ASSISTANT"/>
++            </Attributes>
++        </AttributesGroup>
++        <AttributesGroup streamType="AUDIO_STREAM_SYSTEM" volumeGroup="system">
++            <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_SONIFICATION"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <ProductStrategy name="STRATEGY_DTMF">
++        <AttributesGroup streamType="AUDIO_STREAM_DTMF" volumeGroup="dtmf">
++            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++    <!-- Used to identify the volume of audio streams exclusively transmitted through the  speaker
++         (TTS) of the device -->
++    <ProductStrategy name="STRATEGY_TRANSMITTED_THROUGH_SPEAKER">
++        <AttributesGroup streamType="AUDIO_STREAM_TTS" volumeGroup="tts">
++            <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
++        </AttributesGroup>
++    </ProductStrategy>
++
++</ProductStrategies>
++
+diff --git a/imx8m/redwood_8mm/audio_policy_engine_stream_volumes.xml b/imx8m/redwood_8mm/audio_policy_engine_stream_volumes.xml
+new file mode 100644
+index 00000000..d5c38968
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_policy_engine_stream_volumes.xml
+@@ -0,0 +1,221 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Copyright (C) 2015 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<!-- Volume section defines a volume curve for a given use case and device category.
++It contains a list of points of this curve expressing the attenuation in Millibels for a given
++volume index from 0 to 100.
++<volume deviceCategory=””>
++<point>0,-9600</point>
++<point>100,0</point>
++</volume>
++-->
++
++<volumeGroups>
++    <volumeGroup>
++        <name>voice_call</name>
++        <indexMin>1</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
++            <point>0,-4200</point>
++            <point>33,-2800</point>
++            <point>66,-1400</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
++            <point>0,-2400</point>
++            <point>33,-1600</point>
++            <point>66,-800</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE">
++            <point>0,-2700</point>
++            <point>33,-1800</point>
++            <point>66,-900</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>system</name>
++        <indexMin>0</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
++            <point>1,-3000</point>
++            <point>33,-2600</point>
++            <point>66,-2200</point>
++            <point>100,-1800</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
++            <point>1,-5100</point>
++            <point>57,-2800</point>
++            <point>71,-2500</point>
++            <point>85,-2300</point>
++            <point>100,-2100</point>
++        </volume>
++        <!--volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/-->
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>ring</name>
++        <indexMin>0</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_DEVICE_CATEGORY_SPEAKER_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_DEVICE_CATEGORY_EARPIECE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>music</name>
++        <indexMin>0</indexMin>
++        <indexMax>25</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_DEVICE_CATEGORY_SPEAKER_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID"  ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>alarm</name>
++        <indexMin>1</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_NON_MUTABLE_HEADSET_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_NON_MUTABLE_SPEAKER_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_NON_MUTABLE_EARPIECE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_NON_MUTABLE_EXT_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_NON_MUTABLE_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>notification</name>
++        <indexMin>0</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_DEVICE_CATEGORY_SPEAKER_SYSTEM_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_DEVICE_CATEGORY_EARPIECE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_DEVICE_CATEGORY_HEADSET_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>bluetooth_sco</name>
++        <indexMin>0</indexMin>
++        <indexMax>15</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
++            <point>0,-4200</point>
++            <point>33,-2800</point>
++            <point>66,-1400</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
++            <point>0,-2400</point>
++            <point>33,-1600</point>
++            <point>66,-800</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE">
++            <point>0,-4200</point>
++            <point>33,-2800</point>
++            <point>66,-1400</point>
++            <point>100,0</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>enforced_audible</name>
++        <indexMin>0</indexMin>
++        <indexMax>7</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
++            <point>1,-3000</point>
++            <point>33,-2600</point>
++            <point>66,-2200</point>
++            <point>100,-1800</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
++            <point>1,-3400</point>
++            <point>71,-2400</point>
++            <point>100,-2000</point>
++        </volume>
++        <!--volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/-->
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>dtmf</name>
++        <indexMin>0</indexMin>
++        <indexMax>15</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET">
++            <point>1,-3000</point>
++            <point>33,-2600</point>
++            <point>66,-2200</point>
++            <point>100,-1800</point>
++        </volume>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER">
++            <point>1,-4000</point>
++            <point>71,-2400</point>
++            <point>100,-1400</point>
++        </volume>
++        <!--volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/-->
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_SYSTEM_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_DEVICE_CATEGORY_EXT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>tts</name>
++        <indexMin>0</indexMin>
++        <indexMax>15</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="SILENT_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="FULL_SCALE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="SILENT_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="SILENT_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="SILENT_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>accessibility</name>
++        <indexMin>1</indexMin>
++        <indexMax>15</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_NON_MUTABLE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_NON_MUTABLE_SPEAKER_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_NON_MUTABLE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_NON_MUTABLE_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID" ref="DEFAULT_NON_MUTABLE_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++    <volumeGroup>
++        <name>assistant</name>
++        <indexMin>0</indexMin>
++        <indexMax>15</indexMax>
++        <volume deviceCategory="DEVICE_CATEGORY_HEADSET" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_SPEAKER" ref="DEFAULT_DEVICE_CATEGORY_SPEAKER_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EARPIECE" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_EXT_MEDIA" ref="DEFAULT_MEDIA_VOLUME_CURVE"/>
++        <volume deviceCategory="DEVICE_CATEGORY_HEARING_AID"  ref="DEFAULT_HEARING_AID_VOLUME_CURVE"/>
++    </volumeGroup>
++
++</volumeGroups>
++
+diff --git a/imx8m/redwood_8mm/device_framework_matrix.xml b/imx8m/redwood_8mm/device_framework_matrix.xml
+index c8b5825c..cc7247b5 100644
+--- a/imx8m/redwood_8mm/device_framework_matrix.xml
++++ b/imx8m/redwood_8mm/device_framework_matrix.xml
+@@ -7,4 +7,11 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="aidl" optional="true">
++        <name>android.hardware.kioskled</name>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </compatibility-matrix>
+diff --git a/imx8m/redwood_8mm/fstab.nxp b/imx8m/redwood_8mm/fstab.nxp
+index 049b689a..6eca30d9 100644
+--- a/imx8m/redwood_8mm/fstab.nxp
++++ b/imx8m/redwood_8mm/fstab.nxp
+@@ -7,5 +7,9 @@
+ /dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block
+ /dev/block/by-name/metadata    /metadata    ext4    noatime,nosuid,nodev,discard,sync                                                wait,formattable,first_stage_mount,check
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
++/dev/block/by-name/idtechdata  /mnt/vendor/idtechdata  ext4    nosuid,nodev,noatime,barrier=1                       wait,formattable
+ /dev/block/zram0 none swap defaults zramsize=629145600
++/tmp /sdcard none defaults,bind recoveryonly
+ 
++/devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
++/devices/platform/soc@0/38100000.usb/* auto auto defaults voldmanaged=usb:auto
+diff --git a/imx8m/redwood_8mm/init.imx8mm.rc b/imx8m/redwood_8mm/init.imx8mm.rc
+index 3d0b476a..fda06072 100755
+--- a/imx8m/redwood_8mm/init.imx8mm.rc
++++ b/imx8m/redwood_8mm/init.imx8mm.rc
+@@ -45,3 +45,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk0boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk0boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk0boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk0boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/redwood_8mm/init.rc b/imx8m/redwood_8mm/init.rc
+index 88eed760..d98702ff 100644
+--- a/imx8m/redwood_8mm/init.rc
++++ b/imx8m/redwood_8mm/init.rc
+@@ -1,6 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
+-import /vendor/etc/init/hw/init.${ro.hardware}.additional.rc
++import /product/etc/init/hw/init.idt.common.rc
+ 
+ service vendor.charger /system/bin/charger
+     class charger
+diff --git a/imx8m/redwood_8mm/init.usbhid.sh b/imx8m/redwood_8mm/init.usbhid.sh
+new file mode 100644
+index 00000000..ad9a6fef
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.usbhid.sh
+@@ -0,0 +1,4 @@
++#! /vendor/bin/sh
++
++mkdir /config/usb_gadget/g1/functions/acm.GS0
++ln -s /config/usb_gadget/g1/functions/acm.GS0 /config/usb_gadget/g1/configs/b.1/
+diff --git a/imx8m/redwood_8mm/manifest.xml b/imx8m/redwood_8mm/manifest.xml
+index bcb87ee9..af2fc1b6 100644
+--- a/imx8m/redwood_8mm/manifest.xml
++++ b/imx8m/redwood_8mm/manifest.xml
+@@ -69,15 +69,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/redwood_8mm/manifest_userdebug.xml b/imx8m/redwood_8mm/manifest_userdebug.xml
+new file mode 100644
+index 00000000..d17c7503
+--- /dev/null
++++ b/imx8m/redwood_8mm/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="5">
++    <kernel  target-level="6" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml
+index e8ae7457..8d4457f8 100644
+--- a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+@@ -172,6 +172,7 @@
+     </integer-array>
+ 
+     <integer name="config_screenBrightnessDim">5</integer>
++    <item name="config_screenBrightnessDimFloat" format="float" type="dimen">0.8</item>
+ 
+     <!--  Maximum number of supported users -->
+     <integer name="config_multiuserMaximumUsers">8</integer>
+@@ -189,8 +190,27 @@
+         If true, this means that the device supports data connectivity through
+         the telephony network.
+         This can be overridden to false for devices that support voice and/or sms . -->
+-    <bool name="config_mobile_data_capable">false</bool>
++    <bool name="config_mobile_data_capable">true</bool>
+ 
+     <!-- Boolean indicating whether system support sustained performance mode. -->
+     <bool name="config_sustainedPerformanceModeSupported">true</bool>
++
++    <!-- If the system has the input method for each display - enable per-display focus. -->
++    <bool name="config_perDisplayFocusEnabled">true</bool>
++
++    <!-- The default gravity for the picture-in-picture window.
++         Currently, this maps to Gravity.TOP | Gravity.RIGHT -->
++    <integer name="config_defaultPictureInPictureGravity">0x35</integer>
++
++    <!-- When true use the linux /dev/input/event subsystem to detect the switch changes
++         on the headphone/microphone jack. When false use the older uevent framework. -->
++    <bool name="config_useDevInputEventForAudioJack">true</bool>
++
++    <!-- If true, the direction rotation is applied to get to an application's requested
++         orientation is reversed.  Normally, the model is that landscape is
++         clockwise from portrait; thus on a portrait device an app requesting
++         landscape will cause a clockwise rotation, and on a landscape device an
++         app requesting portrait will cause a counter-clockwise rotation.  Setting
++         true here reverses that logic. -->
++    <bool name="config_reverseDefaultRotation">true</bool>
+ </resources>
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+index 660abbe5..0bf9ee21 100644
+--- a/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+@@ -21,4 +21,5 @@
+     <bool name="def_user_setup_complete">true</bool>
+     <bool name="def_bluetooth_on">false</bool>
+     <bool name="def_stay_on_while_plugged_in">true</bool>
++    <string name="def_immersive_mode_confirmations" translatable="false">confirmed</string>
+ </resources>
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/packages/SystemUI/res/values/config.xml b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SystemUI/res/values/config.xml
+new file mode 100644
+index 00000000..0abcd950
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SystemUI/res/values/config.xml
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <!-- The default tiles to display in QuickSettings -->
++    <string name="quick_settings_tiles_default" translatable="false">
++        wifi,bt,mediaoutput,dnd,flashlight,cell
++    </string>
++
++    <!-- Defines the blacklist for system icons.  That is to say, the icons in the status bar that
++         are part of the blacklist are never displayed. Each item in the blacklist must be a string
++         defined in core/res/res/config.xml to properly blacklist the icon.
++     -->
++    <string-array name="config_statusBarIconBlackList" translatable="false">
++        <item>@*android:string/status_bar_rotate</item>
++        <item>@*android:string/status_bar_headset</item>
++        <item>@*android:string/status_bar_alarm_clock</item>
++        <item>@*android:string/status_bar_battery</item>
++    </string-array>
++</resources>
+diff --git a/imx8m/redwood_8mm/redwood_8mm.mk b/imx8m/redwood_8mm/redwood_8mm.mk
+index db3b6952..b3711449 100644
+--- a/imx8m/redwood_8mm/redwood_8mm.mk
++++ b/imx8m/redwood_8mm/redwood_8mm.mk
+@@ -73,7 +73,10 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/imx8m/permissions/privapp-permissions-imx.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp.permissions-imx.xml
+ 
+ PRODUCT_COPY_FILES += \
+-    $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml
++    $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml \
++    $(CONFIG_REPO_PATH)/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
++    $(CONFIG_REPO_PATH)/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
++    $(CONFIG_REPO_PATH)/imx8m/device_policy.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/device_policy.sh
+ 
+ # -------@block_kernel_bootimg-------
+ 
+@@ -160,6 +163,11 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
+     $(CONFIG_REPO_PATH)/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
+ 
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    $(CONFIG_REPO_PATH)/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img \
++    $(CONFIG_REPO_PATH)/common/prebuilts/mem_info.txt:$(PRODUCT_OUT)/mem_info.txt
++
+ # -------@block_security-------
+ 
+ # Include keystore attestation keys and certificates.
+@@ -239,6 +247,12 @@ PRODUCT_PACKAGES += \
+     libwvhidl \
+     libwvdrmengine
+ 
++# PCI config
++ifneq ($(BOARD_PCI_SECURE),)
++PRODUCT_PRODUCT_PROPERTIES += \
++    ro.vendor.idt.min_rsa_size_bits=2048
++endif
++
+ # -------@block_audio-------
+ 
+ # Audio card json
+@@ -249,12 +263,18 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+     $(CONFIG_REPO_PATH)/common/audio-json/ak4497_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4497_config.json \
+     $(CONFIG_REPO_PATH)/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++    $(CONFIG_REPO_PATH)/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt \
++    $(IMX_DEVICE_PATH)/audio-json/tlv320aic3110_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/tlv320aic3110_config.json
++
+ 
+ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/mcu-sdk/imx8mm/imx8mm_mcu_demo.img:imx8mm_mcu_demo.img \
+     $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
+     $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_configuration.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_default_stream_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_default_stream_volumes.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_product_strategies.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_product_strategies.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_stream_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_stream_volumes.xml \
+     $(IMX_DEVICE_PATH)/usb_audio_policy_configuration-direct-output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration-direct-output.xml
+ 
+ 
+@@ -455,3 +475,38 @@ PRODUCT_COPY_FILES += \
+ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
+ PRODUCT_SOONG_NAMESPACES += vendor/partner_gms
+ 
++#AMS
++PRODUCT_PACKAGES += \
++    deviceadmin \
++    appmanager \
++    conciergerdmservice \
++    conciergerdmclouddrive \
++    conciergerdmbootmediasync \
++    welcomeapp \
++    diagnosis \
++    otaupdater \
++    peripheralmanager \
++    watchdog
++
++# Enable kernel log for diagnosis
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.logd.kernel=true
++
++# led control
++PRODUCT_PACKAGES += \
++    android.hardware.kioskled-service \
++    android.hardware.kioskled
++
++# -------@bringup_test-------
++ifeq (userdebug,$(TARGET_BUILD_VARIANT))
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/imx8m/init.idt.bringuptest.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/init.idt.bringuptest.rc \
++    $(CONFIG_REPO_PATH)/imx8m/bringup_test.sh:$(TARGET_COPY_OUT_PRODUCT)/bin/bringup_test.sh
++
++# install socat for USB bridge K81(connect ttyGS0 and ttyIDG)
++PRODUCT_PACKAGES += \
++     socat
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.usbhid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.usbhid.sh
++endif
+diff --git a/imx8m/redwood_8mm/redwood_8mm_pci.mk b/imx8m/redwood_8mm/redwood_8mm_pci.mk
+new file mode 100644
+index 00000000..46b78911
+--- /dev/null
++++ b/imx8m/redwood_8mm/redwood_8mm_pci.mk
+@@ -0,0 +1,14 @@
++# -------@block_infrastructure-------
++
++CONFIG_REPO_PATH := device/idtech
++CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
++IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mm.mk)
++
++# -------@block_common_config-------
++
++# Overrides
++PRODUCT_NAME := redwood_8mm_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true
+diff --git a/imx8m/redwood_8mm/redwood_8mm_pcidev.mk b/imx8m/redwood_8mm/redwood_8mm_pcidev.mk
+new file mode 100644
+index 00000000..9b11695d
+--- /dev/null
++++ b/imx8m/redwood_8mm/redwood_8mm_pcidev.mk
+@@ -0,0 +1,12 @@
++# -------@block_infrastructure-------
++
++CONFIG_REPO_PATH := device/idtech
++CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
++IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mm.mk)
++
++# -------@block_common_config-------
++
++# Overrides
++PRODUCT_NAME := redwood_8mm_pcidev
+diff --git a/imx8m/redwood_8mm/sepolicy/attributes b/imx8m/redwood_8mm/sepolicy/attributes
+new file mode 100644
+index 00000000..4f651be6
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/attributes
+@@ -0,0 +1,3 @@
++attribute hal_kioskled;
++attribute hal_kioskled_client;
++attribute hal_kioskled_server;
+diff --git a/imx8m/redwood_8mm/sepolicy/file.te b/imx8m/redwood_8mm/sepolicy/file.te
+new file mode 100644
+index 00000000..13d940a6
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/file.te
+@@ -0,0 +1 @@
++type sysfs_idtech_kioskleds, fs_type, sysfs_type;
+diff --git a/imx8m/redwood_8mm/sepolicy/file_contexts b/imx8m/redwood_8mm/sepolicy/file_contexts
+index 281379b1..ad7bfba4 100644
+--- a/imx8m/redwood_8mm/sepolicy/file_contexts
++++ b/imx8m/redwood_8mm/sepolicy/file_contexts
+@@ -10,9 +10,14 @@
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++/vendor/bin/init\.usbhid\.sh                u:object_r:init-insmod-sh_exec:s0
+ 
+ /dev/block/pmem0  u:object_r:rebootescrow_device:s0
+ 
++#Kiosk Led file node
++/vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
++/vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
++
+ # android.system.suspend@1.0-service
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                  u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                    u:object_r:sysfs_wakeup:s0
+@@ -21,5 +26,6 @@
+ /sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
+ /sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup[0-9]*(/.*)?                     u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0020/power_supply/tps65994-source-psy-0-0020/wakeup[0-9]*(/.*)?                 u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                        u:object_r:sysfs_wakeup:s0
+-
++/sys/devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/redwood_8mm/sepolicy/hal_kioskled.te b/imx8m/redwood_8mm/sepolicy/hal_kioskled.te
+new file mode 100644
+index 00000000..0d96991d
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/hal_kioskled.te
+@@ -0,0 +1,11 @@
++# HwBinder IPC from client to server, and callbacks
++binder_call(hal_kioskled_client, hal_kioskled_server)
++binder_call(hal_kioskled_server, hal_kioskled_client)
++
++hal_attribute_hwservice(hal_kioskled, hal_kioskled_hwservice)
++
++add_service(hal_kioskled_server, hal_kioskled_service)
++binder_call(hal_kioskled_server, servicemanager)
++binder_call(hal_kioskled_client, servicemanager)
++allow hal_kioskled_client hal_kioskled_service:service_manager find;
++
+diff --git a/imx8m/redwood_8mm/sepolicy/hal_kioskled_default.te b/imx8m/redwood_8mm/sepolicy/hal_kioskled_default.te
+new file mode 100644
+index 00000000..07cbddc4
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/hal_kioskled_default.te
+@@ -0,0 +1,9 @@
++type hal_kioskled_default, domain, mlstrustedsubject;
++type hal_kioskled_default_exec, exec_type, vendor_file_type, file_type;
++
++init_daemon_domain(hal_kioskled_default)
++hal_server_domain(hal_kioskled_default, hal_kioskled)
++
++allow hal_kioskled_default sysfs_leds:dir { search read open };
++allow hal_kioskled_default sysfs:file { getattr open read write };
++
+diff --git a/imx8m/redwood_8mm/sepolicy/hwservice.te b/imx8m/redwood_8mm/sepolicy/hwservice.te
+new file mode 100644
+index 00000000..560c4b41
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/hwservice.te
+@@ -0,0 +1 @@
++type hal_kioskled_hwservice, hwservice_manager_type;
+diff --git a/imx8m/redwood_8mm/sepolicy/hwservice_contexts b/imx8m/redwood_8mm/sepolicy/hwservice_contexts
+new file mode 100644
+index 00000000..cfc3211d
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/hwservice_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled::IKioskled      u:object_r:hal_kioskled_hwservice:s0
+diff --git a/imx8m/redwood_8mm/sepolicy/init-insmod-sh.te b/imx8m/redwood_8mm/sepolicy/init-insmod-sh.te
+new file mode 100644
+index 00000000..7d47ef8f
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/init-insmod-sh.te
+@@ -0,0 +1,3 @@
++allow init-insmod-sh configfs:dir  { write add_name remove_name create search };
++allow init-insmod-sh configfs:file  { write create open };
++allow init-insmod-sh configfs:lnk_file { create };
+diff --git a/imx8m/redwood_8mm/sepolicy/platform_app.te b/imx8m/redwood_8mm/sepolicy/platform_app.te
+new file mode 100644
+index 00000000..956c73b0
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/platform_app.te
+@@ -0,0 +1,3 @@
++allow platform_app sysfs_leds:dir { search };
++allow platform_app hal_kioskled_service:service_manager { find };
++allow platform_app hal_kioskled_default:binder { call };
+diff --git a/imx8m/redwood_8mm/sepolicy/service.te b/imx8m/redwood_8mm/sepolicy/service.te
+new file mode 100644
+index 00000000..935b5ea1
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/service.te
+@@ -0,0 +1 @@
++type hal_kioskled_service, vendor_service, service_manager_type;
+diff --git a/imx8m/redwood_8mm/sepolicy/service_contexts b/imx8m/redwood_8mm/sepolicy/service_contexts
+new file mode 100644
+index 00000000..24764b3d
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/service_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled.IKioskled/default                        u:object_r:hal_kioskled_service:s0
+diff --git a/imx8m/redwood_8mm/sepolicy/system_server.te b/imx8m/redwood_8mm/sepolicy/system_server.te
+new file mode 100644
+index 00000000..dc511380
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/system_server.te
+@@ -0,0 +1 @@
++hal_client_domain(system_server, hal_kioskled)
+diff --git a/imx8m/redwood_8mm/ueventd.nxp.rc b/imx8m/redwood_8mm/ueventd.nxp.rc
+index d2681454..d7c34c3f 100644
+--- a/imx8m/redwood_8mm/ueventd.nxp.rc
++++ b/imx8m/redwood_8mm/ueventd.nxp.rc
+@@ -23,3 +23,25 @@
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
+ 
+ /dev/dmabuf_imx           0664   system     system
++
++#quectel port
++/dev/ttyUSB*              0660   radio        radio
++/dev/ttyACM*              0660   radio        radio
++/dev/cdc-wdm*             0660   radio        radio
++/dev/qcqmi*               0660   radio        radio
++/dev/cdc-acm*             0660   radio        radio
++#PCIe
++/dev/mhi_DUN              0660   radio        radio
++/dev/mhi_DIAG             0660   radio        radio
++/dev/mhi_BHI              0660   radio        radio
++/dev/mhi_LOOPBACK         0660   radio        radio
++/dev/mhi_QMI0             0660   radio        radio
++
++# K81 IDG SPI
++/dev/ttyIDG*              0660   system       root
++
++#KIOSK LED
++/sys/class/leds/* brightness 0660 system root
++/sys/class/leds/* trigger 0660 system root
++/sys/class/leds/* delay_on 0660 system root
++/sys/class/leds/* delay_off 0660 system root

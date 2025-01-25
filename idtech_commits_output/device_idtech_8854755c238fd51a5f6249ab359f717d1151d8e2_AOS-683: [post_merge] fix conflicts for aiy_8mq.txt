@@ -1,0 +1,297 @@
+8854755c George.Huang 2021-08-03
+
+AOS-683: [post_merge] fix conflicts for aiy_8mq
+
+Change-Id: I493191dc7aa5942afef10e7371424ec24f327179
+
+diff --git a/imx8m/aiy_8mq/aiy_8mq.mk b/imx8m/aiy_8mq/aiy_8mq.mk
+index f78ccec3..a52f5206 100644
+--- a/imx8m/aiy_8mq/aiy_8mq.mk
++++ b/imx8m/aiy_8mq/aiy_8mq.mk
+@@ -255,6 +255,9 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     MultiClientInputMethod
+ 
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/input-port-associations.xml:$(TARGET_COPY_OUT_VENDOR)/etc/input-port-associations.xml
++
+ # -------@block_gpu-------
+ PRODUCT_PACKAGES += \
+         libEGL_VIVANTE \
+@@ -284,6 +287,7 @@ PRODUCT_PACKAGES += \
+         libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+         libNNGPUBinary-ulite \
++        libNNGPUBinary-nano \
+         libNNArchPerf \
+         libarchmodelSw
+ 
+@@ -300,6 +304,7 @@ PRODUCT_COPY_FILES += \
+ # GPU openCL icdloader config file
+ -include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/gpu-viv/icdloader/icdloader.mk
+ 
++
+ # -------@block_wifi-------
+ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+@@ -400,10 +405,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/aiy_8mq/audio_policy_configuration.xml b/imx8m/aiy_8mq/audio_policy_configuration.xml
+index 008b1c7c..81de06c9 100644
+--- a/imx8m/aiy_8mq/audio_policy_configuration.xml
++++ b/imx8m/aiy_8mq/audio_policy_configuration.xml
+@@ -27,12 +27,26 @@
+             <mixPorts>
+                 <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-                             samplingRates="44100" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+                 </mixPort>
+                 <mixPort name="hdmi output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
+                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                              samplingRates="32000,44100,48000,88200,96000,176400,192000" channelMasks="AUDIO_CHANNEL_NONE"/>
+                 </mixPort>
++                <mixPort name="esai output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000,96000,192000,384000,768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_QUAD,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
++                </mixPort>
++                <mixPort name="dsd output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD">
++                    <profile name="" format="AUDIO_FORMAT_DSD"
++                             samplingRates="2822400,5644800,11289600,22579200" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="bt sco output" role="source">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="16000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++
+                 <mixPort name="primary input" role="sink">
+                     <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                              samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+@@ -55,19 +69,27 @@
+ 
+                 <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
+                 </devicePort>
+-                <devicePort tagName="Wired Headset Mic" type="AUDIO_DEVICE_IN_WIRED_HEADSET" role="source">
++                <devicePort tagName="Spdif-In" type="AUDIO_DEVICE_IN_AUX_DIGITAL" role="source">
++                </devicePort>
++                <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET" role="source">
+                 </devicePort>
+             </devicePorts>
+             <routes>
+                 <route type="mix" sink="Speaker"
+                        sources="primary output"/>
+                 <route type="mix" sink="Wired Headphones"
+-                       sources="primary output"/>
++                       sources="dsd output,esai output,primary output"/>
+                 <route type="mix" sink="HDMI Out"
+                        sources="hdmi output,primary output"/>
++                <route type="mix" sink="BT SCO Headset"
++                       sources="bt sco output"/>
++                <route type="mix" sink="BT SCO CarKit"
++                       sources="bt sco output"/>
++                <route type="mix" sink="BT SCO"
++                       sources="bt sco output"/>
+ 
+                 <route type="mix" sink="primary input"
+-                       sources="Built-In Mic,Wired Headset Mic"/>
++                       sources="Built-In Mic,Spdif-In,BT SCO Headset Mic"/>
+             </routes>
+         </module>
+ 
+diff --git a/imx8m/aiy_8mq/camera_config_imx8mq.json b/imx8m/aiy_8mq/camera_config_imx8mq.json
+index 49b57dee..25252ec4 100644
+--- a/imx8m/aiy_8mq/camera_config_imx8mq.json
++++ b/imx8m/aiy_8mq/camera_config_imx8mq.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/aiy_8mq/init.imx8mq.rc b/imx8m/aiy_8mq/init.imx8mq.rc
+index 25355d09..44613aae 100644
+--- a/imx8m/aiy_8mq/init.imx8mq.rc
++++ b/imx8m/aiy_8mq/init.imx8mq.rc
+@@ -24,9 +24,6 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
+ 
+-    # disable 3D composition overlay to fix video rotate problem
+-    setprop vendor.hwc.enable.overlay 0
+-
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/aiy_8mq/init.rc b/imx8m/aiy_8mq/init.rc
+index f810714f..5aa5a9e3 100644
+--- a/imx8m/aiy_8mq/init.rc
++++ b/imx8m/aiy_8mq/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -101,10 +97,6 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     setprop vendor.media.fsl_codec.flag 7
+ 
+     setprop camera.disable_zsl_mode 1
+-    setprop back_camera_name mx6s-csi0
+-    setprop back_camera_orient 0
+-    setprop front_camera_name mx6s-csi1
+-    setprop front_camera_orient 0
+ 
+    # Tweak the mmc device read ahead buffer size
+     write /sys/block/mmcblk0/queue/read_ahead_kb 2048
+@@ -137,13 +129,10 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     chmod 0664 /sys/kernel/debug/sync/sw_sync
+ 
+     # Default backlight device
+-    #setprop vendor.hw.backlight.dev "30a00000.mipi-dsi.0"
++    setprop vendor.hw.backlight.dev "30a00000.mipi-dsi.0"
+     # Chmod/chown FSL specific sys entry
+-    #chown system system /sys/class/backlight/30a00000.mipi-dsi.0/brightness
+-    #chmod 0660 /sys/class/backlight/30a00000.mipi-dsi.0/brightness
+-    setprop vendor.hw.backlight.dev "backlight"
+-    chown system system /sys/class/backlight/backlight/brightness
+-    chmod 0660 /sys/class/backlight/backlight/brightness
++    chown system system /sys/class/backlight/30a00000.mipi-dsi.0/brightness
++    chmod 0660 /sys/class/backlight/30a00000.mipi-dsi.0/brightness
+ 
+     # Set light sensor sysfs path and light sensor threshold lux value
+     setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
+diff --git a/imx8m/aiy_8mq/init.recovery.nxp.rc b/imx8m/aiy_8mq/init.recovery.nxp.rc
+index db84a9ea..6074b693 100644
+--- a/imx8m/aiy_8mq/init.recovery.nxp.rc
++++ b/imx8m/aiy_8mq/init.recovery.nxp.rc
+@@ -3,3 +3,6 @@ on init
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+     setprop sys.usb.configfs 1
++
++on post-fs-data
++    setprop sys.usb.controller "38100000.usb"
+diff --git a/imx8m/aiy_8mq/input-port-associations.xml b/imx8m/aiy_8mq/input-port-associations.xml
+new file mode 100644
+index 00000000..d5f8fa39
+--- /dev/null
++++ b/imx8m/aiy_8mq/input-port-associations.xml
+@@ -0,0 +1,24 @@
++<!-- Use below commands to get display port number:
++# dumpsys SurfaceFlinger - -display-id
++Display 4692921138614785 (HWC display 1): port=1 pnpId=DEL displayName="DELL S2740L"
++Display 4693505326422272 (HWC display 0): port=0 pnpId=DEL displayName="DELL P2314T"
++
++Use below commands to get touch input location:
++# getevent -i | grep location
++location: "usb-xhci-hcd.0.auto-1.1.4/input0"
++location: "usb-xhci-hcd.0.auto-1.2.4/input0"
++
++Then bind the display port and input location with below table. This table need
++to modify according to actual connection.
++One display can link with multi-input.
++-->
++<ports>
++	<port display="0" input="usb-xhci-hcd.1.auto-1.4/input0" />
++	<port display="1" input="usb-xhci-hcd.1.auto-1.4/input0" />
++	<port display="0" input="usb-xhci-hcd.2.auto-1.4/input0" />
++	<port display="1" input="usb-xhci-hcd.2.auto-1.4/input0" />
++	<port display="0" input="usb-xhci-hcd.1.auto-1.3.4/input0" />
++	<port display="1" input="usb-xhci-hcd.1.auto-1.3.4/input0" />
++	<port display="0" input="usb-xhci-hcd.2.auto-1.3.4/input0" />
++	<port display="1" input="usb-xhci-hcd.2.auto-1.3.4/input0" />
++</ports>
+diff --git a/imx8m/aiy_8mq/sepolicy/file_contexts b/imx8m/aiy_8mq/sepolicy/file_contexts
+index 629d9e4e..54c061a2 100644
+--- a/imx8m/aiy_8mq/sepolicy/file_contexts
++++ b/imx8m/aiy_8mq/sepolicy/file_contexts
+@@ -2,13 +2,8 @@
+ /dev/block/mmcblk1                           u:object_r:sdcard:s0
+ 
+ #peripheral
+-/vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
+-/dev/mma8x5x                    u:object_r:sensors_device:s0
+ /dev/ttymxc[0-9]*               u:object_r:tty_device:s0
+-/dev/FreescaleAccelerometer     u:object_r:sensors_device:s0
+-/dev/FreescaleMagnetometer      u:object_r:sensors_device:s0
+-/dev/FreescaleGyroscope         u:object_r:sensors_device:s0
+ /dev/sda[0-8]*                  u:object_r:fuse:s0
+ 
+ #Neural Network HAL service
+@@ -22,3 +17,14 @@
+ #Kiosk Led file node
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+ /vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup[0-9]*(/.*)?                                          u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/aiy_8mq/sepolicy/genfs_contexts b/imx8m/aiy_8mq/sepolicy/genfs_contexts
+index 00b2bff4..20f83532 100644
+--- a/imx8m/aiy_8mq/sepolicy/genfs_contexts
++++ b/imx8m/aiy_8mq/sepolicy/genfs_contexts
+@@ -7,26 +7,7 @@ genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/m
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock u:object_r:sysfs_block_devices:s0
+ 
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a00000.mipi-dsi/30a00000.mipi-dsi.0/backlight u:object_r:sysfs_leds:s0
+-genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+ 
+ #/sys/class/net
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net               u:object_r:sysfs_net:s0
+-genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
+-genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
+-
+-
+-# android.system.suspend@1.0-service
+-genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup0                                       u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup6                                       u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup2                 u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup3                 u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup      u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/virtual/power_supply/battery/wakeup2                                                                       u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/virtual/power_supply/usb/wakeup3                                                                           u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6          u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/38200000.usb/xhci-hcd.1.auto/usb1/1-1/1-1.1/1-1.1:1.2/0003:046D:C52B.0003/0003:046D:[a-fA-F0-9]*.[a-fA-F0-9]*/power_supply/hidpp_battery_[01]/wakeup[0-9]* u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0001:00/0001:00:00.0/0001:01:00.0/net u:object_r:sysfs_net:s0
+diff --git a/imx8m/aiy_8mq/thermal_info_config_imx8mq.json b/imx8m/aiy_8mq/thermal_info_config_imx8mq.json
+old mode 100644
+new mode 100755

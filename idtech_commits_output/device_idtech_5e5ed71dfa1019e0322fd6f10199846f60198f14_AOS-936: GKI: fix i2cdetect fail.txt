@@ -1,0 +1,36 @@
+5e5ed71d owen.wen 2022-04-08
+
+AOS-936: GKI: fix i2cdetect fail
+
+CONFIG_I2C_CHARDEV provide i2c-* device files
+i2cdetect: /dev/i2c-0: No such file or directory
+
+Change-Id: I22d4625d06d61a8ad9bceb5cc4546a6ebc4fb485
+
+diff --git a/imx8m/redwood_8mq/SharedBoardConfig.mk b/imx8m/redwood_8mq/SharedBoardConfig.mk
+index 52cebcbf..91ca212e 100644
+--- a/imx8m/redwood_8mq/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mq/SharedBoardConfig.mk
+@@ -74,8 +74,10 @@ endif
+ 
+ # kernel modules add by IDTECH
+ # CONFIG_SND_SOC_IMX_TLV320AIC31XX: snd-soc-imx-tlv320aic31xx.ko, audio codec
++# CONFIG_I2C_CHARDEV: i2c-dev.ko, for userspace(i2cdetect) to access /dev/i2c*
+ ifeq ($(IMX8MQ_USES_GKI),true)
+ BOARD_VENDOR_KERNEL_MODULES += \
++    $(KERNEL_OUT)/drivers/i2c/i2c-dev.ko \
+     $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-tlv320aic31xx.ko
+ endif
+ 
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index 97ee9a34..d6aa8f05 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -31,6 +31,7 @@ CONFIG_TYPEC_TPS65994=y
+ CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100
+ CONFIG_DP83822_PHY=y
+ CONFIG_OPT3001=y
++CONFIG_I2C_CHARDEV=m
+ 
+ CONFIG_PARAVIRT=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y

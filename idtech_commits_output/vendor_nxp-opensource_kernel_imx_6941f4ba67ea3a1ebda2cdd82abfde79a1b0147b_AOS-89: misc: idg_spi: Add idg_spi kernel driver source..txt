@@ -1,0 +1,1051 @@
+6941f4ba67ea Arthur Chen 2020-02-26
+
+AOS-89: misc: idg_spi: Add idg_spi kernel driver source.
+
+    for Android 10 & bug fixed.
+
+Change-Id: I76dd20a8e8fca063003f7e668b2330b037fdd0f9
+
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index 27ab870d9d6c..ca5608c92652 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -426,6 +426,12 @@ config SPEAR13XX_PCIE_GADGET
+ 	 entry will be created for that controller. User can use these
+ 	 sysfs node to configure PCIe EP as per his requirements.
+ 
++config IDG_SPI
++	tristate "IDG SPI Communication Support"
++	help
++	  This driver supports IDG SPI from the idtech on
++	  Android platform.
++
+ config VMWARE_BALLOON
+ 	tristate "VMware Balloon Driver"
+ 	depends on VMWARE_VMCI && X86 && HYPERVISOR_GUEST
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index 723e2c73c128..64edc72fe5b6 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -34,6 +34,7 @@ obj-$(CONFIG_ISL29003)		+= isl29003.o
+ obj-$(CONFIG_ISL29020)		+= isl29020.o
+ obj-$(CONFIG_SENSORS_TSL2550)	+= tsl2550.o
+ obj-$(CONFIG_DS1682)		+= ds1682.o
++obj-$(CONFIG_IDG_SPI)		+= idg_spi.o
+ obj-$(CONFIG_C2PORT)		+= c2port/
+ obj-$(CONFIG_HMC6352)		+= hmc6352.o
+ obj-y				+= eeprom/
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+new file mode 100644
+index 000000000000..eb8d422f0e1b
+--- /dev/null
++++ b/drivers/misc/idg_spi.c
+@@ -0,0 +1,838 @@
++/*
++ *  idg_spi driver
++ *
++ *  Copyright (c) 2020 ID TECH.
++ *  Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/spi/spi.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++#include <linux/sched.h>
++#include <linux/time.h>
++#include <linux/wait.h>
++#include <linux/delay.h>
++#include <linux/types.h>
++#include <linux/err.h>
++#include <linux/sched.h>
++#include <linux/of.h>
++#include <linux/mutex.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/miscdevice.h>
++#include <linux/poll.h>
++#include <linux/stat.h>
++#include <linux/uaccess.h>
++#include <linux/semaphore.h>
++
++#include "idg_spi.h"
++
++static struct spi_device *idg_spi_tty;
++
++struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
++{
++	struct mt_fifo *fifo = kmalloc(sizeof(struct mt_fifo), GFP_KERNEL);
++	static char *buffer;
++
++	if (fifo != NULL) {
++		fifo->msg_tail = 0;
++		fifo->msg_head = 0;
++		fifo->msg_avail = msg_cnt;
++		fifo->msg_size = msg_size;
++		fifo->msg_cnt = 0;
++		buffer = kmalloc(msg_size * msg_cnt * sizeof(char), GFP_KERNEL);
++		if (buffer == NULL) {
++			kfree(fifo);
++			fifo = NULL;
++			goto fifo_error;
++		}
++		fifo->data = buffer;
++		fifo->sem = kmalloc(sizeof(struct semaphore), GFP_KERNEL);
++		if (fifo->sem == NULL) {
++			kfree(fifo->sem);
++			kfree(fifo->data);
++			kfree(fifo);
++			fifo = NULL;
++			goto fifo_error;
++		}
++		sema_init(fifo->sem, 0);
++		fifo->sem_buf = kmalloc(sizeof(struct semaphore), GFP_KERNEL);
++		if (fifo->sem_buf == NULL) {
++			kfree(fifo->sem_buf);
++			kfree(fifo->sem);
++			kfree(fifo->data);
++			kfree(fifo);
++			fifo = NULL;
++			goto fifo_error;
++		}
++		sema_init(fifo->sem_buf, 1);
++	}
++
++fifo_error:
++	return fifo;
++}
++
++int fifo_add_msg(struct mt_fifo *fifo, char *msg)
++{
++	int ret = 0;
++
++	if (fifo->msg_cnt < fifo->msg_avail) {
++		down(fifo->sem_buf);
++		memcpy(&fifo->data[fifo->msg_size * fifo->msg_head], msg,
++		       fifo->msg_size);
++		/* size reduce 1 for boundary protection */
++		if (fifo->msg_head < (fifo->msg_avail - 1))
++			fifo->msg_head++;
++		else
++			fifo->msg_head = 0;
++
++		fifo->msg_cnt++;
++		up(fifo->sem_buf);
++		up(fifo->sem);
++	} else {
++		ret = FIFO_OVERFLOW;
++	}
++
++	return ret;
++}
++
++int fifo_get_msg(struct mt_fifo *fifo, char *msg)
++{
++	int ret = 0;
++
++	down(fifo->sem);
++	down(fifo->sem_buf);
++	memcpy(msg, &fifo->data[fifo->msg_size * fifo->msg_tail],
++	       fifo->msg_size);
++	/* size reduce 1 for boundary protection */
++	if (fifo->msg_tail < (fifo->msg_avail - 1))
++		fifo->msg_tail++;
++	else
++		fifo->msg_tail = 0;
++
++	if (fifo->msg_cnt) {
++		fifo->msg_cnt--;
++		ret = msg[RX_SIZE_MSB] << 8;
++		ret += msg[RX_SIZE_LSB];
++		ret += NEOII_CMD_LEN;
++	} else {
++		ret = 0;
++	}
++
++	up(fifo->sem_buf);
++
++	return ret;
++}
++
++void fifo_clean(struct mt_fifo *fifo)
++{
++	fifo->msg_tail = 0;
++	fifo->msg_head = 0;
++	fifo->msg_cnt = 0;
++}
++
++void fifo_destroy(struct mt_fifo *fifo)
++{
++	if (fifo->sem_buf != NULL)
++		kfree(fifo->sem_buf);
++
++	if (fifo->sem != NULL)
++		kfree(fifo->sem);
++
++	if (fifo->data != NULL)
++		kfree(fifo->data);
++
++	if (fifo != NULL)
++		kfree(fifo);
++}
++
++/* referenced from NEO 2 IDG_Rev sample code */
++unsigned short CalculateCRC(unsigned char *Buffer, unsigned int Len)
++{
++	unsigned short Crc = 0xffff;
++		while (Len--)
++			Crc = CrcTable[((Crc >> 8) ^ *Buffer++)] ^ (Crc << 8);
++
++	return Crc;
++}
++
++int idg_char2hex(int raw)
++{
++	if ((raw >= NUM_ASCII) && (raw <= (NUM_ASCII + 9)))
++		return NUM_ASCII;
++	else if ((raw >= UALPHA_ASCII) && (raw <= (UALPHA_ASCII + 5)))
++		return UPPER_ASCII;
++	else if ((raw >= LALPHA_ASCII) && (raw <= (LALPHA_ASCII + 5)))
++		return LOWER_ASCII;
++	else
++		return CHAR2HEX_FAIL;
++}
++
++static int idgv5_spi_tty_open(struct inode *inode, struct file *file)
++{
++	struct idg_spi_device *idg_dev = spi_get_drvdata(idg_spi_tty);
++
++	spin_lock_irq(&idg_dev->spi_lock);
++	file->private_data = idg_spi_tty;
++	spin_unlock_irq(&idg_dev->spi_lock);
++	if ((!idg_dev->irq_en) && (!idg_dev->keep_sense)) {
++		enable_irq(idg_dev->idg_irq);
++		idg_dev->irq_en = true;
++	}
++
++	return 0;
++}
++
++static int idgv5_spi_tty_release(struct inode *inode, struct file *file)
++{
++	struct idg_spi_device *idg_dev = spi_get_drvdata(idg_spi_tty);
++
++	file->private_data = NULL;
++	if ((idg_dev->irq_en) && (!idg_dev->keep_sense)) {
++		disable_irq(idg_dev->idg_irq);
++		idg_dev->irq_en = false;
++	}
++
++	return 0;
++}
++
++static ssize_t idgv5_spi_tty_read(struct file *file, char __user *user_buffer,
++				size_t count, loff_t *ppos)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	unsigned char buf[MAX_BUFFER_SIZE];
++	int ret;
++
++	idg_tty = (struct spi_device *)file->private_data;
++	idg_dev = spi_get_drvdata(idg_tty);
++	ret = fifo_get_msg(idg_dev->v5_fifo, buf);
++	if (copy_to_user(user_buffer, buf, ret))
++		ret = -EFAULT;
++
++	return ret;
++}
++
++static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
++				   size_t count, loff_t *ppos)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	struct spi_message m;
++	struct spi_transfer *x_init;
++	struct spi_transfer *x;
++	unsigned short crc;
++	int ch4msb, ch4lsb, status, i;
++	int cmdcheck = 0;
++	char idg_tx[MAX_BUFFER_SIZE] = "";
++	char idg_rx[MAX_BUFFER_SIZE] = "";
++	char user_buf[MAX_BUFFER_SIZE] = "";
++
++	spi_message_init(&m);
++	idg_tty = (struct spi_device *)file->private_data;
++	idg_dev = spi_get_drvdata(idg_tty);
++	x_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	if (x_init == NULL) {
++		status = -ENOMEM;
++		pr_err("%s: idgv5 spi tty write failed(%d)", DRVNAME, status);
++		goto ttyv5_write_out;
++	}
++	x = x_init;
++	memcpy(idg_tx, CLIENT_NEOII_Header_V5, IDG_HEADER_LEN);
++	if (copy_from_user(user_buf, buffer, count)) {
++		status = -EIO;
++		goto ttyv5_write_out;
++	}
++#if IDG_DEBUG_INFO
++	dev_info(&idg_tty->dev, "idg v5 from user data (%d bytes):
+", count);
++	for (i = 0; i < count; i++)
++		dev_info(&spi->dev, "0x%.2X ", data[i]);
++
++#endif
++	for (i = 0; i < count; i += 2) {
++		ch4msb = idg_char2hex(user_buf[i]);
++		if (ch4msb < 0)
++			cmdcheck++;
++
++		ch4lsb = idg_char2hex(user_buf[i + 1]);
++		if (ch4lsb < 0)
++			cmdcheck++;
++
++		idg_tx[IDG_HEADER_LEN + (i/2)] = (user_buf[i] - ch4msb) << 4;
++		idg_tx[IDG_HEADER_LEN + (i/2)] += (user_buf[i + 1] - ch4lsb);
++	}
++	if (cmdcheck)
++		dev_info(&idg_tty->dev, "not hex number string input
+");
++	/* append CRC */
++	crc = CalculateCRC((unsigned char *)idg_tx,
++			   (IDG_HEADER_LEN + (count/2)));
++	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
++	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
++	mutex_lock(&idg_dev->lock);
++	x->tx_buf = idg_tx;
++	x->rx_buf = idg_rx;
++	x->len = ((IDG_HEADER_LEN + (count/2)) + NEOII_CRC_LEN);
++	x->speed_hz = idg_dev->clock_freq;
++	m.spi = idg_tty;
++	spi_message_add_tail(x, &m);
++	status = spi_sync(idg_tty, &m);
++	mutex_unlock(&idg_dev->lock);
++
++ttyv5_write_out:
++	if (!status)
++		status = x->len;
++	else
++		pr_err("%s: idgv5 spi tty write failed(%d)", DRVNAME, status);
++
++	kfree(x_init);
++
++	return status;
++}
++
++static unsigned int idgv5_spi_tty_poll(struct file *file, poll_table *wait)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	unsigned int mask = 0;
++
++	idg_tty = (struct spi_device *)file->private_data;
++	if (!idg_tty) {
++		mask = -EBADFD;
++		goto ttyv5_poll_out;
++	}
++
++	idg_dev = spi_get_drvdata(idg_tty);
++	if (!idg_dev) {
++		mask = -EBADFD;
++		goto ttyv5_poll_out;
++	}
++
++	poll_wait(file, &idg_dev->wait, wait);
++
++	if (idg_dev->v5_fifo->msg_head != idg_dev->v5_fifo->msg_tail)
++		mask |= POLLIN | POLLRDNORM;
++
++ttyv5_poll_out:
++	return mask;
++}
++
++static const struct file_operations idgv5_spi_tty_fops = {
++	.owner		= THIS_MODULE,
++	.read		= idgv5_spi_tty_read,
++	.write		= idgv5_spi_tty_write,
++	.open           = idgv5_spi_tty_open,
++	.release        = idgv5_spi_tty_release,
++	.poll		= idgv5_spi_tty_poll,
++};
++
++static struct miscdevice idgv5_spi_tty_misc = {
++	.minor = MISC_DYNAMIC_MINOR,
++	.name  = TTYV5NAME,
++	.fops  = &idgv5_spi_tty_fops
++};
++
++static int idg_spi_tty_open(struct inode *inode, struct file *file)
++{
++	struct idg_spi_device *idg_dev = spi_get_drvdata(idg_spi_tty);
++
++	spin_lock_irq(&idg_dev->spi_lock);
++	file->private_data = idg_spi_tty;
++	spin_unlock_irq(&idg_dev->spi_lock);
++	if ((!idg_dev->irq_en) && (!idg_dev->keep_sense)) {
++		enable_irq(idg_dev->idg_irq);
++		idg_dev->irq_en = true;
++	}
++
++	return 0;
++}
++
++static int idg_spi_tty_release(struct inode *inode, struct file *file)
++{
++	struct idg_spi_device *idg_dev = spi_get_drvdata(idg_spi_tty);
++
++	file->private_data = NULL;
++	if ((idg_dev->irq_en) && (!idg_dev->keep_sense)) {
++		disable_irq(idg_dev->idg_irq);
++		idg_dev->irq_en = false;
++	}
++
++	return 0;
++}
++
++static ssize_t idg_spi_tty_read(struct file *file, char __user *user_buffer,
++				size_t count, loff_t *ppos)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	unsigned char buf[MAX_BUFFER_SIZE];
++	int ret;
++
++	idg_tty = (struct spi_device *)file->private_data;
++	idg_dev = spi_get_drvdata(idg_tty);
++	ret = fifo_get_msg(idg_dev->v2_fifo, buf);
++	if (copy_to_user(user_buffer, buf, ret))
++		ret = -EFAULT;
++
++	return ret;
++}
++
++static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
++				 size_t count, loff_t *ppos)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	struct spi_message m;
++	struct spi_transfer *x_init;
++	struct spi_transfer *x;
++	unsigned short crc;
++	int ch4msb, ch4lsb, status, i;
++	int cmdcheck = 0;
++	char idg_tx[MAX_BUFFER_SIZE] = "";
++	char idg_rx[MAX_BUFFER_SIZE] = "";
++	char user_buf[MAX_BUFFER_SIZE] = "";
++
++	spi_message_init(&m);
++	idg_tty = (struct spi_device *)file->private_data;
++	idg_dev = spi_get_drvdata(idg_tty);
++	x_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	if (x_init == NULL) {
++		status = -ENOMEM;
++		pr_err("%s: idgv2 spi tty write failed(%d)", DRVNAME, status);
++		goto tty_write_out;
++	}
++	x = x_init;
++	memcpy(idg_tx, CLIENT_NEOII_Header_V2, IDG_HEADER_LEN);
++	if (copy_from_user(user_buf, buffer, count)) {
++		status = -EIO;
++		goto tty_write_out;
++	}
++#if IDG_DEBUG_INFO
++	dev_info(&idg_tty->dev, "idg v2 from user data (%d bytes):
+", count);
++	for (i = 0; i < count; i++)
++		dev_info(&spi->dev, "0x%.2X ", data[i]);
++
++#endif
++	for (i = 0; i < count; i += 2) {
++		ch4msb = idg_char2hex(user_buf[i]);
++		if (ch4msb < 0)
++			cmdcheck++;
++
++		ch4lsb = idg_char2hex(user_buf[i + 1]);
++		if (ch4lsb < 0)
++			cmdcheck++;
++
++		idg_tx[IDG_HEADER_LEN + (i/2)] = (user_buf[i] - ch4msb) << 4;
++		idg_tx[IDG_HEADER_LEN + (i/2)] += (user_buf[i + 1] - ch4lsb);
++	}
++	if (cmdcheck)
++		dev_info(&idg_tty->dev, "not hex number string input
+");
++	/* append CRC */
++	crc = CalculateCRC((unsigned char *)idg_tx,
++			   (IDG_HEADER_LEN + (count/2)));
++	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
++	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
++	mutex_lock(&idg_dev->lock);
++	x->tx_buf = idg_tx;
++	x->rx_buf = idg_rx;
++	x->len = ((IDG_HEADER_LEN + (count/2)) + NEOII_CRC_LEN);
++	x->speed_hz = idg_dev->clock_freq;
++	m.spi = idg_tty;
++	spi_message_add_tail(x, &m);
++	status = spi_sync(idg_tty, &m);
++	mutex_unlock(&idg_dev->lock);
++
++tty_write_out:
++	if (!status)
++		status = x->len;
++	else
++		pr_err("%s: idg spi tty write failed(%d)", DRVNAME, status);
++
++	kfree(x_init);
++
++	return status;
++}
++
++static unsigned int idg_spi_tty_poll(struct file *file, poll_table *wait)
++{
++	struct spi_device *idg_tty;
++	struct idg_spi_device *idg_dev;
++	unsigned int mask = 0;
++
++	idg_tty = (struct spi_device *)file->private_data;
++	if (!idg_tty) {
++		mask = -EBADFD;
++		goto tty_poll_out;
++	}
++
++	idg_dev = spi_get_drvdata(idg_tty);
++	if (!idg_dev) {
++		mask = -EBADFD;
++		goto tty_poll_out;
++	}
++
++	poll_wait(file, &idg_dev->wait, wait);
++
++	if (idg_dev->v2_fifo->msg_head != idg_dev->v2_fifo->msg_tail)
++		mask |= POLLIN | POLLRDNORM;
++
++tty_poll_out:
++	return mask;
++}
++
++static const struct file_operations idg_spi_tty_fops = {
++	.owner		= THIS_MODULE,
++	.read		= idg_spi_tty_read,
++	.write		= idg_spi_tty_write,
++	.open           = idg_spi_tty_open,
++	.release        = idg_spi_tty_release,
++	.poll		= idg_spi_tty_poll,
++};
++
++static struct miscdevice idg_spi_tty_misc = {
++	.minor = MISC_DYNAMIC_MINOR,
++	.name  = TTYNAME,
++	.fops  = &idg_spi_tty_fops
++};
++
++static void idg_spi_report(struct idg_spi_device *idg_dev)
++{
++	struct spi_device *spi;
++	struct spi_message m;
++	struct spi_transfer *x_init;
++	struct spi_transfer *x;
++	char idg_tx[BASE_READ_SIZE] = "";
++	char idg_rx[BASE_READ_SIZE] = "";
++	struct spi_message m_s;
++	struct spi_transfer *x_s_init;
++	struct spi_transfer *x_s;
++	char idg_tx_s[MAX_BUFFER_SIZE] = "";
++	char idg_rx_s[MAX_BUFFER_SIZE] = "";
++	char data[(BASE_READ_SIZE + MAX_BUFFER_SIZE)] = "";
++	int invaild = 0;
++	int idg_size;
++	int status;
++	int status_s;
++#if IDG_DEBUG_INFO
++	int i;
++#endif
++
++	spi_message_init(&m);
++	spi_message_init(&m_s);
++	x_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	if (x_init == NULL) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	x = x_init;
++	x_s_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	if (x_s_init == NULL) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	x_s = x_s_init;
++	spin_lock_irq(&idg_dev->spi_lock);
++	spi = spi_dev_get(idg_dev->spi_dev);
++	spin_unlock_irq(&idg_dev->spi_lock);
++	dev_info(&spi->dev, "K81 returned
+");
++	x->tx_buf = idg_tx;
++	x->rx_buf = idg_rx;
++	x->len = BASE_READ_SIZE;
++	x->speed_hz = idg_dev->clock_freq;
++	mutex_lock(&idg_dev->lock);
++	spin_lock_irq(&idg_dev->spi_lock);
++	m.spi = spi;
++	spin_unlock_irq(&idg_dev->spi_lock);
++	spi_message_add_tail(x, &m);
++	status = spi_sync(spi, &m);
++	mutex_unlock(&idg_dev->lock);
++#if IDG_DEBUG_INFO
++	dev_info(&spi->dev, "first read (16 bytes)
+");
++#endif
++spi_report_out:
++	if (!status) {
++		memcpy(data, idg_rx, BASE_READ_SIZE);
++		idg_size = data[IDG_SIZE_MSB] << 8;
++		idg_size += data[IDG_SIZE_LSB];
++#if IDG_DEBUG_INFO
++		for (i = 0; i < BASE_READ_SIZE ; i++)
++			dev_info(&spi->dev, "0x%.2X ", data[i]);
++
++#endif
++		if (idg_size > (MAX_BUFFER_SIZE - BASE_READ_SIZE)) {
++			dev_info(&spi->dev, "K81 return not ready
+");
++#if IDG_DEBUG_INFO
++			for (i = 0; i < BASE_READ_SIZE ; i++)
++				dev_info(&spi->dev, "0x%.2X ", idg_rx[i]);
++
++#endif
++			invaild++;
++		} else if (idg_size == 0) {
++#if IDG_DEBUG_INFO
++			dev_info(&spi->dev, "idg header: %s
+", data);
++			dev_info(&spi->dev, "idg data length: %d
+", idg_size);
++#endif
++			/* CRC check */
++			if (CalculateCRC(data, BASE_READ_SIZE)) {
++				dev_info(&spi->dev, "read data CRC error
+");
++				invaild++;
++			}
++		} else {
++			x_s->tx_buf = idg_tx_s;
++			x_s->rx_buf = idg_rx_s;
++			x_s->len = idg_size;
++			x_s->speed_hz = idg_dev->clock_freq;
++			mutex_lock(&idg_dev->lock);
++			spin_lock_irq(&idg_dev->spi_lock);
++			m_s.spi = spi;
++			spin_unlock_irq(&idg_dev->spi_lock);
++			spi_message_add_tail(x_s, &m_s);
++			status = spi_sync(spi, &m_s);
++			mutex_unlock(&idg_dev->lock);
++#if IDG_DEBUG_INFO
++			dev_info(&spi->dev, "second read (%d bytes)
+",
++				 idg_size);
++#endif
++			if (!status_s) {
++				memcpy(&data[BASE_READ_SIZE], idg_rx_s,
++				       idg_size);
++#if IDG_DEBUG_INFO
++				for (i = 0; i < idg_size; i++)
++					dev_info(&spi->dev, "0x%.2X ",
++						 data[BASE_READ_SIZE + i]);
++
++#endif
++				if (CalculateCRC(data,
++						 (idg_size + BASE_READ_SIZE))) {
++					dev_info(&spi->dev,
++						 "read data CRC error
+");
++					invaild++;
++				}
++			} else {
++				pr_err("%s: idg spi second read failed(%d)",
++				       DRVNAME, status_s);
++					invaild++;
++#if IDG_DEBUG_INFO
++				for (i = 0; i < BASE_READ_SIZE ; i++)
++					dev_info(&spi->dev, "0x%.2X ",
++						 idg_rx_s[i]);
++
++#endif
++			}
++		}
++
++		if ((!invaild) && (strncmp(&data[NEOII_HEADER_LEN],
++					   NEOII_Header_V2,
++					   NEOII_VERSION_LEN) == 0)) {
++			if (fifo_add_msg(idg_dev->v2_fifo,
++					 &data[IDG_HEADER_LEN])) {
++				fifo_clean(idg_dev->v2_fifo);
++				dev_info(&spi->dev, "FIFO v2 overflow, "
++					 "cleaned
+");
++				fifo_add_msg(idg_dev->v2_fifo,
++					     &data[IDG_HEADER_LEN]);
++			}
++		} else if ((!invaild) && (strncmp(&data[NEOII_HEADER_LEN],
++						  NEOII_Header_V5,
++						  NEOII_VERSION_LEN) == 0)) {
++			if (fifo_add_msg(idg_dev->v5_fifo,
++					 &data[IDG_HEADER_LEN])) {
++				fifo_clean(idg_dev->v5_fifo);
++				dev_info(&spi->dev, "FIFO v5 overflow. "
++					 "cleaned
+");
++				fifo_add_msg(idg_dev->v5_fifo,
++					     &data[IDG_HEADER_LEN]);
++			}
++		} else {
++			dev_info(&spi->dev, "read data failed
+");
++		}
++	} else {
++		pr_err("%s: idg spi report failed(%d)", DRVNAME, status);
++	}
++	kfree(x_init);
++	if (x_s_init != NULL)
++		kfree(x_s_init);
++}
++
++static irqreturn_t idg_spi_irq_handler(int irq, void *handle)
++{
++	struct idg_spi_device *idg_dev = handle;
++
++	idg_spi_report(idg_dev);
++
++	return IRQ_HANDLED;
++}
++
++static int idg_spi_probe(struct spi_device *spi)
++{
++	struct idg_spi_device *idg_dev;
++	struct device_node *np = spi->dev.of_node;
++	unsigned long irq_flags;
++	int cs_gpio = 0;
++	int irq = 0;
++	int err = 0;
++
++	dev_info(&spi->dev, "idg_spi driver probe
+");
++	irq = spi->irq;
++	if (!irq) {
++		dev_err(&spi->dev, "irq is not exist
+");
++		err = -ENODATA;
++		goto setup_error;
++	}
++	cs_gpio = spi->cs_gpio;
++	if (!cs_gpio) {
++		dev_err(&spi->dev, "chipselect is not exist
+");
++		err = -ENODATA;
++		goto setup_error;
++	}
++	err = of_property_read_u32(np, "spi-working-mode", &spi->mode);
++	if (err < 0) {
++		pr_err("%s: get mode failed(%d)", DRVNAME, err);
++		goto setup_error;
++	}
++	dev_info(&spi->dev, "idg_spi driver is mode %d
+", spi->mode);
++	err = of_property_read_u32(np, "spi-bits-per-word",
++				   &spi->bits_per_word);
++	if (err < 0) {
++		pr_err("%s: get bits per word failed(%d)", DRVNAME, err);
++		goto setup_error;
++	}
++	dev_info(&spi->dev, "idg_spi driver is %d bits per word
+",
++		 spi->bits_per_word);
++	err = of_property_read_u32(np, "spi-max-frequency",
++				   &spi->max_speed_hz);
++	if (err < 0) {
++		pr_err("%s: get speed setting failed(%d)", DRVNAME, err);
++		goto setup_error;
++	}
++	dev_info(&spi->dev, "idg_spi driver speed: %d Hz
+", spi->max_speed_hz);
++	err = spi_setup(spi);
++	if (err < 0) {
++		pr_err("%s: spi_setup failed(%d)", DRVNAME, err);
++		goto setup_error;
++	}
++	dev_info(&spi->dev, "idg_spi driver spi setuped
+");
++	idg_dev = kmalloc(sizeof(struct idg_spi_device), GFP_KERNEL);
++	if (idg_dev == NULL) {
++		dev_err(&spi->dev, "idg_spi_device initial failed
+");
++		err = -ENOMEM;
++		goto idg_dev_error;
++	}
++	spin_lock_init(&idg_dev->spi_lock);
++	spi_set_drvdata(spi, idg_dev);
++	spin_lock_irq(&idg_dev->spi_lock);
++	idg_dev->spi_dev = spi;
++	idg_dev->clock_freq = spi->max_speed_hz;
++	idg_spi_tty = spi;
++	idg_dev->idg_irq = irq;
++	spin_unlock_irq(&idg_dev->spi_lock);
++	dev_info(&spi->dev, "idg_irq: %d
+", idg_dev->idg_irq);
++	dev_info(&spi->dev, "idg_spi driver initial fifo
+");
++	idg_dev->v2_fifo = fifo_create(MAX_BUFFER_SIZE, FIFO_SIZE);
++	if (idg_dev->v2_fifo == NULL) {
++		dev_err(&spi->dev, "idg_spi fifo initial failed
+");
++		err = -ENOMEM;
++		goto idg_dev_error;
++	}
++	idg_dev->v5_fifo = fifo_create(MAX_BUFFER_SIZE, FIFO_SIZE);
++	if (idg_dev->v5_fifo == NULL) {
++		dev_err(&spi->dev, "idg_spi v5 fifo initial failed
+");
++		err = -ENOMEM;
++		goto idg_dev_error;
++	}
++	mutex_init(&idg_dev->lock);
++	idg_spi_tty_misc.parent = &spi->dev;
++	err = misc_register(&idg_spi_tty_misc);
++	if (err) {
++		pr_err("%s: spi_register_misc_driver failed(%d)", DRVNAME, err);
++		goto idg_tty_error;
++	}
++	idgv5_spi_tty_misc.parent = &spi->dev;
++	err = misc_register(&idgv5_spi_tty_misc);
++	if (err) {
++		dev_err(&spi->dev, "failed to register idgv5 tty misc
+");
++		goto idgv5_tty_error;
++	}
++	init_waitqueue_head(&idg_dev->wait);
++	if (of_property_read_bool(np, "idg-low-triggered")) {
++		irq_flags = IRQF_TRIGGER_FALLING;
++		dev_info(&spi->dev, "idg_spi is low triggered
+");
++	} else if (of_property_read_bool(np, "idg-high-triggered")) {
++		irq_flags = IRQF_TRIGGER_RISING;
++		dev_info(&spi->dev, "idg_spi is high triggered
+");
++	} else {
++		dev_err(&spi->dev, "trigger setting is not exist
+");
++		err = -ENODATA;
++		goto idgv5_tty_error;
++	}
++	irq_flags |= IRQF_ONESHOT;
++	err = request_threaded_irq(idg_dev->idg_irq, NULL, idg_spi_irq_handler,
++				   irq_flags, spi->dev.driver->name, idg_dev);
++	if (err) {
++		pr_err("%s: spi_request_irq failed(%d)", DRVNAME, err);
++		goto idg_irq_error;
++	}
++	disable_irq(idg_dev->idg_irq);
++	idg_dev->irq_en = false;
++	idg_dev->keep_sense = of_property_read_bool(np, "idg-keep-sense");
++	if (idg_dev->keep_sense) {
++		dev_info(&spi->dev, "idg_spi irq is keep triggered
+");
++		enable_irq(idg_dev->idg_irq);
++		idg_dev->irq_en = true;
++	}
++	dev_info(&spi->dev, "idg_spi driver probed
+");
++
++	return 0;
++
++idg_irq_error:
++	free_irq(idg_dev->idg_irq, idg_dev);
++idgv5_tty_error:
++	misc_deregister(&idgv5_spi_tty_misc);
++idg_tty_error:
++	misc_deregister(&idg_spi_tty_misc);
++idg_dev_error:
++	kfree(idg_dev);
++setup_error:
++	return err;
++}
++
++static int idg_spi_remove(struct spi_device *spi)
++{
++	struct idg_spi_device *idg_dev = spi_get_drvdata(spi);
++
++	free_irq(idg_dev->idg_irq, idg_dev);
++	misc_deregister(&idgv5_spi_tty_misc);
++	misc_deregister(&idg_spi_tty_misc);
++	fifo_destroy(idg_dev->v5_fifo);
++	fifo_destroy(idg_dev->v2_fifo);
++	kfree(idg_dev);
++	dev_dbg(&spi->dev, "unregistered idg spi module
+");
++
++	return 0;
++}
++
++static const struct of_device_id idg_spi_dt_ids[] = {
++	{ .compatible = "idtech,idg-spi", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, idg_spi_dt_ids);
++
++static struct spi_driver idg_spi_driver = {
++	.driver = {
++		.name	= DRVNAME,
++		.of_match_table = of_match_ptr(idg_spi_dt_ids),
++	},
++	.probe		= idg_spi_probe,
++	.remove		= idg_spi_remove,
++};
++module_spi_driver(idg_spi_driver);
++
++MODULE_AUTHOR("Arthur Chen <arthur.chen@idtechproducts.com>");
++MODULE_DESCRIPTION("idg_spi misc driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+new file mode 100644
+index 000000000000..48e235084664
+--- /dev/null
++++ b/drivers/misc/idg_spi.h
+@@ -0,0 +1,130 @@
++/*
++ * Driver for idg spi.
++ *
++ * Copyright (c) 2020 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef _IDG_SPI_H
++#define _IDG_SPI_H
++
++#define DRVNAME			"idg_spi"
++#define TTYNAME			"ttyIDG"
++#define TTYV5NAME		"ttyIDGV5"
++
++#define IDG_HEADER_LEN		10
++#define IDG_SIZE_MSB		12
++#define IDG_SIZE_LSB		13
++#define MAX_BUFFER_SIZE		256 /* referenced from RT1050 defined */
++				/* ViVOtech2  */
++#define CLIENT_NEOII_Header_V2	"\x56\x69\x56\x4F\x74\x65\x63\x68\x32\x00"
++				/* ViVOpayV5  */
++#define CLIENT_NEOII_Header_V5	"\x56\x69\x56\x4F\x70\x61\x79\x56\x35\x00"
++				/* ViVO */
++#define NEOII_Header		"\x56\x69\x56\x4F"
++				/* tech2  */
++#define NEOII_Header_V2		"\x74\x65\x63\x68\x32\x00"
++				/* payV5  */
++#define NEOII_Header_V5		"\x70\x61\x79\x56\x35\x00"
++#define NEOII_HEADER_LEN	4
++#define NEOII_VERSION_LEN	6
++#define NEOII_CRC_LEN		2
++#define NEOII_CMD_LEN		4
++#define RX_SIZE_MSB		2
++#define RX_SIZE_LSB		3
++#define BASE_READ_SIZE		16
++
++#define NUM_ASCII		48
++#define UPPER_ASCII		55
++#define LOWER_ASCII		87
++#define UALPHA_ASCII		65
++#define LALPHA_ASCII		97
++#define LUNVIS_ASCII		31
++#define UUNVIS_ASCII		127
++#define CHAR2HEX_FAIL		(-1)
++#define DELAY_5MS		5000
++#define DELAY_10MS		10000
++#define MSPI_MSG_COUNT		8
++#define CRC_TABLE_SIZE		256
++
++#define READ_ERROR		"ERROR"
++#define READ_ERROR_SIZE		1
++
++#define FIFO_SIZE		16
++#define FIFO_OVERFLOW		(-1)
++
++#define RECOVER_OFFSET		1
++
++struct idg_spi_device {
++				/* spi related */
++	struct spi_device	*spi_dev;
++	int			clock_freq;
++	int			idg_irq;
++	spinlock_t		spi_lock; /* to get spi device safely */
++	wait_queue_head_t	wait;
++				/* protect related */
++	struct mutex		lock;
++				/* fifo related */
++	struct mt_fifo		*v2_fifo;
++	struct mt_fifo		*v5_fifo;
++				/* interrupt switch (enable/disable) */
++	bool			irq_en;
++				/*
++				 * flag about don't make interrupt controlled by
++				 * device file entry open/close.
++				 */
++	bool			keep_sense;
++};
++
++struct mt_fifo {
++	int			msg_size;
++	int			msg_avail;
++	int			msg_cnt;
++	int			msg_head;
++	int			msg_tail;
++	char			*data;
++	struct semaphore	*sem;
++	struct semaphore	*sem_buf;
++};
++
++/* referenced from NEO 2 IDG_Rev sample code */
++static const unsigned short CrcTable[CRC_TABLE_SIZE] = {
++	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
++	0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
++	0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
++	0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
++	0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
++	0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
++	0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
++	0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
++	0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
++	0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
++	0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
++	0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
++	0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
++	0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
++	0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
++	0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
++	0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
++	0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
++	0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
++	0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
++	0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
++	0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
++	0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
++	0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
++	0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
++	0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
++	0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
++	0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
++	0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
++	0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
++	0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
++	0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
++};
++
++#endif /* _IDG_SPI_H */

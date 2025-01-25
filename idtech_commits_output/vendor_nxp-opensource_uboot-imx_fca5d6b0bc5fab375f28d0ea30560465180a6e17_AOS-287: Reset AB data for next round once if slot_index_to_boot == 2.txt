@@ -1,0 +1,30 @@
+fca5d6b0bc George.Huang 2020-08-13
+
+AOS-287: Reset AB data for next round once if slot_index_to_boot == 2
+
+- This change will reset AB data in spl
+
+- Below change will reset AB data in bootloader
+    commit 02a2f076de0a6df304a6dbed38c5cb412a76dab9
+    ("AOS-56: Reset AB data for next round once if ret = AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS")
+    Author: George.Huang <George.Huang@idtechproducts.com>
+    Date:   Fri Feb 7 16:30:16 2020 +0800
+    Change-Id: I9bea3b032b44552fc390c168ff3e1a98f33009db
+
+Change-Id: I1b4fe717eb0ffb9dd01437e5288b8817554e4a86
+
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index 161dc621a9..79ff65827b 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -463,6 +463,9 @@ int mmc_load_image_raw_sector_dual_uboot(struct spl_image_info *spl_image,
+ 		/* No bootable slots, try to boot into recovery! */
+ 		printf("No bootable slots found, try to boot into recovery mode...
+");
+ 
++#if defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_IDT_DUAL_SPL)
++		fsl_avb_ab_data_init(&ab_data);
++#endif
+ 		ab_data.spl_recovery = true;
+ 		if ((ab_data.last_boot != 0) && (ab_data.last_boot != 1))
+ 			slot_index_to_boot = 0;

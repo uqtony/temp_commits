@@ -1,0 +1,107 @@
+d7de754bef09 owen.wen 2022-03-01
+
+AOS-870: rename variable, x to spi_xfer, m to spi_msg
+
+just make it more human readable
+
+Change-Id: I03a083b6c3aad1d4492c388ed0c7694b5ae56edf
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 20824cc3ae64..c7139fb0653d 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -653,8 +653,8 @@ static struct miscdevice idg_spi_tty_misc = {
+ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ {
+ 	struct spi_device *spi;
+-	struct spi_message m;
+-	struct spi_transfer *x;
++	struct spi_message spi_msg;
++	struct spi_transfer *spi_xfer;
+ 	char *idg_tx = NULL;
+ 	char *idg_rx = NULL;
+ 	char *data = NULL;
+@@ -665,12 +665,12 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	int status_s;
+ 	int i;
+ 
+-	spi_message_init(&m);
+-	x = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+-	if (!x)
++	spi_message_init(&spi_msg);
++	spi_xfer = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	if (!spi_xfer)
+ 		goto out;
+-	x->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+-	if (!x->ptp_sts)
++	spi_xfer->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
++	if (!spi_xfer->ptp_sts)
+ 		goto out;
+ 	idg_tx = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!idg_tx)
+@@ -686,20 +686,20 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+ 	dev_dbg(&spi->dev, "K81 returned
+");
+-	x->tx_buf = idg_tx;
+-	x->tx_nbits = SPI_NBITS_SINGLE;
+-	x->rx_buf = idg_rx;
+-	x->rx_nbits = SPI_NBITS_SINGLE;
+-	x->len = BASE_READ_SIZE;
+-	x->speed_hz = idg_dev->clock_freq;
+-	x->bits_per_word = idg_dev->bits_per_word;
++	spi_xfer->tx_buf = idg_tx;
++	spi_xfer->tx_nbits = SPI_NBITS_SINGLE;
++	spi_xfer->rx_buf = idg_rx;
++	spi_xfer->rx_nbits = SPI_NBITS_SINGLE;
++	spi_xfer->len = BASE_READ_SIZE;
++	spi_xfer->speed_hz = idg_dev->clock_freq;
++	spi_xfer->bits_per_word = idg_dev->bits_per_word;
+ 	mutex_lock(&idg_dev->lock);
+ 	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+-	m.spi = spi;
++	spi_msg.spi = spi;
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+-	spi_message_add_tail(x, &m);
+-	status = spi_sync(spi, &m);
++	spi_message_add_tail(spi_xfer, &spi_msg);
++	status = spi_sync(spi, &spi_msg);
+ 	mutex_unlock(&idg_dev->lock);
+ 	dev_dbg(&spi->dev, "first read (16 bytes)
+");
+ 	if (!status) {
+@@ -728,12 +728,12 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			dev_info(&spi->dev, "NEOII header not found
+");
+ 			err = EINVAL;
+ 		} else if (idg_size < MAX_BUFFER_SIZE) {
+-			x->len = idg_size;
++			spi_xfer->len = idg_size;
+ 			mutex_lock(&idg_dev->lock);
+ 			spin_lock_irq(&idg_dev->spi_lock);
+-			m.spi = spi;
++			spi_msg.spi = spi;
+ 			spin_unlock_irq(&idg_dev->spi_lock);
+-			status_s = spi_sync(spi, &m);
++			status_s = spi_sync(spi, &spi_msg);
+ 			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 			mutex_unlock(&idg_dev->lock);
+ 			dev_dbg(&spi->dev, "second read (%d bytes)
+",
+@@ -903,10 +903,10 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		}
+ 	}
+ out:
+-	if (x->ptp_sts != NULL)
+-		kfree(x->ptp_sts);
+-	if (x != NULL)
+-		kfree(x);
++	if (spi_xfer->ptp_sts != NULL)
++		kfree(spi_xfer->ptp_sts);
++	if (spi_xfer != NULL)
++		kfree(spi_xfer);
+ 	if (idg_tx != NULL)
+ 		kfree(idg_tx);
+ 	if (idg_rx != NULL)

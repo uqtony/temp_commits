@@ -1,0 +1,99 @@
+a60e1116e307 jenkins 2020-10-23
+
+Merge branch 'merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: I34edf8405a82a252606c2a0c5e45821fdd654d17
+
+diff --cc packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
+index f2ed3e648220,7c9537b95319..b5c39c9d2a05
+--- a/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
++++ b/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
+@@@ -141,9 -141,9 +141,15 @@@ public class NotificationStackScrollLay
+          mDependency.injectTestDependency(
+                  NotificationBlockingHelperManager.class,
+                  mBlockingHelperManager);
+++<<<<<<< HEAD
+ +        mDependency.injectTestDependency(NotificationLockscreenUserManager.class,
+ +                mLockscreenUserManager);
+ +        mDependency.injectTestDependency(StatusBarStateController.class, mBarState);
+++=======
++         mDependency.injectTestDependency(SysuiStatusBarStateController.class, mBarState);
++         mDependency.injectTestDependency(NotificationLockscreenUserManager.class,
++                 mLockscreenUserManager);
+++>>>>>>> merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test
+          mDependency.injectTestDependency(MetricsLogger.class, mMetricsLogger);
+          mDependency.injectTestDependency(NotificationRemoteInputManager.class,
+                  mRemoteInputManager);
+diff --cc services/core/java/com/android/server/am/ActivityManagerService.java
+index 2600d7c86a4e,8d589728ba71..d4796cd07928
+--- a/services/core/java/com/android/server/am/ActivityManagerService.java
++++ b/services/core/java/com/android/server/am/ActivityManagerService.java
+@@@ -5225,45 -5202,6 +5222,48 @@@ public class ActivityManagerService ext
+              mCallFinishBooting = false;
+          }
+  
+++<<<<<<< HEAD
+ +        boolean isAndroidAuto = false;
+ +        MonitorZygoteProperty monitorThread = null;
+ +        if (SystemProperties.getBoolean("vendor.all.car", false)) {
+ +            isAndroidAuto = true;
+ +        }
+ +
+ +        ArraySet<String> completedIsas = new ArraySet<String>();
+ +        for (String abi : Build.SUPPORTED_ABIS) {
+ +            if (isAndroidAuto && !abi.equals("arm64-v8a")) {
+ +                if (monitorThread == null) {
+ +                    monitorThread = new MonitorZygoteProperty();
+ +                }
+ +                monitorThread.addAbi(abi);
+ +                break;
+ +            }
+ +
+ +            ZYGOTE_PROCESS.establishZygoteConnectionForAbi(abi);
+ +            final String instructionSet = VMRuntime.getInstructionSet(abi);
+ +            if (!completedIsas.contains(instructionSet)) {
+ +                try {
+ +                    mInstaller.markBootComplete(VMRuntime.getInstructionSet(abi));
+ +                } catch (InstallerException e) {
+ +                    if (!VMRuntime.didPruneDalvikCache()) {
+ +                        // This is technically not the right filter, as different zygotes may
+ +                        // have made different pruning decisions. But the log is best effort,
+ +                        // anyways.
+ +                        Slog.w(TAG, "Unable to mark boot complete for abi: " + abi + " (" +
+ +                                e.getMessage() +")");
+ +                    }
+ +                }
+ +                completedIsas.add(instructionSet);
+ +            }
+ +        }
+ +
+ +        if (monitorThread != null && isAndroidAuto) {
+ +            Slog.d(TAG, "Detect AndroidAuto, will use async thread to wait for secondary zygote.");
+ +            monitorThread.start();
+ +        }
+ +
+++=======
+++>>>>>>> merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test
+          IntentFilter pkgFilter = new IntentFilter();
+          pkgFilter.addAction(Intent.ACTION_QUERY_PACKAGE_RESTART);
+          pkgFilter.addDataScheme("package");
+diff --cc services/core/java/com/android/server/am/AppErrors.java
+index bbd2d34e92a6,055ee1e2a0c0..571359d5e881
+--- a/services/core/java/com/android/server/am/AppErrors.java
++++ b/services/core/java/com/android/server/am/AppErrors.java
+@@@ -383,7 -383,11 +383,15 @@@ class AppErrors 
+              // and then the delayed summary kill will be a no-op.
+              final ProcessRecord p = proc;
+              mService.mHandler.postDelayed(
+++<<<<<<< HEAD
+ +                    () -> killAppImmediateLocked(p, "forced", "killed for invalid state"),
+++=======
++                     () -> {
++                         synchronized (mService) {
++                             killAppImmediateLocked(p, "forced", "killed for invalid state");
++                         }
++                     },
+++>>>>>>> merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test
+                      5000L);
+          }
+      }

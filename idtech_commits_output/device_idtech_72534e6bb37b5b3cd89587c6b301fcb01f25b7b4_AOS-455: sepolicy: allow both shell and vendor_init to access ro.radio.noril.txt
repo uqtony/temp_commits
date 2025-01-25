@@ -1,0 +1,36 @@
+72534e6b George.Huang 2021-06-24
+
+AOS-455: sepolicy: allow both shell and vendor_init to access ro.radio.noril
+
+Error Log:
+- avc:  denied  { read } for property=ro.radio.noril pid=0 uid=0 gid=0
+  scontext=u:r:vendor_init:s0 tcontext=u:object_r:radio_prop:s0 tclass=file
+
+Solution:
+- change ro.radio.noril type to exported_radio_prop for vendor_init
+
+Change-Id: I54fb3d94407503e00d8c5ad055f090a14b5cb8b6
+
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 156a8e5a..2e19130e 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -212,7 +212,7 @@ ro.rfkilldisabled                   u:object_r:vendor_default_prop:s0
+ # serial number for mdnsd broadcast
+ ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+ 
+-ro.radio.noril                      u:object_r:radio_prop:s0 exact string
++ro.radio.noril                      u:object_r:exported_radio_prop:s0 exact string
+ vendor.rild.                        u:object_r:radio_prop:s0
+ rild.                               u:object_r:radio_prop:s0
+ net.eth0.                           u:object_r:radio_prop:s0
+diff --git a/imx8m/sepolicy/shell.te b/imx8m/sepolicy/shell.te
+index 7b7ca307..24d756e4 100644
+--- a/imx8m/sepolicy/shell.te
++++ b/imx8m/sepolicy/shell.te
+@@ -10,4 +10,5 @@ allow shell vendor_file:file { read execute open getattr };
+ allow shell system_prop:property_service { set };
+ allow shell sysfs_usb_uevent:file { getattr read open };
+ set_prop(shell, radio_prop)
++set_prop(shell, exported_radio_prop)
+ get_prop(shell, device_config_runtime_native_boot_prop)

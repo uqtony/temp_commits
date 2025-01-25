@@ -1,0 +1,98 @@
+e221ad2d57d1 Jay 2021-09-15
+
+AOS-732: arm64: dts: redwood_8mq: setup ICN6211 device tree
+
+Setup ICN6211 bridge to output RGB data to panel ST7262.
+
+Change-Id: I709f48a9f366c34760ae329f5da4dbce22eaf421
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 9ba97e6c6394..ee5f34af557d 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -161,6 +161,14 @@ reg_lcm_lcd_vdd: fixed-regulator-3v3-vdd {
+ 		off-on_delay-us = <2000>;
+ 	};
+ 
++	reg_lcm_bridg_vdd: fixed-regulator-3v3-vdd {
++		compatible = "regulator-fixed";
++		regualtor-name = "bridge_3v3_supply";
++		regualtor-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
+ 	sound-tlv320aic31xx {
+ 		compatible = "fsl,imx-audio-tlv320aic31xx";
+ 		model = "tlv320aic3110-audio";
+@@ -513,6 +521,12 @@ timing {
+ 				pixelclk-active = <0>;
+ 			};
+ 		};
++
++		port {
++			st7262_input: endpoint {
++				remote-endpoint = <&bridge_out_dsi>;
++			};
++		};
+ 	};
+ 
+ };
+@@ -1360,13 +1374,42 @@ panel_in: endpoint {
+ 		};
+ 	};
+ 
++	bridge@0 {
++		compatible = "chipone,icn6211";
++		reg = <0>;
++		vdd1-supply = <&reg_lcm_bridg_vdd>;
++		vdd2-supply = <&reg_lcm_bridg_vdd>;
++		vdd3-supply = <&reg_lcm_bridg_vdd>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				bridge_in_dsi: endpoint {
++					remote-endpoint = <&mipi_dsi_out_2>;
++				};
++			};
++
++			port@1 {
++				reg = <1>;
++				bridge_out_dsi: endpoint {
++					remote-endpoint = <&st7262_input>;
++				};
++			};
++		};
++	};
++
+ 	ports {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+ 		port@0 {
+ 			reg = <0>;
+-			mipi_dsi_in: endpoint {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			mipi_dsi_in: endpoint@0 {
+ 				remote-endpoint = <&lcdif_mipi_dsi>;
+ 			};
+ 		};
+@@ -1377,6 +1420,13 @@ mipi_dsi_out: endpoint {
+ 				remote-endpoint = <&panel_in>;
+ 			};
+ 		};
++
++		port@2 {
++			reg = <2>;
++			mipi_dsi_out_2: endpoint {
++				remote-endpoint = <&bridge_in_dsi>;
++			};
++		};
+ 	};
+ };
+ 

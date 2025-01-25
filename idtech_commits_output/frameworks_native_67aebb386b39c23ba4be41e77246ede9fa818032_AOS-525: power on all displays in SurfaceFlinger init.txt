@@ -1,0 +1,24 @@
+67aebb386b AndrewS 2021-02-03
+
+AOS-525: power on all displays in SurfaceFlinger init
+
+power on all displays in SurfaceFlinger init to move
+non default displays power on process before
+DisplayManagerService start.
+
+Change-Id: If82cff5a2a4bd308c2008f0c1fb839e23f2fafb5
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index ff740e442d..1f3a1b9cd0 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -4194,7 +4194,8 @@ void SurfaceFlinger::onInitializeDisplays() {
+     setTransactionState(state, displays, 0, nullptr, mPendingInputWindowCommands, -1, {}, false,
+                         {});
+ 
+-    setPowerModeInternal(display, hal::PowerMode::ON);
++    for (const auto& [token, displayDevice] : mDisplays)
++        setPowerModeInternal(displayDevice, hal::PowerMode::ON);
+ 
+     const nsecs_t vsyncPeriod = getVsyncPeriod();
+     mAnimFrameTracker.setDisplayRefreshPeriod(vsyncPeriod);

@@ -1,0 +1,48 @@
+036973a6a294 George.Huang 2021-11-01
+
+AOS-784: arm64: dts: imx8mq: fix incorrect PCIE Supply Configuration
+
+- Reference:
+  https://community.nxp.com/t5/i-MX-Processors-Knowledge-Base/i-MX-8M-Dual-8M-QuadLite-8M-Quad-Incorrect-PCIE-Supply/ta-p/1299599
+
+- Root Cause:
+  The PCIE_VPH power supply is selectable in software between 1.8V and
+  3.3V. When the PCIE_VPH supply is configured to operate at 3.3V, the
+  1.8V internal regulator (disabled by default) must be enabled to
+  prevent overstress conditions on the PCIe PHY.
+  If the 1.8V internal regulator is left disabled when the PCIE_VPH
+  supply is configured to operate at 3.3V, it could potentially impact
+  the product lifetime of the device.
+
+- Solution:
+  make sure "vph-supply = <&vgen5_reg>" is set for pcie and
+  IMX8MQ_GPR_PCIE_VREG_BYPASS is set from 1 to 0 which means do not
+  bypass 1.8V internal regulator.
+
+Change-Id: Ie62ba7652c671038f4a46913edbee62906eb397e
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index d38c0bf3c354..a6859b7c94c6 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -705,7 +705,7 @@ &pcie0 {
+ 	assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_50M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_100M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_250M>;
+-	vph-supply = <&reg_pcie>;
++	vph-supply = <&vgen5_reg>;
+ 	l1ss-disabled;
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index f2c21be65408..101c560e76f7 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -796,6 +796,7 @@ &pcie0 {
+ 	assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_50M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_100M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_250M>;
++	vph-supply = <&vgen5_reg>;
+ 	epdev_on-supply = <&epdev_on>;
+ 	reserved-time-before-reg-ms = <50>;
+ 	reserved-time-after-reg-ms = <200>;

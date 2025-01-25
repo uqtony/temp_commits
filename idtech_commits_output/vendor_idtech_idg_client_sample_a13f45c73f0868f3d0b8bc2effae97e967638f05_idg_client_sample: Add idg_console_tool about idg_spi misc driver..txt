@@ -1,0 +1,165 @@
+a13f45c Arthur Chen 2020-03-19
+
+idg_client_sample: Add idg_console_tool about idg_spi misc driver.
+
+Change-Id: I30b44ec8e33f3ff837fa7e942177990175718fef
+
+diff --git a/idg_console_tool/Android.mk b/idg_console_tool/Android.mk
+new file mode 100644
+index 0000000..da1a91a
+--- /dev/null
++++ b/idg_console_tool/Android.mk
+@@ -0,0 +1,9 @@
++LOCAL_PATH:=$(call my-dir)
++include $(CLEAR_VARS)
++
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES:=\
++main.c
++
++LOCAL_MODULE := idg_console_tool
++include $(BUILD_EXECUTABLE)
+diff --git a/idg_console_tool/main.c b/idg_console_tool/main.c
+new file mode 100644
+index 0000000..a785386
+--- /dev/null
++++ b/idg_console_tool/main.c
+@@ -0,0 +1,126 @@
++/*
++ * IDG test for idg_spi misc driver
++ *
++ * Copyright (c) 2020 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ */
++
++#include <stdio.h>
++#include <stdbool.h>
++#include <sys/ioctl.h>
++#include <sys/poll.h>
++#include <arpa/inet.h>
++#include <fcntl.h>
++#include <poll.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <pthread.h>
++#include <stdint.h>
++#include <unistd.h>
++
++#define LOCAL_DRIVER_V2	"/dev/ttyIDGV2"
++#define LOCAL_DRIVER_V5	"/dev/ttyIDGV5"
++#define MAX_BUFFER_SIZE	256
++#define INIT		2
++
++struct idt_channel {
++	int fd;
++};
++
++void *get_data(void *data)
++{
++	struct idt_channel *channel = (struct idt_channel *)data;
++	char buffer[MAX_BUFFER_SIZE] = "";
++	struct pollfd fds = {0, 0, 0};
++	int get_size;
++	int ret, i;
++
++	fds.fd = channel->fd;
++	fds.events = POLLIN;
++	while (1) {
++		ret = poll(&fds, 1, 100);
++		if (ret > 0) {
++			get_size = read(fds.fd, buffer, MAX_BUFFER_SIZE);
++			printf("read data and get size = %d
+", get_size);
++			for (i = 0; i < get_size; i++) {
++				if ((buffer[i] > 32) && (buffer[i] < 126))
++					printf("%c", buffer[i]);
++				else
++					printf(" 0x%.2X ", buffer[i]);
++			}
++			puts("
+");
++		}
++	}
++	pthread_exit(NULL);
++}
++
++int main(int argc, char const *argv[])
++{
++	struct idt_channel *channel;
++	pthread_t read_th;
++	char buffer[MAX_BUFFER_SIZE] = "";
++	int fd = 0;
++	int ret = 0;
++
++	channel = malloc(sizeof(struct idt_channel));
++
++	switch (argc) {
++	case 1:
++		fd = open(LOCAL_DRIVER_V2, O_RDWR);
++		printf("path: %s, ttyfd = %d
+", LOCAL_DRIVER_V2, fd);
++		break;
++	case 2:
++		if (*argv[1] == '2') {
++			fd = open(LOCAL_DRIVER_V2, O_RDWR);
++			printf("path: %s, ttyfd = %d
+", LOCAL_DRIVER_V2, fd);
++			break;
++		}
++		if (*argv[1] == '5') {
++			fd = open(LOCAL_DRIVER_V5, O_RDWR);
++			printf("path: %s, ttyfd = %d
+", LOCAL_DRIVER_V5, fd);
++			break;
++		}
++	default:
++		puts("Usage:
+"
++		     "	For IDG V2: 		idg_console_tool
+"
++		     "				idg_console_tool 2
+"
++		     "	For IDG V5: 		idg_console_tool 5
+");
++			break;
++	}
++
++	if (fd <= 0)
++		goto idg_tool_out;
++
++	ret = write(fd, buffer, INIT); /* for initial communication */
++	channel->fd = fd;
++	ret = pthread_create(&read_th, NULL, get_data, (void *)channel);
++
++	while (1) {
++		puts("Please enter IDG command"
++		     "(hex number only, no space):
+");
++		scanf("%s", buffer);
++		ret = write(fd, buffer, strlen(buffer));
++		if (ret < 0)
++			printf("IDG data sent error %d
+", ret);
++		else
++			puts("IDG data sent
+");
++
++	}
++	pthread_join(read_th, NULL);
++	ret = 0;
++
++idg_tool_out:
++	if (fd != -1)
++		close(fd);
++
++	if (channel)
++		free(channel);
++
++	return ret;
++}

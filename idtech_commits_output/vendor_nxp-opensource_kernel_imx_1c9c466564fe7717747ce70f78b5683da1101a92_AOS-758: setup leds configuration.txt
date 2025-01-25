@@ -1,0 +1,114 @@
+1c9c466564fe Jay 2021-10-08
+
+AOS-758: setup leds configuration
+
+Setup camera related leds
+  1. Status led : GPIO led
+  2. flash led : PWM led
+
+setup system system status led as gpio led.
+We can access those leds with file node in /sys/class/leds.
+
+Change-Id: I73dd6e13d16166d33102a28291e678bf5350a1c0
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 11853494d57b..0d9c3d841ce9 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -308,20 +308,6 @@ reg_usdhc2_vmmc: regulator-vsd-3v3 {
+ 		enable-active-high;
+ 	};
+ 
+-	buck2_reg: regulator-buck2 {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_buck2>;
+-		compatible = "regulator-gpio";
+-		regulator-name = "vdd_arm";
+-		regulator-min-microvolt = <900000>;
+-		regulator-max-microvolt = <1000000>;
+-		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+-		states = <1000000 0x0
+-			  900000 0x1>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+ 	sound-hdmi {
+ 		compatible = "fsl,imx8mq-evk-cdnhdmi",
+ 				"fsl,imx-audio-cdnhdmi";
+@@ -345,22 +331,30 @@ backlight: backlight {
+ 		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255>;
+ 		default-brightness-level = <12>;
+ 	};
+-};
+ 
+-&A53_0 {
+-	cpu-supply = <&buck2_reg>;
+-};
+-
+-&A53_1 {
+-	cpu-supply = <&buck2_reg>;
+-};
++	gpio-leds {
++		compatible = "gpio-leds";
++		front-camera-status {
++			label = "front-cam:status";
++			gpios = <&gpio5 3 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
+ 
+-&A53_2 {
+-	cpu-supply = <&buck2_reg>;
+-};
++		system-status {
++			label = "system:status";
++			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
+ 
+-&A53_3 {
+-	cpu-supply = <&buck2_reg>;
++	pwm-leds {
++		compatible = "pwm-leds";
++		front-camera-flash {
++			label = "front-cam:flash";
++			pwms = <&pwm4 0 50000 0>;
++			max-brightness = <255>;
++		};
++	};
+ };
+ 
+ &csi1_bridge {
+@@ -935,19 +929,12 @@ MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10			0x19  //LCD_BLEN, also control K81 battery
+ 			MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12			0x82  //K81_PWR_ON
+ 			MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5			0x19  //CAM2_PWR_ON
+ 			MX8MQ_IOMUXC_SPDIF_TX_GPIO5_IO3				0x19  //CAMERA2_STATUS_LED
+-			MX8MQ_IOMUXC_SAI3_MCLK_GPIO5_IO2			0x19  //CAMERA2_PWM_WHT_LED
++			MX8MQ_IOMUXC_SAI3_MCLK_PWM4_OUT				0x19  //CAMERA2_PWM_WHT_LED
+ 			MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1			0x19  //PROXIMITY_INT
+ 			MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x16
+ 		>;
+ 	};
+ 
+-	pinctrl_buck2: vddarmgrp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13			0x19
+-		>;
+-
+-	};
+-
+ 	pinctrl_csi1_power: csi1_power_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3			0x19
+@@ -1353,6 +1340,10 @@ &pwm2 {
+ 	status = "okay";
+ };
+ 
++&pwm4 {
++	status = "okay";
++};
++
+ &tmu {
+ 	throttle-cfgs {
+ 		throttle_devfreq: devfreq {

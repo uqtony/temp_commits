@@ -1,0 +1,31 @@
+5482b7f owen.wen 2021-06-28
+
+AAPP-517: fix stuck at boot, lack of permission in whitelist
+
+Symptom: stuck at boot
+RootCause: lack of android.permission.REBOOT in whitelist
+Log:
+06-25 18:24:57.992  5228  5228 E AndroidRuntime: java.lang.IllegalStateException: Signature|privileged permissions not in privapp-permissions whitelist: {com.idtech.otaupdater (/product/priv-app/otaupdater): android.permission.REBOOT}
+Solution: add android.permission.REBOOT in whitelist
+
+you can also find the permission problem during verify build
+https://jenkins.idtechproducts.com/view/Android-11/job/android_11_idt_dev-verify/920/console
+
+refer below for more information
+https://source.android.com/devices/tech/config/perms-allowlist
+In sum: app located in /system, /product, /vendor need to put signature|privileged permission in
+privapp-permissions.xml
+
+Change-Id: I008e1a71fe952be04905eb1890a62421028818d4
+
+diff --git a/privapp-permissions-com.idtech.otaupdater.xml b/privapp-permissions-com.idtech.otaupdater.xml
+index 5984f18..3cb9a51 100644
+--- a/privapp-permissions-com.idtech.otaupdater.xml
++++ b/privapp-permissions-com.idtech.otaupdater.xml
+@@ -3,5 +3,6 @@
+ <permissions>
+     <privapp-permissions package="com.idtech.otaupdater">
+         <permission name="android.permission.ACCESS_CACHE_FILESYSTEM"/>
++        <permission name="android.permission.REBOOT"/>
+     </privapp-permissions>
+ </permissions>

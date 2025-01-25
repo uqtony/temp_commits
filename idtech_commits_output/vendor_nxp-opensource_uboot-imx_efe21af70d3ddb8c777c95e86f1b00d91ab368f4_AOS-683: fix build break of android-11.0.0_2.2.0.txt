@@ -1,0 +1,39 @@
+efe21af70d George.Huang 2021-07-26
+
+AOS-683: fix build break of android-11.0.0_2.2.0
+
+uboot-imx/drivers/idt/bdinfo_parser/linux_dtb.c:87:3: warning: implicit declaration of function 'env_set'
+   env_set("dtbo_slot", "a");
+   ^~~~~~~
+
+uboot-imx/drivers/idt/bdinfo_parser/linux_dtb.c:249:5: error: conflicting types for 'get_dtbo_mipi_dsi_timing'
+ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+
+Change-Id: I8c9c9701e6af70a53af8d20af6928e31687ee271
+
+diff --git a/drivers/idt/bdinfo_parser/linux_dtb.c b/drivers/idt/bdinfo_parser/linux_dtb.c
+index b720749971..3745b3e5b6 100644
+--- a/drivers/idt/bdinfo_parser/linux_dtb.c
++++ b/drivers/idt/bdinfo_parser/linux_dtb.c
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <common.h>
++#include <env.h>
+ #include <fb_fsl.h>
+ #include <dt_table.h>
+ #include <errno.h>
+diff --git a/include/idt_bdinfo_parser.h b/include/idt_bdinfo_parser.h
+index 5a71f078f5..8aa29ec538 100644
+--- a/include/idt_bdinfo_parser.h
++++ b/include/idt_bdinfo_parser.h
+@@ -7,6 +7,8 @@
+ #ifndef __IDT_BDINFO_PARSER_H__
+ #define __IDT_BDINFO_PARSER_H__
+ 
++#include <fdtdec.h>
++
+ #define BOARD_ID	128
+ 
+ #ifdef CONFIG_IDT_LINUX_DTB

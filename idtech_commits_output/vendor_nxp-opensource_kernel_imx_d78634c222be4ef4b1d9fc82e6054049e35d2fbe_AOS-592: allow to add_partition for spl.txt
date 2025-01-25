@@ -1,0 +1,51 @@
+d78634c222be George.Huang 2021-05-14
+
+AOS-592: allow to add_partition for spl
+
+Change-Id: Iebeeeb80669d60fa599ad515dcb2cb8c3fb592c5
+
+diff --git a/block/partitions/core.c b/block/partitions/core.c
+index a02e22411594..ebc2314a1ace 100644
+--- a/block/partitions/core.c
++++ b/block/partitions/core.c
+@@ -360,7 +360,7 @@ static DEVICE_ATTR(whole_disk, 0444, whole_disk_show, NULL);
+  * Must be called either with bd_mutex held, before a disk can be opened or
+  * after all disk users are gone.
+  */
+-static struct hd_struct *add_partition(struct gendisk *disk, int partno,
++struct hd_struct *add_partition(struct gendisk *disk, int partno,
+ 				sector_t start, sector_t len, int flags,
+ 				struct partition_meta_info *info)
+ {
+diff --git a/drivers/mmc/core/block.c b/drivers/mmc/core/block.c
+index 7f344109220b..76a2d3ccea48 100644
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -2937,8 +2937,8 @@ static int mmc_blk_probe(struct mmc_card *card)
+ 			spl_length = 4096 - spl_offset;
+ 			spl_length_4k_aligned = (size_t)(spl_length / factor) * factor;
+ 			pr_info("IDTech added partition at offset %zu sectors
+", spl_offset);
+-			//add_partition(part_md->disk, 1, 0    + spl_offset, spl_length_4k_aligned, 0, NULL);
+-			//add_partition(part_md->disk, 2, 4096 + spl_offset, spl_length_4k_aligned, 0, NULL);
++			add_partition(part_md->disk, 1, 0    + spl_offset, spl_length_4k_aligned, 0, NULL);
++			add_partition(part_md->disk, 2, 4096 + spl_offset, spl_length_4k_aligned, 0, NULL);
+ 		}
+ 	}
+ 
+diff --git a/include/linux/genhd.h b/include/linux/genhd.h
+index 03da3f603d30..03e9c8c9741f 100644
+--- a/include/linux/genhd.h
++++ b/include/linux/genhd.h
+@@ -339,6 +339,11 @@ int bdev_disk_changed(struct block_device *bdev, bool invalidate);
+ int blk_add_partitions(struct gendisk *disk, struct block_device *bdev);
+ int blk_drop_partitions(struct block_device *bdev);
+ 
++extern struct hd_struct * __must_check add_partition(struct gendisk *disk,
++						     int partno, sector_t start,
++						     sector_t len, int flags,
++						     struct partition_meta_info
++						       *info);
+ extern struct gendisk *__alloc_disk_node(int minors, int node_id);
+ extern struct kobject *get_disk_and_module(struct gendisk *disk);
+ extern void put_disk(struct gendisk *disk);

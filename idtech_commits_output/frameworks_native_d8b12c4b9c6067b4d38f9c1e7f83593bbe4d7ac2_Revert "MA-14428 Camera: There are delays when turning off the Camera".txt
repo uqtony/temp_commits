@@ -1,0 +1,24 @@
+d8b12c4b9c George.Huang 2020-12-28
+
+Revert "MA-14428 Camera: There are delays when turning off the Camera"
+
+This reverts commit 2fd73d1fe3ba5bf875c059b49119bf2a1a3380e2.
+
+Change-Id: I9be351cfaefd8411ede5ba997084ecc1be4bcd17
+
+diff --git a/services/surfaceflinger/DisplayHardware/HWComposer.cpp b/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+index 5c2df71c8f..7a2f0f34ee 100644
+--- a/services/surfaceflinger/DisplayHardware/HWComposer.cpp
++++ b/services/surfaceflinger/DisplayHardware/HWComposer.cpp
+@@ -586,11 +586,6 @@ status_t HWComposer::presentAndGetReleaseFences(DisplayId displayId) {
+     }
+ 
+     auto error = hwcDisplay->present(&displayData.lastPresentFence);
+-    // Dont log NOT_VALIDATED error as we will trigger
+-    // Multiple refresh for evs case
+-    if(error == HWC2::Error::NotValidated){
+-        return UNKNOWN_ERROR;
+-    }
+     RETURN_IF_HWC_ERROR_FOR("present", error, displayId, UNKNOWN_ERROR);
+ 
+     std::unordered_map<HWC2::Layer*, sp<Fence>> releaseFences;

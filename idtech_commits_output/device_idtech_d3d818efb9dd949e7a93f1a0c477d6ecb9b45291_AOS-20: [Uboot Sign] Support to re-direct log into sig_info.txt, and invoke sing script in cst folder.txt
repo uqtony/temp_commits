@@ -1,0 +1,41 @@
+d3d818ef max.yang 2019-11-13
+
+AOS-20: [Uboot Sign] Support to re-direct log into sig_info.txt, and invoke sing script in cst folder
+
+1. Add code in uboot.mk, preparing inputs for signing uboot image
+  - Add here because we don't need to porting to every project, its common code
+2. Add caller of sign_uboot.py, dealing with inputs and generating signed_uboot.imx
+
+Change-Id: I0749d5423a412c8d5480442debf5b49df4b0e421
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index e7171c3d..f02a9e31 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -128,6 +128,16 @@ ifeq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ IDTECH_BUILD += SECURE_BOOT=1
+ endif
+ 
++CST_PATH := ./vendor/idtech/cst
++
++define sign_imx_uboot
++       echo IDTech sign uboot process ...; \
++       $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab 2>&1 | tee $(UBOOT_OUT)/hab_info.txt; \
++       cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
++       cp $(UBOOT_BIN) $(CST_PATH)/flash.bin; \
++       $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH);
++endef
++
+ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 	$(hide) echo "Building $(UBOOT_ARCH) $(UBOOT_VERSION) U-Boot ..."
+ 	$(hide) $(call build_m4_image)
+@@ -150,7 +160,8 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		    $(call build_uboot_w_tee,  $(TARGET_BOOTLOADER_POSTFIX), $$UBOOT_PLATFORM) \
+ 		fi; \
+ 		install -D $(UBOOT_COLLECTION)/u-boot-$$UBOOT_PLATFORM.imx $(UBOOT_BIN); \
+-	done
++		$(call sign_imx_uboot) \
++	done 2>&1 | tee $(UBOOT_OUT)/sig_info.txt
+ 
+ .PHONY: bootloader $(UBOOT_BIN) $(UBOOTENVSH)
+ 

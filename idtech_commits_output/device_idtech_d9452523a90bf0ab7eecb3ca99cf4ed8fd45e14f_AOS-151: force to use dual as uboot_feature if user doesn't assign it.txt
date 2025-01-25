@@ -1,0 +1,62 @@
+d9452523 George.Huang 2020-04-14
+
+AOS-151: force to use dual as uboot_feature if user doesn't assign it
+
+Change-Id: I85abe876c8639b03ffff7eab1b366af948df8fd7
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index a93e3df0..1a42764d 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -123,6 +123,9 @@ call :help & goto :eof
+ if [%soc_name%] == [] set soc_name=imx8mq
+ set som_model=%soc_name%
+ 
++:: force to use dual as uboot_feature if user doesn't assign it
++if [%uboot_feature%] == [] set uboot_feature=-dual
++
+ :: check whether the soc_name is legal or not
+ if not [%soc_name%] == [] (
+     setlocal enabledelayedexpansion
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index fe35cfdc..f448f48e 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -434,6 +434,9 @@ done
+ [ -z "$soc_name" ] && soc_name="imx8mq"
+ som_model="${soc_name}"
+ 
++# force to use dual as uboot_feature if user doesn't assign it
++[ -z "$uboot_feature" ] && uboot_feature="-dual"
++
+ # check whether the soc_name is legal or not
+ if [ -n "${soc_name}" ]; then
+     whether_in_array soc_name supported_soc_names
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index afc56d5d..861585b5 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -137,6 +137,9 @@ call :help & set /A error_level=1 && goto :exit
+ if [%soc_name%] == [] set soc_name=imx8mq
+ set som_model=%soc_name%
+ 
++:: force to use dual as uboot_feature if user doesn't assign it
++if [%uboot_feature%] == [] set uboot_feature=-dual
++
+ :: avoid substring judgement error
+ set uboot_feature_test=A%uboot_feature%
+ 
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 138fe2dc..abb3f3ca 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -489,6 +489,9 @@ done
+ [ -z "$soc_name" ] && soc_name="imx8mq"
+ som_model="${soc_name}"
+ 
++# force to use dual as uboot_feature if user doesn't assign it
++[ -z "$uboot_feature" ] && uboot_feature="-dual"
++
+ # Process of the uboot_feature parameter
+ if [[ "${uboot_feature}" = *"trusty"* ]] || [[ "${uboot_feature}" = *"secure"* ]]; then
+     support_trusty=1;

@@ -1,0 +1,282 @@
+6d5f8b58 George.Huang 2022-03-17
+
+AOS-887: [post_merge] fix conflicts
+
+Change-Id: I76d035f34feda579836ba510cfd2626f9bc090a7
+
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 64da34f2..7807e2b9 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -82,6 +82,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MP_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -100,6 +103,13 @@ PRODUCT_COPY_FILES += \
+ 
+ 
+ # -------@block_storage-------
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
+ 
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+@@ -231,7 +241,7 @@ PRODUCT_PACKAGES += \
+     libwvdrmengine \
+     liboemcrypto \
+ 
+-$(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee.mk)
++$(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee_8mp.mk)
+ 
+ # -------@block_audio-------
+ 
+@@ -249,15 +259,16 @@ PRODUCT_COPY_FILES += \
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/mcu-sdk/imx8mp/imx8mp_mcu_demo.img:imx8mp_mcu_demo.img \
+     $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
+     $(IMX_DEVICE_PATH)/usb_audio_policy_configuration-direct-output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration-direct-output.xml
+ 
+ ifeq ($(POWERSAVE),true)
+ PRODUCT_COPY_FILES += \
++    $(OUT_DIR)/target/product/$(firstword $(PRODUCT_DEVICE))/imx8mp_mcu_demo.bin:imx8mp_mcu_demo.img \
+     $(IMX_DEVICE_PATH)/audio_policy_configuration_pcm512x.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml
+ else
+ PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/mcu-sdk/imx8mp/imx8mp_mcu_demo.img:imx8mp_mcu_demo.img \
+     $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml
+ endif
+ 
+@@ -276,10 +287,6 @@ PRODUCT_PACKAGES += \
+     media_profiles_8mp-ov5640.xml \
+     media_profiles_8mp-basler-ov5640.xml
+ 
+-# ISP camera feature demo
+-PRODUCT_PACKAGES += \
+-    CameraXBasic
+-
+ # -------@block_display-------
+ 
+ PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi xxhdpi
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index 7a96a9fd..be427b88 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -4,6 +4,8 @@ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+@@ -74,6 +76,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MQ_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -91,6 +96,14 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh
+ 
+ # -------@block_storage-------
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
++
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ 
+@@ -457,6 +470,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
++# Set CCodec property in default
++PRODUCT_PROPERTY_OVERRIDES += \
++    debug.stagefright.ccodec_delayed_params=true
++
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index 4019c4cf..6894e76a 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -4,6 +4,8 @@ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+@@ -74,6 +76,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MQ_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -91,6 +96,14 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh
+ 
+ # -------@block_storage-------
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
++
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ 
+@@ -455,6 +468,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
++# Set CCodec property in default
++PRODUCT_PROPERTY_OVERRIDES += \
++    debug.stagefright.ccodec_delayed_params=true
++
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index ec050064..95bb30a3 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -4,6 +4,8 @@ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+@@ -74,6 +76,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MQ_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -466,6 +471,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
++# Set CCodec property in default
++PRODUCT_PROPERTY_OVERRIDES += \
++    debug.stagefright.ccodec_delayed_params=true
++
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index 7f0e18eb..b576f799 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -77,6 +77,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MN_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -94,6 +97,14 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh
+ 
+ # -------@block_storage-------
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
++
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ 
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index fe76b4f5..927fa5ab 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -4,6 +4,8 @@ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+@@ -74,6 +76,9 @@ TARGET_USE_VENDOR_BOOT ?= true
+ 
+ ifeq ($(IMX8MQ_USES_GKI),true)
+   BOARD_RAMDISK_USE_LZ4 := true
++
++  BOARD_USES_GENERIC_KERNEL_IMAGE := true
++  $(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
+ endif
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+@@ -91,6 +96,14 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh
+ 
+ # -------@block_storage-------
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
++
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ 
+@@ -458,6 +471,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
++# Set CCodec property in default
++PRODUCT_PROPERTY_OVERRIDES += \
++    debug.stagefright.ccodec_delayed_params=true
++
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \

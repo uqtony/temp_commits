@@ -1,0 +1,283 @@
+fb1d27d44724 George.Huang 2020-02-19
+
+AOS-70: Sync changes from fsl-imx8mq-evk.dts
+
+Change-Id: I948b3012279f4eb1c1d8d1f4be14b0af2cbe4672
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-imx8mq-evk-idtech-spi.dts b/arch/arm64/boot/dts/freescale/fsl-imx8mq-evk-idtech-spi.dts
+index 89f5f8e4f8cf..b2814be11110 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-imx8mq-evk-idtech-spi.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-imx8mq-evk-idtech-spi.dts
+@@ -15,6 +15,7 @@
+ 
+ /dts-v1/;
+ 
++#include <dt-bindings/usb/pd.h>
+ #include "fsl-imx8mq.dtsi"
+ 
+ / {
+@@ -24,14 +25,38 @@ android {
+ 			compatible = "android,firmware";
+ 			fstab {
+ 				compatible = "android,fstab";
++				system {
++					compatible = "android,system";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/30b40000.usdhc/by-name/system";
++					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
++					dev_mmcblk1 = "/dev/block/platform/30b50000.usdhc/by-name/system";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/30b40000.usdhc/by-name/system";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
++				};
+ 				vendor {
+ 					compatible = "android,vendor";
+-					/* sd card node which used if androidboot.storage_type=sd */
+-					dev_sd = "/dev/block/platform/30b50000.usdhc/by-name/vendor";
+-					/* emmc node which used if androidboot.storage_type=emmc */
+-					dev_emmc = "/dev/block/platform/30b40000.usdhc/by-name/vendor";
+ 					/* default emmc node used for GSI */
+ 					dev = "/dev/block/platform/30b40000.usdhc/by-name/vendor";
++					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
++					dev_mmcblk1 = "/dev/block/platform/30b50000.usdhc/by-name/vendor";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/30b40000.usdhc/by-name/vendor";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb";
++				};
++				product {
++					compatible = "android,product";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/30b40000.usdhc/by-name/product";
++					/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
++					dev_mmcblk1 = "/dev/block/platform/30b50000.usdhc/by-name/product";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/30b40000.usdhc/by-name/product";
+ 					type = "ext4";
+ 					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
+ 					fsmgr_flags = "wait,slotselect,avb";
+@@ -41,12 +66,39 @@ vbmeta {
+ 				/*we need use FirstStageMountVBootV2 if we enable avb*/
+ 				compatible = "android,vbmeta";
+ 				/*parts means the partition witch can be mount in first stage*/
+-				parts = "vbmeta,boot,system,vendor";
++				parts = "vbmeta,dtbo,boot,system,vendor,product";
+ 			};
+ 		};
+ 	};
+ };
+ 
++/ {
++	trusty {
++		compatible = "android,trusty-smc-v1";
++		ranges;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		use-gicv3-workaround;
++		trusty-irq {
++			use-gicv3-workaround;
++			compatible = "android,trusty-irq-v1";
++			interrupt-templates = <&trusty_ipi 0>;
++			interrupt-ranges = < 0 15 0>;
++		};
++		trusty-virtio {
++			compatible = "android,trusty-virtio-v1";
++		};
++		trusty-log {
++			compatible = "android,trusty-log-v1";
++		};
++	};
++	trusty_ipi: interrupt-controller@0 {
++		compatible = "android,CustomIPI";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++	};
++};
++
+ / {
+ 	model = "Freescale i.MX8MQ EVK";
+ 	compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
+@@ -84,12 +136,6 @@ reg_gpio_dvfs: regulator-gpio {
+ 		};
+ 	};
+ 
+-	bt_rfkill {
+-		compatible = "fsl,mxc_bt_rfkill";
+-		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+-		status ="okay";
+-	};
+-
+ 	ir_recv: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+@@ -105,6 +151,12 @@ brcmfmac: brcmfmac {
+ 		pinctrl-2 = <&pinctrl_wlan>;
+ 	};
+ 
++	bt_rfkill {
++		compatible = "fsl,mxc_bt_rfkill";
++		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++		status ="okay";
++	};
++
+ 	wm8524: wm8524 {
+ 		compatible = "wlf,wm8524";
+ 		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+@@ -558,7 +610,7 @@ &i2c1 {
+ 	pinctrl-0 = <&pinctrl_i2c1>;
+ 	status = "okay";
+ 
+-	pmic: pfuze100@08 {
++	pmic: pfuze100@8 {
+ 		compatible = "fsl,pfuze100";
+ 		reg = <0x08>;
+ 
+@@ -643,21 +695,26 @@ vgen6_reg: vgen6 {
+ 	};
+ 
+ 	typec_ptn5100: ptn5110@50 {
+-		compatible = "usb,tcpci";
++		compatible = "nxp,ptn5110";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_typec>;
+ 		reg = <0x50>;
+ 		interrupt-parent = <&gpio3>;
+ 		interrupts = <3 8>;
+ 		ss-sel-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+-		src-pdos = <0x380190c8>;
+-		snk-pdos = <0x380190c8 0x3802d0c8>;
+-		max-snk-mv = <9000>;
+-		max-snk-ma = <2000>;
+-		op-snk-mw = <9000>;
+-		max-snk-mw = <18000>;
+-		port-type = "drp";
+-		default-role = "sink";
++
++		usb_con1: connector {
++			compatible = "usb-c-connector";
++			label = "USB-C";
++			power-role = "dual";
++			data-role = "dual";
++			try-power-role = "sink";
++			source-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
++			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)
++				     PDO_VAR(5000, 20000, 3000)>;
++			op-sink-microwatt = <15000000>;
++			self-powered;
++		};
+ 	};
+ 
+ 	ov5640_mipi2: ov5640_mipi2@3c {
+@@ -946,16 +1003,6 @@ &mu {
+ 	status = "okay";
+ };
+ 
+-&rpmsg{
+-	/*
+-	 * 64K for one rpmsg instance:
+-	 * --0x98000000~0x9800ffff: pingpong
+-	 */
+-	vdev-nums = <1>;
+-	reg = <0x0 0x98000000 0x0 0x10000>;
+-	status = "okay";
+-};
+-
+ &A53_0 {
+ 	operating-points = <
+ 		/* kHz    uV */
+@@ -967,53 +1014,6 @@ &A53_0 {
+ 	dc-supply = <&reg_gpio_dvfs>;
+ };
+ 
+-/* Data for energy-aware-scheduling */
+-/{
+-	cpus {
+-		energy-costs {
+-			CPU_COST_A53: core-cost-a53 {
+-				busy-cost-data = <
+-					546  1017
+-					682  1272
+-					887  2041
+-					1024 2356
+-				>;
+-				idle-cost-data = <
+-					94
+-					94
+-					0
+-				>;
+-			};
+-			CLUSTER_COST_A53: cluster-cost-a53 {
+-				busy-cost-data = <
+-					546  1017
+-					682  1272
+-					887  2041
+-					1024 3095
+-				>;
+-				idle-cost-data = <
+-					1037
+-					1037
+-					1037
+-				>;
+-			};
+-		};
+-	};
+-};
+-
+-&A53_0 {
+-	sched-energy-costs = <&CPU_COST_A53 &CLUSTER_COST_A53>;
+-};
+-&A53_1 {
+-	sched-energy-costs = <&CPU_COST_A53 &CLUSTER_COST_A53>;
+-};
+-&A53_2 {
+-	sched-energy-costs = <&CPU_COST_A53 &CLUSTER_COST_A53>;
+-};
+-&A53_3 {
+-	sched-energy-costs = <&CPU_COST_A53 &CLUSTER_COST_A53>;
+-};
+-
+ &dcss {
+ 	status = "okay";
+ 
+@@ -1053,12 +1053,12 @@ &mipi_csi_1 {
+ 	#size-cells = <0>;
+ 	status = "okay";
+ 	port {
+-		mipi1_sensor_ep: endpoint1 {
++		mipi1_sensor_ep: endpoint@0 {
+ 			remote-endpoint = <&ov5640_mipi1_ep>;
+ 			data-lanes = <1 2>;
+ 		};
+ 
+-		csi1_mipi_ep: endpoint2 {
++		csi1_mipi_ep: endpoint@1 {
+ 			remote-endpoint = <&csi1_ep>;
+ 		};
+ 	};
+@@ -1069,12 +1069,12 @@ &mipi_csi_2 {
+ 	#size-cells = <0>;
+ 	status = "okay";
+ 	port {
+-		mipi2_sensor_ep: endpoint1 {
++		mipi2_sensor_ep: endpoint@0 {
+ 			remote-endpoint = <&ov5640_mipi2_ep>;
+ 			data-lanes = <1 2>;
+ 		};
+ 
+-		csi2_mipi_ep: endpoint2 {
++		csi2_mipi_ep: endpoint@1 {
+ 			remote-endpoint = <&csi2_ep>;
+ 		};
+ 	};
+@@ -1095,6 +1095,7 @@ &crypto {
+ &resmem {
+ 	carveout_region: imx_ion@0 {
+ 		compatible = "imx-ion-pool";
+-		reg = <0x0 0xf8000000 0 0x8000000>;
++		reg = <0x0 0xf6000000 0 0x8000000>;
+ 	};
+ };
++

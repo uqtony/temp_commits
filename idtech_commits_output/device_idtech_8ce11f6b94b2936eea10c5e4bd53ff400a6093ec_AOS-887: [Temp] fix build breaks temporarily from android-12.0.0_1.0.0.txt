@@ -1,0 +1,55 @@
+8ce11f6b George.Huang 2022-03-08
+
+AOS-887: [Temp] fix build breaks temporarily from android-12.0.0_1.0.0
+
+Change-Id: I5b5ce36a86e02c4a79b2b29d518c9f70878fc474
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 57ec041b..d4f1166c 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -237,3 +237,6 @@ SOONG_CONFIG_IDT_PCI_RM_ADBD ?= false
+ 
+ # add symbolic link for idtechdata
+ BOARD_ROOT_EXTRA_SYMLINKS := /mnt/vendor/idtechdata:/idtechdata
++
++BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
++BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE := true
+diff --git a/imx8m/redwood_8mq/SharedBoardConfig.mk b/imx8m/redwood_8mq/SharedBoardConfig.mk
+index cba3d3cc..4621383c 100644
+--- a/imx8m/redwood_8mq/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mq/SharedBoardConfig.mk
+@@ -2,7 +2,7 @@
+ 
+ KERNEL_NAME := Image.lz4
+ TARGET_KERNEL_ARCH := arm64
+-IMX8MQ_USES_GKI := true
++IMX8MQ_USES_GKI := false
+ 
+ #NXP 8997 wifi driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index b9f5e8c7..89d000ef 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -470,7 +470,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.logd.kernel=true
+ 
+ # led control
+-PRODUCT_PACKAGES += \
++#PRODUCT_PACKAGES += \
+     android.hardware.kioskled-service \
+     android.hardware.kioskled
+ 
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index f7740b2a..9cb7062e 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -17,7 +17,6 @@ allow system_app ota_package_file:dir rw_dir_perms;
+ allow system_app ota_package_file:file { create_file_perms relabelfrom };
+ allow system_app media_rw_data_file:file relabelto;
+ allow system_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
+-allow system_app apk_data_file:dir { write };
+ allow system_app idg_device:chr_file { open getattr read write };
+ 
+ get_prop(system_app, vendor_public_default_prop)

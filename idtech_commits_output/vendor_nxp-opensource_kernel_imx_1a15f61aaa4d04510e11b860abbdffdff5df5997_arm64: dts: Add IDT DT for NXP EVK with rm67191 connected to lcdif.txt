@@ -1,0 +1,90 @@
+1a15f61aaa4d Sergii Postulga 2020-06-15
+
+arm64: dts: Add IDT DT for NXP EVK with rm67191 connected to lcdif
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: Ia404b20adb9ded64c11f64b8477edc56327fd2bd
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 70bdacc06aaa..33737ee95ded 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -130,6 +130,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk-idtech-spi.dtb \
+ 			 idt_imx8mq_evt-0_evk_idtechspi-0.dtb \
+ 			 idt_imx8mq_evt-0_evk_mipi-0.dtb \
+ 			 idt_imx8mq_evt-0_evk_mipipanel-0.dtb \
++			 idt_imx8mq_evt-0_evk_lcdifrm67191-0.dtb \
+ 			 idt_imx8mq_evt-0_evk_ram1gb-0.dtb \
+ 			 idt_a300_evt-0_devboard_evt-0.dtb \
+ 			 idt_a300_evt-0_devboard_hdmi-0.dtb \
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0.dts
+new file mode 100644
+index 000000000000..fbb7422403da
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_lcdifrm67191-0.dts
+@@ -0,0 +1,65 @@
++/*
++ * Dummy device-tree based om EVK with IDTech ID's
++ *
++ * Copyright 2019 IDTech
++ *
++ */
++ 
++/dts-v1/;
++
++#include "imx8mq-evk-lcdif-rm67191.dts"
++
++/ {
++	firmware {
++		android {
++			compatible = "android,firmware";
++			/* default emmc node used for GSI */
++			boot_devices = "soc@0/soc@0:bus@30800000/30b40000.mmc";
++			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++			boot_devices_mmcblk0 = "soc@0/soc@0:bus@30800000/30b40000.mmc";
++			fstab {
++				compatible = "android,fstab";
++				system {
++					compatible = "android,system";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
++				};
++				vendor {
++					compatible = "android,vendor";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb";
++				};
++				product {
++					compatible = "android,product";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb";
++				};
++			};
++			vbmeta {
++				/*we need use FirstStageMountVBootV2 if we enable avb*/
++				compatible = "android,vbmeta";
++				/*parts means the partition witch can be mount in first stage*/
++				parts = "vbmeta,dtbo,boot,system,vendor,product";
++			};
++		};
++	};
++};
++
++/ {
++	idt,prod-id = "idt_imx8mq_evt-0_evk_lcdifrm67191-0";
++};

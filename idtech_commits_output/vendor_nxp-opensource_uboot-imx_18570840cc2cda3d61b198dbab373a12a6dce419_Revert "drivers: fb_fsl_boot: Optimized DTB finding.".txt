@@ -1,0 +1,51 @@
+18570840cc George.Huang 2020-07-28
+
+Revert "drivers: fb_fsl_boot: Optimized DTB finding."
+
+This reverts commit 722548677a7b8e90b271fa7d397089e1861d3ef9.
+
+Change-Id: I2dc590947097c61fe34189f4bad34ae06e979136
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index a9eec4e492..735366c24e 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -653,7 +653,6 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	AvbABFlowResult avb_result;
+ 	AvbSlotVerifyData *avb_out_data = NULL;
+ 	AvbPartitionData *avb_loadpart = NULL;
+-	char *env_value;
+ 
+ 	if (!is_bdinfo_som_set()) {
+ 		goto fail;
+@@ -918,23 +917,12 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 
+ 		printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
+ 							    dt_entry_count));
+-		env_value = env_get("idt,prod-id");
+-		if (env_value == NULL) {
+-			puts("boota: no IDTECH product ID in board_info
+");
++		entry_idx = find_dtb_in_dtbo(dt_img);
++		if (entry_idx < 1) {
++			puts("boota: no avaliable dtb
+");
+ 			retry_boot = true;
+ 			goto fail;
+ 		}
+-		env_value = env_get("entry_idx");
+-		if (env_value != NULL) {
+-			entry_idx = (int)simple_strtol(env_value, NULL, 10);
+-		} else {
+-			entry_idx = find_dtb_in_dtbo(dt_img);
+-			if (entry_idx < 1) {
+-				puts("boota: no avaliable dtb
+");
+-				retry_boot = true;
+-				goto fail;
+-			}
+-		}
+ 		dt_entry = (struct dt_table_entry *)
+ 			   ((ulong)dt_img +
+ 			    fdt32_to_cpu(dt_img->dt_entries_offset) *

@@ -1,0 +1,75 @@
+6bf7963484e7 George.Huang 2020-06-30
+
+[A100]Type-C controller device-tree setting
+
+Change-Id: I469560c6ab08b87b1ba64d9b3765598d22efffb9
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index fbcb99ca6a33..df04eae36a45 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -739,35 +739,6 @@ adv7535_from_dsim: endpoint {
+ 			};
+ 		};
+ 	};
+-
+-	ptn5110_1: tcpc@50 {
+-		compatible = "nxp,ptn5110";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_typec1>;
+-		reg = <0x50>;
+-		interrupt-parent = <&gpio2>;
+-		interrupts = <11 8>;
+-		status = "okay";
+-
+-		port {
+-			typec1_dr_sw: endpoint {
+-				remote-endpoint = <&usb1_drd_sw>;
+-			};
+-		};
+-
+-		typec1_con: connector {
+-			compatible = "usb-c-connector";
+-			label = "USB-C";
+-			power-role = "dual";
+-			data-role = "dual";
+-			try-power-role = "sink";
+-			source-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)>;
+-			sink-pdos = <PDO_FIXED(5000, 3000, PDO_FIXED_USB_COMM)
+-				     PDO_VAR(5000, 20000, 3000)>;
+-			op-sink-microwatt = <15000000>;
+-			self-powered;
+-		};
+-	};
+ };
+ 
+ &i2c3 {
+@@ -843,6 +814,13 @@ ov5640_ep: endpoint {
+ 			};
+ 		};
+ 	};
++
++	typec_hd3ss3220: hd3ss3220@67 {
++		compatible = "ti,hd3ss3220";
++		reg = <0x67>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++	};
+ };
+ 
+ &fec1 {
+@@ -1024,13 +1002,9 @@ &usbotg1 {
+ 	srp-disable;
+ 	adp-disable;
+ 	usb-role-switch;
++	extcon = <0>, <&typec_hd3ss3220>;
+ 	status = "okay";
+ 
+-	port {
+-		usb1_drd_sw: endpoint {
+-			remote-endpoint = <&typec1_dr_sw>;
+-		};
+-	};
+ };
+ 
+ &gpu {

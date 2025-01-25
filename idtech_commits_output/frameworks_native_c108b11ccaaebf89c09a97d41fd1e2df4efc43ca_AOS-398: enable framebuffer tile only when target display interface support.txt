@@ -1,0 +1,93 @@
+c108b11cca AndrewS 2020-11-12
+
+AOS-398: enable framebuffer tile only when target display interface support
+
+There are two flags to decide to enable framebuffer tile support or not, one is to check if the display is primary display or not, another one is to check if the primary display interface support framebuffer tile or not.
+And here's the chart if fbTileSupport when primary display interface support framebuffer tile:
+isPrimaryDisplay | fbTileSupportOnPrimary | fbTileSupport?
+------------------------------------------------------------
+       Y         |            Y           |       Y
+------------------------------------------------------------
+       N         |            Y           |       N
+
+The chart if fbTileSupport when primary display interface does not support framebuffer tile:
+isPrimaryDisplay | fbTileSupportOnPrimary | fbTileSupport?
+------------------------------------------------------------
+       Y         |            N           |       N
+------------------------------------------------------------
+       N         |            N           |       Y
+
+So we know that fbTileSupport equals to the NOT value of the two flags XOR value.
+
+/***********************************************************************/
+This works in most cases, but will fail when primary_display configured as dcss, and only one display connected through lcdif.
+/***********************************************************************/
+
+Change-Id: I1d197d9a6b2956c6e0291e7a0c1545f782dd8191
+
+diff --git a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+index 0ebc93f3ea..8e4868b14c 100644
+--- a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
++++ b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+@@ -54,7 +54,7 @@ using ui::Dataspace;
+  * imx8qm/imx8qxp support framebuffer tile.
+  */
+ 
+-static uint64_t GetPlatformPrivateUsage()
++static uint64_t GetPlatformPrivateUsage(HWComposer& hwc, DisplayId displayId)
+ {
+     uint64_t usage = 0;
+     char name[PROPERTY_VALUE_MAX] = {};
+@@ -69,7 +69,23 @@ static uint64_t GetPlatformPrivateUsage()
+         {
+             if(strcmp(name, "imx8mq") == 0)
+             {
+-                usage = GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_PRIVATE_0 | GRALLOC_USAGE_PRIVATE_1;
++                // check the coming display is primary or not
++                auto helper = hwc.fromPhysicalDisplayId(displayId);
++                unsigned long physicalDisplayId = helper.value_or(0);
++                helper = hwc.getInternalHwcDisplayId();
++                unsigned long internalDisplayId = helper.value_or(0);
++                bool isPrimaryDisplay = physicalDisplayId == internalDisplayId;
++                // check if primary display is dcss
++                char display_name[PROPERTY_VALUE_MAX] = {};
++                bool fbTileSupportOnPrimary = false;
++                property_get("ro.boot.primary_display", display_name, "");
++                if (strcmp(display_name, "imx-dcss") == 0) {
++                    fbTileSupportOnPrimary = true;
++                }
++                // enable framebuffer tile only when target display interface support
++                if (!(isPrimaryDisplay ^ fbTileSupportOnPrimary)) {
++                    usage = GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_PRIVATE_0 | GRALLOC_USAGE_PRIVATE_1;
++                }
+             }
+             else if((strcmp(name, "imx8qm") == 0) || (strcmp(name, "imx8qxp") == 0))
+             {
+@@ -100,23 +116,12 @@ FramebufferSurface::FramebufferSurface(HWComposer& hwc, DisplayId displayId,
+         mPreviousBuffer() {
+     ALOGV("Creating for display %s", to_string(displayId).c_str());
+ 
+-    // performance improve for HDMI display
+-    bool hdmiPerformanceImprove = (property_get_int32("ro.idt.hdmi_performance_improve", int32_t(0)) == 1);
+-
+     mName = "FramebufferSurface";
+     mConsumer->setConsumerName(mName);
+-    if (hdmiPerformanceImprove) {
+-        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
+-                                           GRALLOC_USAGE_HW_RENDER |
+-                                           GRALLOC_USAGE_HW_COMPOSER |
+-                                           GRALLOC_USAGE_HW_TEXTURE |
+-                                           GRALLOC_USAGE_PRIVATE_0);
+-    } else {
+-        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
+-                                           GRALLOC_USAGE_HW_RENDER |
+-                                           GRALLOC_USAGE_HW_COMPOSER |
+-                                           GetPlatformPrivateUsage());
+-    }
++    mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
++                                       GRALLOC_USAGE_HW_RENDER |
++                                       GRALLOC_USAGE_HW_COMPOSER |
++                                       GetPlatformPrivateUsage(hwc, displayId));
+     const auto& activeConfig = mHwc.getActiveConfig(displayId);
+     mConsumer->setDefaultBufferSize(activeConfig->getWidth(),
+             activeConfig->getHeight());

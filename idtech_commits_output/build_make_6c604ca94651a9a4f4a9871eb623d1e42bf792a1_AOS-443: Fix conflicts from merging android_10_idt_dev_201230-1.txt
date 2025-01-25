@@ -1,0 +1,129 @@
+6c604ca94 George.Huang 2020-12-31
+
+AOS-443: Fix conflicts from merging android_10_idt_dev_201230-1
+
+Change-Id: If3455deb629fed87686514c015887fb707075c78
+
+diff --git a/core/Makefile b/core/Makefile
+index f74a1ab90..78e47a4b3 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4093,7 +4093,6 @@ else
+ endif
+ 
+ ifeq ($(build_otatools_package),true)
+-<<<<<<< HEAD
+ 
+ INTERNAL_OTATOOLS_MODULES := \
+   aapt2 \
+@@ -4166,53 +4165,6 @@ INTERNAL_OTATOOLS_MODULES += \
+   merge_zips \
+   resize2fs \
+   soong_zip \
+-=======
+-OTATOOLS :=  $(HOST_OUT_EXECUTABLES)/minigzip \
+-  $(HOST_OUT_EXECUTABLES)/aapt \
+-  $(HOST_OUT_EXECUTABLES)/aapt2 \
+-  $(HOST_OUT_EXECUTABLES)/checkvintf \
+-  $(HOST_OUT_EXECUTABLES)/mkbootfs \
+-  $(HOST_OUT_EXECUTABLES)/mkbootimg \
+-  $(HOST_OUT_EXECUTABLES)/fs_config \
+-  $(HOST_OUT_EXECUTABLES)/zipalign \
+-  $(HOST_OUT_EXECUTABLES)/bsdiff \
+-  $(HOST_OUT_EXECUTABLES)/imgdiff \
+-  $(HOST_OUT_JAVA_LIBRARIES)/signapk.jar \
+-  $(HOST_OUT_JAVA_LIBRARIES)/BootSignature.jar \
+-  $(HOST_OUT_JAVA_LIBRARIES)/VeritySigner.jar \
+-  $(HOST_OUT_EXECUTABLES)/mke2fs \
+-  $(HOST_OUT_EXECUTABLES)/mkuserimg_mke2fs \
+-  $(HOST_OUT_EXECUTABLES)/e2fsdroid \
+-  $(HOST_OUT_EXECUTABLES)/tune2fs \
+-  $(HOST_OUT_EXECUTABLES)/mksquashfsimage.sh \
+-  $(HOST_OUT_EXECUTABLES)/mksquashfs \
+-  $(HOST_OUT_EXECUTABLES)/mkf2fsuserimg.sh \
+-  $(HOST_OUT_EXECUTABLES)/make_f2fs \
+-  $(HOST_OUT_EXECUTABLES)/sload_f2fs \
+-  $(HOST_OUT_EXECUTABLES)/simg2img \
+-  $(HOST_OUT_EXECUTABLES)/e2fsck \
+-  $(HOST_OUT_EXECUTABLES)/generate_verity_key \
+-  $(HOST_OUT_EXECUTABLES)/verity_signer \
+-  $(HOST_OUT_EXECUTABLES)/verity_verifier \
+-  $(HOST_OUT_EXECUTABLES)/append2simg \
+-  $(HOST_OUT_EXECUTABLES)/img2simg \
+-  $(HOST_OUT_EXECUTABLES)/boot_signer \
+-  $(HOST_OUT_EXECUTABLES)/fec \
+-  $(HOST_OUT_EXECUTABLES)/brillo_update_payload \
+-  $(HOST_OUT_EXECUTABLES)/lib/shflags/shflags \
+-  $(HOST_OUT_EXECUTABLES)/delta_generator \
+-  $(HOST_OUT_EXECUTABLES)/care_map_generator \
+-  $(HOST_OUT_EXECUTABLES)/fc_sort \
+-  $(HOST_OUT_EXECUTABLES)/sefcontext_compile \
+-  $(HOST_OUT_EXECUTABLES)/apksigner \
+-  $(HOST_OUT_JAVA_LIBRARIES)/apksigner.jar \
+-  $(LPMAKE) \
+-  $(AVBTOOL) \
+-  $(BLK_ALLOC_TO_BASE_FS) \
+-  $(BROTLI) \
+-  $(BUILD_VERITY_METADATA) \
+-  $(BUILD_VERITY_TREE)
+->>>>>>> android_10_idt_dev_201230-1
+ 
+ ifeq (true,$(PRODUCT_SUPPORTS_VBOOT))
+ INTERNAL_OTATOOLS_MODULES += \
+@@ -4254,7 +4206,12 @@ INTERNAL_OTATOOLS_PACKAGE_FILES += \
+   $(sort $(shell find external/vboot_reference/tests/devkeys -type f))
+ endif
+ 
+-<<<<<<< HEAD
++# IDT added for post signing process with CA
++# *.der and fake.keystore for apk sign, csf_parser for bootloader sign
++INTERNAL_OTATOOLS_PACKAGE_FILES += \
++  $(sort $(shell find device -type f -name "*.der" -o -name "fake.keystore")) \
++  $(sort $(shell find vendor/idtech/cst -type f -name "*.py" -o -name "csf_parser"))
++
+ INTERNAL_OTATOOLS_RELEASETOOLS := \
+   $(sort $(shell find build/make/tools/releasetools -name "*.pyc" -prune -o \
+       \( -type f -o -type l \) -print))
+@@ -4265,15 +4222,6 @@ $(BUILT_OTATOOLS_PACKAGE): PRIVATE_OTATOOLS_PACKAGE_FILES := $(INTERNAL_OTATOOLS
+ $(BUILT_OTATOOLS_PACKAGE): PRIVATE_OTATOOLS_RELEASETOOLS := $(INTERNAL_OTATOOLS_RELEASETOOLS)
+ $(BUILT_OTATOOLS_PACKAGE): $(INTERNAL_OTATOOLS_PACKAGE_FILES) $(INTERNAL_OTATOOLS_RELEASETOOLS)
+ $(BUILT_OTATOOLS_PACKAGE): $(SOONG_ZIP) $(ZIP2ZIP)
+-=======
+-# IDT added for post signing process with CA
+-# *.der and fake.keystore for apk sign, csf_parser for bootloader sign
+-OTATOOLS_DEPS += \
+-  $(sort $(shell find device -type f -name "*.der" -o -name "fake.keystore")) \
+-  $(sort $(shell find vendor/idtech/cst -type f -name "*.py" -o -name "csf_parser"))
+-
+-$(BUILT_OTATOOLS_PACKAGE): $(OTATOOLS) $(OTATOOLS_DEPS) $(OTATOOLS_RELEASETOOLS) $(SOONG_ZIP)
+->>>>>>> android_10_idt_dev_201230-1
+ 	@echo "Package OTA tools: $@"
+ 	rm -rf $@ $(PRIVATE_ZIP_ROOT)
+ 	mkdir -p $(dir $@)
+diff --git a/target/product/mainline_arm64.mk b/target/product/mainline_arm64.mk
+index d3ac9bc78..52b322295 100644
+--- a/target/product/mainline_arm64.mk
++++ b/target/product/mainline_arm64.mk
+@@ -23,22 +23,6 @@ PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := relaxed
+ 
+ # Modules that should probably be moved to /product
+ PRODUCT_ARTIFACT_PATH_REQUIREMENT_WHITELIST += \
+-<<<<<<< HEAD
+-=======
+-  system/app/Browser2/Browser2.apk \
+-  system/app/Calendar/Calendar.apk \
+-  system/app/Camera2/Camera2.apk \
+-  system/app/DeskClock/DeskClock.apk \
+-  system/app/DeskClock/oat/arm64/DeskClock.odex \
+-  system/app/DeskClock/oat/arm64/DeskClock.vdex \
+-  system/app/Gallery2/Gallery2.apk \
+-  system/app/LatinIME/LatinIME.apk \
+-  system/app/LatinIME/oat/arm64/LatinIME.odex \
+-  system/app/LatinIME/oat/arm64/LatinIME.vdex \
+-  system/app/Music/Music.apk \
+-  system/app/QuickSearchBox/QuickSearchBox.apk \
+-  system/app/webview/webview.apk \
+->>>>>>> android_10_idt_dev_201230-1
+   system/bin/healthd \
+   system/etc/init/healthd.rc \
+   system/etc/vintf/manifest/manifest_healthd.xml \

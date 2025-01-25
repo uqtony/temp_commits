@@ -1,0 +1,1253 @@
+f5e6328 jenkins 2020-02-10
+
+Download imx-android-10.0.0_1.0.0.tar.gz from nxp.com
+
+Change-Id: I97d490343b9b6089d510b0d89b68343a72ac9886
+
+diff --git a/apks/Android.mk b/apks/Android.mk
+index 55a4e52..28ffc7e 100644
+--- a/apks/Android.mk
++++ b/apks/Android.mk
+@@ -1,5 +1,5 @@
+ ###############################################################################
+-# tflitecamerademo 
++# tflitecamerademo
+ LOCAL_PATH := $(call my-dir)
+ 
+ include $(CLEAR_VARS)
+@@ -12,4 +12,3 @@ LOCAL_VENDOR_MODULE := true
+ LOCAL_CERTIFICATE := platform
+ LOCAL_SRC_FILES := $(LOCAL_MODULE).apk
+ include $(BUILD_PREBUILT)
+-
+diff --git a/apks/imx-app-keystore.jks b/apks/imx-app-keystore.jks
+new file mode 100644
+index 0000000..5abde4b
+Binary files /dev/null and b/apks/imx-app-keystore.jks differ
+diff --git a/apks/tflitecamerademo.apk b/apks/tflitecamerademo.apk
+index 8296907..9e9d238 100644
+Binary files a/apks/tflitecamerademo.apk and b/apks/tflitecamerademo.apk differ
+diff --git a/fsl-dpu/Android.mk b/fsl-dpu/Android.mk
+index 8bfccce..df4e0c6 100644
+--- a/fsl-dpu/Android.mk
++++ b/fsl-dpu/Android.mk
+@@ -1,8 +1,7 @@
+ ifeq ($(PREBUILT_FSL_IMX_GPU),true)
+-ifeq ($(TARGET_FSL_IMX_2D),DPU2D)
+ LOCAL_PATH := $(my-dir)
+ include $(CLEAR_VARS)
+-LOCAL_MODULE := libg2d
++LOCAL_MODULE := libg2d-dpu
+ LOCAL_MODULE_SUFFIX :=.so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+@@ -19,4 +18,3 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
+ endif
+ include $(BUILD_PREBUILT)
+ endif
+-endif
+diff --git a/fsl-dpu/lib/libg2d-dpu.so b/fsl-dpu/lib/libg2d-dpu.so
+new file mode 100755
+index 0000000..29b93b1
+Binary files /dev/null and b/fsl-dpu/lib/libg2d-dpu.so differ
+diff --git a/fsl-dpu/lib/libg2d.so b/fsl-dpu/lib/libg2d.so
+deleted file mode 100755
+index f46166d..0000000
+Binary files a/fsl-dpu/lib/libg2d.so and /dev/null differ
+diff --git a/fsl-dpu/lib64/libg2d-dpu.so b/fsl-dpu/lib64/libg2d-dpu.so
+new file mode 100755
+index 0000000..2355b77
+Binary files /dev/null and b/fsl-dpu/lib64/libg2d-dpu.so differ
+diff --git a/fsl-dpu/lib64/libg2d.so b/fsl-dpu/lib64/libg2d.so
+deleted file mode 100755
+index 5f6ffe8..0000000
+Binary files a/fsl-dpu/lib64/libg2d.so and /dev/null differ
+diff --git a/gpu-viv/Android.mk b/gpu-viv/Android.mk
+index e6870a7..af11d06 100644
+--- a/gpu-viv/Android.mk
++++ b/gpu-viv/Android.mk
+@@ -109,6 +109,42 @@ LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+ endif
+ include $(BUILD_PREBUILT)
+ 
++include $(CLEAR_VARS)
++LOCAL_MODULE := libovxlib
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libnnrt
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := libGLSLC
+ LOCAL_MODULE_SUFFIX :=.so
+@@ -145,9 +181,8 @@ LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+ endif
+ include $(BUILD_PREBUILT)
+ 
+-ifeq ($(TARGET_FSL_IMX_2D),GPU2D)
+ include $(CLEAR_VARS)
+-LOCAL_MODULE := libg2d
++LOCAL_MODULE := libg2d-viv
+ LOCAL_MODULE_SUFFIX :=.so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+@@ -163,7 +198,6 @@ LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
+ LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+ endif
+ include $(BUILD_PREBUILT)
+-endif
+ 
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := libgpuhelper
+@@ -294,4 +328,159 @@ LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
+ endif
+ include $(BUILD_PREBUILT)
+ 
++include $(CLEAR_VARS)
++LOCAL_MODULE := libNNGPUBinary-evis
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libNNGPUBinary-lite
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libNNVXCBinary-evis
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libNNVXCBinary-lite
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libOvx12VXCBinary-evis
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libOvx12VXCBinary-lite
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libOpenVX
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libOpenVXU
++LOCAL_MODULE_SUFFIX :=.so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifdef TARGET_2ND_ARCH
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64/
++LOCAL_SRC_FILES_64 := lib64/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES_32 := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++else
++LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR)/lib/
++LOCAL_SRC_FILES := lib/$(LOCAL_MODULE)$(LOCAL_MODULE_SUFFIX)
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := android.hardware.neuralnetworks@1.2-service-vsi-npu-server
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := EXECUTABLES
++LOCAL_PROPRIETARY_MODULE := true
++LOCAL_SRC_FILES :=  hal/$(LOCAL_MODULE)
++LOCAL_MODULE_RELATIVE_PATH := hw
++LOCAL_INIT_RC := hal/VsiDriver.rc
++LOCAL_VENDOR_MODULE := true
++include $(BUILD_PREBUILT)
++
+ endif
+diff --git a/gpu-viv/hal/VsiDriver.rc b/gpu-viv/hal/VsiDriver.rc
+new file mode 100644
+index 0000000..e013680
+--- /dev/null
++++ b/gpu-viv/hal/VsiDriver.rc
+@@ -0,0 +1,4 @@
++service neuralnetworks_hal_vsi_npu_server /vendor/bin/hw/android.hardware.neuralnetworks@1.2-service-vsi-npu-server
++    class hal
++    user system
++    group system
+diff --git a/gpu-viv/hal/android.hardware.neuralnetworks@1.2-service-vsi-npu-server b/gpu-viv/hal/android.hardware.neuralnetworks@1.2-service-vsi-npu-server
+new file mode 100755
+index 0000000..e360f17
+Binary files /dev/null and b/gpu-viv/hal/android.hardware.neuralnetworks@1.2-service-vsi-npu-server differ
+diff --git a/gpu-viv/icdloader/Vivante.icd b/gpu-viv/icdloader/Vivante.icd
+new file mode 100644
+index 0000000..52c240c
+--- /dev/null
++++ b/gpu-viv/icdloader/Vivante.icd
+@@ -0,0 +1 @@
++libVivanteOpenCL.so
+diff --git a/gpu-viv/icdloader/icdloader.mk b/gpu-viv/icdloader/icdloader.mk
+new file mode 100644
+index 0000000..d6261aa
+--- /dev/null
++++ b/gpu-viv/icdloader/icdloader.mk
+@@ -0,0 +1,10 @@
++# Viv OpenCL SDK files
++ifneq ($(PREBUILT_FSL_IMX_GPU),true)
++CL_ICDLOADER_DIR := $(FSL_PROPRIETARY_PATH)/fsl-proprietary/gpu-viv/icdloader
++
++PRODUCT_COPY_FILES += \
++    $(CL_ICDLOADER_DIR)/Vivante.icd:vendor/Khronos/OpenCL/vendors/Vivante.icd
++
++endif
++
++
+diff --git a/gpu-viv/lib/egl/egl.cfg b/gpu-viv/lib/egl/egl.cfg
+deleted file mode 100644
+index 41ff545..0000000
+--- a/gpu-viv/lib/egl/egl.cfg
++++ /dev/null
+@@ -1,2 +0,0 @@
+-0 0 android
+-0 1 VIVANTE
+diff --git a/gpu-viv/lib/egl/libEGL_VIVANTE.so b/gpu-viv/lib/egl/libEGL_VIVANTE.so
+index 0406e5c..c01c7a4 100644
+Binary files a/gpu-viv/lib/egl/libEGL_VIVANTE.so and b/gpu-viv/lib/egl/libEGL_VIVANTE.so differ
+diff --git a/gpu-viv/lib/egl/libGLESv1_CM_VIVANTE.so b/gpu-viv/lib/egl/libGLESv1_CM_VIVANTE.so
+index cd9f619..cf77a32 100644
+Binary files a/gpu-viv/lib/egl/libGLESv1_CM_VIVANTE.so and b/gpu-viv/lib/egl/libGLESv1_CM_VIVANTE.so differ
+diff --git a/gpu-viv/lib/egl/libGLESv2_VIVANTE.so b/gpu-viv/lib/egl/libGLESv2_VIVANTE.so
+index d41aed1..0812010 100644
+Binary files a/gpu-viv/lib/egl/libGLESv2_VIVANTE.so and b/gpu-viv/lib/egl/libGLESv2_VIVANTE.so differ
+diff --git a/gpu-viv/lib/hw/gralloc_viv.imx8.so b/gpu-viv/lib/hw/gralloc_viv.imx8.so
+index 1b494e4..1185a28 100644
+Binary files a/gpu-viv/lib/hw/gralloc_viv.imx8.so and b/gpu-viv/lib/hw/gralloc_viv.imx8.so differ
+diff --git a/gpu-viv/lib/hw/hwcomposer_viv.imx8.so b/gpu-viv/lib/hw/hwcomposer_viv.imx8.so
+index 5ef3264..7f4e165 100644
+Binary files a/gpu-viv/lib/hw/hwcomposer_viv.imx8.so and b/gpu-viv/lib/hw/hwcomposer_viv.imx8.so differ
+diff --git a/gpu-viv/lib/hw/vulkan.imx8.so b/gpu-viv/lib/hw/vulkan.imx8.so
+index 4f857a3..598104d 100644
+Binary files a/gpu-viv/lib/hw/vulkan.imx8.so and b/gpu-viv/lib/hw/vulkan.imx8.so differ
+diff --git a/gpu-viv/lib/libCLC.so b/gpu-viv/lib/libCLC.so
+index 0d79b9c..fe03dd3 100644
+Binary files a/gpu-viv/lib/libCLC.so and b/gpu-viv/lib/libCLC.so differ
+diff --git a/gpu-viv/lib/libGAL.so b/gpu-viv/lib/libGAL.so
+index 278389a..c5442ca 100644
+Binary files a/gpu-viv/lib/libGAL.so and b/gpu-viv/lib/libGAL.so differ
+diff --git a/gpu-viv/lib/libGLSLC.so b/gpu-viv/lib/libGLSLC.so
+index 8e00a03..dc1eb5c 100644
+Binary files a/gpu-viv/lib/libGLSLC.so and b/gpu-viv/lib/libGLSLC.so differ
+diff --git a/gpu-viv/lib/libLLVM_viv.so b/gpu-viv/lib/libLLVM_viv.so
+index 0ed2d50..0c55841 100644
+Binary files a/gpu-viv/lib/libLLVM_viv.so and b/gpu-viv/lib/libLLVM_viv.so differ
+diff --git a/gpu-viv/lib/libNNGPUBinary-evis.so b/gpu-viv/lib/libNNGPUBinary-evis.so
+new file mode 100755
+index 0000000..bbe6f45
+Binary files /dev/null and b/gpu-viv/lib/libNNGPUBinary-evis.so differ
+diff --git a/gpu-viv/lib/libNNGPUBinary-lite.so b/gpu-viv/lib/libNNGPUBinary-lite.so
+new file mode 100755
+index 0000000..81336db
+Binary files /dev/null and b/gpu-viv/lib/libNNGPUBinary-lite.so differ
+diff --git a/gpu-viv/lib/libNNVXCBinary-evis.so b/gpu-viv/lib/libNNVXCBinary-evis.so
+new file mode 100755
+index 0000000..ef4ad84
+Binary files /dev/null and b/gpu-viv/lib/libNNVXCBinary-evis.so differ
+diff --git a/gpu-viv/lib/libNNVXCBinary-lite.so b/gpu-viv/lib/libNNVXCBinary-lite.so
+new file mode 100755
+index 0000000..9b3667e
+Binary files /dev/null and b/gpu-viv/lib/libNNVXCBinary-lite.so differ
+diff --git a/gpu-viv/lib/libOpenCL.so b/gpu-viv/lib/libOpenCL.so
+index 4d2803a..6e042cc 100644
+Binary files a/gpu-viv/lib/libOpenCL.so and b/gpu-viv/lib/libOpenCL.so differ
+diff --git a/gpu-viv/lib/libOpenVX.so b/gpu-viv/lib/libOpenVX.so
+new file mode 100755
+index 0000000..6aad561
+Binary files /dev/null and b/gpu-viv/lib/libOpenVX.so differ
+diff --git a/gpu-viv/lib/libOpenVXU.so b/gpu-viv/lib/libOpenVXU.so
+new file mode 100755
+index 0000000..278aa0b
+Binary files /dev/null and b/gpu-viv/lib/libOpenVXU.so differ
+diff --git a/gpu-viv/lib/libOvx12VXCBinary-evis.so b/gpu-viv/lib/libOvx12VXCBinary-evis.so
+new file mode 100755
+index 0000000..8ba70ea
+Binary files /dev/null and b/gpu-viv/lib/libOvx12VXCBinary-evis.so differ
+diff --git a/gpu-viv/lib/libOvx12VXCBinary-lite.so b/gpu-viv/lib/libOvx12VXCBinary-lite.so
+new file mode 100755
+index 0000000..941023c
+Binary files /dev/null and b/gpu-viv/lib/libOvx12VXCBinary-lite.so differ
+diff --git a/gpu-viv/lib/libSPIRV_viv.so b/gpu-viv/lib/libSPIRV_viv.so
+index 34bce04..674c38f 100644
+Binary files a/gpu-viv/lib/libSPIRV_viv.so and b/gpu-viv/lib/libSPIRV_viv.so differ
+diff --git a/gpu-viv/lib/libVSC.so b/gpu-viv/lib/libVSC.so
+index 5248944..98f73e3 100644
+Binary files a/gpu-viv/lib/libVSC.so and b/gpu-viv/lib/libVSC.so differ
+diff --git a/gpu-viv/lib/libg2d-viv.so b/gpu-viv/lib/libg2d-viv.so
+new file mode 100644
+index 0000000..400b749
+Binary files /dev/null and b/gpu-viv/lib/libg2d-viv.so differ
+diff --git a/gpu-viv/lib/libg2d.so b/gpu-viv/lib/libg2d.so
+deleted file mode 100644
+index adc8def..0000000
+Binary files a/gpu-viv/lib/libg2d.so and /dev/null differ
+diff --git a/gpu-viv/lib/libgpuhelper.so b/gpu-viv/lib/libgpuhelper.so
+index 076b98c..667f99b 100644
+Binary files a/gpu-viv/lib/libgpuhelper.so and b/gpu-viv/lib/libgpuhelper.so differ
+diff --git a/gpu-viv/lib/libnnrt.so b/gpu-viv/lib/libnnrt.so
+new file mode 100755
+index 0000000..0d77970
+Binary files /dev/null and b/gpu-viv/lib/libnnrt.so differ
+diff --git a/gpu-viv/lib/libovxlib.so b/gpu-viv/lib/libovxlib.so
+new file mode 100755
+index 0000000..d5f2c42
+Binary files /dev/null and b/gpu-viv/lib/libovxlib.so differ
+diff --git a/gpu-viv/lib/libvulkan_VIVANTE.so b/gpu-viv/lib/libvulkan_VIVANTE.so
+index 9c8557c..82304fb 100644
+Binary files a/gpu-viv/lib/libvulkan_VIVANTE.so and b/gpu-viv/lib/libvulkan_VIVANTE.so differ
+diff --git a/gpu-viv/lib64/egl/egl.cfg b/gpu-viv/lib64/egl/egl.cfg
+deleted file mode 100644
+index 41ff545..0000000
+--- a/gpu-viv/lib64/egl/egl.cfg
++++ /dev/null
+@@ -1,2 +0,0 @@
+-0 0 android
+-0 1 VIVANTE
+diff --git a/gpu-viv/lib64/egl/libEGL_VIVANTE.so b/gpu-viv/lib64/egl/libEGL_VIVANTE.so
+index ff7e3a7..b276336 100644
+Binary files a/gpu-viv/lib64/egl/libEGL_VIVANTE.so and b/gpu-viv/lib64/egl/libEGL_VIVANTE.so differ
+diff --git a/gpu-viv/lib64/egl/libGLESv1_CM_VIVANTE.so b/gpu-viv/lib64/egl/libGLESv1_CM_VIVANTE.so
+index 56f5132..12446d2 100644
+Binary files a/gpu-viv/lib64/egl/libGLESv1_CM_VIVANTE.so and b/gpu-viv/lib64/egl/libGLESv1_CM_VIVANTE.so differ
+diff --git a/gpu-viv/lib64/egl/libGLESv2_VIVANTE.so b/gpu-viv/lib64/egl/libGLESv2_VIVANTE.so
+index 9d24371..f4dfc3f 100644
+Binary files a/gpu-viv/lib64/egl/libGLESv2_VIVANTE.so and b/gpu-viv/lib64/egl/libGLESv2_VIVANTE.so differ
+diff --git a/gpu-viv/lib64/hw/gralloc_viv.imx8.so b/gpu-viv/lib64/hw/gralloc_viv.imx8.so
+index bcd8e67..474f2d6 100644
+Binary files a/gpu-viv/lib64/hw/gralloc_viv.imx8.so and b/gpu-viv/lib64/hw/gralloc_viv.imx8.so differ
+diff --git a/gpu-viv/lib64/hw/hwcomposer_viv.imx8.so b/gpu-viv/lib64/hw/hwcomposer_viv.imx8.so
+index 5251dcb..71537b5 100644
+Binary files a/gpu-viv/lib64/hw/hwcomposer_viv.imx8.so and b/gpu-viv/lib64/hw/hwcomposer_viv.imx8.so differ
+diff --git a/gpu-viv/lib64/hw/vulkan.imx8.so b/gpu-viv/lib64/hw/vulkan.imx8.so
+index af1cf0e..4a5fcc6 100644
+Binary files a/gpu-viv/lib64/hw/vulkan.imx8.so and b/gpu-viv/lib64/hw/vulkan.imx8.so differ
+diff --git a/gpu-viv/lib64/libCLC.so b/gpu-viv/lib64/libCLC.so
+index 5a8661f..6390166 100644
+Binary files a/gpu-viv/lib64/libCLC.so and b/gpu-viv/lib64/libCLC.so differ
+diff --git a/gpu-viv/lib64/libGAL.so b/gpu-viv/lib64/libGAL.so
+index ac2ed42..4edec74 100644
+Binary files a/gpu-viv/lib64/libGAL.so and b/gpu-viv/lib64/libGAL.so differ
+diff --git a/gpu-viv/lib64/libGLSLC.so b/gpu-viv/lib64/libGLSLC.so
+index 92e1123..5e54734 100644
+Binary files a/gpu-viv/lib64/libGLSLC.so and b/gpu-viv/lib64/libGLSLC.so differ
+diff --git a/gpu-viv/lib64/libLLVM_viv.so b/gpu-viv/lib64/libLLVM_viv.so
+index 00815ed..f02ce98 100644
+Binary files a/gpu-viv/lib64/libLLVM_viv.so and b/gpu-viv/lib64/libLLVM_viv.so differ
+diff --git a/gpu-viv/lib64/libNNGPUBinary-evis.so b/gpu-viv/lib64/libNNGPUBinary-evis.so
+new file mode 100755
+index 0000000..80a54df
+Binary files /dev/null and b/gpu-viv/lib64/libNNGPUBinary-evis.so differ
+diff --git a/gpu-viv/lib64/libNNGPUBinary-lite.so b/gpu-viv/lib64/libNNGPUBinary-lite.so
+new file mode 100755
+index 0000000..313684f
+Binary files /dev/null and b/gpu-viv/lib64/libNNGPUBinary-lite.so differ
+diff --git a/gpu-viv/lib64/libNNVXCBinary-evis.so b/gpu-viv/lib64/libNNVXCBinary-evis.so
+new file mode 100755
+index 0000000..94032d6
+Binary files /dev/null and b/gpu-viv/lib64/libNNVXCBinary-evis.so differ
+diff --git a/gpu-viv/lib64/libNNVXCBinary-lite.so b/gpu-viv/lib64/libNNVXCBinary-lite.so
+new file mode 100755
+index 0000000..05c1a4d
+Binary files /dev/null and b/gpu-viv/lib64/libNNVXCBinary-lite.so differ
+diff --git a/gpu-viv/lib64/libOpenCL.so b/gpu-viv/lib64/libOpenCL.so
+index 3e21f8a..bebfdec 100644
+Binary files a/gpu-viv/lib64/libOpenCL.so and b/gpu-viv/lib64/libOpenCL.so differ
+diff --git a/gpu-viv/lib64/libOpenVX.so b/gpu-viv/lib64/libOpenVX.so
+new file mode 100755
+index 0000000..319304d
+Binary files /dev/null and b/gpu-viv/lib64/libOpenVX.so differ
+diff --git a/gpu-viv/lib64/libOpenVXU.so b/gpu-viv/lib64/libOpenVXU.so
+new file mode 100755
+index 0000000..ecf1dca
+Binary files /dev/null and b/gpu-viv/lib64/libOpenVXU.so differ
+diff --git a/gpu-viv/lib64/libOvx12VXCBinary-evis.so b/gpu-viv/lib64/libOvx12VXCBinary-evis.so
+new file mode 100755
+index 0000000..921f4d3
+Binary files /dev/null and b/gpu-viv/lib64/libOvx12VXCBinary-evis.so differ
+diff --git a/gpu-viv/lib64/libOvx12VXCBinary-lite.so b/gpu-viv/lib64/libOvx12VXCBinary-lite.so
+new file mode 100755
+index 0000000..d6dce0f
+Binary files /dev/null and b/gpu-viv/lib64/libOvx12VXCBinary-lite.so differ
+diff --git a/gpu-viv/lib64/libSPIRV_viv.so b/gpu-viv/lib64/libSPIRV_viv.so
+index 1bcec5f..b66fa64 100644
+Binary files a/gpu-viv/lib64/libSPIRV_viv.so and b/gpu-viv/lib64/libSPIRV_viv.so differ
+diff --git a/gpu-viv/lib64/libVSC.so b/gpu-viv/lib64/libVSC.so
+index b1c331e..6d82d0c 100644
+Binary files a/gpu-viv/lib64/libVSC.so and b/gpu-viv/lib64/libVSC.so differ
+diff --git a/gpu-viv/lib64/libg2d-viv.so b/gpu-viv/lib64/libg2d-viv.so
+new file mode 100644
+index 0000000..c7194ba
+Binary files /dev/null and b/gpu-viv/lib64/libg2d-viv.so differ
+diff --git a/gpu-viv/lib64/libg2d.so b/gpu-viv/lib64/libg2d.so
+deleted file mode 100644
+index f34979a..0000000
+Binary files a/gpu-viv/lib64/libg2d.so and /dev/null differ
+diff --git a/gpu-viv/lib64/libgpuhelper.so b/gpu-viv/lib64/libgpuhelper.so
+index fd69d91..395294a 100644
+Binary files a/gpu-viv/lib64/libgpuhelper.so and b/gpu-viv/lib64/libgpuhelper.so differ
+diff --git a/gpu-viv/lib64/libnnrt.so b/gpu-viv/lib64/libnnrt.so
+new file mode 100755
+index 0000000..595978e
+Binary files /dev/null and b/gpu-viv/lib64/libnnrt.so differ
+diff --git a/gpu-viv/lib64/libovxlib.so b/gpu-viv/lib64/libovxlib.so
+new file mode 100755
+index 0000000..72cbc1f
+Binary files /dev/null and b/gpu-viv/lib64/libovxlib.so differ
+diff --git a/gpu-viv/lib64/libvulkan_VIVANTE.so b/gpu-viv/lib64/libvulkan_VIVANTE.so
+index db4bd38..a009e75 100644
+Binary files a/gpu-viv/lib64/libvulkan_VIVANTE.so and b/gpu-viv/lib64/libvulkan_VIVANTE.so differ
+diff --git a/include/CL/cl_ext.h b/include/CL/cl_ext.h
+index 630a9fc..ee58ff8 100644
+--- a/include/CL/cl_ext.h
++++ b/include/CL/cl_ext.h
+@@ -521,6 +521,8 @@ clSetKernelExecInfoARM(cl_kernel            /* kernel */,
+ * cl_vivante_device_attribute_query
+ *********************************/
+ #define CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV         (1 << 28)
++/*for CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV, application must make sure the physical address passed in is a 40 bit address*/
++#define CL_MEM_USE_HOST_PHYSICAL_ADDR_VIV           (1 << 29)
+ 
+ #endif /* CL_VERSION_1_2 */
+ 
+diff --git a/include/CL/cl_sdk.mk b/include/CL/cl_sdk.mk
+new file mode 100644
+index 0000000..e02ef2c
+--- /dev/null
++++ b/include/CL/cl_sdk.mk
+@@ -0,0 +1,21 @@
++# Viv OpenCL SDK files
++ifneq ($(PREBUILT_FSL_IMX_GPU),true)
++CL_SDK_DIR := $(FSL_PROPRIETARY_PATH)/fsl-proprietary/include/CL
++
++PRODUCT_COPY_FILES += \
++    $(CL_SDK_DIR)/cl_d3d10.h:vendor/etc/viv_sdk/inc/CL/cl_d3d10.h \
++    $(CL_SDK_DIR)/cl_d3d11.h:vendor/etc/viv_sdk/inc/CL/cl_d3d11.h \
++    $(CL_SDK_DIR)/cl_dx9_media_sharing.h:vendor/etc/viv_sdk/inc/CL/cl_dx9_media_sharing.h \
++    $(CL_SDK_DIR)/cl_egl.h:vendor/etc/viv_sdk/inc/CL/cl_egl.h \
++    $(CL_SDK_DIR)/cl_ext.h:vendor/etc/viv_sdk/inc/CL/cl_ext.h \
++    $(CL_SDK_DIR)/cl_gl_ext.h:vendor/etc/viv_sdk/inc/CL/cl_gl_ext.h \
++    $(CL_SDK_DIR)/cl_gl.h:vendor/etc/viv_sdk/inc/CL/cl_gl.h \
++    $(CL_SDK_DIR)/cl.h:vendor/etc/viv_sdk/inc/CL/cl.h \
++    $(CL_SDK_DIR)/cl.hpp:vendor/etc/viv_sdk/inc/CL/cl.hpp \
++    $(CL_SDK_DIR)/cl_platform.h:vendor/etc/viv_sdk/inc/CL/cl_platform.h \
++    $(CL_SDK_DIR)/cl_viv_vx_ext.h:vendor/etc/viv_sdk/inc/CL/cl_viv_vx_ext.h \
++    $(CL_SDK_DIR)/opencl.h:vendor/etc/viv_sdk/inc/CL/opencl.h
++
++endif
++
++
+diff --git a/include/CL/cl_viv_vx_ext.h b/include/CL/cl_viv_vx_ext.h
+index e18619c..471673c 100644
+--- a/include/CL/cl_viv_vx_ext.h
++++ b/include/CL/cl_viv_vx_ext.h
+@@ -1,6 +1,6 @@
+ /****************************************************************************
+ *
+-*    Copyright 2012 - 2018 Vivante Corporation, Santa Clara, California.
++*    Copyright 2012 - 2019 Vivante Corporation, Santa Clara, California.
+ *    All Rights Reserved.
+ *
+ *    Permission is hereby granted, free of charge, to any person obtaining
+@@ -58,16 +58,45 @@ typedef enum _VXC_RoundMode
+     VXC_RM_ToNearestEven = 2
+ } vxc_round_mode;
+ 
+-#define VXC_CLAMP_BITMASK           0x400000     /* shift 22 */
+-#define VXC_PREADJ_BITMASK          0x200000     /* shift 21 */
+-#define VXC_RANGEPI_BITMASK         0x100000     /* shift 20 */
+-#define VXC_FILTER_BITMASK          0x0F0000     /* shift 16 */
+-#define VXC_START_BIN_BITMASK       0x00F000     /* shift 12 */
+-#define VXC_END_BIN_BITMASK         0x000F00     /* shift 8 */
+-#define VXC_SOURCE_BIN_BITMASK      0x0000F0     /* shift 4 */
+-#define VXC_ROUNDING_MODE_BITMASK   0x00000C     /* shift 2 */
+-#define VXC_ENABLEBOOL_BITMASK      0x000002     /* shift 1 */
+-#define VXC_SIGNEXT_BITMASK         0x000001     /* shift 0 */
++typedef enum _VXC_ScatteredOffsetType
++{
++    VXC_OFFSET_UNSIGNED32   = 0,
++    VXC_OFFSET_SIGNED32     = 1,
++    VXC_OFFSET_UNSIGNED16   = 2,
++    VXC_OFFSET_SIGNED16     = 3,
++    VXC_OFFSET_UNSIGNED8    = 4,
++    VXC_OFFSET_SIGNED8      = 5,
++} VXC_ScatteredOffsetType;
++
++typedef enum _VXC_AtomicOp
++{
++    VXC_ATOMIC_OP_ADD       = 0,
++    VXC_ATOMIC_OP_MIN       = 1,
++    VXC_ATOMIC_OP_MAX       = 2,
++    VXC_ATOMIC_OP_OR        = 3,
++    VXC_ATOMIC_OP_AND       = 4,
++    VXC_ATOMIC_OP_XOR       = 5,
++    VXC_ATOMIC_OP_XCHG      = 6,
++}VXC_AtomicOpType;
++
++#define VXC_CLAMP_BITMASK           0x00400000     /* shift 22 */
++#define VXC_PREADJ_BITMASK          0x00200000     /* shift 21 */
++#define VXC_RANGEPI_BITMASK         0x00100000     /* shift 20 */
++#define VXC_FILTER_BITMASK          0x000F0000     /* shift 16 */
++#define VXC_START_BIN_BITMASK       0x0000F000     /* shift 12 */
++#define VXC_END_BIN_BITMASK         0x00000F00     /* shift 8 */
++#define VXC_SOURCE_BIN_BITMASK      0x000000F0     /* shift 4 */
++#define VXC_ROUNDING_MODE_BITMASK   0x0000000C     /* shift 2 */
++#define VXC_ENABLEBOOL_BITMASK      0x00000002     /* shift 1 */
++#define VXC_SIGNEXT_BITMASK         0x00000001     /* shift 0 */
++
++/* overload FILTER bits, bits in [16:18] for scattered offset type. */
++#define VXC_OFFSET_TYPE_BITMASK     0x00070000     /* shift 16 */
++#define VXC_OFFSET_TYPE_SHIFT       16             /* shift 16 */
++
++/* overload FILTER, PREADJ and RANGEPI, bits in [19:21] for scattered offset type. */
++#define VXC_ATOM_OP_BITMASK         0x00380000     /* shift 19 */
++#define VXC_ATOM_OP_SHIFT           19             /* shift 19 */
+ 
+ #define VXC_MODIFIER(StartBin, EndBin, SourceBin, RoundingMode, Clamp)    \
+          (                                                                \
+@@ -121,6 +150,31 @@ typedef enum _VXC_RoundMode
+           (((EndBin) << 8)&VXC_END_BIN_BITMASK)                           \
+          )
+ 
++#define VXC_MODIFIER_GATHER(StartBin, EndBin, SourceBin, OffsetType)                \
++         (                                                                          \
++          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
++          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
++          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
++          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
++         )
++
++#define VXC_MODIFIER_SCATTER(StartBin, EndBin, SourceBin, OffsetType)               \
++         (                                                                          \
++          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
++          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
++          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
++          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
++         )
++
++#define VXC_MODIFIER_ATOMIC_S(StartBin, EndBin, SourceBin, OffsetType, AtomOp)      \
++         (                                                                          \
++          (((OffsetType) << VXC_OFFSET_TYPE_SHIFT)&VXC_OFFSET_TYPE_BITMASK)  |      \
++          (((AtomOp) << VXC_ATOM_OP_SHIFT)&VXC_ATOM_OP_BITMASK)              |      \
++          (((StartBin) << 12)&VXC_START_BIN_BITMASK)     |                          \
++          (((EndBin) << 8)&VXC_END_BIN_BITMASK)          |                          \
++          (((SourceBin) << 4)&VXC_SOURCE_BIN_BITMASK)                               \
++         )
++
+ /*
+  * Clamp : 0 ==> result is truncated to fit result type
+  *         1 ==> result is clamp to fit result type
+@@ -206,8 +260,10 @@ typedef struct _vxc_half16
+ } vxc_half16;
+ 
+ typedef uint16 vxc_512bits;
++typedef uint4  vxc_128bits;
+ 
+ typedef vxc_512bits VXC_512Bits;
++typedef vxc_128bits VXC_128Bits;
+ typedef vxc_modifier VXC_Modifier_t ;
+ typedef vxc_round_mode VXC_RoundMode;
+ typedef vxc_filter_mode VXC_FilterMode;
+@@ -271,6 +327,12 @@ enum VXC_OP {
+     VXC_OP_dp8x2_b,
+     VXC_OP_dp4x4_b,
+     VXC_OP_dp2x8_b,
++    VXC_OP_gather,
++    VXC_OP_gather_b,
++    VXC_OP_scatter,
++    VXC_OP_scatter_b,
++    VXC_OP_atomic_s,
++    VXC_OP_atomic_s_b,
+ };
+ 
+ enum eVXC_ERROR
+@@ -344,6 +406,16 @@ enum eVXC_ERROR
+         _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t4);      \
+     } while(0)
+ 
++#define VXC_OP5_NoDest(Op, Src0, Src1, Src2, Src3, Src4)  \
++    do {                                                  \
++        int _t1, _t2, _t3, _t4, _t5;                      \
++        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);           \
++        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);            \
++        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);            \
++        _viv_asm(PARAM_CHAIN, _t4, _t3, Src4);            \
++        _viv_asm(INTRINSIC_ST, _t5, VXC_OP_##Op, _t4);    \
++    } while(0)
++
+ /* make sure the immediate value offsetX and offsetY are in range of [-16, 15] */
+ #define VXC_5BITOFFSET_XY(offsetX, offsetY)  ((((offsetY) & 0x1F) << 5) | ((offsetX) & 0x1F))
+ 
+@@ -420,6 +492,15 @@ enum eVXC_ERROR
+ #define VXC_DP4x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
+ #define VXC_DP2x16_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp2x16_b, Dest, Src0, Src1, Src2, Info, U512)
+ 
++#define VXC_Gather(Dest, BaseAddr, Offsets, GatherInfo)                         VXC_OP3(gather, Dest, BaseAddr, Offsets, GatherInfo)
++#define VXC_Gather_b(Dest, BaseAddr, Offsets, Offsets_b, GatherInfo)            VXC_OP4(gather_b, Dest, BaseAddr, Offsets, Offsets_b, GatherInfo)
++
++#define VXC_Scatter(BaseAddr, Offsets, Data, ScatterInfo)                       VXC_OP4_NoDest(scatter, BaseAddr, Offsets, Data, ScatterInfo)
++#define VXC_Scatter_b(BaseAddr, Offsets, Offsets_b, Data, ScatterInfo)          VXC_OP5_NoDest(scatter_b, BaseAddr, Offsets, Offsets_b, Data, ScatterInfo)
++
++#define VXC_AtomicS(Dest, BaseAddr, Offsets, Data, AtomicSInfo)                 VXC_OP4(atomic_s, Dest, BaseAddr, Offsets, Data, AtomicSInfo)
++#define VXC_AtomicS_b(Dest, BaseAddr, Offsets, Offsets_b, Data, AtomicSInfo)    VXC_OP5(atomic_s_b, Dest, BaseAddr, Offsets, Offsets_b, Data, AtomicSInfo)
++
+ /* packed type image data read/write: supported types are packed 8-bit/16bit integer, 16bit float */
+ /* image read/write for image1d_t/image1d_array/image2d_t,
+  * offset should be composed by using VXC_5BITOFFSET_XY(x, y) */
+@@ -431,25 +512,23 @@ enum eVXC_ERROR
+  * Offset should be composed by using VXC_5BITOFFSET_XY(x, y)
+  * Coord must be type of int4 or float4
+  */
+-#define VXC_ReadImage2DArray(Dest, Image, Coord, Offset, Info)       \
+-    do {                                                             \
+-       int8 desc;                                                    \
+-       int arraySize = get_image_array_size(Image);                  \
+-       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
+-       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
+-       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
+-       _viv_asm(MOV, Coord.w, baseAddr);                             \
+-       VXC_OP4(img_load_3d, Dest, Image, Coord.xyww, Offset, Info);  \
++#define VXC_ReadImage2DArray(Dest, Image, Coord, Offset, Info)         \
++    do {                                                               \
++       int8 desc;                                                      \
++       _viv_asm(COPY, desc, Image, sizeof(desc));                      \
++       _viv_asm(CLAMP0MAX, (Coord).w, (Coord).z, desc.s5 - 1);         \
++       int baseAddr =  (int)(Coord).w *desc.s4 + desc.s0;              \
++       _viv_asm(MOV, (Coord).w, baseAddr);                             \
++       VXC_OP4(img_load_3d, Dest, Image, (Coord).xyww, Offset, Info);  \
+     } while (0)
+-#define VXC_WriteImage2DArray(Image, Coord, Color, Info)             \
+-    do {                                                             \
+-       int8 desc;                                                    \
+-       int arraySize = get_image_array_size(Image);                  \
+-       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
+-       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
+-       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
+-       _viv_asm(MOV, Coord.w, baseAddr);                             \
+-       VXC_OP4_NoDest(img_store_3d, Image, Coord.xyww, Color, Info); \
++#define VXC_WriteImage2DArray(Image, Coord, Color, Info)               \
++    do {                                                               \
++       int8 desc;                                                      \
++       _viv_asm(COPY, desc, Image, sizeof(desc));                      \
++       _viv_asm(CLAMP0MAX, (Coord).w, (Coord).z, desc.s5 - 1);         \
++       int baseAddr =  (int)(Coord).w *(desc).s4 + desc.s0;            \
++       _viv_asm(MOV, (Coord).w, baseAddr);                             \
++       VXC_OP4_NoDest(img_store_3d, Image, (Coord).xyww, Color, Info); \
+     } while (0)
+ 
+ /* image load/store for image3d_t,
+@@ -459,15 +538,15 @@ enum eVXC_ERROR
+ #define VXC_ReadImage3D(Dest, Image, Coord, Offset, Info)       VXC_OP4(img_load_3d, Dest, Image, Coord, Offset, Info)
+ #define VXC_WriteImage3D(Image, Coord, Color, Info)             VXC_OP4_NoDest(img_store_3d, Image, Coord, Color, Info)
+ 
+-#define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
+-#define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
+-#define VXC_Vload8(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload8, Dest, Pointer,  byteOffset); } while(0)
+-#define VXC_Vload16(Dest, Pointer, Offset)   do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload16, Dest, Pointer,  byteOffset); } while(0)
++#define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
++#define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
++#define VXC_Vload8(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload8, Dest, Pointer,  byteOffset); } while(0)
++#define VXC_Vload16(Dest, Pointer, Offset)   do { int byteOffset = ((int)sizeof((Dest)))*(Offset); VXC_OP2(vload16, Dest, Pointer,  byteOffset); } while(0)
+ 
+-#define VXC_Vstore2(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore2, Pointer, byteOffset, Data); } while(0)
+-#define VXC_Vstore4(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore4, Pointer, byteOffset, Data); } while(0)
+-#define VXC_Vstore8(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore8, Pointer, byteOffset, Data); } while(0)
+-#define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
++#define VXC_Vstore2(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore2, Pointer, byteOffset, Data); } while(0)
++#define VXC_Vstore4(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore4, Pointer, byteOffset, Data); } while(0)
++#define VXC_Vstore8(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore8, Pointer, byteOffset, Data); } while(0)
++#define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*(Offset); VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
+ 
+ /* VX2 only instructions*/
+ #define VXC_IndexAdd(Dest, Src0, Src1, Src2, Info)        VXC_OP4(index_add, Dest, Src0, Src1, Src2, Info)
+@@ -481,19 +560,19 @@ enum eVXC_ERROR
+ #if (VX_VERSION == 2)
+ #define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)                                      \
+     do {                                                                                \
+-        int endBin = (Info & VXC_END_BIN_BITMASK) >> 8;                                 \
+-        int roundMode = (Info & VXC_ROUNDING_MODE_BITMASK) >> 2;                        \
+-        int clamp = (Info & VXC_CLAMP_BITMASK) >> 22;                                   \
++        int endBin = ((Info) & VXC_END_BIN_BITMASK) >> 8;                               \
++        int roundMode = ((Info) & VXC_ROUNDING_MODE_BITMASK) >> 2;                      \
++        int clamp = ((Info) & VXC_CLAMP_BITMASK) >> 22;                                 \
+         int mod1 = VXC_MODIFIER(0, endBin + 1, 0, roundMode, clamp);                    \
+         int4 bitMask = { 0x00000000, 0x00000008, 0x00000010, 0x00000018};               \
+-        vxc_uchar16 bi1;                                                                \
++        typeof (Dest) bi1;                                                              \
+         uint4 bi2;                                                                      \
+         int bi3, bi4;                                                                   \
+-        VXC_Lerp(bi1, Src0, Src1, Src2.y, mod1);                                        \
++        VXC_Lerp(bi1, Src0, Src1, (Src2).y, mod1);                                      \
+         _viv_asm(PARAM_CHAIN, bi3, bi1.x!<f:UINT>, bitMask);                            \
+         _viv_asm(PARAM_CHAIN, bi4, bi3, 8);                                             \
+         _viv_asm(INTRINSIC, bi2, OP_bit_extract, bi4);                                  \
+-        VXC_Lerp(Dest, bi2!<f:UCHAR>, bi2.y!<f:UCHAR>, Src2.x, Info);                   \
++        VXC_Lerp(Dest, bi2!<f:UCHAR>, bi2.y!<f:UCHAR>, (Src2).x, Info);                 \
+     }   while (0)
+ 
+ #define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   /* BitReplace definition here */
+diff --git a/include/VX/viv_nn_compatibility.h b/include/VX/viv_nn_compatibility.h
+new file mode 100644
+index 0000000..019dfce
+--- /dev/null
++++ b/include/VX/viv_nn_compatibility.h
+@@ -0,0 +1,202 @@
++/****************************************************************************
++*
++*    Copyright (c) 2005 - 2019 by Vivante Corp.  All rights reserved.
++*
++*    The material in this file is confidential and contains trade secrets
++*    of Vivante Corporation. This is proprietary information owned by
++*    Vivante Corporation. No part of this work may be disclosed,
++*    reproduced, copied, transmitted, or used in any way for any purpose,
++*    without the express written permission of Vivante Corporation.
++*
++*****************************************************************************/
++
++
++#ifndef _VIV_NN_COMPATIBILITY_H_
++#define _VIV_NN_COMPATIBILITY_H_
++
++#include <VX/vx.h>
++#include <VX/vx_khr_nn.h>
++
++/* keep the backward compatibility with spec 1.1 for standard nn kernels */
++#define    VX_KERNEL_NN_SOFTMAX_LAYER                   VX_KERNEL_SOFTMAX_LAYER
++#define    VX_KERNEL_NN_NORMALIZATION_LAYER             VX_KERNEL_NORMALIZATION_LAYER
++#define    VX_KERNEL_NN_POOLING_LAYER                   VX_KERNEL_POOLING_LAYER
++#define    VX_KERNEL_NN_FULLY_CONNECTED_LAYER           VX_KERNEL_FULLY_CONNECTED_LAYER
++#define    VX_KERNEL_NN_ACTIVATION_LAYER                VX_KERNEL_ACTIVATION_LAYER
++#define    VX_KERNEL_NN_ROIPOOL                         VX_KERNEL_ROI_POOLING_LAYER
++#define    VX_KERNEL_NN_CONVOLUTION_LAYER               VX_KERNEL_CONVOLUTION_LAYER
++#define    VX_KERNEL_NN_DECONVOLUTION_LAYER             VX_KERNEL_DECONVOLUTION_LAYER
++
++/* keep the backward compatibility with spec 1.1 for vx_tensor_attribute_e */
++#define    VX_TENSOR_NUM_OF_DIMS                        VX_TENSOR_NUMBER_OF_DIMS
++#define    VX_TENSOR_FIXED_POINT_POS                    VX_TENSOR_FIXED_POINT_POSITION
++
++/* keep the backward compatibility with spec 1.1 from vx_convolutional_network_rounding_type_e to vx_nn_rounding_type_e */
++typedef    enum vx_nn_rounding_type_e                                vx_convolutional_network_rounding_type_e;
++#define    VX_CONVOLUTIONAL_NETWORK_DS_SIZE_ROUNDING_FLOOR           VX_NN_DS_SIZE_ROUNDING_FLOOR
++#define    VX_CONVOLUTIONAL_NETWORK_DS_SIZE_ROUNDING_CEILING         VX_NN_DS_SIZE_ROUNDING_CEILING
++
++/* keep the backward compatibility with spec 1.1 from vx_convolutional_network_pooling_type_e to vx_nn_pooling_type_e */
++typedef    enum vx_nn_pooling_type_e                                 vx_convolutional_network_pooling_type_e;
++#define    VX_CONVOLUTIONAL_NETWORK_POOLING_MAX                      VX_NN_POOLING_MAX
++#define    VX_CONVOLUTIONAL_NETWORK_POOLING_AVG                      VX_NN_POOLING_AVG
++#define    VX_CONVOLUTIONAL_NETWORK_POOLING_L2                       VX_NN_POOLING_L2
++#define    VX_CONVOLUTIONAL_NETWORK_POOLING_AVG_ANDROID              VX_NN_POOLING_AVG_ANDROID
++
++/* keep the backward compatibility with spec 1.1 from vx_convolutional_network_norm_type_e to vx_nn_norm_type_e */
++typedef    enum vx_nn_norm_type_e                        vx_convolutional_network_norm_type_e;
++#define    VX_CONVOLUTIONAL_NETWORK_NORM_SAME_MAP        VX_NN_NORMALIZATION_SAME_MAP
++#define    VX_CONVOLUTIONAL_NETWORK_NORM_ACROSS_MAPS     VX_NN_NORMALIZATION_ACROSS_MAPS
++
++/* keep the backward compatibility with spec 1.1 from vx_convolutional_network_layer_type_e to vx_nn_layer_type_e */
++typedef    enum vx_nn_layer_type_e                           vx_convolutional_network_layer_type_e;
++#define    VX_CONVOLUTIONAL_NETWORK_CONVOLUTION_LAYER        VX_NN_CONVOLUTION_LAYER
++#define    VX_CONVOLUTIONAL_NETWORK_FULLYCONNECTED_LAYER     VX_NN_FULLYCONNECTED_LAYER
++
++/* keep the backward compatibility with spec 1.1 from vx_convolutional_network_activation_func_e to vx_nn_activation_function_e */
++typedef    enum vx_nn_activation_function_e                                vx_convolutional_network_activation_func_e;
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_LOGISTIC                    VX_NN_ACTIVATION_LOGISTIC
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_HYPERBOLIC_TAN              VX_NN_ACTIVATION_HYPERBOLIC_TAN
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_RELU                        VX_NN_ACTIVATION_RELU
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_BRELU                       VX_NN_ACTIVATION_BRELU
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_SOFTRELU                    VX_NN_ACTIVATION_SOFTRELU
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_ABS                         VX_NN_ACTIVATION_ABS
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_SQUARE                      VX_NN_ACTIVATION_SQUARE
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_SQRT                        VX_NN_ACTIVATION_SQRT
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_LINEAR                      VX_NN_ACTIVATION_LINEAR
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_LEAKYRELU                   VX_NN_ACTIVATION_LEAKYRELU
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_RELU6                       VX_NN_ACTIVATION_RELU6
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_RELU1                       VX_NN_ACTIVATION_RELU1
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_RSQRT                       VX_NN_ACTIVATION_RSQRT
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_LEAKYRELU_MAX_POOLING       VX_NN_ACTIVATION_LEAKYRELU_MAX_POOLING
++#define    VX_CONVOLUTIONAL_NETWORK_ACTIVATION_NONE                        VX_NN_ACTIVATION_NONE
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* keep the backward compatibility with spec 1.1 for vxCreateTensor */
++VX_API_ENTRY vx_tensor VX_API_CALL
++vxCreateTensor_11(
++    vx_context    context,
++    vx_uint32     num_of_dims,
++    vx_uint32     *sizes,
++    vx_enum       data_format,
++    vx_int8       fixed_point_pos
++    );
++#define vxCreateTensor    vxCreateTensor_11
++
++/* keep the backward compatibility with spec 1.1 for vxCreateVirtualTensor */
++VX_API_ENTRY vx_tensor VX_API_CALL
++vxCreateVirtualTensor_11(
++    vx_graph      graph,
++    vx_uint32     num_of_dims,
++    vx_uint32     *sizes,
++    vx_enum       data_format,
++    vx_int8       fixed_point_pos
++);
++#define vxCreateVirtualTensor    vxCreateVirtualTensor_11
++
++/* keep the backward compatibility with spec 1.1 for vxCreateTensorFromView */
++VX_API_ENTRY vx_tensor VX_API_CALL
++vxCreateTensorFromView_11(
++    vx_tensor       tensor,
++    vx_tensor_view  view
++);
++#define vxCreateTensorFromView    vxCreateTensorFromView_11
++
++/* keep the backward compatibility with spec 1.1 for vxCopyTensorPatch */
++VX_API_ENTRY vx_status VX_API_CALL
++vxCopyTensorPatch_11(
++    vx_tensor         tensor,
++    vx_tensor_view    view,
++    vx_tensor_addressing    user_addr,
++    void              *user_ptr,
++    vx_enum           usage,
++    vx_enum           user_mem_type
++);
++#define vxCopyTensorPatch    vxCopyTensorPatch_11
++
++/* keep the backward compatibility with spec 1.1 for vxCreateImageObjectArrayFromTensor */
++VX_API_ENTRY vx_object_array VX_API_CALL
++vxCreateImageObjectArrayFromTensor_11(
++    vx_tensor         tensor,
++    vx_rectangle_t    rect,
++    vx_uint32         array_size,
++    vx_uint32         stride,
++    vx_df_image       image_format
++);
++#define vxCreateImageObjectArrayFromTensor    vxCreateImageObjectArrayFromTensor_11
++
++/* keep the backward compatibility with spec 1.1 for vxFullyConnectedLayer */
++VX_API_ENTRY vx_node VX_API_CALL
++vxFullyConnectedLayer_11(
++    vx_graph     graph,
++    vx_tensor    inputs,
++    vx_tensor    weights,
++    vx_tensor    biases,
++    vx_uint32    pad,
++    vx_uint8     accumulator_bits,
++    vx_enum      overflow_policy,
++    vx_enum      rounding_policy,
++    vx_enum      down_scale_size_rounding,
++    vx_tensor    outputs
++);
++#define vxFullyConnectedLayer    vxFullyConnectedLayer_11
++
++/* keep the backward compatibility with spec 1.1 for vxActivationLayer */
++VX_API_ENTRY vx_node VX_API_CALL
++vxActivationLayer_11(
++    vx_graph     graph,
++    vx_tensor    inputs,
++    vx_enum      func,
++    vx_int32     a,
++    vx_int32     b,
++    vx_tensor    outputs
++);
++#define vxActivationLayer    vxActivationLayer_11
++
++/* keep the backward compatibility with spec 1.1 for vxPoolingLayer */
++VX_API_ENTRY vx_node VX_API_CALL
++vxPoolingLayer_11(
++    vx_graph     graph,
++    vx_tensor    inputs,
++    vx_enum      pool_type,
++    vx_uint32    pool_size_x,
++    vx_uint32    pool_size_y,
++    vx_uint32    pool_pad_x,
++    vx_uint32    pool_pad_y,
++    vx_enum      rounding,
++    vx_tensor    outputs
++);
++#define vxPoolingLayer    vxPoolingLayer_11
++
++/* keep the backward compatibility with spec 1.1 for vxNormalizationLayer */
++VX_API_ENTRY vx_node VX_API_CALL
++vxNormalizationLayer_11(
++    vx_graph     graph,
++    vx_tensor    inputs,
++    vx_enum      type,
++    vx_uint32    norm_size,
++    vx_float32   alpha,
++    vx_float32   beta,
++    vx_tensor    outputs
++);
++#define vxNormalizationLayer    vxNormalizationLayer_11
++
++/* keep the backward compatibility with spec 1.1 for vxTensorTransposeNode */
++VX_API_ENTRY vx_node VX_API_CALL
++vxTensorTransposeNode_11(
++    vx_graph     graph,
++    vx_tensor    inputs,
++    vx_tensor    outputs,
++    vx_uint32    dim1,
++    vx_uint32    dim2
++);
++#define vxTensorTransposeNode    vxTensorTransposeNode_11
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/include/VX/vx.h b/include/VX/vx.h
+new file mode 100644
+index 0000000..f85f66a
+--- /dev/null
++++ b/include/VX/vx.h
+@@ -0,0 +1,83 @@
++/*
++
++ * Copyright (c) 2012-2017 The Khronos Group Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _OPENVX_H_
++#define _OPENVX_H_
++
++/*!
++ * ile
++ * rief The top level OpenVX Header.
++ */
++
++/*! rief Defines the length of the implementation name string, including the trailing zero.
++ * \ingroup group_context
++ */
++#define VX_MAX_IMPLEMENTATION_NAME (64)
++
++/*! rief Defines the length of a kernel name string to be added to OpenVX, including the trailing zero.
++ * \ingroup group_kernel
++ */
++#define VX_MAX_KERNEL_NAME (256)
++
++/*! rief Defines the length of a message buffer to copy from the log, including the trailing zero.
++ * \ingroup group_basic_features
++ */
++#define VX_MAX_LOG_MESSAGE_LEN (1024)
++
++/*! rief Defines the length of the reference name string, including the trailing zero.
++ * \ingroup group_reference
++ * \see vxSetReferenceName
++ */
++#define VX_MAX_REFERENCE_NAME (64)
++
++#include <VX/vx_vendors.h>
++#include <VX/vx_types.h>
++#include <VX/vx_kernels.h>
++#include <VX/vx_api.h>
++#include <VX/vx_nodes.h>
++
++/*! rief Defines the major version number macro.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION_MAJOR(x) ((x & 0xFF) << 8)
++
++/*! rief Defines the minor version number macro.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION_MINOR(x) ((x & 0xFF) << 0)
++
++/*! rief Defines the predefined version number for 1.0.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION_1_0      (VX_VERSION_MAJOR(1) | VX_VERSION_MINOR(0))
++
++/*! rief Defines the predefined version number for 1.1.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION_1_1      (VX_VERSION_MAJOR(1) | VX_VERSION_MINOR(1))
++
++/*! rief Defines the predefined version number for 1.2.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION_1_2      (VX_VERSION_MAJOR(1) | VX_VERSION_MINOR(2))
++
++/*! rief Defines the OpenVX Version Number.
++ * \ingroup group_basic_features
++ */
++#define VX_VERSION          VX_VERSION_1_2
++
++#endif
+diff --git a/include/VX/vx_api.h b/include/VX/vx_api.h
+new file mode 100644
+index 0000000..e19fbd5
+--- /dev/null
++++ b/include/VX/vx_api.h
+@@ -0,0 +1,3226 @@
++/*
++
++ * Copyright (c) 2012-2017 The Khronos Group Inc.
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *    http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#ifndef _OPENVX_API_H_
++#define _OPENVX_API_H_
++
++/*!
++ * ile
++ * rief The API definition for OpenVX.
++ */
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/*==============================================================================
++ CONTEXT
++ =============================================================================*/
++
++/*! rief Creates a <tt>ef vx_context</tt>.
++ * \details This creates a top-level object context for OpenVX.
++ * 
+ote This is required to do anything else.
++ * eturns The reference to the implementation context <tt>ef vx_context</tt>. Any possible errors
++ * preventing a successful creation should be checked using <tt>ef vxGetStatus</tt>.
++ * \ingroup group_context
++ * \post <tt>ef vxReleaseContext</tt>
++ */
++VX_API_ENTRY vx_context VX_API_CALL vxCreateContext(void);
++
++/*! rief Releases the OpenVX object context.
++ * \details All reference counted objects are garbage-collected by the return of this call.
++ * No calls are possible using the parameter context after the context has been
++ * released until a new reference from <tt>ef vxCreateContext</tt> is returned.
++ * All outstanding references to OpenVX objects from this context are invalid
++ * after this call.
++ * \param [in] context The pointer to the reference to the context.
++ * \post After returning from this function the reference is zeroed.
++ * eturn A <tt>ef vx_status_e</tt> enumeration.
++ * etval VX_SUCCESS No errors; any other value indicates failure.
++ * etval VX_ERROR_INVALID_REFERENCE context is not a valid <tt>ef vx_context</tt> reference.
++ * \ingroup group_context
++ * \pre <tt>ef vxCreateContext</tt>
++ */
++VX_API_ENTRY vx_status VX_API_CALL vxReleaseContext(vx_context *context);
++
++/*! rief Retrieves the context from any reference from within a context.
++ * \param [in] reference The reference from which to extract the context.
++ * \ingroup group_context
++ * eturn The overall context that created the particular
++ * reference. Any possible errors preventing a successful completion of this function
++ * should be checked using <tt>ef vxGetStatus</tt>.
++ */
++VX_API_ENTRY vx_context VX_API_CALL vxGetContext(vx_reference reference);
++
++/*! rief Queries the context for some specific information.
++ * \param [in] context The reference to the context.
++ * \param [in] attribute The attribute to query. Use a <tt>ef vx_context_attribute_e</tt>.
++ * \param [out] ptr The location at which to store the resulting value.
++ * \param [in] size The size in bytes of the container to which  ptr points.
++ * eturn A <tt>ef vx_status_e</tt> enumeration.
++ * etval VX_SUCCESS No errors; any other value indicates failure.
++ * etval VX_ERROR_INVALID_REFERENCE context is not a valid <tt>ef vx_context</tt> reference.
++ * etval VX_ERROR_INVALID_PARAMETERS If any of the other parameters are incorrect.
++ * etval VX_ERROR_NOT_SUPPORTED If the attribute is not supported on this implementation.
++ * \ingroup group_context
++ */
++VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum attribute, void *ptr, vx_size size);
++
++/*! rief Sets an attribute on the context.
++ * \param [in] context The handle to the overall context.
++ * \param [in] attribute The attribute to set from <tt>ef vx_context_attribute_e</tt>.
++ * \param [in] ptr The pointer to the data to which to set the attribute.
++ * \param [in] size The size in bytes of the data to which  ptr points.
++ * eturn A <tt>ef vx_status_e</tt> enumeration.
++ * etval VX_SUCCESS No errors; any other value indicates failure.
++ * etval VX_ERROR_INVALID_REFERENCE context is not a valid <tt>ef vx_context</tt> reference.
++ * etval VX_ERROR_INVALID_PARAMETERS If any of the other parameters are incorrect.
++ * etval VX_ERROR_NOT_SUPPORTED If the attribute is not settable.
++ * \ingroup group_context
++ */
++VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_enum attribute, const void *ptr, vx_size size);
++
++/*! rief Provides a generic API to give platform-specific hints to the implementation.
++ * \param [in] reference The reference to the object to hint at.
++ * This could be <tt>ef vx_context</tt>, <tt>ef vx_graph</tt>, <tt>ef vx_node</tt>, <tt>ef vx_image</tt>, <tt>ef vx_array</tt>, or any other reference.
++ * \param [in] hint A <tt>ef vx_hint_e</tt>  hint to give to a ef vx_context. This is a platform-specific optimization or implementation mechanism.
++ * \param [in] data Optional vendor specific data.
++ * \param [in] data_size Size of the data structure \p data.
++ * eturn A <tt>ef vx_status_e</tt> enumeration.
++ * etval VX_SUCCESS No errors; any other value indicates failure.
++ * etval VX_ERROR_INVALID_REFERENCE reference is not a valid <tt>ef vx_reference</tt> reference.
++ * etval VX_ERROR_NOT_SUPPORTED If the hint is not supported.
++ * \ingroup group_hint
++ */
++VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint, const void* data, vx_size data_size);
++
++/*! rief Provides a generic API to give platform-specific directives to the implementations.
++ * \param [in] reference The reference to the object to set the directive on.
++ * This could be <tt>ef vx_context</tt>, <tt>ef vx_graph</tt>, <tt>ef vx_node</tt>, <tt>ef vx_image</tt>, <tt>ef vx_array</tt>, or any other reference.
++ * \param [in] directive The directive to set. See <tt>ef vx_directive_e</tt>.
++ * eturn A <tt>ef vx_status_e</tt> enumeration.
++ * etval VX_SUCCESS No errors; any other value indicates failure.
++ * etval VX_ERROR_INVALID_REFERENCE reference is not a valid <tt>ef vx_reference</tt> reference.
++ * etval VX_ERROR_NOT_SUPPORTED If the directive is not supported.
++ * 
+ote The performance counter directives are only available for the reference ef vx_context.
++ *       Error VX_ERROR_NOT_SUPPORTED is returned when used with any other reference.
++ * \ingroup group_directive
++ */
++VX_API_ENTRY vx_status VX_API_CALL vxDirective(vx_reference reference, vx_enum directive);
++
++/*! rief Provides a generic API to return status values from Object constructors if they
++ * fail.
++ * 
+ote Users do not need to strictly check every object creator as the errors
++ * should properly propagate and be detected during verification time or run-time.
++ * 

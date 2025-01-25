@@ -1,0 +1,28 @@
+049e3e44f owen.wen 2021-04-29
+
+AOS-547: fix multiclientinput cannot unlock screen
+
+Symptom: cannot unlock screen password when press enter
+RootCause: multiclientinput add a 'line feed' char instead of ENTER keyevent
+Solution: send KeyEvent.KEYCODE_ENTER when 'line feed'
+
+Change-Id: Ic8a36011a2be8857fa9ace05a56a5c6bf21b9586
+
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
+index 300bad2f1..e58cd7e4c 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
+@@ -156,6 +156,12 @@ final class SoftInputWindow extends Dialog {
+                     case Keyboard.KEYCODE_SHIFT:
+                         handleShift(isShifted);
+                         break;
++                    case '
+':
++                        inputConnection.sendKeyEvent(
++                                new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
++                        inputConnection.sendKeyEvent(
++                                new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
++                        break;
+                     default:
+                         handleCharacter(inputConnection, primaryCode, isShifted);
+                         break;

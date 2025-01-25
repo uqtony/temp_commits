@@ -1,0 +1,1131 @@
+51c74d7 jenkins 2022-02-18
+
+Download imx-android-12.0.0_1.0.0-er1.tar.gz from nxp.com
+
+Change-Id: Id8299a018547e855c0034e85207249cf87b5b03b
+
+diff --git a/Makefile b/Makefile
+index 9a775b0..e73ff47 100755
+--- a/Makefile
++++ b/Makefile
+@@ -22,7 +22,7 @@ OUT_FILE = vsidaemon
+ DEC = nxp_enc_hw
+ ENC = nxp_dec_hw
+ LIBFILES = 
+-LD_FLAGS = -lpthread -lm
++LD_FLAGS = $(LDFLAGS) -lpthread -lm
+ 
+ PLATFORM ?= IMX8MP
+ 
+diff --git a/imx_vpu_hantro_daemon.go b/imx_vpu_hantro_daemon.go
+index e7793f8..55744bb 100755
+--- a/imx_vpu_hantro_daemon.go
++++ b/imx_vpu_hantro_daemon.go
+@@ -95,6 +95,15 @@ func Hantro_Daemon_Defaults(ctx android.LoadHookContext) {
+         Srcs = append(Srcs, "v4l2_vsi_daemon/src/vsi_dec_avs.c")
+     }
+ 
++    //android debug log in adb
++    if false {
++        Cflags = append(Cflags, "-DANDROID_DEBUG")
++	    Shared_libs = append(Shared_libs, "liblog")
++	    Shared_libs = append(Shared_libs, "libcutils")
++	    Include_dirs = append(Include_dirs, "system/core/include")
++	    Srcs = append(Srcs, "v4l2_vsi_daemon/src/vsi_daemon_debug.c")
++    }
++
+     p.Target.Android.Cflags = Cflags
+     p.Target.Android.Srcs = Srcs
+     p.Target.Android.Shared_libs = Shared_libs
+diff --git a/v4l2_vsi_daemon/src/command_defines.h b/v4l2_vsi_daemon/src/command_defines.h
+index 6f3e7c2..4326d3e 100755
+--- a/v4l2_vsi_daemon/src/command_defines.h
++++ b/v4l2_vsi_daemon/src/command_defines.h
+@@ -30,7 +30,7 @@
+ #include "object_heap.h"
+ #include "v4l2_base_type.h"
+ 
+-#define MAX_STREAMS 100
++#define MAX_STREAMS 200
+ #define MAX_GOP_SIZE 8
+ #define MAX_INTRA_PIC_RATE 0x7fffffff
+ #define NO_RESPONSE_SEQID 0xFFFFFFFE
+@@ -127,7 +127,7 @@ typedef enum {
+   V4L2_DAEMON_VIDIOC_STREAMON = 0,  // for streamon and start
+   V4L2_DAEMON_VIDIOC_BUF_RDY,
+   V4L2_DAEMON_VIDIOC_CMD_STOP,   // this is for flush.
+-  V4L2_DAEMON_VIDIOC_STREAMOFF,   //enc destroy
++  V4L2_DAEMON_VIDIOC_DESTROY_ENC,   //enc destroy
+   V4L2_DAEMON_VIDIOC_ENC_RESET,   //enc reset, as in spec
+   //above are enc cmds
+ 
+@@ -154,6 +154,7 @@ typedef enum {
+   V4L2_DAEMON_VIDIOC_CROPCHANGE,
+   V4L2_DAEMON_VIDIOC_WARNONOPTION,
+   V4L2_DAEMON_VIDIOC_STREAMOFF_CAPTURE_DONE,
++  V4L2_DAEMON_VIDIOC_STREAMOFF_OUTPUT_DONE,
+   V4L2_DAEMON_VIDIOC_TOTAL_AMOUNT,
+ } v4l2_daemon_cmd_id;
+ 
+@@ -469,6 +470,8 @@ typedef struct v4l2_daemon_enc_h26x_cmd {
+   uint32_t vuiColorPrimaries;
+   uint32_t vuiTransferCharacteristics;
+   uint32_t vuiMatrixCoefficients;
++
++  uint32_t idrHdr;
+ } v4l2_daemon_enc_h26x_cmd;
+ 
+ typedef struct v4l2_daemon_enc_jpeg_cmd {
+diff --git a/v4l2_vsi_daemon/src/daemon_instance.h b/v4l2_vsi_daemon/src/daemon_instance.h
+index 9109a13..22b52b0 100755
+--- a/v4l2_vsi_daemon/src/daemon_instance.h
++++ b/v4l2_vsi_daemon/src/daemon_instance.h
+@@ -57,8 +57,11 @@ typedef enum {
+ 
+ // for instance flag, bit mapped
+ typedef enum {
+-  INST_CATCH_EXCEPTION,
++  INST_CATCH_EXCEPTION = 0,
+   INST_FATAL_ERROR,
++  INST_ZOMBIE,
++  INST_DEAD,
++  INST_FORCEEXIT,
+ } v4l2_inst_flag;
+ 
+ typedef struct {
+diff --git a/v4l2_vsi_daemon/src/vsi_daemon_debug.c b/v4l2_vsi_daemon/src/vsi_daemon_debug.c
+new file mode 100644
+index 0000000..f5d2bac
+--- /dev/null
++++ b/v4l2_vsi_daemon/src/vsi_daemon_debug.c
+@@ -0,0 +1,47 @@
++
++#ifdef ANDROID_DEBUG
++
++//#define LOG_NDEBUG 0
++#define LOG_TAG "vsi_daemon"
++#include <log/log.h>
++#include <android/log.h>
++#include "vsi_daemon_debug.h"
++
++#define LOG_BUF_SIZE 1024
++
++void LogOutput(int level, const char *fmt, ...)
++{
++    va_list ap;
++    char buf[LOG_BUF_SIZE];
++    android_LogPriority android_level = ANDROID_LOG_VERBOSE;
++
++    va_start(ap, fmt);
++    vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
++    va_end(ap);
++
++    switch(level){
++        case HANTRO_LEVEL_ERROR:
++            android_level = ANDROID_LOG_ERROR;
++            break;
++        case HANTRO_LEVEL_WARNING:
++        case HANTRO_LEVEL_FIXME:
++            android_level = ANDROID_LOG_WARN;
++            break;
++        case HANTRO_LEVEL_INFO:
++            android_level = ANDROID_LOG_INFO;
++            break;
++        case HANTRO_LEVEL_DEBUG:
++            android_level = ANDROID_LOG_DEBUG;
++            break;
++        case HANTRO_LEVEL_LOG:
++            android_level = ANDROID_LOG_VERBOSE;
++        default:
++            break;
++    };
++    __android_log_write(android_level, LOG_TAG, buf);
++
++    return;
++}
++#endif
++
++
+diff --git a/v4l2_vsi_daemon/src/vsi_daemon_debug.h b/v4l2_vsi_daemon/src/vsi_daemon_debug.h
+old mode 100755
+new mode 100644
+index 7592a93..a838488
+--- a/v4l2_vsi_daemon/src/vsi_daemon_debug.h
++++ b/v4l2_vsi_daemon/src/vsi_daemon_debug.h
+@@ -47,13 +47,22 @@
+ extern int hantro_log_level;
+ extern char hantro_level[HANTRO_LEVEL_COUNT][20];
+ extern FILE *vsidaemonstdlog;
++
++#ifdef ANDROID_DEBUG
++void LogOutput(int level, const char *fmt, ...);
++#define HANTRO_LOG(level, fmt, args...) \
++    if (level < hantro_log_level) { \
++        LogOutput(level, fmt, ##args); \
++    }
++
++#else
+ #define HANTRO_LOG(level, fmt, args...)                     \
+   if (level < hantro_log_level) {                           \
+     printf(__FILE__ ":%d:%s() %s " fmt, __LINE__, __func__, \
+            hantro_level[level], ##args);                    \
+     if (vsidaemonstdlog) fflush(vsidaemonstdlog);           \
+   }
+-
++#endif
+ //#define SW_PERFORMANCE
+ 
+ #ifdef SW_PERFORMANCE
+diff --git a/v4l2_vsi_daemon/src/vsi_dec.c b/v4l2_vsi_daemon/src/vsi_dec.c
+index b4a75a5..133877d 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec.c
++++ b/v4l2_vsi_daemon/src/vsi_dec.c
+@@ -79,7 +79,8 @@ char cmd_name[V4L2_DAEMON_VIDIOC_TOTAL_AMOUNT][50] = {
+     "V4L2_DAEMON_VIDIOC_STREAMON",
+     "V4L2_DAEMON_VIDIOC_BUF_RDY",
+     "V4L2_DAEMON_VIDIOC_CMD_STOP",
+-    "V4L2_DAEMON_VIDIOC_STREAMOFF",
++    "V4L2_DAEMON_VIDIOC_DESTROY_ENC",
++    "V4L2_DAEMON_VIDIOC_ENC_RESET",
+     "V4L2_DAEMON_VIDIOC_FAKE",
+     "V4L2_DAEMON_VIDIOC_S_EXT_CTRLS",
+     "V4L2_DAEMON_VIDIOC_RESET_BITRATE",
+@@ -598,6 +599,22 @@ re_get:
+   return 0;
+ }
+ 
++void vsi_dec_send_picconsumed_info(v4l2_dec_inst *h, i32 in_idx, i32 out_idx) {
++    vsi_v4l2_msg msg = {0};
++
++    msg.error = 0;
++    msg.seq_id = NO_RESPONSE_SEQID;
++    msg.size = sizeof(struct v4l2_daemon_dec_buffers);
++    msg.cmd_id = V4L2_DAEMON_VIDIOC_PICCONSUMED;
++    msg.inst_id = h->instance_id;
++    msg.params.dec_params.io_buffer.inbufidx = in_idx;
++    msg.params.dec_params.io_buffer.outbufidx = out_idx;
++    send_notif_to_v4l2(pipe_fd, &msg,
++                        sizeof(struct vsi_v4l2_msg_hdr) +
++                            sizeof(struct v4l2_daemon_dec_buffers));
++}
++
++
+ static void vsi_dec_handle_inpkt_cnt(v4l2_dec_inst *h) {
+   /* If current input packet doesn't have picture decoded,
+    * send out a specific event out. It is for Android CTS,
+@@ -606,28 +623,25 @@ static void vsi_dec_handle_inpkt_cnt(v4l2_dec_inst *h) {
+   if (h->dec_inpkt_pic_decoded_cnt == h->dec_pic_id &&
+       h->dec_inpkt_ignore_picconsumed_event == 0) {
+     BUFFER *p = NULL;
+-    i32 inbufidx = INVALID_IOBUFF_IDX;
+ 
+     p = bufferlist_get_buffer(h->bufferlist_input);
+-
+     if (p == NULL) {
+         HANTRO_LOG(HANTRO_LEVEL_ERROR, "Inst[%lx]: SHOULD GET INPUT BUFFER.
+",
+-                   h->instance_id);
++                    h->instance_id);
+         ASSERT(0);
+     } else {
+-        inbufidx = p->dec_cmd.io_buffer.inbufidx;
++      vsi_dec_send_picconsumed_info(h, p->dec_cmd.io_buffer.inbufidx, INVALID_IOBUFF_IDX);
+     }
+-    vsi_v4l2_msg msg = {0};
+-    msg.error = 0;
+-    msg.seq_id = NO_RESPONSE_SEQID;
+-    msg.size = sizeof(struct v4l2_daemon_dec_buffers);
+-    msg.cmd_id = V4L2_DAEMON_VIDIOC_PICCONSUMED;
+-    msg.inst_id = h->instance_id;
+-    msg.params.dec_params.io_buffer.inbufidx = inbufidx;
+-    msg.params.dec_params.io_buffer.outbufidx = INVALID_IOBUFF_IDX;
+-    send_notif_to_v4l2(pipe_fd, &msg,
+-                       sizeof(struct vsi_v4l2_msg_hdr) +
+-                           sizeof(struct v4l2_daemon_dec_buffers));
++  }
++
++  if (h->discard_dbp_count > 0) {
++    i32 i;
++
++    for (i = 0; i < h->discard_dbp_count; i++) {
++      vsi_dec_send_picconsumed_info(h, INVALID_IOBUFF_IDX, INVALID_IOBUFF_IDX);
++      TSManagerSend2(h->tsm, NULL);
++    }
++    h->discard_dbp_count = 0;
+   }
+ }
+ 
+@@ -1673,6 +1687,11 @@ int vsi_dec_seek2(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ int vsi_dec_seek3(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+   ASSERT(h->dec_cur_state == DAEMON_DEC_STATE_SEEK);
+ 
++  if (h->dec_output_state2 != 0) {
++    HANTRO_LOG(HANTRO_LEVEL_DEBUG, "reset dec_output_state2
+");
++    h->dec_output_state2 = 0;
++  }
++
+   if (h->existed_dpb_nums)
+     h->dec_output_state = DAEMON_QUEUE_STATE_ON;
+   else
+diff --git a/v4l2_vsi_daemon/src/vsi_dec.h b/v4l2_vsi_daemon/src/vsi_dec.h
+index d83635c..ae4dd33 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec.h
++++ b/v4l2_vsi_daemon/src/vsi_dec.h
+@@ -248,6 +248,7 @@ struct _v4l2_dec_inst {
+   void *priv_data;
+   void *priv_pic_data;
+   uint32_t dec_inpkt_ignore_picconsumed_event;
++  uint32_t discard_dbp_count;
+ 
+   /*obsoleted*/
+   void *dec_dll_handle;
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_avs.c b/v4l2_vsi_daemon/src/vsi_dec_avs.c
+index bfba6ef..244a3b3 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_avs.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_avs.c
+@@ -330,8 +330,6 @@ v4l2_inst_dec_event avs_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+-
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         goto update_input;
+ #endif
+@@ -339,7 +337,6 @@ v4l2_inst_dec_event avs_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+ 
+       case AVSDEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         goto update_input;
+ #endif
+@@ -368,7 +365,6 @@ v4l2_inst_dec_event avs_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+ 
+         if (avs_dec_check_res_change(h, &dec_info, &hbuf) != 0) {
+           re_dec_event = DEC_SOURCE_CHANGE_EVENT;
+-          h->consumed_len += dec_input.data_len - dec_output.data_left;
+           goto update_input;
+         }
+         if (h->dec_info.needed_dpb_nums > h->existed_dpb_nums) {
+@@ -436,6 +432,7 @@ error:
+     goto end;
+   }
+ update_input:
++  h->consumed_len += dec_input.data_len - dec_output.data_left;
+   avs_update_input(in_mem, &dec_input, &dec_output);
+ 
+ end:
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_hevc.c b/v4l2_vsi_daemon/src/vsi_dec_hevc.c
+index 2e51104..57030f1 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_hevc.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_hevc.c
+@@ -524,6 +524,7 @@ v4l2_inst_dec_event hevc_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+   do {
+     /* Picture ID is the picture number in decoding order */
+     ret = HevcDecDecode(dec_inst, &dec_input, &dec_output);
++    h->discard_dbp_count += HevcDecDiscardDpbNums(dec_inst);
+     HANTRO_LOG(HANTRO_LEVEL_INFO, "Inst[%lx]: HevcDecDecode ret %d decoded pic %d
+",
+                h->instance_id, ret, h->dec_pic_id);
+     switch (ret) {
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_mpeg2.c b/v4l2_vsi_daemon/src/vsi_dec_mpeg2.c
+index 66fdf55..370a95f 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_mpeg2.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_mpeg2.c
+@@ -363,14 +363,12 @@ v4l2_inst_dec_event mpeg2_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         goto update_input;
+ #endif
+         break;
+       case MPEG2DEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         goto update_input;
+ #endif
+@@ -396,7 +394,6 @@ v4l2_inst_dec_event mpeg2_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+ 
+         if (mpeg2_dec_check_res_change(h, &dec_info, &hbuf) != 0) {
+           re_dec_event = DEC_SOURCE_CHANGE_EVENT;
+-          h->consumed_len += dec_input.data_len - dec_output.data_left;
+           goto update_input;
+         }
+ 
+@@ -468,6 +465,7 @@ error:
+     goto end;
+   }
+ update_input:
++  h->consumed_len += dec_input.data_len - dec_output.data_left;
+   mpeg2_update_input(in_mem, &dec_input, &dec_output);
+ end:
+   return re_dec_event;
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_mpeg4.c b/v4l2_vsi_daemon/src/vsi_dec_mpeg4.c
+index c056351..173cb8f 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_mpeg4.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_mpeg4.c
+@@ -368,8 +368,6 @@ v4l2_inst_dec_event mpeg4_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+-
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         goto update_input;
+ #endif
+@@ -377,7 +375,6 @@ v4l2_inst_dec_event mpeg4_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+       case MP4DEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         goto update_input;
+ #endif
+@@ -409,8 +406,6 @@ v4l2_inst_dec_event mpeg4_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+         if (mpeg4_dec_check_res_change(h, &dec_info, &hbuf) != 0) {
+           re_dec_event = DEC_SOURCE_CHANGE_EVENT;
+-          h->consumed_len += dec_input.data_len - dec_output.data_left;
+-
+           goto update_input;
+         }
+         if (h->dec_info.needed_dpb_nums > h->existed_dpb_nums) {
+@@ -480,6 +475,7 @@ error:
+     goto end;
+   }
+ update_input:
++  h->consumed_len += dec_input.data_len - dec_output.data_left;
+   mpeg4_update_input(in_mem, &dec_input, &dec_output);
+ 
+ end:
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_rv.c b/v4l2_vsi_daemon/src/vsi_dec_rv.c
+index f02649f..52e6c53 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_rv.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_rv.c
+@@ -502,7 +502,6 @@ v4l2_inst_dec_event rv_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         dec_input.data_len = dec_output.data_left;
+ #endif
+@@ -512,7 +511,6 @@ v4l2_inst_dec_event rv_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+       case RVDEC_PIC_CONSUMED:
+       case RVDEC_NONREF_PIC_SKIPPED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+ #endif
+       goto update_input;
+@@ -593,6 +591,7 @@ v4l2_inst_dec_event rv_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+   }
+ 
+ update_input:
++  h->consumed_len += dec_input.data_len - dec_output.data_left;
+   rv_priv->total_slice_info_size = 0;
+   rv_update_input(in_mem, &dec_output);
+ end:
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_vc1.c b/v4l2_vsi_daemon/src/vsi_dec_vc1.c
+index c0f40fe..252e55a 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_vc1.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_vc1.c
+@@ -425,7 +425,6 @@ v4l2_inst_dec_event vc1l_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+         if (vc1_dec_check_res_change(h, &dec_info, &hbuf) != 0) {
+           re_dec_event = DEC_SOURCE_CHANGE_EVENT;
+-          h->consumed_len += dec_input.stream_size - dec_output.data_left;
+           goto update_input;
+         }
+         if (h->dec_info.needed_dpb_nums > h->existed_dpb_nums) {
+@@ -450,7 +449,6 @@ v4l2_inst_dec_event vc1l_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.stream_size - dec_output.data_left;
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         goto update_input;
+ #endif
+@@ -458,7 +456,6 @@ v4l2_inst_dec_event vc1l_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+       case VC1DEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.stream_size - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         goto update_input;
+ #endif
+@@ -525,6 +522,7 @@ error:
+   }
+ 
+ update_input:
++  h->consumed_len += dec_input.stream_size - dec_output.data_left;
+   vc1l_update_input(in_mem, &dec_input, &dec_output);
+ 
+ end:
+@@ -622,7 +620,6 @@ v4l2_inst_dec_event vc1g_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+   v4l2_inst_dec_event re_dec_event = DEC_EMPTY_EVENT;
+   i32 ret = 0;
+   u32 skip_non_reference = 0;
+-  u32 raw_frame_data = 0;
+   VC1DecInput dec_input = {0};
+   VC1DecOutput dec_output = {0};
+   VC1DecInfo dec_info = {0};
+@@ -635,13 +632,12 @@ v4l2_inst_dec_event vc1g_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+   dec_input.skip_non_reference = skip_non_reference;
+   dec_input.stream_size = in_mem->logical_size;
+   dec_input.pic_id = h->dec_in_pic_id; /*curr_pic_id*/
+-  if (h->dec_in_new_packet) {
+-    if (VC1_IS_NAL_HDR(dec_input.stream, 0) ||
+-        VC1_IS_NAL_HDR(dec_input.stream, 1))
+-      raw_frame_data = 0;
+-    else
+-      raw_frame_data = 1;
+-    VC1DecSetFrameDataMode(dec_inst, raw_frame_data);
++  if (VC1_IS_NAL_HDR(dec_input.stream, 0) ||
++      VC1_IS_NAL_HDR(dec_input.stream, 1)) {
++    VC1DecSetFrameDataMode(dec_inst, 0);
++  } else {
++    if (h->dec_in_new_packet)
++      VC1DecSetFrameDataMode(dec_inst, 1);
+   }
+   HANTRO_LOG(HANTRO_LEVEL_INFO, "input: %p %lx stream len: %d
+",
+              dec_input.stream, dec_input.stream_bus_address,
+@@ -692,7 +688,6 @@ v4l2_inst_dec_event vc1g_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+         if (vc1_dec_check_res_change(h, &dec_info, &hbuf) != 0) {
+           re_dec_event = DEC_SOURCE_CHANGE_EVENT;
+-          h->consumed_len += dec_input.stream_size - dec_output.data_left;
+           goto update_input;
+         }
+         if (h->dec_info.needed_dpb_nums > h->existed_dpb_nums) {
+@@ -717,7 +712,6 @@ v4l2_inst_dec_event vc1g_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+         }
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.stream_size - dec_output.data_left;
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         goto update_input;
+ #endif
+@@ -725,7 +719,6 @@ v4l2_inst_dec_event vc1g_dec_decode(v4l2_dec_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+       case VC1DEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.stream_size - dec_output.data_left;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         goto update_input;
+ #endif
+@@ -791,6 +784,7 @@ error:
+     goto end;
+   }
+ update_input:
++  h->consumed_len += dec_input.stream_size - dec_output.data_left;
+   vc1g_update_input(in_mem, &dec_input, &dec_output);
+ 
+ end:
+diff --git a/v4l2_vsi_daemon/src/vsi_dec_vp8.c b/v4l2_vsi_daemon/src/vsi_dec_vp8.c
+index bb459e4..e102a57 100755
+--- a/v4l2_vsi_daemon/src/vsi_dec_vp8.c
++++ b/v4l2_vsi_daemon/src/vsi_dec_vp8.c
+@@ -260,10 +260,9 @@ v4l2_inst_dec_event vp8_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+ 
+       case VP8DEC_PIC_CONSUMED:
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len;
+         re_dec_event = DEC_DECODING_FAILED_EVENT;
+         in_mem->logical_size = 0;
+-        goto end;
++        goto update_input;
+ #endif
+         dec_input.data_len = 0;
+         break;
+@@ -273,10 +272,9 @@ v4l2_inst_dec_event vp8_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+         /* Picture is now ready */
+         h->dec_pic_id++;
+ #ifdef NXP_TIMESTAMP_MANAGER
+-        h->consumed_len += dec_input.data_len;
+         re_dec_event = DEC_PIC_DECODED_EVENT;
+         in_mem->logical_size = 0;
+-        goto end;
++        goto update_input;
+ #endif
+         dec_input.data_len = 0;
+         break;
+@@ -373,6 +371,8 @@ v4l2_inst_dec_event vp8_dec_decode(v4l2_dec_inst* h, vsi_v4l2_msg* v4l2_msg) {
+   }
+ error:
+   in_mem->logical_size = 0;
++update_input:
++  h->consumed_len += dec_input.data_len;
+ end:
+   return re_dec_event;
+ }
+diff --git a/v4l2_vsi_daemon/src/vsi_enc.c b/v4l2_vsi_daemon/src/vsi_enc.c
+index 012ac43..fd65fc2 100755
+--- a/v4l2_vsi_daemon/src/vsi_enc.c
++++ b/v4l2_vsi_daemon/src/vsi_enc.c
+@@ -78,7 +78,6 @@ static void handle_encoder_err(v4l2_enc_inst *h, vsi_v4l2_msg *v4l2_msg,
+   send_enc_orphan_msg(v4l2_msg, io_buf->inbufidx, io_buf->outbufidx,
+                       stream_size, ret);
+   h->func.close(h);
+-  h->inst = NULL;
+ }
+ 
+ void check_if_cbr_bitrate_changed(v4l2_enc_inst *h,
+@@ -261,17 +260,11 @@ int32_t enc_cmd_processor(v4l2_enc_inst *h, struct vsi_v4l2_msg *v4l2_msg) {
+       {
+         HANTRO_LOG(HANTRO_LEVEL_INFO, "Has Param when streamon.
+");
+       }
+-      if (v4l2_msg->param_type == 0 &&
+-        (h->state == ENC_ENCODING || h->state == ENC_PAIRING || h->state == ENC_DRAIN)) {
+-        HANTRO_LOG(HANTRO_LEVEL_DEBUG, "ignore stream on because current state is %d.
+", h->state);
+-        break;
+-      }
+       h->state = ENC_INIT;
+       h->already_streamon = 1;
+       h->already_command_stop = h->drain_input_num_total =
+           h->drain_input_num_now = 0;
+-      if (v4l2_msg->param_type)
+-        h->flushbuf = 1;
++      h->flushbuf = 1;
+       break;
+ 
+     case V4L2_DAEMON_VIDIOC_CMD_STOP:  // this is for flush.
+@@ -281,11 +274,29 @@ int32_t enc_cmd_processor(v4l2_enc_inst *h, struct vsi_v4l2_msg *v4l2_msg) {
+       h->state = ENC_DRAIN;
+       break;
+ 
+-    case V4L2_DAEMON_VIDIOC_STREAMOFF:
++    case V4L2_DAEMON_VIDIOC_DESTROY_ENC:
+     case V4L2_DAEMON_VIDIOC_EXIT:
+       h->state = ENC_RELEASED;
+       break;
+ 
++    case V4L2_DAEMON_VIDIOC_ENC_RESET:
++      h->func.reset_enc(h);
++      h->state = ENC_STOPPED;
++    break;
++
++    case V4L2_DAEMON_VIDIOC_STREAMOFF_OUTPUT:
++      bufferlist_flush(h->bufferlist_input);
++      send_cmd_orphan_msg(h->instance_id, V4L2_DAEMON_VIDIOC_STREAMOFF_OUTPUT_DONE);
++      h->state = ENC_STOPPED;
++      break;
++
++    case V4L2_DAEMON_VIDIOC_STREAMOFF_CAPTURE:
++      bufferlist_flush(h->bufferlist_output);
++      h->func.reset_enc(h);
++      send_cmd_orphan_msg(h->instance_id, V4L2_DAEMON_VIDIOC_STREAMOFF_CAPTURE_DONE);
++      h->state = ENC_STOPPED;
++      break;
++
+     case V4L2_DAEMON_VIDIOC_FAKE:
+       break;
+     default:
+@@ -418,15 +429,6 @@ v4l2_inst_state enc_state_processor(v4l2_enc_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+     case ENC_ENCODING:
+       /*encoding step 1: find next picture, get buffer and set gop structure.*/
+-      if(v4l2_msg->cmd_id == V4L2_DAEMON_VIDIOC_ENC_RESET) {
+-          if (h->bufferlist_input) bufferlist_flush(h->bufferlist_input);
+-          if (h->bufferlist_output) bufferlist_flush(h->bufferlist_output);
+-          if (h->bufferlist_reorder) bufferlist_flush(h->bufferlist_reorder);
+-          h->input_frame_cnt = 0;
+-          h->func.reset_enc(h);
+-          return ENC_ENCODING;
+-      }
+-
+       h->func.find_next_pic(h, &p_buffer, &list_num);
+       if (p_buffer == NULL) {
+         break;
+@@ -448,6 +450,7 @@ v4l2_inst_state enc_state_processor(v4l2_enc_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+       if (h->cbr_bitrate_change == 1 && h->next_pic_type == 0) {
+         h->func.end(h, &size_header_plus_i);
++        h->func.close(h);
+         enc_unmap_io_buff(h, io_buf);
+         h->cbr_bitrate_change = 0;
+         h->state = ENC_INIT;
+@@ -612,18 +615,12 @@ v4l2_inst_state enc_state_processor(v4l2_enc_inst *h, vsi_v4l2_msg *v4l2_msg) {
+                    "Encoded frames: %ld, encode fps: %0.2f
+", h->total_frames,
+                    ((double)h->total_frames * 1000000) / h->total_time);
+       }
+-      if (h->inst) {
+-        h->func.close(h);
+-        h->inst = NULL;
+-        h->state = ENC_NONE;
+-      }
++      h->func.close(h);
++      h->state = ENC_NONE;
+       return ENC_STOPPED;
+     case ENC_RELEASED:
+-      if (h->inst) {
+-        h->func.close(h);
+-        h->inst = NULL;
+-        h->state = ENC_NONE;
+-      }
++      h->func.close(h);
++      h->state = ENC_NONE;
+       return ENC_RELEASED;
+     default:
+       break;
+@@ -632,7 +629,6 @@ v4l2_inst_state enc_state_processor(v4l2_enc_inst *h, vsi_v4l2_msg *v4l2_msg) {
+ 
+ _label_enc_stopped:
+   h->func.close(h);
+-  h->inst = NULL;
+   return ENC_STOPPED;
+ }
+ 
+@@ -1033,16 +1029,3 @@ int32_t calculate_level(v4l2_daemon_codec_fmt     format, int32_t width, int32_t
+     return leveIdx;
+ }
+ 
+-int32_t is_input_level_ilegal(v4l2_daemon_codec_fmt format, int32_t width, int32_t height,
+-                                    uint32_t frameRateNum, uint32_t frameRateDenom, int32_t level_idx_input) {
+-    uint32_t sample_per_picture = width * height;
+-    uint32_t sample_per_second = sample_per_picture * frameRateNum / frameRateDenom;
+-
+-    uint32_t sample_per_picture_limit = getMaxPicSize(format, level_idx_input);
+-    unsigned long long sample_per_second_limit = getMaxSBPS(format, level_idx_input);
+-    if((sample_per_picture > sample_per_picture_limit) || (sample_per_second > sample_per_second_limit)) {
+-        return 1;
+-    }
+-    else
+-        return 0;
+-}
+diff --git a/v4l2_vsi_daemon/src/vsi_enc.h b/v4l2_vsi_daemon/src/vsi_enc.h
+index f922a87..13dee41 100755
+--- a/v4l2_vsi_daemon/src/vsi_enc.h
++++ b/v4l2_vsi_daemon/src/vsi_enc.h
+@@ -163,9 +163,6 @@ void check_if_cbr_bitrate_changed(v4l2_enc_inst* h,
+ 
+ int32_t calculate_level(v4l2_daemon_codec_fmt format, int32_t width, int32_t height,
+                         uint32_t frameRateNum, uint32_t frameRateDenom, uint32_t bitPerSecond, int32_t profile);
+-
+-int32_t is_input_level_ilegal(v4l2_daemon_codec_fmt format, int32_t width, int32_t height,
+-                        uint32_t frameRateNum, uint32_t frameRateDenom, int32_t level_idx_input);
+ uint32_t getMaxCpbSize( v4l2_daemon_codec_fmt codecFormat , int32_t levelIdx );
+ 
+ #endif
+diff --git a/v4l2_vsi_daemon/src/vsi_enc_video_h1.c b/v4l2_vsi_daemon/src/vsi_enc_video_h1.c
+index 5cd2690..6dcc2b1 100755
+--- a/v4l2_vsi_daemon/src/vsi_enc_video_h1.c
++++ b/v4l2_vsi_daemon/src/vsi_enc_video_h1.c
+@@ -273,13 +273,13 @@ static int init_encoder_h264(v4l2_enc_inst *h,
+   if (enc_params->specific.enc_h26x_cmd.avclevel != DEFAULTLEVEL)
+     cfg->level = (H264EncLevel)enc_params->specific.enc_h26x_cmd.avclevel;
+ 
+-  int32_t levelIdx = getLevelIdxH264(cfg->level);
++  int32_t levelIdx = getLevelIdxH264(cfg->level), minLvl;
+ 
+-  if(1 == is_input_level_ilegal(h->codec_fmt, cfg->width, cfg->height,
+-                                cfg->frameRateNum, cfg->frameRateDenom, levelIdx)) {
+-      levelIdx = calculate_level(h->codec_fmt, cfg->width, cfg->height,
+-                                cfg->frameRateNum, cfg->frameRateDenom, enc_params->general.bitPerSecond, enc_params->specific.enc_h26x_cmd.profile);
+-      cfg->level = getLevelH264(levelIdx);
++  minLvl = calculate_level(h->codec_fmt, cfg->width, cfg->height,
++                 cfg->frameRateNum, cfg->frameRateDenom, enc_params->general.bitPerSecond,
++                 enc_params->specific.enc_h26x_cmd.profile);
++   if(levelIdx < minLvl) {
++      cfg->level = getLevelH264(minLvl);
+       send_warning_orphan_msg(h->instance_id, WARN_LEVEL);
+   }
+ 
+@@ -670,6 +670,7 @@ static int set_coding_control_h264(v4l2_enc_inst *h,
+     return DAEMON_ERR_ENC_INTERNAL;
+   }
+ 
++  codingCfg->idrHeader = enc_params->specific.enc_h26x_cmd.idrHdr;
+   if (enc_params->specific.enc_h26x_cmd.sliceSize != -1)
+     codingCfg->sliceSize = enc_params->specific.enc_h26x_cmd.sliceSize;
+   if (enc_params->specific.enc_h26x_cmd.enableCabac != -1)
+@@ -1264,7 +1265,8 @@ int encoder_find_next_pic_h1(v4l2_enc_inst *h, BUFFER **p_buffer,
+  */
+ void reset_enc_h1(v4l2_enc_inst *h)
+ {
+-    return;
++  h->input_frame_cnt = 0;
++  h->output_frame_cnt = 0;
+ }
+ 
+ /**
+@@ -1313,8 +1315,9 @@ int encoder_close_h1(v4l2_enc_inst *h) {
+                    ret);
+       }
+     }
++    h->inst = NULL;
+   }
+-
++  if(h->cbr_bitrate_change) return ret;
+   if (h->bufferlist_input) bufferlist_flush(h->bufferlist_input);
+   if (h->bufferlist_output) bufferlist_flush(h->bufferlist_output);
+   if (h->bufferlist_reorder) bufferlist_flush(h->bufferlist_reorder);
+diff --git a/v4l2_vsi_daemon/src/vsi_enc_video_h2.c b/v4l2_vsi_daemon/src/vsi_enc_video_h2.c
+index 5f130db..37c8c73 100755
+--- a/v4l2_vsi_daemon/src/vsi_enc_video_h2.c
++++ b/v4l2_vsi_daemon/src/vsi_enc_video_h2.c
+@@ -1324,7 +1324,7 @@ static int get_config_from_cmd_h2(v4l2_enc_inst *h,
+            IS_HEVC(enc_params->general.codecFormat))
+     cfg->level = (VCEncLevel)enc_params->specific.enc_h26x_cmd.hevclevel;
+ 
+-  int32_t levelIdx = 0;
++  int32_t levelIdx = 0, minLvl;
+   if(IS_HEVC(enc_params->general.codecFormat)) {
+       levelIdx = getlevelIdxHevc(cfg->level);
+   }
+@@ -1351,11 +1351,11 @@ static int get_config_from_cmd_h2(v4l2_enc_inst *h,
+         cfg->profile <= VCENC_H264_HIGH_PROFILE)
+       cfg->profile = VCENC_HEVC_MAIN_PROFILE;
+   }
+-  if(is_input_level_ilegal(h->codec_fmt, cfg->width, cfg->height,
+-        cfg->frameRateNum, cfg->frameRateDenom, levelIdx)) {
+-      levelIdx = calculate_level(h->codec_fmt, cfg->width, cfg->height,
+-                                cfg->frameRateNum, cfg->frameRateDenom, enc_params->general.bitPerSecond, cfg->profile);
+-      cfg->level = getLevel(h->codec_fmt, levelIdx);
++  minLvl = calculate_level(h->codec_fmt, cfg->width, cfg->height,
++                  cfg->frameRateNum, cfg->frameRateDenom,
++                  enc_params->general.bitPerSecond, cfg->profile);
++  if(levelIdx < minLvl) {
++      cfg->level = getLevel(h->codec_fmt, minLvl);
+       send_warning_orphan_msg(h->instance_id, WARN_LEVEL);
+   }
+ 
+@@ -2200,9 +2200,8 @@ void encoder_get_input_h2(v4l2_enc_inst *h, v4l2_daemon_enc_params *enc_params,
+ 
+   encIn->vui_timing_info_enable = 1;
+ 
+-  if (encIn->codingType == VCENC_INTRA_FRAME && !if_config)
+-    encIn->resendVPS = encIn->resendSPS = encIn->resendPPS =
+-        1;  // default enabe this value
++  if (encIn->codingType == VCENC_INTRA_FRAME && !if_config && enc_params->specific.enc_h26x_cmd.idrHdr)
++    encIn->resendVPS = encIn->resendSPS = encIn->resendPPS = 1;  // default enabe this value
+   else
+     encIn->resendVPS = encIn->resendSPS = encIn->resendPPS = 0;
+ 
+@@ -2214,6 +2213,8 @@ void encoder_get_input_h2(v4l2_enc_inst *h, v4l2_daemon_enc_params *enc_params,
+   else
+     encIn->timeIncrement = 1;
+   if (enc_params->specific.enc_h26x_cmd.force_idr) {
++    encIn->poc = 0;
++    encIn->last_idr_picture_cnt = encIn->picture_cnt;
+     encIn->codingType = VCENC_INTRA_FRAME;
+     encIn->bIsIDR = 1;
+     h->next_pic_type = (int)VCENC_INTRA_FRAME;
+@@ -2409,6 +2410,8 @@ void reset_enc_h2(v4l2_enc_inst *h) {
+ 
+   //when get reset command, reset picture_cnt
+   encIn->picture_cnt = 0;
++  h->input_frame_cnt = 0;
++  h->output_frame_cnt = 0;
+ }
+ 
+ /**
+@@ -2442,8 +2445,9 @@ int encoder_close_h2(v4l2_enc_inst *h) {
+     if (ret != VCENC_OK) {
+       HANTRO_LOG(HANTRO_LEVEL_INFO, "VCEncRelease failed, ret=%d
+", ret);
+     }
++    h->inst = NULL;
+   }
+-
++  if(h->cbr_bitrate_change) return ret;
+   if (h->bufferlist_input) bufferlist_flush(h->bufferlist_input);
+   if (h->bufferlist_output) bufferlist_flush(h->bufferlist_output);
+   if (h->bufferlist_reorder) bufferlist_flush(h->bufferlist_reorder);
+diff --git a/v4l2_vsi_daemon/src/vsi_main.c b/v4l2_vsi_daemon/src/vsi_main.c
+index 01b62ed..ba35a1a 100755
+--- a/v4l2_vsi_daemon/src/vsi_main.c
++++ b/v4l2_vsi_daemon/src/vsi_main.c
+@@ -42,6 +42,7 @@
+ #include <unistd.h>
+ #include <errno.h>
+ #include <signal.h>
++#include <time.h>
+ 
+ #include "daemon_instance.h"
+ #include "hash_table.h"
+@@ -52,6 +53,7 @@ typedef struct zombie_inst{
+   struct zombie_inst *next;
+ } zombie_inst;
+ 
++static int64_t zombie_delaytime = 1000000000;
+ FILE *vsidaemonstdlog = NULL;
+ static HashTable ht;
+ static pthread_t maintid;
+@@ -100,21 +102,39 @@ static void check_instance(v4l2_daemon_inst *cur_inst_p) {
+   }
+ }
+ 
++static v4l2_daemon_inst *find_zombieinst(pthread_t tid)
++{
++    zombie_inst *pz = hzinst;
++
++    while (pz) {
++        if (pz->pinst->tid == tid)
++            return pz->pinst;
++        pz = pz->next;
++    }
++    return NULL;	
++}
++
+ static void signalhandler(int signo) {
+   v4l2_daemon_inst *inst_p;
+   pthread_t tid = pthread_self();
+   HANTRO_LOG(HANTRO_LEVEL_ERROR, "%s : sig: %d(%s), thread: %lX 
+",
+              __FUNCTION__, signo, strsignal(signo), pthread_self());
+ 
+-  if ((inst_p = hash_table_find_bytid(&ht, tid)) != NULL) {
++  inst_p = hash_table_find_bytid(&ht, tid);
++  if (inst_p == NULL)
++    inst_p = find_zombieinst(tid);
++  if (inst_p != NULL) {
+     HANTRO_LOG(HANTRO_LEVEL_ERROR, "%s: catch exception for ctx %lx !!!!!
+",
+                __FUNCTION__, inst_p->instance_id);
+     if (inst_p->flag & (1 << INST_CATCH_EXCEPTION)) {
+       HANTRO_LOG(HANTRO_LEVEL_ERROR, "%s: repeatedly catch exception for ctx %lx !!!!!",
+         __FUNCTION__, inst_p->instance_id);
+       inst_p->flag |= (1 << INST_FATAL_ERROR);
+-    } else
++    } else {
++      if (signo != SIGUSR1)
++          inst_p->flag |= (1 << INST_CATCH_EXCEPTION);
+       siglongjmp(inst_p->sigbuf, 1);
++    }
+   } else if (tid == maintid) {
+     HANTRO_LOG(HANTRO_LEVEL_ERROR, "%s: catch exception for main!!!!!
+",
+                __FUNCTION__);
+@@ -131,7 +151,7 @@ static void signalhandler(int signo) {
+ static int register_sighandler(void) {
+   int i;
+   static const int siglist[] = {
+-      SIGHUP, SIGINT,  SIGILL,  SIGABRT, SIGBUS,
++      SIGHUP, SIGINT,  SIGILL,  SIGUSR1, SIGABRT, SIGBUS,
+       SIGFPE, SIGSEGV, SIGTERM, SIGTSTP, SIGTTIN,
+   };
+   for (i = 0; i < sizeof(siglist) / sizeof(siglist[0]); i++) {
+@@ -167,6 +187,7 @@ static int add_zombieinst(v4l2_daemon_inst *pinst, struct timespec *pstarttime)
+         return -1;
+     pz->next = NULL;
+     pz->pinst = pinst;
++    pz->pinst->flag |= (1 << INST_ZOMBIE);
+     pz->starttime = *pstarttime;    
+     if (hzinst == NULL)
+         hzinst = pz;
+@@ -185,29 +206,33 @@ static int zombie_timeout(struct timespec *before)
+     clock_gettime(CLOCK_REALTIME, &after);
+     elapse = ((int64_t)after.tv_sec - (int64_t)before->tv_sec) * (int64_t)1000000000
+          + ((int64_t)after.tv_nsec - (int64_t)before->tv_nsec);
+-    return (elapse >= (int64_t)1000000000); //over 1 sec
++    return (elapse >= zombie_delaytime); //over 1 sec
+ }
+ 
+ static void check_zombieinst(void)
+ {
+     zombie_inst *pz = hzinst, *pn, *prev = NULL;
+-    int ret, done;
++    int ret = 0, done;
+ 
+     while (pz) {
+         done = 0;
+-        pn = pz->next;        
+-        ret = sem_trywait(&pz->pinst->sem_done);
+-        if (ret == 0)
+-            done = 1;
+-        else if (zombie_timeout(&pz->starttime)) {
+-            kill(pz->pinst->tid, SIGKILL);
++        pn = pz->next;
++        if (pz->pinst->flag & (1 << INST_DEAD))
+             done = 1;
++        else {
++            ret = sem_trywait(&pz->pinst->sem_done);
++            if (ret == 0)
++                done = 1;
++            else if (zombie_timeout(&pz->starttime))
++                pthread_kill(pz->pinst->tid, SIGUSR1);
+         }
+         if (done) {
+             HANTRO_LOG(HANTRO_LEVEL_WARNING, "release zombie inst %lx with %d
+", pz->pinst->instance_id, ret);
+-            inst_destroy(pz->pinst);        
+-            free(pz->pinst);
+-            free(pz);
++            if (done) {
++                inst_destroy(pz->pinst);
++                free(pz->pinst);
++                free(pz);
++            }
+             if (prev == NULL)
+                 hzinst = pz = pn;
+             else
+@@ -221,20 +246,45 @@ static void check_zombieinst(void)
+ 
+ static void removeall_zombieinst(void)
+ {
+-    zombie_inst *pz = hzinst, *pn;
++    int i;
++    zombie_inst *pz = hzinst, *pn, *prev;
++    struct timespec interval, rem;
++
++    if (hzinst == NULL)
++        return;
+     while (pz) {
+-        pn = pz->next;
+-        HANTRO_LOG(HANTRO_LEVEL_WARNING, "release zombie inst %lx in tail
+", pz->pinst->instance_id);
+-        kill(pz->pinst->tid, SIGKILL);
+-        if (!(pz->pinst->flag & (1 << INST_FATAL_ERROR)))
+-            inst_destroy(pz->pinst);
+-        free(pz->pinst);
+-        free(pz);
+-        pz = pn;
++        pz->pinst->flag |= (1 << INST_FORCEEXIT);
++        pthread_kill(pz->pinst->tid, SIGUSR1);
++        pz = pz->next;
++    }
++    interval.tv_sec = 0;
++    interval.tv_nsec = 100;
++    for (i = 0; i < 100; i++) {
++        nanosleep(&interval, &rem);
++        pz = hzinst;
++        prev = NULL;
++        while (pz) {
++            pn = pz->next;
++            if (pz->pinst->flag & (1 << INST_DEAD)){
++                HANTRO_LOG(HANTRO_LEVEL_WARNING, "release zombie inst %lx in tail
+", pz->pinst->instance_id);
++                inst_destroy(pz->pinst);
++                free(pz->pinst);
++                free(pz);
++                if (prev == NULL)
++                    hzinst = pz = pn;
++                else
++                    prev->next = pz = pn;
++            } else {
++                prev = pz;
++                pz = pn;
++            }
++        }
++        if (hzinst == NULL)
++            return;
+     }
+-    hzinst = NULL;
+ }
+ 
++
+ /**
+  * @brief Main thread.
+  * @return an int value.
+@@ -309,7 +359,7 @@ int32_t main(int32_t argc, char **argv) {
+   struct vsi_v4l2_dev_info hwinfo = {0};
+   get_codec_info(&hwinfo);
+ 
+-  v4l2_daemon_inst *cur_inst_p;
++  v4l2_daemon_inst *cur_inst_p = NULL;
+   hash_table_init(&ht);
+   maintid = pthread_self();
+   HANTRO_LOG(HANTRO_LEVEL_INFO, "main thread id = %lx
+", maintid);
+@@ -370,10 +420,10 @@ int32_t main(int32_t argc, char **argv) {
+ 
+       /*  send command to worker. */
+       if (cur_inst_p->flag & (1 << INST_FATAL_ERROR)) {
+-        if (vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_STREAMOFF
++        if (vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_DESTROY_ENC
+           || vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_DESTROY_DEC
+           || vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_EXIT) {
+-          kill(cur_inst_p->tid, SIGKILL);
++          pthread_kill(cur_inst_p->tid, SIGKILL);
+           //inst_destroy is not reliable in this condition
+           hash_table_remove(&ht, vsi_v4l2_cmd_p.msg.inst_id, 1);
+         }
+@@ -386,7 +436,7 @@ int32_t main(int32_t argc, char **argv) {
+         send_cmd_to_worker(cur_inst_p, &vsi_v4l2_cmd_p.msg);
+ 
+         /* if get STREAMOFF, wait worker's semphore, and destory inst.*/
+-        if ((vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_STREAMOFF)
++        if ((vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_DESTROY_ENC)
+             //                || (vsi_v4l2_cmd_p.msg.cmd_id ==
+             //                V4L2_DAEMON_VIDIOC_STREAMOFF_CAPTURE)
+             || (vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_DESTROY_DEC) ||
+@@ -397,18 +447,13 @@ int32_t main(int32_t argc, char **argv) {
+             semtime.tv_nsec += 50000000;	//20ms should be enough for normal exit
+             ret = sem_timedwait(&cur_inst_p->sem_done, &semtime);
+             if (ret != 0) {
+-                HANTRO_LOG(HANTRO_LEVEL_WARNING, "wait %lx exit timeout
+", cur_inst_p->instance_id);
+-                if (vsi_v4l2_cmd_p.msg.cmd_id == V4L2_DAEMON_VIDIOC_EXIT) {
+-                  kill(cur_inst_p->tid, SIGKILL);
++              HANTRO_LOG(HANTRO_LEVEL_WARNING, "wait %lx exit timeout
+", cur_inst_p->instance_id);
++
++              hash_table_remove(&ht, vsi_v4l2_cmd_p.msg.inst_id, 0);
++              if (add_zombieinst(cur_inst_p, &semtime)) {
+                   inst_destroy(cur_inst_p);
+-                  hash_table_remove(&ht, vsi_v4l2_cmd_p.msg.inst_id, 1);
+-                } else {
+-                  hash_table_remove(&ht, vsi_v4l2_cmd_p.msg.inst_id, 0); //make it zombie
+-                  if (add_zombieinst(cur_inst_p, &semtime)) {
+-                      inst_destroy(cur_inst_p);
+-                      free(cur_inst_p);
+-                  }
+-                }
++                  free(cur_inst_p);
++              }
+             } else {
+               inst_destroy(cur_inst_p);
+               hash_table_remove(&ht, vsi_v4l2_cmd_p.msg.inst_id, 1);
+@@ -429,6 +474,7 @@ int32_t main(int32_t argc, char **argv) {
+     vsi_v4l2_cmd_p.msg.inst_id = 0;  // make sure this value is read from pipe.
+   }
+ exit:
++  close(pipe_fd);
+   removeall_zombieinst();
+   if (vsidaemonstdlog) fclose(vsidaemonstdlog);
+   return 0;
+@@ -445,10 +491,12 @@ void *worker_threads(void *arg) {
+   if (ret != 0) {
+     // send error msg to driver
+     HANTRO_LOG(HANTRO_LEVEL_ERROR, " %lx catch exception 
+", inst_id);
+-    if (h->instance_id != NO_RESPONSE_SEQID) {
++    if (h->flag & (1 << INST_ZOMBIE))
++        h->flag |= (1 << INST_DEAD);
++    if (h->flag & (1 << INST_FORCEEXIT))
++        goto label_worker_done;
++    if (h->instance_id != NO_RESPONSE_SEQID)
+       send_fatalerror_orphan_msg(h->instance_id, DAEMON_ERR_SIGNAL_CONFIG);
+-    }
+-    h->flag |= (1 << INST_CATCH_EXCEPTION);
+     goto label_worker_done;
+   }
+ 
+@@ -488,7 +536,6 @@ label_worker_done:
+   sem_post(&h->sem_done);
+   HANTRO_LOG(HANTRO_LEVEL_DEBUG, "worker_threads finish, instance id %lx
+",
+              h->instance_id);
+-
+   return NULL;
+ }
+ 
+@@ -635,7 +682,6 @@ int inst_destroy(v4l2_daemon_inst *h) {
+ 
+   // object_heap_destroy(&(h->cmds));
+   destroy_heap(&(h->cmds), object_heap_free);
+-  memset(h, 0, sizeof(v4l2_daemon_inst));
+   HANTRO_LOG(HANTRO_LEVEL_DEBUG, "inst_destroy finish
+");
+   return 0;
+ }

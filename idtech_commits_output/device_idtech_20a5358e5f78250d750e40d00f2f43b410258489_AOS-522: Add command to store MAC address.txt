@@ -1,0 +1,161 @@
+20a5358e jay deng 2021-03-16
+
+AOS-522: Add command to store MAC address
+
+Change-Id: I9217165656821bb51031db404cc378c227b3709c
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 07492902..f030e4b7 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -52,6 +52,7 @@ set /A support_dynamic_partition=0
+ set /A support_board_info=0
+ set /A support_mem_info=0
+ set /A write_bdinfo_serial=0
++set /A write_bdinfo_macaddr=0
+ set /A support_idt_dual_spl=0
+ set /A support_idt_backup_spl=0
+ set /A support_idt_spl_table=0
+@@ -136,6 +137,7 @@ if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+ if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
++if %1 == -macaddr set macaddr_str=%2& set /A write_bdinfo_macaddr=1& shift & shift & goto :parse_loop
+ echo %1 is an illegal option
+ call :help & goto :eof
+ :parse_end
+@@ -334,6 +336,7 @@ echo                        If only one board connected to computer, no need to
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo                               If not set, use naming from current board_info partition
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
++echo  -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once.
+ goto :eof
+ 
+ :: this function checks whether the value of first parameter is in the array value of second parameter.
+@@ -705,6 +708,9 @@ if %support_dynamic_partition% == 1 (
+ if %write_bdinfo_serial% == 1 (
+     %fastboot_tool% oem setvar dev-serial %serialno_str%
+ )
++if %write_bdinfo_macaddr% == 1 (
++    %fastboot_tool% oem setvar mac-addr %macaddr_str%
++)
+ 
+ del fastboot_var.log
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 95b0cc79..82e8d5f9 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -79,6 +79,7 @@ options:
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
++  -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once
+ EOF
+ 
+ }
+@@ -410,6 +411,10 @@ function flash_android
+     if [ ${write_bdinfo_serial} -eq 1 ]; then
+         ${fastboot_tool} oem setvar dev-serial ${serialno_str}
+     fi
++
++    if [ ${write_bdinfo_macaddr} -eq 1 ]; then
++        ${fastboot_tool} oem setvar mac-addr ${macaddr_str}
++    fi
+ }
+ 
+ 
+@@ -449,6 +454,7 @@ support_dynamic_partition=0
+ support_board_info=0
+ support_mem_info=0
+ write_bdinfo_serial=0
++write_bdinfo_macaddr=0
+ support_idt_dual_spl=0
+ support_idt_backup_spl=0
+ support_idt_spl_table=0
+@@ -526,6 +532,7 @@ while [ $# -gt 0 ]; do
+         -s) ser_num=$2; shift;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
++        -macaddr) macaddr_str=$2; write_bdinfo_macaddr=1; shift;;
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+             help; exit;;
+     esac
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index f953d0d5..e9af2042 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -56,6 +56,7 @@ set /A support_dynamic_partition=0
+ set /A support_board_info=0
+ set /A support_mem_info=0
+ set /A write_bdinfo_serial=0
++set /A write_bdinfo_macaddr=0
+ set /A support_idt_dual_spl=0
+ set /A support_idt_backup_spl=0
+ set /A support_idt_spl_table=0
+@@ -158,6 +159,7 @@ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
++if %1 == -macaddr set macaddr_str=%2& set /A write_bdinfo_macaddr=1& shift & shift & goto :parse_loop
+ echo unknown option "%1", please check it.
+ call :help & set /A error_level=1 && goto :exit
+ :parse_end
+@@ -674,6 +676,7 @@ echo  -daemon           after uuu script generated, uuu will be invoked with dae
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
++echo  -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once
+ goto :eof
+ 
+ 
+@@ -1087,6 +1090,10 @@ if %write_bdinfo_serial% == 1 (
+     echo FB: oem setvar dev-serial %serialno_str% >> %tmp_dir%uuu.lst
+ )
+ 
++if %write_bdinfo_macaddr% == 1 (
++    echo FB: oem setvar mac-addr %macaddr_str% >> %tmp_dir%uuu.lst
++)
++
+ goto :eof
+ 
+ :dec_to_hex
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index cd8ef751..504aa2ff 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -88,6 +88,7 @@ options:
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
++  -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once
+ EOF
+ 
+ }
+@@ -415,6 +416,10 @@ function flash_android
+     if [ ${write_bdinfo_serial} -eq 1 ]; then
+         echo FB: oem setvar dev-serial ${serialno_str} >> /tmp/uuu.lst
+     fi
++
++    if [ ${write_bdinfo_macaddr} -eq 1 ]; then
++        echo FB: oem setvar mac-addr ${macaddr_str} >> /tmp/uuu.lst
++    fi
+ }
+ 
+ # parse command line
+@@ -453,6 +458,7 @@ support_dynamic_partition=0
+ support_board_info=0
+ support_mem_info=0
+ write_bdinfo_serial=0
++write_bdinfo_macaddr=0
+ support_idt_dual_spl=0
+ support_idt_backup_spl=0
+ support_idt_spl_table=0
+@@ -555,6 +561,7 @@ while [ $# -gt 0 ]; do
+         -dryrun) dryrun=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
++        -macaddr) macaddr_str=$2; write_bdinfo_macaddr=1; shift;;
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+             help; exit;;
+     esac

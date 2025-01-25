@@ -1,0 +1,377 @@
+3fec35db3510 owen.wen 2022-02-11
+
+AOS-870: change DEBUG macro to dev_dbg
+
+using dev_dbg instead of IDG_DEBUG_INFO macro
+1. add dyndbg to command line to turn on/off debug info via kernel command
+   e.g. setenv append_bootargs dyndbg=\"file drivers/misc/idg_spi.c +p\"
+2. add CONFIG_DYNAMIC_DEBUG=y in android_addition_defconfig
+
+Change-Id: I938132bb1506bfecaa284fb9864bf027340f0832
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 0d661794a3ea..a02eae31728a 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -44,8 +44,6 @@
+ 
+ #define IDG_RETURN_WITH_HEADER	1  /* enable: 1, disable: 0 */
+ 
+-#define IDG_DEBUG_INFO		0  /* enable: 1, disable: 0 */
+-
+ #define IDG_K81_CRC_RULE	1  /* enable: 1, disable: 0 */
+ 
+ static struct spi_device *idg_spi_tty;
+@@ -270,9 +268,7 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
+ 	int status;
+-#if IDG_DEBUG_INFO
+ 	int i;
+-#endif /* IDG_DEBUG_INFO */
+ #if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+ 	int ch4msb, ch4lsb;
+@@ -320,12 +316,10 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		status = -EIO;
+ 		goto ttyv5_write_out;
+ 	}
+-#if IDG_DEBUG_INFO
+-	dev_info(&idg_tty->dev, "idg v5 from user data (%d bytes):
+", count);
++	dev_dbg(&idg_tty->dev, "idg v5 from user data (%d bytes):
+", count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
++		dev_dbg(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 	for (j = 0; j < count; j += 2) {
+ 		ch4msb = idg_char2hex(user_buf[j]);
+ 		if (ch4msb < 0)
+@@ -350,13 +344,11 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		status = -EIO;
+ 		goto ttyv5_write_out;
+ 	}
+-#if IDG_DEBUG_INFO
+-	dev_info(&idg_tty->dev, "idg v5 entry from user data (%d bytes):
+",
++	dev_dbg(&idg_tty->dev, "idg v5 entry from user data (%d bytes):
+",
+ 		 count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
++		dev_dbg(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ #endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+ 	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+@@ -498,9 +490,7 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
+ 	int status;
+-#if IDG_DEBUG_INFO
+ 	int i;
+-#endif /* IDG_DEBUG_INFO */
+ #if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+ 	int ch4msb, ch4lsb;
+@@ -548,12 +538,10 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		status = -EIO;
+ 		goto tty_write_out;
+ 	}
+-#if IDG_DEBUG_INFO
+-	dev_info(&idg_tty->dev, "idg v2 from user data (%d bytes):
+", count);
++	dev_dbg(&idg_tty->dev, "idg v2 from user data (%d bytes):
+", count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
++		dev_dbg(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 	for (j = 0; j < count; j += 2) {
+ 		ch4msb = idg_char2hex(user_buf[j]);
+ 		if (ch4msb < 0)
+@@ -578,13 +566,11 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		status = -EIO;
+ 		goto tty_write_out;
+ 	}
+-#if IDG_DEBUG_INFO
+-	dev_info(&idg_tty->dev, "idg v2 entry from user data (%d bytes):
+",
++	dev_dbg(&idg_tty->dev, "idg v2 entry from user data (%d bytes):
+",
+ 		 count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
++		dev_dbg(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ #endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+ 	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+@@ -751,9 +737,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+-#if IDG_DEBUG_INFO
+-	dev_info(&spi->dev, "K81 returned
+");
+-#endif /* IDG_DEBUG_INFO */
++	dev_dbg(&spi->dev, "K81 returned
+");
+ 	x->tx_buf = idg_tx;
+ 	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
+@@ -769,34 +753,26 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(spi, &m);
+ 	mutex_unlock(&idg_dev->lock);
+-#if IDG_DEBUG_INFO
+-	dev_info(&spi->dev, "first read (16 bytes)
+");
+-#endif /* IDG_DEBUG_INFO */
++	dev_dbg(&spi->dev, "first read (16 bytes)
+");
+ spi_report_out:
+ 	if (!status) {
+ 		memcpy(data, idg_rx, BASE_READ_SIZE);
+ 		idg_size = data[IDG_SIZE_MSB] << 8;
+ 		idg_size += data[IDG_SIZE_LSB];
+-#if IDG_DEBUG_INFO
+-		dev_info(&spi->dev, "K81 size: %d
+", idg_size);
+-#endif /* IDG_DEBUG_INFO */
++		dev_dbg(&spi->dev, "K81 size: %d
+", idg_size);
+ 		for (i = 0; i < BASE_READ_SIZE - NEOII_HEADER_LEN ; i++) {
+-#if IDG_DEBUG_INFO
+-			dev_info(&spi->dev, "0x%.2X ", data[i]);
+-#endif /* IDG_DEBUG_INFO */
++			dev_dbg(&spi->dev, "0x%.2X ", data[i]);
+ 			if (!strncmp(&data[i],
+ 				     NEOII_Header, NEOII_HEADER_LEN)) {
+ 				idg_start_pos = i;
+ 				break;
+ 			}
+ 		}
+-#if IDG_DEBUG_INFO
+-		dev_info(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 4]);
+-		dev_info(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 3]);
+-		dev_info(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 2]);
+-		dev_info(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 1]);
+-		dev_info(&spi->dev, "idg_start_pos: %d", idg_start_pos);
+-#endif /* IDG_DEBUG_INFO */
++		dev_dbg(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 4]);
++		dev_dbg(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 3]);
++		dev_dbg(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 2]);
++		dev_dbg(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 1]);
++		dev_dbg(&spi->dev, "idg_start_pos: %d", idg_start_pos);
+ 		if (idg_start_pos > 0) {
+ #if IDG_V5_ISSUE_RECOVERY
+ 			idg_size_re = data[IDG_SIZE_MSB + idg_start_pos] << 8;
+@@ -808,22 +784,16 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ #endif /* IDG_V5_ISSUE_RECOVERY */
+ 				dev_info(&spi->dev, "K81 return not ready
+");
+ #if IDG_V5_ISSUE_RECOVERY
+-#if IDG_DEBUG_INFO
+-				dev_info(&spi->dev, "K81 re size: %d
+",
++				dev_dbg(&spi->dev, "K81 re size: %d
+",
+ 					 idg_size_re);
+-				for (i = 0;
+-				     i < (BASE_READ_SIZE - idg_start_pos); i++)
+-					dev_info(&spi->dev, "0x%.2X ",
+-						 recover[i]);
++				for (i = 0; i < (BASE_READ_SIZE - idg_start_pos); i++)
++					dev_dbg(&spi->dev, "0x%.2X ", recover[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 				err = EBUSY;
+ 			} else if (idg_size_re == 0) {
+ 				/* Recovery logic for IDG V5 */
+-#if IDG_DEBUG_INFO
+-				dev_info(&spi->dev, "enter recovery
+");
+-				dev_info(&spi->dev, "recover base read
+");
+-#endif /* IDG_DEBUG_INFO */
++				dev_dbg(&spi->dev, "enter recovery
+");
++				dev_dbg(&spi->dev, "recover base read
+");
+ 				recovered = true;
+ 				x_s->tx_buf = idg_tx_s;
+ 				x_s->tx_nbits = SPI_NBITS_SINGLE;
+@@ -841,31 +811,27 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				gpiod_set_value_cansleep(idg_dev->spi_cs,
+ 							 CS_CLEAR);
+ 				mutex_unlock(&idg_dev->lock);
+-#if IDG_DEBUG_INFO
+-				dev_info(&spi->dev, "second re read "
++				dev_dbg(&spi->dev, "second re read "
+ 						    "(%d bytes)
+",
+ 					 idg_start_pos);
+-#endif /* IDG_DEBUG_INFO */
+ 				if (!status_s) {
+ 					memcpy(&recover[BASE_READ_SIZE -
+ 							idg_start_pos],
+ 					       idg_rx_s, idg_start_pos);
+-#if IDG_DEBUG_INFO
+ 					for (i = 0; i < idg_start_pos; i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							recover[BASE_READ_SIZE -
+ 								idg_start_pos +
+ 								i]);
+ 
+-					dev_info(&spi->dev, "total read %d:",
++					dev_dbg(&spi->dev, "total read %d:",
+ 						 (idg_size_re +
+ 						  BASE_READ_SIZE));
+ 					for (i = 0; i < (idg_size_re +
+ 							 BASE_READ_SIZE); i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							 recover[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ #if IDG_K81_CRC_RULE
+ 					if (!k81_crc(recover,
+ 						     (idg_size_re +
+@@ -889,17 +855,13 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 					pr_err("%s: idg spi re second read "
+ 					       "failed(%d)", DRVNAME, status_s);
+ 					err = EIO;
+-#if IDG_DEBUG_INFO
+ 					for (i = 0; i < BASE_READ_SIZE ; i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							 idg_rx_s[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 				}
+ 			} else if (idg_size_re < MAX_BUFFER_SIZE) {
+-#if IDG_DEBUG_INFO
+-				dev_info(&spi->dev, "enter recovery
+");
+-#endif /* IDG_DEBUG_INFO */
++				dev_dbg(&spi->dev, "enter recovery
+");
+ 				recovered = true;
+ 				x_s->tx_buf = idg_tx_s;
+ 				x_s->tx_nbits = SPI_NBITS_SINGLE;
+@@ -917,33 +879,29 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				gpiod_set_value_cansleep(idg_dev->spi_cs,
+ 							 CS_CLEAR);
+ 				mutex_unlock(&idg_dev->lock);
+-#if IDG_DEBUG_INFO
+-				dev_info(&spi->dev, "second re read "
++				dev_dbg(&spi->dev, "second re read "
+ 						    "(%d bytes)
+",
+ 					 (idg_size_re + idg_start_pos));
+-#endif /* IDG_DEBUG_INFO */
+ 				if (!status_s) {
+ 					memcpy(&recover[BASE_READ_SIZE -
+ 							idg_start_pos],
+ 					       idg_rx_s,
+ 					       (idg_size_re + idg_start_pos));
+-#if IDG_DEBUG_INFO
+ 					for (i = 0; i < (idg_size_re +
+ 							 idg_start_pos); i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							recover[BASE_READ_SIZE -
+ 								idg_start_pos +
+ 								i]);
+ 
+-					dev_info(&spi->dev, "total read %d:",
++					dev_dbg(&spi->dev, "total read %d:",
+ 						 (idg_size_re +
+ 						  BASE_READ_SIZE));
+ 					for (i = 0; i < (idg_size_re +
+ 							 BASE_READ_SIZE); i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							 recover[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ #if IDG_K81_CRC_RULE
+ 					if (!k81_crc(recover,
+ 						     (idg_size_re +
+@@ -968,12 +926,10 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 					       "failed(%d)",
+ 						DRVNAME, status_s);
+ 					err = EIO;
+-#if IDG_DEBUG_INFO
+ 					for (i = 0; i < BASE_READ_SIZE ; i++)
+-						dev_info(&spi->dev, "0x%.2X ",
++						dev_dbg(&spi->dev, "0x%.2X ",
+ 							 idg_rx_s[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 				}
+ 			} else {
+ 				dev_info(&spi->dev,
+@@ -982,10 +938,8 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			}
+ #endif /* IDG_V5_ISSUE_RECOVERY */
+ 		} else if (idg_size == 0) {
+-#if IDG_DEBUG_INFO
+-			dev_info(&spi->dev, "idg header: %s
+", data);
+-			dev_info(&spi->dev, "idg data length: %d
+", idg_size);
+-#endif /* IDG_DEBUG_INFO */
++			dev_dbg(&spi->dev, "idg header: %s
+", data);
++			dev_dbg(&spi->dev, "idg data length: %d
+", idg_size);
+ 			/* CRC check */
+ 			if (CalculateCRC(data, BASE_READ_SIZE)) {
+ 				dev_info(&spi->dev, "read data CRC error
+");
+@@ -1010,19 +964,15 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			status_s = spi_sync(spi, &m_s);
+ 			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 			mutex_unlock(&idg_dev->lock);
+-#if IDG_DEBUG_INFO
+-			dev_info(&spi->dev, "second read (%d bytes)
+",
++			dev_dbg(&spi->dev, "second read (%d bytes)
+",
+ 				 idg_size);
+-#endif /* IDG_DEBUG_INFO */
+ 			if (!status_s) {
+ 				memcpy(&data[BASE_READ_SIZE], idg_rx_s,
+ 				       idg_size);
+-#if IDG_DEBUG_INFO
+ 				for (i = 0; i < idg_size; i++)
+-					dev_info(&spi->dev, "0x%.2X ",
++					dev_dbg(&spi->dev, "0x%.2X ",
+ 						 data[BASE_READ_SIZE + i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ #if IDG_K81_CRC_RULE
+ 				if (!k81_crc(data,
+ 					     (idg_size + BASE_READ_SIZE))) {
+@@ -1042,12 +992,10 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				pr_err("%s: idg spi second read failed(%d)",
+ 				       DRVNAME, status_s);
+ 				err = EIO;
+-#if IDG_DEBUG_INFO
+ 				for (i = 0; i < BASE_READ_SIZE ; i++)
+-					dev_info(&spi->dev, "0x%.2X ",
++					dev_dbg(&spi->dev, "0x%.2X ",
+ 						 idg_rx_s[i]);
+ 
+-#endif /* IDG_DEBUG_INFO */
+ 			}
+ 		} else {
+ 			dev_info(&spi->dev,

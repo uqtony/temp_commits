@@ -1,0 +1,482 @@
+62674ae3 George.Huang 2022-05-03
+
+AOS-1006: android-12.0.0_1.0.0: fix build breaks for reference projects
+
+Change-Id: I12bd79b977825ddb2493bf0bc17e0135b9edba74
+
+diff --git a/common/tools/imx-make.sh b/common/tools/imx-make.sh
+index e1538ead..5328c3dd 100755
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@ -129,7 +129,7 @@ if [ "${build_bootloader}" = "" ] && [ "${build_kernel}" = "" ] && \
+ fi
+ 
+ # vvcam.ko need build with in-tree modules each time to make sure "insmod vvcam.ko" works
+-if [ -n "${build_kernel_modules}" ] && [ ${TARGET_PRODUCT} = "evk_8mp" ]; then
++if [ -n "${build_kernel_modules}" ] && [ ${TARGET_PRODUCT##*_} = "8mp" ]; then
+     build_vvcam="vvcam";
+     build_kernel_oot_module_flag=1;
+ fi
+diff --git a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+index 67a11e91..0f9680fc 100644
+--- a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+@@ -7,7 +7,7 @@ TARGET_BOOTLOADER_CONFIG := imx8mp-lpddr4:bigcypress_8mp_evk_android_defconfig:s
+ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-trusty:bigcypress_8mp_evk_android_trusty_defconfig
+ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-trusty-secure-unlock:bigcypress_8mp_evk_android_trusty_secure_unlock_defconfig
+ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-dual:bigcypress_8mp_evk_android_dual_defconfig:signed
+-TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-trusty-dual:bigcypress_8mp_evk_android_trusty_dual_defconfig:signed
++#TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-trusty-dual:bigcypress_8mp_evk_android_trusty_dual_defconfig:signed
+ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-evk-uuu-mic6g:bigcypress_8mp_evk_android_uuu_mic6g_defconfig:signed
+ #TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-powersave:bigcypress_8mp_evk_android_powersave_defconfig
+ #TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-trusty-powersave:bigcypress_8mp_evk_android_trusty_powersave_defconfig
+diff --git a/imx8m/bigcypress_8mp/device_framework_matrix.xml b/imx8m/bigcypress_8mp/device_framework_matrix.xml
+index c8b5825c..cc7247b5 100644
+--- a/imx8m/bigcypress_8mp/device_framework_matrix.xml
++++ b/imx8m/bigcypress_8mp/device_framework_matrix.xml
+@@ -7,4 +7,11 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="aidl" optional="true">
++        <name>android.hardware.kioskled</name>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </compatibility-matrix>
+diff --git a/imx8m/bigcypress_8mp/manifest_userdebug.xml b/imx8m/bigcypress_8mp/manifest_userdebug.xml
+index da69eb68..d17c7503 100644
+--- a/imx8m/bigcypress_8mp/manifest_userdebug.xml
++++ b/imx8m/bigcypress_8mp/manifest_userdebug.xml
+@@ -1,5 +1,5 @@
+ <manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
++    <kernel  target-level="6" />
+     <hal format="hidl">
+         <name>android.hardware.memtrack</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
+index 4f0f1a54..8822a173 100644
+--- a/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/bigcypress_8mp/powerhint_imx8mp.json b/imx8m/bigcypress_8mp/powerhint_imx8mp.json
+index 9a30931f..c788c745 100644
+--- a/imx8m/bigcypress_8mp/powerhint_imx8mp.json
++++ b/imx8m/bigcypress_8mp/powerhint_imx8mp.json
+@@ -8,7 +8,8 @@
+         "1600000",
+         "1200000"
+       ],
+-      "DefaultIndex": 0
++      "DefaultIndex": 0,
++      "ResetOnInit": true
+     },
+     {
+       "Name": "CPULittleClusterMinFreq",
+@@ -17,7 +18,8 @@
+         "1800000",
+         "1600000",
+         "1200000"
+-      ]
++      ],
++      "ResetOnInit": true
+     },
+     {
+       "Name": "TASchedtuneBoost",
+@@ -68,6 +70,18 @@
+     }
+   ],
+   "Actions": [
++    {
++      "PowerHint": "SUSTAINED_PERFORMANCE",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "INTERACTION",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 0,
++      "Value": "1800000"
++    },
+     {
+       "PowerHint": "INTERACTION",
+       "Node": "TASchedtuneBoost",
+@@ -80,12 +94,36 @@
+       "Duration": 500,
+       "Value": "0"
+     },
++    {
++      "PowerHint": "LAUNCH",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "LAUNCH",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
+     {
+       "PowerHint": "LAUNCH",
+       "Node": "PMQoSCpuDmaLatency",
+       "Duration": 5000,
+       "Value": "0"
+     },
++    {
++      "PowerHint": "CAMERA_LAUNCH",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_LAUNCH",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
+     {
+       "PowerHint": "CAMERA_LAUNCH",
+       "Node": "PMQoSCpuDmaLatency",
+@@ -98,12 +136,42 @@
+       "Duration": 0,
+       "Value": "CAMERA_STREAMING_MID"
+     },
++    {
++      "PowerHint": "CAMERA_STREAMING_MID",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "CAMERA_SHOT",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_SHOT",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
+     {
+       "PowerHint": "CAMERA_SHOT",
+       "Node": "PMQoSCpuDmaLatency",
+       "Duration": 1000,
+       "Value": "0"
+     },
++    {
++      "PowerHint": "LOW_POWER",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 0,
++      "Value": "1200000"
++    },
++    {
++      "PowerHint": "LOW_POWER",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
+     {
+       "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
+       "Node": "PowerHALAudioState",
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index be427b88..d8d39e98 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -352,8 +352,8 @@ PRODUCT_COPY_FILES += \
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \
+-    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
+-    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++    external/wireless-regdb/regulatory.db:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db.p7s
+ 
+ # -------@block_bluetooth-------
+ # Bluetooth HAL
+@@ -491,6 +491,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.logd.kernel=true
+ 
++# led control
+ PRODUCT_PACKAGES += \
+     android.hardware.kioskled-service \
+     android.hardware.kioskled
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
+index 9a1b37e5..6836c7e7 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
+@@ -10,3 +10,11 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ 
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mq_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true
++
++# PCI config
++ifneq ($(BOARD_PCI_SECURE),)
++PRODUCT_PRODUCT_PROPERTIES += \
++    ro.vendor.idt.min_rsa_size_bits=2048
++endif
+diff --git a/imx8m/bigcypress_8mq/manifest_userdebug.xml b/imx8m/bigcypress_8mq/manifest_userdebug.xml
+index da69eb68..d17c7503 100644
+--- a/imx8m/bigcypress_8mq/manifest_userdebug.xml
++++ b/imx8m/bigcypress_8mq/manifest_userdebug.xml
+@@ -1,5 +1,5 @@
+ <manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
++    <kernel  target-level="6" />
+     <hal format="hidl">
+         <name>android.hardware.memtrack</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 4f0f1a54..8822a173 100644
+--- a/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/bigcypress_8mq/ueventd.nxp.rc b/imx8m/bigcypress_8mq/ueventd.nxp.rc
+index 732baf93..fdc656c4 100644
+--- a/imx8m/bigcypress_8mq/ueventd.nxp.rc
++++ b/imx8m/bigcypress_8mq/ueventd.nxp.rc
+@@ -26,7 +26,7 @@
+ /dev/usb/lp0              0666   root         root
+ 
+ #KIOSK LED
+-/sys/class/leds/* brightness 0666 root root
+-/sys/class/leds/* trigger 0666 root root
+-/sys/class/leds/* delay_on 0666 root root
+-/sys/class/leds/* delay_off 0666 root root
++/sys/class/leds/* brightness 0660 system root
++/sys/class/leds/* trigger 0660 system root
++/sys/class/leds/* delay_on 0660 system root
++/sys/class/leds/* delay_off 0660 system root
+diff --git a/imx8m/kingscanyon_8mq/BoardConfig.mk b/imx8m/kingscanyon_8mq/BoardConfig.mk
+index dbe359c2..c0d3dcc7 100644
+--- a/imx8m/kingscanyon_8mq/BoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/BoardConfig.mk
+@@ -201,3 +201,5 @@ endif
+ ifeq ($(IMX8MQ_USES_GKI),true)
+     BOARD_KERNEL_CMDLINE += cpuidle.off=1
+ endif
++
++BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
+diff --git a/imx8m/kingscanyon_8mq/init.imx8mq.rc b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+index 86286707..6b2b0a78 100755
+--- a/imx8m/kingscanyon_8mq/init.imx8mq.rc
++++ b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+@@ -30,8 +30,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+     write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+ 
+ on property:sys.boot_completed=1
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index 6894e76a..5928ad05 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -489,6 +489,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.logd.kernel=true
+ 
++# led control
+ PRODUCT_PACKAGES += \
+     android.hardware.kioskled-service \
+     android.hardware.kioskled
+diff --git a/imx8m/kingscanyon_8mq/manifest_userdebug.xml b/imx8m/kingscanyon_8mq/manifest_userdebug.xml
+index da69eb68..d17c7503 100644
+--- a/imx8m/kingscanyon_8mq/manifest_userdebug.xml
++++ b/imx8m/kingscanyon_8mq/manifest_userdebug.xml
+@@ -1,5 +1,5 @@
+ <manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
++    <kernel  target-level="6" />
+     <hal format="hidl">
+         <name>android.hardware.memtrack</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 9ee342e6..7758e036 100644
+--- a/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/kingscanyon_8mq/thermal_info_config_imx8mq.json b/imx8m/kingscanyon_8mq/thermal_info_config_imx8mq.json
+index 32aec548..3e8b013d 100755
+--- a/imx8m/kingscanyon_8mq/thermal_info_config_imx8mq.json
++++ b/imx8m/kingscanyon_8mq/thermal_info_config_imx8mq.json
+@@ -48,7 +48,7 @@
+     ],
+     "CoolingDevices":[
+         {
+-            "Name":"thermal-devfreq-0",
++            "Name":"thermal-gpufreq-0",
+             "Type":"GPU"
+         },
+         {
+diff --git a/imx8m/vp6820_8mn/device_framework_matrix.xml b/imx8m/vp6820_8mn/device_framework_matrix.xml
+index c8b5825c..cc7247b5 100644
+--- a/imx8m/vp6820_8mn/device_framework_matrix.xml
++++ b/imx8m/vp6820_8mn/device_framework_matrix.xml
+@@ -7,4 +7,11 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="aidl" optional="true">
++        <name>android.hardware.kioskled</name>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </compatibility-matrix>
+diff --git a/imx8m/vp6820_8mn/manifest_userdebug.xml b/imx8m/vp6820_8mn/manifest_userdebug.xml
+index da69eb68..d17c7503 100644
+--- a/imx8m/vp6820_8mn/manifest_userdebug.xml
++++ b/imx8m/vp6820_8mn/manifest_userdebug.xml
+@@ -1,5 +1,5 @@
+ <manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
++    <kernel  target-level="6" />
+     <hal format="hidl">
+         <name>android.hardware.memtrack</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mn/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/vp6820_8mn/overlay/frameworks/base/core/res/res/values/config.xml
+index 026bccba..d3ab2fd7 100644
+--- a/imx8m/vp6820_8mn/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/vp6820_8mn/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index b576f799..df575cc6 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -329,7 +329,7 @@ PRODUCT_PACKAGES += \
+ # -------@block_wifi-------
+ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    $(CONFIG_REPO_PATH)/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    $(CONFIG_REPO_PATH)/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
+ # WiFi HAL
+ PRODUCT_PACKAGES += \
+@@ -348,8 +348,8 @@ PRODUCT_COPY_FILES += \
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \
+-    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
+-    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++    external/wireless-regdb/regulatory.db:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db.p7s
+ 
+ # -------@block_bluetooth-------
+ # Bluetooth HAL
+@@ -409,10 +409,6 @@ PRODUCT_PACKAGES += \
+     libnnrt \
+     android.hardware.neuralnetworks@1.3-service-vsi-npu-server
+ 
+-# Tensorflow lite camera demo
+-PRODUCT_PACKAGES += \
+-                    tflitecamerademo
+-
+ # -------@block_miscellaneous-------
+ 
+ # Copy device related config and binary to board
+@@ -477,6 +473,7 @@ PRODUCT_PACKAGES += \
+     welcomeapp \
+     diagnosis \
+     otaupdater \
++    peripheralmanager \
+     watchdog
+ 
+ # Enable kernel log for diagnosis
+diff --git a/imx8m/vp6820_8mq/device_framework_matrix.xml b/imx8m/vp6820_8mq/device_framework_matrix.xml
+index c8b5825c..cc7247b5 100644
+--- a/imx8m/vp6820_8mq/device_framework_matrix.xml
++++ b/imx8m/vp6820_8mq/device_framework_matrix.xml
+@@ -7,4 +7,11 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="aidl" optional="true">
++        <name>android.hardware.kioskled</name>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </compatibility-matrix>
+diff --git a/imx8m/vp6820_8mq/manifest_userdebug.xml b/imx8m/vp6820_8mq/manifest_userdebug.xml
+index da69eb68..d17c7503 100644
+--- a/imx8m/vp6820_8mq/manifest_userdebug.xml
++++ b/imx8m/vp6820_8mq/manifest_userdebug.xml
+@@ -1,5 +1,5 @@
+ <manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
++    <kernel  target-level="6" />
+     <hal format="hidl">
+         <name>android.hardware.memtrack</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 6fd5eaae..7401d64b 100644
+--- a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 927fa5ab..a8a440ce 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -485,6 +485,7 @@ PRODUCT_PACKAGES += \
+     welcomeapp \
+     diagnosis \
+     otaupdater \
++    peripheralmanager \
+     watchdog
+ 
+ # Enable kernel log for diagnosis

@@ -1,0 +1,148 @@
+a18c410a George.Huang 2022-03-31
+
+AOS-930: rename idtech properties for android-12.0.0_1.0.0
+
+- rename from ro.boot.idt_ to ro.boot.idt.
+  rename from ro.idt. to ro.vendor.idt.
+  rename from persist.idt. to persist.vendor.idt.
+
+- Error Logs from android-12.0.0_1.0.0:
+  device/idtech/imx8m/sepolicy/property_contexts contains properties
+  which are not properly namespaced.
+  This is enforced by VTS, so please fix such offending properties.
+
+- Allowed property prefixes for device/idtech/imx8m/sepolicy/property_contexts:
+  ['ctl.odm.', 'ctl.vendor.', 'ctl.start$odm.', 'ctl.start$vendor.',
+   'ctl.stop$odm.', 'ctl.stop$vendor.', 'init.svc.odm.', 'init.svc.vendor.',
+   'ro.boot.', 'ro.hardware.', 'ro.odm.', 'ro.vendor.', 'odm.', 'persist.odm.',
+   'persist.vendor.', 'vendor.', 'persist.camera.']
+
+- Allowed context prefixes for device/idtech/imx8m/sepolicy/property_contexts:
+  ['vendor_', 'odm_']
+
+Change-Id: Ia5b7bf8f2c45310c02b2c05e74939bbc7dc4e2e6
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 7ca270bb..53bb6ea0 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -50,7 +50,7 @@ PRODUCT_PACKAGES += \
+ 
+ # IDT common properties
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    persist.idt.secondary_display.navigation_bar.enable=0
++    persist.vendor.idt.secondary_display.navigation_bar.enable=0
+ 
+ endif
+ 
+@@ -438,7 +438,10 @@ PRODUCT_SOONG_NAMESPACES += external/mesa3d
+ 
+ # IDT common properties
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    persist.idt.enable_externalsource=0
++    ro.vendor.idt.app_perm_approve=true \
++    ro.vendor.idt.signature_of_signature=false \
++    ro.vendor.idt.extend_boot_anim=1 \
++    persist.vendor.idt.enable_externalsource=0
+ 
+ # Copy soc related config and binary to board
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp.mk b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+index 613f1e00..2297e365 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+@@ -11,9 +11,9 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mp_common.mk)
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mp
+ 
+-# set persist.idt.lock_orientation as 1 in default prop file, and
++# set persist.vendor.idt.lock_orientation as 1 in default prop file, and
+ # if user modified property value it would be stored in /data/property,
+ # and init process will first load default prop value, and overwrite it
+ # if find key in /data/property
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    persist.idt.lock_orientation=1
++    persist.vendor.idt.lock_orientation=1
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq.mk b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+index a2f2f23a..82cb9a24 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+@@ -11,10 +11,10 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mq
+ 
+-# set persist.idt.lock_orientation as 1 in default prop file, and
++# set persist.vendor.idt.lock_orientation as 1 in default prop file, and
+ # if user modified property value it would be stored in /data/property,
+ # and init process will first load default prop value, and overwrite it
+ # if find key in /data/property
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    persist.idt.lock_orientation=1 \
+-    persist.idt.audio_rerouting_device=0x400
++    persist.vendor.idt.lock_orientation=1 \
++    persist.vendor.idt.audio_rerouting_device=0x400
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 75b62298..9962cddd 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -1,10 +1,4 @@
+ on early-boot
+-    # Approve Apps permissions
+-    setprop ro.idt.app_perm_approve true
+-    # apk off-line check, verify if the app signed by IDTech key
+-    setprop ro.idt.signature_of_signature false
+-    # set extend boot animation for smooth boot
+-    setprop ro.idt.extend_boot_anim 1
+     # allow mobile data during provisioning
+     setprop ro.com.android.prov_mobiledata true
+     # setup default adb listen on 5555
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index e591a5d7..c43737cf 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -227,7 +227,7 @@ $(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee_8
+ # PCI config
+ ifneq ($(BOARD_PCI_SECURE),)
+ PRODUCT_PRODUCT_PROPERTIES += \
+-    ro.idt.min_rsa_size_bits=2048
++    ro.vendor.idt.min_rsa_size_bits=2048
+ endif
+ 
+ # -------@block_audio-------
+@@ -282,7 +282,7 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/input-port-associations.xml:$(TARGET_COPY_OUT_VENDOR)/etc/input-port-associations.xml
+ 
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    persist.idt.default_touch_location=usb-xhci-hcd.1.auto
++    persist.vendor.idt.default_touch_location=usb-xhci-hcd.1.auto
+ 
+ # -------@block_gpu-------
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 45e04715..76b72a14 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -207,8 +207,11 @@ vendor.AQROOT                       u:object_r:vendor_public_default_prop:s0
+ vendor.CL_NOPREPROCESS              u:object_r:vendor_public_default_prop:s0
+ ro.rfkilldisabled                   u:object_r:vendor_public_default_prop:s0
+ ro.support_one_handed_mode          u:object_r:vendor_public_default_prop:s0
+-ro.boot.idt_orientation             u:object_r:vendor_public_default_prop:s0
+-ro.boot.idt_display_id              u:object_r:vendor_public_default_prop:s0
++
++# idtech property
++ro.boot.idt.                        u:object_r:vendor_public_default_prop:s0
++ro.vendor.idt.                      u:object_r:vendor_public_default_prop:s0
++persist.vendor.idt.                 u:object_r:vendor_idtech_prop:s0
+ 
+ ro.radio.noril                      u:object_r:telephony_status_prop:s0 exact string
+ vendor.rild.                        u:object_r:radio_prop:s0
+@@ -220,9 +223,6 @@ net.ppp0.local-ip                   u:object_r:radio_prop:s0
+ net.ppp0.remote-ip                  u:object_r:radio_prop:s0
+ net.ppp0.gw                         u:object_r:radio_prop:s0
+ 
+-# create new property header for IDTECH products
+-persist.idt.                        u:object_r:vendor_idtech_prop:s0
+-
+ # vendor_wifi_version
+ vendor.wlan.driver.version    u:object_r:vendor_wifi_version:s0
+ vendor.wlan.firmware.version  u:object_r:vendor_wifi_version:s0

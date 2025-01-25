@@ -1,0 +1,860 @@
+de3a60fb267f AndrewS 2021-09-22
+
+AOS-712: add support for redwood barcode camera
+
+initial version of gc02m2 driver for redwood barcode camera
+
+Change-Id: Id1d960a548c562d69daae51e4b8278dc69fd5592
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index d2bbf8f18c81..3bee409d5ad9 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -425,7 +425,7 @@ &mipi_csi_1 {
+ 	port {
+ 		mipi1_sensor_ep: endpoint@0 {
+ 			remote-endpoint = <&gc02m2_mipi_ep>;
+-			data-lanes = <1 2>;
++			data-lanes = <1>;
+ 			bus-type = <4>;
+ 		};
+ 
+@@ -640,20 +640,20 @@ &i2c2 {
+ 	status = "okay";
+ 
+ 	gc02m2_mipi: gc02m2_mipi@6e {
+-		//compatible = // wait for driver
++		compatible = "galaxycore,gc02m2_mipi";
+ 		reg = <0x6e>;
+ 		status = "okay";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi1_pwn>, <&pinctrl_csi1_rst>, <&pinctrl_csi_clk>;
++		pinctrl-0 = <&pinctrl_csi1_power>, <&pinctrl_csi1_xshutdown>, <&pinctrl_csi1_clk>;
+ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		clock-names = "csi_mclk";
+ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
+ 		assigned-clock-rates = <20000000>;
+ 		csi_id = <0>;
+-		pwn-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+-		rst-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
+-		mclk = <20000000>;
++		power-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
++		xshutdown-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
++		mclk = <24000000>;
+ 		mclk_source = <0>;
+ 		port {
+ 			gc02m2_mipi_ep: endpoint {
+@@ -945,7 +945,7 @@ MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13			0x19
+ 
+ 	};
+ 
+-	pinctrl_csi1_pwn: csi1_pwn_grp {
++	pinctrl_csi1_power: csi1_power_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3			0x19
+ 		>;
+@@ -956,7 +956,7 @@ MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5			0x19
+ 		>;
+ 	};
+ 
+-	pinctrl_csi1_rst: csi1_rst_grp {
++	pinctrl_csi1_xshutdown: csi1_xshutdown_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6			0x19
+ 		>;
+@@ -968,7 +968,7 @@ MX8MQ_IOMUXC_SD1_RESET_B_GPIO2_IO10			0x19
+ 		>;
+ 	};
+ 
+-	pinctrl_csi_clk: csi_clk_grp {
++	pinctrl_csi1_clk: csi1_clk_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
+ 		>;
+diff --git a/drivers/media/platform/mxc/capture/Kconfig b/drivers/media/platform/mxc/capture/Kconfig
+index 981914745998..59245a0d4124 100644
+--- a/drivers/media/platform/mxc/capture/Kconfig
++++ b/drivers/media/platform/mxc/capture/Kconfig
+@@ -80,6 +80,12 @@ config MXC_CAMERA_OV5647_MIPI
+ 	help
+ 	  If you plan to use the ov5647 Camera with mipi interface in your MXC system, say Y here.
+ 
++config MXC_CAMERA_GC02M2_MIPI
++	tristate "GalaxyCore gc02m2 camera support using mipi"
++	depends on MXC_MIPI_CSI && I2C
++	help
++	  If you plan to use the gc02m2 Camera with mipi csi interface in your MXC system, say Y here.
++
+ config MXC_TVIN_ADV7180
+ 	tristate "Analog Device adv7180 TV Decoder Input support"
+ 	depends on !VIDEO_MXC_EMMA_CAMERA && I2C
+diff --git a/drivers/media/platform/mxc/capture/Makefile b/drivers/media/platform/mxc/capture/Makefile
+index 4547894ea85b..0fa08d758c80 100644
+--- a/drivers/media/platform/mxc/capture/Makefile
++++ b/drivers/media/platform/mxc/capture/Makefile
+@@ -35,6 +35,9 @@ obj-$(CONFIG_MXC_CAMERA_OV5640_MIPI_V2) += ov5640_camera_mipi_v2.o
+ ov5647_camera_mipi-objs := ov5647_mipi.o
+ obj-$(CONFIG_MXC_CAMERA_OV5647_MIPI) += ov5647_camera_mipi.o
+ 
++gc02m2_camera_mipi-objs := gc02m2_mipi.o
++obj-$(CONFIG_MXC_CAMERA_GC02M2_MIPI) += gc02m2_camera_mipi.o
++
+ adv7180_tvin-objs := adv7180.o
+ obj-$(CONFIG_MXC_TVIN_ADV7180) += adv7180_tvin.o
+ 
+diff --git a/drivers/media/platform/mxc/capture/gc02m2_mipi.c b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+new file mode 100644
+index 000000000000..637c231ee2bf
+--- /dev/null
++++ b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+@@ -0,0 +1,728 @@
++/*
++ * GalaxyCore GC02M2 MXC mipi driver.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++#include <linux/of_device.h>
++#include <linux/i2c.h>
++#include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/string.h>
++#include <linux/errno.h>
++#include <linux/kmod.h>
++#include <linux/device.h>
++#include <linux/moduleparam.h>
++#include <media/v4l2-device.h>
++#include <linux/v4l2-mediabus.h>
++#include <linux/io.h>
++
++/*
++ * GC02M2 System control registers
++ */
++#define GC02M2_SENSOR_ID_H		0xF0
++#define GC02M2_SENSOR_ID_L		0xF1
++
++#define GC02M2_SHUTTER_TIME_H		0x3
++#define GC02M2_SHUTTER_TIME_L		0x4
++
++#define MIN_FPS 30
++#define MAX_FPS 30
++#define DEFAULT_FPS 30
++
++enum gc02m2_mode {
++        gc02m2_mode_MIN = 0,
++	/* currently only support 1600x1200 */
++        gc02m2_mode_UXGA_1600_1200 = 0,
++        gc02m2_mode_MAX = 1,
++        gc02m2_mode_INIT = 0xff, /*only for sensor init*/
++};
++
++enum gc02m2_frame_rate {
++        gc02m2_30_fps
++};
++
++struct gc02m2 {
++        struct v4l2_subdev subdev;
++        struct i2c_client *i2c_client;
++        struct v4l2_pix_format pix;
++        const struct ov2685_datafmt *fmt;
++        struct v4l2_captureparm streamcap;
++        bool on;
++
++        u32 mclk;
++        u8 mclk_source;
++        struct clk *sensor_clk;
++        int csi;
++
++        void (*io_init)(struct gc02m2 *);
++        int xshutdown_gpio;
++	int power_gpio;
++};
++
++struct gc02m2_datafmt {
++	u32			code;
++	enum v4l2_colorspace	colorspace;
++};
++
++static const struct gc02m2_datafmt gc02m2_colour_fmts[] = {
++        {MEDIA_BUS_FMT_YUYV8_2X8, V4L2_COLORSPACE_JPEG},
++};
++
++
++struct gc02m2_res {
++        int width;
++        int height;
++};
++
++struct gc02m2_res gc02m2_res[] = {
++        [0] = {1600, 1200},
++};
++
++#define RES_SIZE (ARRAY_SIZE(gc02m2_res))
++
++struct sensor_reg_value {
++        u8 addr;
++        u8 val;
++};
++
++static struct sensor_reg_value gc02m2_stream_on[] = {
++	{0xfe, 0x00}, {0x3e, 0x90}
++};
++
++static struct sensor_reg_value gc02m2_stream_off[] = {
++	{0xfe, 0x00}, {0x3e, 0x00}
++};
++
++static struct sensor_reg_value gc02m2_init_setting[] = {
++	/*system*/
++	{0xfc, 0x01}, {0xf4, 0x41}, {0xf5, 0xc0}, {0xf6, 0x44},
++	{0xf8, 0x38}, {0xf9, 0x82}, {0xfa, 0x00}, {0xfd, 0x80},
++	{0xfc, 0x81}, {0xfe, 0x03}, {0x01, 0x0b}, {0xf7, 0x01},
++	{0xfc, 0x80}, {0xfc, 0x80}, {0xfc, 0x80}, {0xfc, 0x8e},
++
++	/*CISCTL*/
++	{0xfe, 0x00}, {0x87, 0x09}, {0xee, 0x72}, {0xfe, 0x01},
++	{0x8c, 0x90}, {0xfe, 0x00}, {0x90, 0x00}, {0x03, 0x04},
++	{0x04, 0x7d}, {0x41, 0x04}, {0x42, 0xf4}, {0x05, 0x04},
++	{0x06, 0x48}, {0x07, 0x00}, {0x08, 0x18}, {0x9d, 0x18},
++	{0x09, 0x00}, {0x0a, 0x02}, {0x0d, 0x04}, {0x0e, 0xbc},
++	{0x17, 0x80}, {0x19, 0x04}, {0x24, 0x00}, {0x56, 0x20},
++	{0x5b, 0x00}, {0x5e, 0x01},
++
++	/*analog Register width*/
++	{0x21, 0x3c}, {0x44, 0x20}, {0xcc, 0x01},
++
++	/*analog mode*/
++	{0x1a, 0x04}, {0x1f, 0x11}, {0x27, 0x30}, {0x2b, 0x00},
++	{0x33, 0x00}, {0x53, 0x90}, {0xe6, 0x50},
++
++	/*analog voltage*/
++	{0x39, 0x07}, {0x43, 0x04}, {0x46, 0x2a}, {0x7c, 0xa0},
++	{0xd0, 0xbe}, {0xd1, 0x40}, {0xd2, 0x40}, {0xd3, 0xb3},
++	{0xde, 0x1c},
++
++	/*analog current*/
++	{0xcd, 0x06}, {0xce, 0x6f},
++
++	/*CISCTL RESET*/
++	{0xfc, 0x88}, {0xfe, 0x10}, {0xfe, 0x00}, {0xfc, 0x8e},
++	{0xfe, 0x00}, {0xfe, 0x00}, {0xfe, 0x00}, {0xfe, 0x00},
++	{0xfc, 0x88}, {0xfe, 0x10}, {0xfe, 0x00}, {0xfc, 0x8e},
++	{0xfe, 0x04}, {0xe0, 0x01}, {0xfe, 0x00},
++
++	/*ISP*/
++	{0xfe, 0x01}, {0x53, 0x54}, {0x87, 0x53}, {0x89, 0x03},
++
++	/*Gain*/
++	{0xfe, 0x00}, {0xb0, 0x74}, {0xb1, 0x04}, {0xb2, 0x00},
++	{0xb6, 0x00}, {0xfe, 0x04}, {0xd8, 0x00}, {0xc0, 0x40},
++	{0xc0, 0x00}, {0xc0, 0x00}, {0xc0, 0x00}, {0xc0, 0x60},
++	{0xc0, 0x00}, {0xc0, 0xc0}, {0xc0, 0x2a}, {0xc0, 0x80},
++	{0xc0, 0x00}, {0xc0, 0x00}, {0xc0, 0x40}, {0xc0, 0xa0},
++	{0xc0, 0x00}, {0xc0, 0x90}, {0xc0, 0x19}, {0xc0, 0xc0},
++	{0xc0, 0x00}, {0xc0, 0xD0}, {0xc0, 0x2F}, {0xc0, 0xe0},
++	{0xc0, 0x00}, {0xc0, 0x90}, {0xc0, 0x39}, {0xc0, 0x00},
++	{0xc0, 0x01}, {0xc0, 0x20}, {0xc0, 0x04}, {0xc0, 0x20},
++	{0xc0, 0x01}, {0xc0, 0xe0}, {0xc0, 0x0f}, {0xc0, 0x40},
++	{0xc0, 0x01}, {0xc0, 0xe0}, {0xc0, 0x1a}, {0xc0, 0x60},
++	{0xc0, 0x01}, {0xc0, 0x20}, {0xc0, 0x25}, {0xc0, 0x80},
++	{0xc0, 0x01}, {0xc0, 0xa0}, {0xc0, 0x2c}, {0xc0, 0xa0},
++	{0xc0, 0x01}, {0xc0, 0xe0}, {0xc0, 0x32}, {0xc0, 0xc0},
++	{0xc0, 0x01}, {0xc0, 0x20}, {0xc0, 0x38}, {0xc0, 0xe0},
++	{0xc0, 0x01}, {0xc0, 0x60}, {0xc0, 0x3c}, {0xc0, 0x00},
++	{0xc0, 0x02}, {0xc0, 0xa0}, {0xc0, 0x40}, {0xc0, 0x80},
++	{0xc0, 0x02}, {0xc0, 0x18}, {0xc0, 0x5c}, {0xfe, 0x00},
++	{0x9f, 0x10},
++
++	/*BLK*/
++	{0xfe, 0x00}, {0x26, 0x20}, {0xfe, 0x01}, {0x40, 0x22},
++	{0x46, 0x7f}, {0x49, 0x0f}, {0x4a, 0xf0}, {0xfe, 0x04},
++	{0x14, 0x80}, {0x15, 0x80}, {0x16, 0x80}, {0x17, 0x80},
++
++	/*ant_blooming*/
++	{0xfe, 0x01}, {0x41, 0x20}, {0x4c, 0x00}, {0x4d, 0x0c},
++	{0x44, 0x08}, {0x48, 0x03},
++
++	/*Window 1600X1200*/
++	{0xfe, 0x01}, {0x90, 0x01}, {0x91, 0x00}, {0x92, 0x06},
++	{0x93, 0x00}, {0x94, 0x06}, {0x95, 0x04}, {0x96, 0xb0},
++	{0x97, 0x06}, {0x98, 0x40},
++
++	/*mipi*/
++	{0xfe, 0x03}, {0x01, 0x23}, {0x03, 0xce}, {0x04, 0x48},
++	{0x15, 0x00}, {0x21, 0x10}, {0x22, 0x05}, {0x23, 0x20},
++	{0x25, 0x20}, {0x26, 0x08}, {0x29, 0x06}, {0x2a, 0x0a},
++	{0x2b, 0x08},
++
++	/*out*/
++	{0xfe, 0x01}, {0x8c, 0x10}, {0xfe, 0x00}, {0x3e, 0x00},
++};
++
++static inline struct gc02m2 *to_gc02m2(const struct i2c_client *client)
++{
++	return container_of(i2c_get_clientdata(client), struct gc02m2, subdev);
++}
++
++/* Find a data format by a pixel code in an array */
++static const struct gc02m2_datafmt
++			*gc02m2_find_datafmt(u32 code)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(gc02m2_colour_fmts); i++)
++		if (gc02m2_colour_fmts[i].code == code)
++			return gc02m2_colour_fmts + i;
++
++	return NULL;
++}
++
++/* i2c read/write stuff */
++static int gc02m2_read_reg(struct i2c_client *client, u16 reg, u8 *val)
++{
++	int ret;
++	unsigned char data;
++
++        if ((ret = i2c_master_send(client, &reg, 1)) != 1) {
++                return ret;
++        }
++
++        if ((ret = i2c_master_recv(client, &data, 1)) != 1) {
++                return ret;
++        }
++
++        *val = data;
++
++	return 0;
++}
++
++static int gc02m2_write_reg(struct i2c_client *client, u8 reg, u8 val)
++{
++	int ret;
++	unsigned char data[2] = {0};
++
++	data[0] = reg;
++	data[1] = val;
++
++	ret = i2c_master_send(client, data, 2);
++
++	return (ret == 2) ? 0 : ret;
++}
++
++static int gc02m2_write_reg_array(struct i2c_client *client,
++		struct sensor_reg_value *reglist, u32 list_size)
++{
++	int ret = 0, i, reg, val;
++	struct sensor_reg_value *reg_value = reglist;
++
++	for (i = 0; i < list_size; i++, reg_value++) {
++		reg = reg_value->addr;
++		val = reg_value->val;
++		ret = gc02m2_write_reg(client, reg, val);
++		if (ret)
++			goto err;
++	}
++err:
++	return ret;
++}
++
++static int gc02m2_power_on(struct gc02m2 *sensor)
++{
++        if (sensor->power_gpio < 0 || sensor->xshutdown_gpio < 0)
++                return -EIO;
++
++        /* power gpio controls IOVDD, DVDD and AVDD */
++        gpio_set_value(sensor->power_gpio, 1);
++
++        /* set xshutdown high */
++        gpio_set_value(sensor->xshutdown_gpio, 1);
++
++	/* delay for t4 and t5 before start i2c transaction */
++	/* 1200/24MHz */
++	msleep(5);
++
++	return 0;
++}
++
++static int gc02m2_power_off(struct gc02m2 *sensor)
++{
++        if (sensor->power_gpio < 0 || sensor->xshutdown_gpio < 0)
++                return -EIO;
++
++        /* set xshutdown low */
++        gpio_set_value(sensor->xshutdown_gpio, 0);
++
++	/* set power gpio low */
++        gpio_set_value(sensor->power_gpio, 0);
++
++	return 0;
++}
++
++static int gc02m2_s_power(struct v4l2_subdev *subdev, int on)
++{
++	int ret;
++	struct gc02m2 *sensor = to_gc02m2(subdev);
++
++	if (on)
++		ret = gc02m2_power_on(sensor);
++	else
++		ret = gc02m2_power_off(sensor);
++
++	return ret;
++}
++
++static int get_resolution_index(int w, int h)
++{
++	int i;
++
++	for (i = 0; i < RES_SIZE; i++) {
++		if (w != gc02m2_res[i].width)
++			continue;
++		if (h != gc02m2_res[i].height)
++			continue;
++
++		return i;
++	}
++
++	return -1;
++}
++
++static int gc02m2_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++{
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct gc02m2 *sensor = to_gc02m2(client);
++	struct device *dev = &sensor->i2c_client->dev;
++	struct v4l2_captureparm *cparm = &a->parm.capture;
++	int ret = 0;
++
++	switch (a->type) {
++	/* This is the only case currently handled. */
++	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
++		memset(a, 0, sizeof(*a));
++		a->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++		cparm->capability = sensor->streamcap.capability;
++		cparm->timeperframe = sensor->streamcap.timeperframe;
++		cparm->capturemode = sensor->streamcap.capturemode;
++		ret = 0;
++		break;
++
++	/* These are all the possible cases. */
++	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
++	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
++	case V4L2_BUF_TYPE_VBI_CAPTURE:
++	case V4L2_BUF_TYPE_VBI_OUTPUT:
++	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
++	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
++		ret = -EINVAL;
++		break;
++
++	default:
++		dev_warn(dev, "Type is unknown - %d
+", a->type);
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++
++static int gc02m2_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++{
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct gc02m2 *sensor = to_gc02m2(client);
++	struct device *dev = &sensor->i2c_client->dev;
++	int ret = 0;
++
++	switch (a->type) {
++	/* This is the only case currently handled. */
++	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
++		/* currently only support default 30 fps */
++	        sensor->streamcap.capturemode = 0;
++		sensor->streamcap.timeperframe.denominator = DEFAULT_FPS;
++	        sensor->streamcap.timeperframe.numerator = 1;
++		break;
++
++	/* These are all the possible cases. */
++	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
++	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
++	case V4L2_BUF_TYPE_VBI_CAPTURE:
++	case V4L2_BUF_TYPE_VBI_OUTPUT:
++	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
++	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
++		dev_warn(dev, "Type is not V4L2_BUF_TYPE_VIDEO_CAPTURE but %d
+",
++			a->type);
++		ret = -EINVAL;
++		break;
++
++	default:
++		dev_warn(dev, "Type is unknown - %d
+", a->type);
++		ret = -EINVAL;
++		break;
++	}
++
++	return ret;
++}
++
++static int gc02m2_set_fmt(struct v4l2_subdev *sd,
++			  struct v4l2_subdev_pad_config *cfg,
++			  struct v4l2_subdev_format *format)
++{
++	struct v4l2_mbus_framefmt *mf = &format->format;
++	const struct gc02m2_datafmt *fmt = gc02m2_find_datafmt(mf->code);
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct gc02m2 *sensor = to_gc02m2(client);
++	int index;
++
++	if (!fmt) {
++		mf->code	= gc02m2_colour_fmts[0].code;
++		mf->colorspace	= gc02m2_colour_fmts[0].colorspace;
++		fmt		= &gc02m2_colour_fmts[0];
++	}
++
++	mf->field	= V4L2_FIELD_NONE;
++
++	if (format->which == V4L2_SUBDEV_FORMAT_TRY)
++		return 0;
++
++	sensor->fmt = fmt;
++
++	index = get_resolution_index(mf->width, mf->height);
++	if (index >= 0) {
++		sensor->streamcap.capturemode = index;
++		sensor->pix.width = mf->width;
++		sensor->pix.height = mf->height;
++		return 0;
++	}
++
++	dev_err(&client->dev, "Set format failed %d, %d
+",
++		fmt->code, fmt->colorspace);
++	return -EINVAL;
++}
++
++static int gc02m2_get_fmt(struct v4l2_subdev *sd,
++			  struct v4l2_subdev_pad_config *cfg,
++			  struct v4l2_subdev_format *format)
++{
++	struct v4l2_mbus_framefmt *mf = &format->format;
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct gc02m2 *sensor = to_gc02m2(client);
++	const struct gc02m2_datafmt *fmt = sensor->fmt;
++
++	if (format->pad)
++		return -EINVAL;
++
++	mf->code	= fmt->code;
++	mf->colorspace	= fmt->colorspace;
++	mf->field	= V4L2_FIELD_NONE;
++
++	mf->width	= sensor->pix.width;
++	mf->height	= sensor->pix.height;
++
++	return 0;
++}
++
++static int gc02m2_detect(struct i2c_client *client)
++{
++	struct i2c_adapter *adapter = client->adapter;
++	u16 id_high, id_low;
++	int ret;
++
++	if (!i2c_check_functionality(adapter, I2C_FUNC_I2C))
++		return -ENODEV;
++
++	ret = gc02m2_read_reg(client, GC02M2_SENSOR_ID_H, &id_high);
++	if (ret || (id_high != 0x02)) {
++		dev_err(&client->dev, "sensor_id_high = 0x%x
+", id_high);
++		return -ENODEV;
++	}
++	ret = gc02m2_read_reg(client, GC02M2_SENSOR_ID_L, &id_low);
++	if (ret || (id_low != 0xf0)) {
++		dev_err(&client->dev, "sensor_id_low = 0x%x
+", id_low);
++		return -ENODEV;
++	}
++
++	dev_info(&client->dev, "detect gc02m2 success
+");
++	return 0;
++}
++
++static int gc02m2_s_stream(struct v4l2_subdev *sd, int enable)
++{
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	int ret;
++
++	if (enable)
++		ret = gc02m2_write_reg_array(client, gc02m2_stream_on,
++				sizeof(gc02m2_stream_on)/sizeof(struct sensor_reg_value));
++	else
++		ret = gc02m2_write_reg_array(client, gc02m2_stream_off,
++				sizeof(gc02m2_stream_off)/sizeof(struct sensor_reg_value));
++
++	return ret;
++}
++
++static int gc02m2_enum_frameintervals(struct v4l2_subdev *sd,
++		struct v4l2_subdev_pad_config *cfg,
++		struct v4l2_subdev_frame_interval_enum *fie)
++{
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct device *dev = &client->dev;
++
++	if (fie->index > gc02m2_mode_MAX)
++		return -EINVAL;
++
++	if (fie->width == 0 || fie->height == 0 || fie->code == 0) {
++		dev_warn(dev, "Please assign pixel format, width and height
+");
++		return -EINVAL;
++	}
++
++	/* currently only support fps 30 for 1600x1200 */
++	fie->interval.numerator = 1;
++	fie->interval.denominator = DEFAULT_FPS;
++
++	return 0;
++}
++
++static int gc02m2_enum_mbus_code(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_pad_config *cfg,
++				 struct v4l2_subdev_mbus_code_enum *code)
++{
++        if (code->pad || code->index >= ARRAY_SIZE(gc02m2_colour_fmts))
++                return -EINVAL;
++
++        code->code = gc02m2_colour_fmts[code->index].code;
++        return 0;
++}
++
++static int gc02m2_enum_frame_size(struct v4l2_subdev *sd,
++				  struct v4l2_subdev_pad_config *cfg,
++				  struct v4l2_subdev_frame_size_enum *fse)
++{
++	int index = fse->index;
++
++	if (index >= RES_SIZE)
++		return -EINVAL;
++
++	fse->min_width = gc02m2_res[index].width;
++	fse->min_height = gc02m2_res[index].height;
++	fse->max_width = gc02m2_res[index].width;
++	fse->max_height = gc02m2_res[index].height;
++
++	return 0;
++}
++
++static int init_device(struct gc02m2 *sensor)
++{
++	int ret;
++	ret = gc02m2_write_reg_array(sensor->i2c_client, gc02m2_init_setting,
++			sizeof(gc02m2_init_setting)/sizeof(struct sensor_reg_value));
++	return ret;
++}
++
++static const struct v4l2_subdev_video_ops gc02m2_video_ops = {
++	.g_parm = gc02m2_g_parm,
++	.s_parm = gc02m2_s_parm,
++	.s_stream = gc02m2_s_stream,
++};
++
++static const struct v4l2_subdev_core_ops gc02m2_core_ops = {
++	.s_power = gc02m2_s_power,
++};
++
++static const struct v4l2_subdev_pad_ops gc02m2_pad_ops = {
++	.enum_mbus_code = gc02m2_enum_mbus_code,
++	.enum_frame_interval   = gc02m2_enum_frameintervals,
++	.enum_frame_size = gc02m2_enum_frame_size,
++	.get_fmt = gc02m2_get_fmt,
++	.set_fmt = gc02m2_set_fmt,
++};
++
++static const struct v4l2_subdev_ops gc02m2_ops = {
++	.core = &gc02m2_core_ops,
++	.video = &gc02m2_video_ops,
++	.pad = &gc02m2_pad_ops,
++};
++
++static int gc02m2_remove(struct i2c_client *client)
++{
++	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
++	struct gc02m2 *sensor = to_gc02m2(subdev);
++
++	dev_dbg(&client->dev, "gc02m2_remove...
+");
++
++	v4l2_device_unregister_subdev(subdev);
++	clk_disable_unprepare(sensor->sensor_clk);
++
++	gc02m2_power_off(sensor);
++
++	devm_kfree(&client->dev, sensor);
++
++	return 0;
++}
++
++static int gc02m2_probe(struct i2c_client *client)
++{
++	struct pinctrl *pinctrl;
++	struct device *dev = &client->dev;
++	int ret;
++	struct gc02m2 *sensor;
++
++	sensor = devm_kzalloc(dev, sizeof(struct gc02m2), GFP_KERNEL);
++
++	/* get default pinctrl */
++	pinctrl = devm_pinctrl_get_select_default(dev);
++	if (IS_ERR(pinctrl))
++		dev_warn(dev, "No pin available
+");
++
++	/* get power pin */
++	sensor->power_gpio = of_get_named_gpio(dev->of_node, "power-gpios", 0);
++	if (!gpio_is_valid(sensor->power_gpio))
++		dev_warn(dev, "No sensor power pin available");
++	else {
++		ret = devm_gpio_request_one(dev, sensor->power_gpio,
++				GPIOF_OUT_INIT_LOW, "gc02m2_mipi_power");
++		if (ret < 0) {
++		        dev_warn(dev, "Failed to set power pin
+");
++		        dev_warn(dev, "ret=%d
+", ret);
++			goto err_free;
++		}
++        }
++
++	/* get xshutdown pin */
++	sensor->xshutdown_gpio = of_get_named_gpio(dev->of_node, "xshutdown-gpios", 0);
++	if (!gpio_is_valid(sensor->xshutdown_gpio))
++		dev_warn(dev, "No sensor xshutdown pin available");
++	else {
++		ret = devm_gpio_request_one(dev, sensor->xshutdown_gpio,
++				GPIOF_OUT_INIT_LOW, "gc02m2_mipi_xshutdown");
++		if (ret < 0) {
++			dev_warn(dev, "Failed to set xshutdown pin
+");
++			dev_warn(dev, "ret=%d
+", ret);
++			goto err_free;
++		}
++	}
++
++	sensor->sensor_clk = devm_clk_get(dev, "csi_mclk");
++	if (IS_ERR(sensor->sensor_clk)) {
++		/* assuming clock enabled by default */
++		sensor->sensor_clk = NULL;
++		dev_err(dev, "clock-frequency missing or invalid
+");
++		goto err_free;
++	}
++
++	ret = of_property_read_u32(dev->of_node, "mclk", &(sensor->mclk));
++	if (ret) {
++		dev_err(dev, "mclk missing or invalid
+");
++		goto err_free;
++	}
++
++	ret = of_property_read_u32(dev->of_node, "mclk_source", (u32 *) &(sensor->mclk_source));
++	if (ret) {
++		dev_err(dev, "mclk_source missing or invalid
+");
++		goto err_free;
++        }
++
++        ret = of_property_read_u32(dev->of_node, "csi_id", &(sensor->csi));
++        if (ret) {
++		dev_err(dev, "csi id missing or invalid
+");
++		goto err_free;
++        }
++
++        clk_prepare_enable(sensor->sensor_clk);
++
++        sensor->io_init = gc02m2_power_off;
++        sensor->i2c_client = client;
++        sensor->pix.pixelformat = V4L2_PIX_FMT_YUYV;
++        sensor->pix.width = 1600;
++        sensor->pix.height = 1200;
++        sensor->streamcap.capability = V4L2_MODE_HIGHQUALITY |
++                                           V4L2_CAP_TIMEPERFRAME;
++        sensor->streamcap.capturemode = 0;
++        sensor->streamcap.timeperframe.denominator = DEFAULT_FPS;
++        sensor->streamcap.timeperframe.numerator = 1;
++
++	/* power on sensor */
++	ret = gc02m2_power_on(sensor);
++	if (ret) {
++                dev_warn(dev, "Power on camera failed");
++		goto err_free;
++	}
++
++	/* check i2c and sensor id */
++	ret = gc02m2_detect(client);
++	if (ret) {
++                dev_warn(dev, "Camera detect failed");
++		goto err_free;
++	}
++
++	ret = init_device(sensor);
++	if (ret < 0) {
++		clk_disable_unprepare(sensor->sensor_clk);
++		dev_warn(dev, "Camera init failed
+");
++		gc02m2_power_off(sensor);
++		goto err_free;
++	}
++
++        v4l2_i2c_subdev_init(&sensor->subdev, client, &gc02m2_ops);
++
++        sensor->subdev.grp_id = 678;
++        ret = v4l2_async_register_subdev(&sensor->subdev);
++        if (ret < 0) {
++                dev_err(&client->dev, "Async register failed, ret=%d
+",
++                        ret);
++		goto err_free;
++	}
++
++	gc02m2_s_stream(&sensor->subdev, 0);
++        dev_info(dev, "Camera is found
+");
++        return ret;
++err_free:
++	devm_kfree(dev, sensor);
++	return ret;
++}
++
++static const struct of_device_id gc02m2_mipi_of_match[] = {
++        { .compatible = "galaxycore,gc02m2_mipi", },
++        { /* end */ }
++};
++
++MODULE_DEVICE_TABLE(of, gc02m2_mipi_of_match);
++
++static struct i2c_driver gc02m2_i2c_driver = {
++	.driver = {
++		.name = "gc02m2",
++		.of_match_table = gc02m2_mipi_of_match,
++	},
++	.probe = gc02m2_probe,
++	.remove = gc02m2_remove,
++};
++
++module_i2c_driver(gc02m2_i2c_driver);
++
++MODULE_AUTHOR("ID TECH");
++MODULE_DESCRIPTION("GC02M2 MIPI Camera Driver");
++MODULE_LICENSE("GPL");
++MODULE_VERSION("2.0");
++MODULE_ALIAS("CSI");

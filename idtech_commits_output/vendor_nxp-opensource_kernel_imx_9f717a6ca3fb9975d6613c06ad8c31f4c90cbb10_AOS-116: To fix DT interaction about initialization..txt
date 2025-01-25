@@ -1,0 +1,94 @@
+9f717a6ca3fb Arthur Chen 2020-03-09
+
+AOS-116: To fix DT interaction about initialization.
+
+Change-Id: I1c58cbff2450e9c21c40bf4de8797066dfe0aad8
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index 9e9295b615c4..fd6f955782ff 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@ -694,7 +694,6 @@ idg_spi@0 {
+ 		spi-bits-per-word = <8>; /* 8 bits */
+ 		spi-working-mode = <0>; /* SPI_MODE_0 */
+ 		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
+-		idg-low-triggered; /* interrupt work with low level triggered */
+ 		/* idg-keep-sense */
+ 		status = "okay";
+ 	};
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 98c882bedbd7..00b6327a5c90 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -901,6 +901,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	struct idg_spi_device *idg_dev;
+ 	struct device_node *np = spi->dev.of_node;
+ 	unsigned long irq_flags;
++	u32 dt_irq[IRQ_SIZE] = {0, 0};
+ 	int irq = 0;
+ 	int err = 0;
+ 
+@@ -987,17 +988,35 @@ static int idg_spi_probe(struct spi_device *spi)
+ 		goto idg_tty_error;
+ 	}
+ 	init_waitqueue_head(&idg_dev->wait);
+-	if (of_property_read_bool(np, "idg-low-triggered")) {
+-		irq_flags = IRQF_TRIGGER_FALLING;
+-		dev_info(&spi->dev, "idg_spi is low triggered
+");
+-	} else if (of_property_read_bool(np, "idg-high-triggered")) {
+-		irq_flags = IRQF_TRIGGER_RISING;
+-		dev_info(&spi->dev, "idg_spi is high triggered
+");
+-	} else {
++	err = of_property_read_variable_u32_array(np, "interrupts", dt_irq,
++						  1, IRQ_SIZE);
++	if (err < 0) {
+ 		dev_err(&spi->dev, "trigger setting is not exist
+");
+ 		err = -ENODATA;
+ 		goto idgv5_tty_error;
+ 	}
++	switch (dt_irq[1]) {
++	case IRQ_TYPE_EDGE_RISING:
++		irq_flags = IRQF_TRIGGER_RISING;
++		dev_info(&spi->dev, "idg_spi is rising triggered
+");
++		break;
++	case IRQ_TYPE_EDGE_FALLING:
++		irq_flags = IRQF_TRIGGER_FALLING;
++		dev_info(&spi->dev, "idg_spi is falling triggered
+");
++		break;
++	case IRQ_TYPE_LEVEL_HIGH:
++		irq_flags = IRQF_TRIGGER_HIGH;
++		dev_info(&spi->dev, "idg_spi is high triggered
+");
++		break;
++	case IRQ_TYPE_LEVEL_LOW:
++		irq_flags = IRQF_TRIGGER_LOW;
++		dev_info(&spi->dev, "idg_spi is low triggered
+");
++		break;
++	default:
++		pr_err("%s: get interrupt triggled level failed(%d)", DRVNAME,
++		       dt_irq[1]);
++		goto idgv5_tty_error;
++	}
+ 	irq_flags |= IRQF_ONESHOT;
+ 	err = request_threaded_irq(idg_dev->idg_irq, NULL, idg_spi_irq_handler,
+ 				   irq_flags, spi->dev.driver->name, idg_dev);
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index 706b7d06eaae..98291b97a530 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -16,6 +16,9 @@
+ #define TTYNAME			"ttyIDG"
+ #define TTYV5NAME		"ttyIDGV5"
+ 
++/* For parsing irq level from DT */
++#define IRQ_SIZE		2
++
+ #define IDG_HEADER_LEN		10
+ #define IDG_SIZE_MSB		12
+ #define IDG_SIZE_LSB		13

@@ -1,0 +1,2343 @@
+7fe46917 Sergii Postulga 2019-09-19
+
+Convert nxp's configuration into idtech's
+
+Initial configuration based on original
+EVKs from NXP:
+ - evk_a300 is based on evk_8mq
+ - evk_a100 is based on evk_8mn
+
+Change-Id: Ia82b4855c4fd8da85b7acf6ced905545db04e720
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Reviewed-on: https://gerrit.idtechproducts.com/c/android-imx/device/idtech/+/264
+Reviewed-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Reviewed-by: Owen Wen <Owen.Wen@idtechproducts.com>
+Tested-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Tested-by: Owen Wen <Owen.Wen@idtechproducts.com>
+
+diff --git a/common/build/kernel.mk b/common/build/kernel.mk
+index 63e105f6..18725ca2 100644
+--- a/common/build/kernel.mk
++++ b/common/build/kernel.mk
+@@ -119,7 +119,7 @@ endif
+ KERNEL_CONFIG_SRC := $(KERNEL_CONFIG_DEFAULT) \
+   $(KERNEL_CONFIG_ADDITION)
+ KERNEL_CONFIG := $(KERNEL_OUT)/.config
+-KERNEL_MERGE_CONFIG := device/fsl/common/tools/mergeconfig.sh
++KERNEL_MERGE_CONFIG := device/idtech/common/tools/mergeconfig.sh
+ 
+ KERNEL_HEADERS_INSTALL := $(KERNEL_OUT)/usr
+ #KERNEL_MODULES_INSTALL := $(TARGET_OUT)/lib/modules
+diff --git a/common/recovery/Android.mk b/common/recovery/Android.mk
+index f5a13c9b..1d1b8806 100644
+--- a/common/recovery/Android.mk
++++ b/common/recovery/Android.mk
+@@ -7,7 +7,7 @@ LOCAL_C_INCLUDES += \
+ LOCAL_SRC_FILES := recovery_ui.cpp
+ 
+ # should match TARGET_RECOVERY_UI_LIB set in BoardConfigCommon.mk
+-LOCAL_MODULE := librecovery_ui_imx
++LOCAL_MODULE := librecovery_ui_imx_idt
+ 
+ include $(BUILD_STATIC_LIBRARY)
+ 
+diff --git a/common/tools/imx-make.sh b/common/tools/imx-make.sh
+index ebd8a2e1..185c964c 100755
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@ -103,7 +103,7 @@ if [ ${build_bootloader_kernel_flag} -eq 0 ] && [ ${build_android_flag} -eq 0 ];
+     build_android_flag=1
+ fi
+ 
+-product_makefile=`pwd`/`find device/fsl -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
++product_makefile=`pwd`/`find device/idtech -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+ product_path=${product_makefile%/*}
+ soc_path=${product_path%/*}
+ fsl_git_path=${soc_path%/*}
+diff --git a/common/tools/update_kerenl_header.sh b/common/tools/update_kerenl_header.sh
+index 2c05bc09..67fa214d 100755
+--- a/common/tools/update_kerenl_header.sh
++++ b/common/tools/update_kerenl_header.sh
+@@ -2,12 +2,12 @@
+ 
+ # usage: cd android_dir & ./common/tools/update_kerenl_header.sh
+ # if user add imx special user header file, you can use below way to update:
+-# cd android_dir & touch device/fsl/common/kernel-headers/linux/new_uapi &
++# cd android_dir & touch device/idtech/common/kernel-headers/linux/new_uapi &
+ # ./common/tools/update_kerenl_header.sh
+ 
+ bionic_uapi_tool_path="bionic/libc/kernel/tools"
+ bionic_kernel_header_path="bionic/libc/kernel/uapi/linux"
+-imx_kernel_header_path="device/fsl/common/kernel-headers/linux/"
++imx_kernel_header_path="idtech"
+ 
+ function prepare_work
+ {
+@@ -35,7 +35,7 @@ ${bionic_uapi_tool_path}/update_all.py
+ 
+ for file in $(ls ${imx_kernel_header_path})
+ do
+-    cp ${bionic_kernel_header_path}/$file device/fsl/common/kernel-headers/linux/.
++    cp ${bionic_kernel_header_path}/$file device/idtech/common/kernel-headers/linux/.
+ done
+ 
+ clean_work
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index 36cfc317..b9b4575b 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -27,26 +27,14 @@
+ # Copied from build/target/product/AndroidProducts.mk
+ 
+ PRODUCT_MAKEFILES := \
+-  $(LOCAL_DIR)/evk_8mq/evk_8mq.mk \
+-  $(LOCAL_DIR)/evk_8mq/evk_8mq_drm.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm_ddr4.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm_drm.mk \
+-  $(LOCAL_DIR)/aiy_8mq/aiy_8mq.mk \
+-  $(LOCAL_DIR)/evk_8mn/evk_8mn.mk
++  $(LOCAL_DIR)/evk_a300/evk_a300.mk \
++  $(LOCAL_DIR)/evk_a300/evk_a300_drm.mk \
++  $(LOCAL_DIR)/evk_a100/evk_a100.mk \
+ 
+ COMMON_LUNCH_CHOICES := \
+-  evk_8mq-user \
+-  evk_8mq-userdebug \
+-  evk_8mq_drm-user \
+-  evk_8mq_drm-userdebug \
+-  evk_8mm-user \
+-  evk_8mm-userdebug \
+-  evk_8mm_ddr4-user \
+-  evk_8mm_ddr4-userdebug \
+-  evk_8mm_drm-user \
+-  evk_8mm_drm-userdebug \
+-  aiy_8mq-user \
+-  aiy_8mq-userdebug \
+-  evk_8mn-user \
+-  evk_8mn-userdebug
++  evk_a300-user \
++  evk_a300-userdebug \
++  evk_a300_drm-user \
++  evk_a300_drm-userdebug \
++  evk_a100-user \
++  evk_a100-userdebug
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 5fedf99b..7a4bb766 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -127,7 +127,7 @@ BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE = ext4
+ TARGET_COPY_OUT_VENDOR := vendor
+ 
+ BOARD_FLASH_BLOCK_SIZE := 4096
+-TARGET_RECOVERY_UI_LIB := librecovery_ui_imx
++TARGET_RECOVERY_UI_LIB := librecovery_ui_imx_idt
+ 
+ BOARD_VNDK_VERSION := current
+ 
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 40dc03eb..e2e573c9 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -25,7 +25,7 @@ PRODUCT_PACKAGES += \
+     libion \
+     librs_jni \
+     slideshow \
+-    verity_warning_images \
++    verity_warning_images_idt \
+     vndk-sp
+ 
+ ifneq ($(PRODUCT_IMX_CAR),true)
+@@ -160,7 +160,7 @@ PRODUCT_PACKAGES += \
+     gmem_info \
+     gpu-top
+ 
+-# Omx related libs, please align to device/fsl/proprietary/omx/fsl-omx.mk
++# Omx related libs, please align to device/idtech/proprietary/omx/fsl-omx.mk
+ PRODUCT_PACKAGES += \
+     ComponentRegistry.txt \
+     component_register \
+@@ -311,14 +311,14 @@ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_telephony.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_telephony.xml \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_tv.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_tv.xml \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_profiles_720p.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_profiles_720p.xml \
+-    device/fsl/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
+-    device/fsl/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
+-    device/fsl/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
+-    device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
+-    device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
+-    device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
+-    device/fsl/imx8m/init.recovery.freescale.rc:root/init.recovery.freescale.rc \
+-    device/fsl/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
++    device/idtech/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
++    device/idtech/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
++    device/idtech/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
++    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
++    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
++    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
++    device/idtech/imx8m/init.recovery.freescale.rc:root/init.recovery.freescale.rc \
++    device/idtech/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+     frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
+     frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+     frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+@@ -350,7 +350,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
+ PRODUCT_TAGS += dalvik.gc.type-precise
+ 
+ PRODUCT_DEFAULT_DEV_CERTIFICATE := \
+-    device/fsl/common/security/testkey
++    device/idtech/common/security/testkey
+ 
+ # In userdebug, add minidebug info the the boot image and the system server to support
+ # diagnosing native crashes.
+diff --git a/imx8m/evk_a100/AndroidBoard.mk b/imx8m/evk_a100/AndroidBoard.mk
+deleted file mode 120000
+index 22ac3abe..00000000
+--- a/imx8m/evk_a100/AndroidBoard.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/AndroidBoard.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/AndroidBoard.mk b/imx8m/evk_a100/AndroidBoard.mk
+new file mode 100644
+index 00000000..84e328fe
+--- /dev/null
++++ b/imx8m/evk_a100/AndroidBoard.mk
+@@ -0,0 +1,7 @@
++LOCAL_PATH := $(call my-dir)
++
++include device/idtech/common/build/dtbo.mk
++include device/idtech/common/build/imx-recovery.mk
++include device/idtech/common/build/gpt.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+deleted file mode 120000
+index 35e88fee..00000000
+--- a/imx8m/evk_a100/BoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/BoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+new file mode 100644
+index 00000000..d63b1bef
+--- /dev/null
++++ b/imx8m/evk_a100/BoardConfig.mk
+@@ -0,0 +1,144 @@
++#
++# SoC-specific compile-time definitions.
++#
++
++BOARD_SOC_TYPE := IMX8MN
++BOARD_TYPE := EVK_A100
++BOARD_HAVE_VPU := false
++HAVE_FSL_IMX_GPU2D := false
++HAVE_FSL_IMX_GPU3D := true
++HAVE_FSL_IMX_IPU := false
++HAVE_FSL_IMX_PXP := false
++BOARD_KERNEL_BASE := 0x40400000
++TARGET_GRALLOC_VERSION := v3
++TARGET_HIGH_PERFORMANCE := true
++TARGET_USES_HWC2 := true
++TARGET_HWCOMPOSER_VERSION := v2.0
++USE_OPENGL_RENDERER := true
++TARGET_HAVE_VULKAN := true
++ENABLE_CFI=false
++
++SOONG_CONFIG_IMXPLUGIN += \
++                        BOARD_HAVE_VPU
++
++SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MN
++SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = false
++
++#
++# Product-specific compile-time definitions.
++#
++
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a100
++
++include device/idtech/imx8m/BoardConfigCommon.mk
++ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
++-include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
++endif
++
++BUILD_TARGET_FS ?= ext4
++TARGET_USERIMAGES_USE_EXT4 := true
++
++TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
++
++# Support gpt
++ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++else
++BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab.bpt
++ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++endif
++
++# Vendor Interface manifest and compatibility
++DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
++
++TARGET_BOOTLOADER_BOARD_NAME := EVK
++
++<<<<<<< HEAD:imx8m/evk_8mn/BoardConfig.mk
++=======
++PRODUCT_MODEL := EVK_A100
++
++TARGET_BOOTLOADER_POSTFIX := bin
++
++>>>>>>> 8369deed... Convert nxp's configuration into idtech's:imx8m/evk_a100/BoardConfig.mk
++USE_OPENGL_RENDERER := true
++
++BOARD_WLAN_DEVICE            := bcmdhd
++WPA_SUPPLICANT_VERSION       := VER_0_8_X
++BOARD_WPA_SUPPLICANT_DRIVER  := NL80211
++BOARD_HOSTAPD_DRIVER         := NL80211
++BOARD_HOSTAPD_PRIVATE_LIB               := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++BOARD_WPA_SUPPLICANT_PRIVATE_LIB        := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++
++WIFI_DRIVER_FW_PATH_PARAM := "/sys/module/brcmfmac/parameters/alternative_fw_path"
++
++BOARD_USE_SENSOR_FUSION := true
++
++# we don't support sparse image.
++TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
++
++BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
++
++# BCM 1MW BT
++BOARD_HAVE_BLUETOOTH_BCM := true
++
++BOARD_HAVE_USB_CAMERA := true
++
++USE_ION_ALLOCATOR := true
++USE_GPU_ALLOCATOR := false
++
++BOARD_AVB_ENABLE := true
++BOARD_AVB_ALGORITHM := SHA256_RSA4096
++# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++TARGET_USES_MKE2FS := true
++
++# define frame buffer count
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++
++CMASIZE=800M
++
++ifeq ($(LOW_MEMORY),true)
++BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardware=freescale cma=320M@0x400M-0xb80M androidboot.primary_display=imx-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7 androidboot.displaymode=720p galcore.contiguousSize=33554432
++else
++BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardware=freescale cma=$(CMASIZE)@0x400M-0xb80M androidboot.primary_display=imx-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7
++endif
++
++# Set the density to 213 tvdpi to match CDD.
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=213
++
++# Default wificountrycode
++BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
++
++ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
++ifeq ($(TARGET_USERIMAGES_USE_EXT4),true)
++$(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open in same time, please only choose one target file system image")
++endif
++endif
++
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a100/dtbo-imx8mn.img
++
++ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk-no-product.dtb
++else
++# imx8mn with MIPI-HDMI display, BCM wifi and support trusty
++TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk.dtb
++# imx8mn with MIPI panel display and BCM wifi
++TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:fsl-imx8mn-ddr4-evk-rm67191.dtb
++# imx8mn with MIPI-HDMI display and BCM wifi and M7 image
++TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:fsl-imx8mn-ddr4-evk-rpmsg.dtb
++endif
++
++BOARD_SEPOLICY_DIRS := \
++       device/idtech/imx8m/sepolicy \
++       $(IMX_DEVICE_PATH)/sepolicy
++
++TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
++
++ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
++
+diff --git a/imx8m/evk_a100/evk_8mn.mk b/imx8m/evk_a100/evk_8mn.mk
+deleted file mode 120000
+index ba2ff7a7..00000000
+--- a/imx8m/evk_a100/evk_8mn.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/evk_8mn.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/evk_a100.mk b/imx8m/evk_a100/evk_a100.mk
+new file mode 100644
+index 00000000..6b548477
+--- /dev/null
++++ b/imx8m/evk_a100/evk_a100.mk
+@@ -0,0 +1,281 @@
++# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
++# It will inherit from FSL core product which in turn inherit from Google generic
++
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a100
++
++# configs shared between uboot, kernel and Android rootfs
++include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
++
++-include device/idtech/common/imx_path/ImxPathConfig.mk
++$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
++
++ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
++$(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
++endif
++
++# Overrides
++PRODUCT_NAME := evk_a100
++PRODUCT_DEVICE := evk_a100
++PRODUCT_MODEL := EVK_A100
++
++PRODUCT_FULL_TREBLE_OVERRIDE := true
++
++#Enable this to choose 32 bit user space build
++#IMX8_BUILD_32BIT_ROOTFS := true
++
++#Enable this to config 1GB ddr on evk_a100
++#LOW_MEMORY := true
++
++# Include keystore attestation keys and certificates.
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++-include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
++endif
++
++# Include Android Go config for low memory device.
++ifeq ($(LOW_MEMORY),true)
++$(call inherit-product, build/target/product/go_defaults.mk)
++endif
++
++# Copy device related config and binary to board
++PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/mcu-sdk/imx8mn/imx8mn_mcu_demo.img:imx8mn_mcu_demo.img \
++    $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml \
++    $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++    $(IMX_DEVICE_PATH)/usb_audio_policy_configuration-direct-output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration-direct-output.xml \
++    $(IMX_DEVICE_PATH)/fstab.freescale:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.freescale \
++    $(IMX_DEVICE_PATH)/init.imx8mn.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mn.rc \
++    $(IMX_DEVICE_PATH)/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg \
++    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.rc \
++    $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.usb.rc \
++    $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
++    $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
++    $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_COPY_FILES += \
++    device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    device/idtech/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++endif
++
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a100/camera_config_imx8mn.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mn.json
++
++# ONLY devices that meet the CDD's requirements may declare these features
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
++    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
++    frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
++    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
++    frameworks/native/data/etc/android.hardware.ethernet.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.ethernet.xml \
++    frameworks/native/data/etc/android.hardware.screen.landscape.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.landscape.xml \
++    frameworks/native/data/etc/android.hardware.screen.portrait.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.portrait.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.xml \
++    frameworks/native/data/etc/android.hardware.usb.accessory.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.accessory.xml \
++    frameworks/native/data/etc/android.hardware.usb.host.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.host.xml \
++    frameworks/native/data/etc/android.hardware.vulkan.level-0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.level-0.xml \
++    frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
++    frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
++    frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
++    frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
++    frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
++    frameworks/native/data/etc/android.software.managed_users.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.managed_users.xml \
++    frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml \
++    frameworks/native/data/etc/android.software.sip.voip.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.sip.voip.xml \
++    frameworks/native/data/etc/android.software.verified_boot.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.verified_boot.xml \
++    frameworks/native/data/etc/android.software.voice_recognizers.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.voice_recognizers.xml \
++    frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
++    frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
++
++# Vendor seccomp policy files for media components:
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/seccomp/mediacodec-seccomp.policy:vendor/etc/seccomp_policy/mediacodec.policy \
++    $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
++
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a100/powerhint_imx8mn.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mn.json
++
++# fastboot_imx_flashall scripts, fsl-sdcard-partition script uuu_imx_android_flash scripts
++PRODUCT_COPY_FILES += \
++    device/idtech/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    device/idtech/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    device/idtech/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
++    device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++
++# Copy media_codecs.xml for 1GB evk_a100 board
++ifeq ($(LOW_MEMORY),true)
++PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/imx8mn/media_codecs_no_vpu.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs.xml
++endif
++
++USE_XML_AUDIO_POLICY_CONF := 1
++
++DEVICE_PACKAGE_OVERLAYS := $(IMX_DEVICE_PATH)/overlay
++
++PRODUCT_CHARACTERISTICS := tablet
++
++PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi
++
++# GPU openCL g2d
++PRODUCT_COPY_FILES += \
++    $(IMX_PATH)/imx/opencl-2d/cl_g2d.cl:$(TARGET_COPY_OUT_VENDOR)/etc/cl_g2d.cl
++
++# HWC2 HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.composer@2.3-service
++
++# Gralloc HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.mapper@2.0-impl-2.1 \
++    android.hardware.graphics.allocator@2.0-impl \
++    android.hardware.graphics.allocator@2.0-service
++
++# RenderScript HAL
++PRODUCT_PACKAGES += \
++    android.hardware.renderscript@1.0-impl
++
++PRODUCT_PACKAGES += \
++    libEGL_VIVANTE \
++    libGLESv1_CM_VIVANTE \
++    libGLESv2_VIVANTE \
++    gralloc_viv.imx8 \
++    libGAL \
++    libGLSLC \
++    libVSC \
++    libgpuhelper \
++    libSPIRV_viv \
++    libvulkan_VIVANTE \
++    vulkan.imx8 \
++    libCLC \
++    libLLVM_viv \
++    libOpenCL \
++    libg2d-opencl \
++    libg2d-viv \
++    gatekeeper.imx8
++
++PRODUCT_PACKAGES += \
++    android.hardware.audio@5.0-impl:32 \
++    android.hardware.audio@2.0-service \
++    android.hardware.audio.effect@5.0-impl:32 \
++    android.hardware.power@1.3-service.imx \
++    android.hardware.light@2.0-impl \
++    android.hardware.light@2.0-service \
++    android.hardware.configstore@1.1-service \
++    configstore@1.1.policy
++
++# Thermal HAL
++PRODUCT_PACKAGES += \
++    android.hardware.thermal@2.0-service.imx
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a100/thermal_info_config_imx8mn.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mn.json
++
++# Usb HAL
++PRODUCT_PACKAGES += \
++    android.hardware.usb@1.1-service.imx
++
++# Bluetooth HAL
++PRODUCT_PACKAGES += \
++    android.hardware.bluetooth@1.0-impl \
++    android.hardware.bluetooth@1.0-service
++
++# BCM Bluetooth vendor config
++PRODUCT_PACKAGES += \
++    bt_vendor.conf
++
++# BCM 1MW Bluetooth Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/BCM4345C0.1MW.hcd:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/CYW4345C0.1MW.hcd
++
++# WiFi HAL
++PRODUCT_PACKAGES += \
++    android.hardware.wifi@1.0-service \
++    wifilogd \
++    wificond
++
++# BCM 1MW Wifi Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.bin \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.clm_blob \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.txt
++
++# Keymaster HAL
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.keymaster@3.0-service.trusty
++endif
++
++PRODUCT_PACKAGES += \
++    android.hardware.keymaster@3.0-impl \
++    android.hardware.keymaster@3.0-service
++
++# DRM HAL
++TARGET_ENABLE_MEDIADRM_64 := true
++PRODUCT_PACKAGES += \
++    android.hardware.drm@1.0-impl \
++    android.hardware.drm@1.0-service
++
++# new gatekeeper HAL
++PRODUCT_PACKAGES += \
++    android.hardware.gatekeeper@1.0-impl \
++    android.hardware.gatekeeper@1.0-service
++
++ifneq ($(BUILD_TARGET_FS),ubifs)
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.internel.storage_size=/sys/block/mmcblk2/size \
++    ro.frp.pst=/dev/block/by-name/presistdata
++endif
++
++# ro.product.first_api_level indicates the first api level the device has commercially launched on.
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.product.first_api_level=28
++
++PRODUCT_PACKAGES += \
++    libg1 \
++    libhantro \
++    libcodec \
++    libhantro_h1 \
++    libcodec_enc \
++    DirectAudioPlayer
++
++# Add oem unlocking option in settings.
++PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
++PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
++
++# Add Trusty OS backed gatekeeper and secure storage proxy
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    gatekeeper.trusty \
++    storageproxyd
++endif
++
++#Dumpstate HAL 1.0 support
++PRODUCT_PACKAGES += \
++    android.hardware.dumpstate@1.0-service.imx
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++#Oemlock HAL 1.0 support
++PRODUCT_PACKAGES += \
++    android.hardware.oemlock@1.0-service.imx
++endif
++
++# Specify rollback index for bootloader and for AVB
++ifneq ($(AVB_RBINDEX),)
++BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)
++else
++BOARD_AVB_ROLLBACK_INDEX := 0
++endif
++
++ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
++$(call inherit-product, $(SRC_TARGET_DIR)/product/gsi_keys.mk)
++PRODUCT_PACKAGES += \
++    adb_debug.prop
++endif
++
++IMX-DEFAULT-G2D-LIB := libg2d-opencl
+diff --git a/imx8m/evk_a100/init.rc b/imx8m/evk_a100/init.rc
+deleted file mode 120000
+index 55661b16..00000000
+--- a/imx8m/evk_a100/init.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/init.rc b/imx8m/evk_a100/init.rc
+new file mode 100644
+index 00000000..a9cfce46
+--- /dev/null
++++ b/imx8m/evk_a100/init.rc
+@@ -0,0 +1,280 @@
++import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
++import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++
++on early-init
++    # mount the debugfs
++    mount debugfs none /sys/kernel/debug/ mode=0755
++
++on early-init
++    start early_init_sh
++
++    # Due keymaster start very early so set prop here
++    # Also gatekeeper share same role for keymaster
++    setprop ro.hardware.keystore ${ro.boot.keystore}
++    setprop ro.hardware.gatekeeper ${ro.boot.keystore}
++    setprop vendor.storageproxyd ${ro.boot.keystore}
++
++on init
++    start watchdogd
++
++    # Support legacy paths
++    symlink /sdcard /mnt/sdcard
++    symlink /sdcard /storage/sdcard0
++
++    # setup the global environment
++    export CORE_REGISTER_FILE /vendor/etc/core_register
++    export COMPONENT_REGISTER_FILE /vendor/etc/component_register
++    export CONTENTPIPE_REGISTER_FILE /vendor/etc/contentpipe_register
++
++    # disable cursor blink for fbcon, if no splash screen support
++    write /sys/class/graphics/fbcon/cursor_blink 0
++
++    # deattch the fbcon as hdmi hotplug conflict with fbcon
++    write /sys/class/vtconsole/vtcon1/bind 0
++
++    chown system system /dev/stune/top-app/schedtune.boost
++    chmod 664 /dev/stune/top-app/schedtune.boost
++    chown system system /dev/stune/top-app/schedtune.prefer_idle
++    chmod 664 /dev/stune/top-app/schedtune.prefer_idle
++    chown system system /dev/stune/foreground/schedtune.boost
++    chmod 664 /dev/stune/foreground/schedtune.boost
++    chown system system /dev/stune/foreground/schedtune.prefer_idle
++    chmod 664 /dev/stune/foreground/schedtune.prefer_idle
++    chown system system /dev/stune/schedtune.boost
++    chmod 664 /dev/stune/schedtune.boost
++
++    # set default schedTune value for foreground/top-app (only affects EAS)
++    write /dev/stune/foreground/schedtune.boost 10
++    write /dev/stune/foreground/schedtune.prefer_idle 1
++    write /dev/stune/top-app/schedtune.boost 40
++    write /dev/stune/top-app/schedtune.prefer_idle 1
++    write /dev/stune/rt/schedtune.boost 50
++    write /dev/stune/rt/schedtune.prefer_idle 1
++
++on late-fs
++    # Start keymaster service
++    start vendor.keymaster-3-0-${ro.boot.keystore}
++    setprop vendor.powerhal.init 1
++
++on late-fs && property:vendor.storageproxyd=trusty
++    start vendor.oemlock-1-0
++
++on early-boot
++    # For evk_8mn, when swap used about 400M, upgrade the level.
++    setprop ro.lmk.upgrade_pressure 80
++    setprop ro.lmk.downgrade_pressure 95
++    setprop ro.lmk.critical_upgrade true
++
++    # Set the host name which used in console
++    export HOSTNAME evk_a100
++
++    # Set permission for IIM node
++    symlink /dev/mxs_viim /dev/mxc_mem
++
++    # Enable Tethering in the Settings
++    setprop ro.tether.denied false
++
++    setprop hwc.stretch.filter  1
++
++    # fsl omx graphic manager media framework property
++    setprop rw.VIDEO_RENDER_NAME video_render.surface
++    setprop media.fsl_codec.flag 7
++    setprop debug.stagefright.ccodec 0
++
++    setprop camera.disable_zsl_mode 1
++
++    #Enable GPU 2D do CSC on imx8mn platform
++    setprop vendor.camera.2d.enable true
++
++   # Tweak the mmc device read ahead buffer size
++    write /sys/block/mmcblk1/queue/read_ahead_kb 2048
++    write /sys/block/mmcblk2/queue/read_ahead_kb 2048
++
++    # Set period_us for usb audio
++    setprop ro.audio.usb.period_us 20000
++
++    # Wifi firmware reload path
++    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
++
++    # Prepare for wifi
++    setprop wifi.interface wlan0
++    setprop wifi.direct.interface p2p-dev-wlan0
++
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
++
++    setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
++
++    # Use ro.boot.lcd_density to override ro.sf.lcd_density
++    setprop ro.sf.lcd_density ${ro.boot.lcd_density}
++
++    # prepare for ril
++    setprop ro.ril.wake_lock_timeout 300
++
++    # Set tracefs permission to 755
++    chmod 0755 /sys/kernel/debug/tracing
++
++    # Set sw_sync group to graphics and set permission to 664
++    chown root graphics /sys/kernel/debug/sync/sw_sync
++    chmod 0664 /sys/kernel/debug/sync/sw_sync
++
++    # Default backlight device
++    setprop hw.backlight.dev "32e10000.mipi_dsi.0"
++    # Chmod/chown FSL specific sys entry
++    chown system system /sys/class/backlight/32e10000.mipi_dsi.0/brightness
++    chmod 0660 /sys/class/backlight/32e10000.mipi_dsi.0/brightness
++
++    # Set light sensor sysfs path and light sensor threshold lux value
++    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
++    setprop ro.lightsensor.threshold  20
++
++    # Dectect DSF streams when scanning media
++    setprop ro.FSL_DSF_PARSER 1
++
++    # Allow DSD file(duration larger than 10s) can play
++    setprop audio.offload.min.duration.secs 10
++
++    # Enlarge limition of audio buffer allocation
++    setprop ro.af.client_heap_size_kbyte 32768
++
++    # enlarge media max memory size to 3G.
++    setprop ro.media.maxmem 3221225471
++
++    start vendor.wifi_hal_legacy
++
++service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
++    -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
++    -g@android:wpa_wlan0
++    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
++    class main
++    socket wpa_wlan0 dgram 660 wifi wifi
++    disabled
++    oneshot
++
++service sensor_fusion /vendor/bin/fsl_sensor_fusion
++    class late_start
++    seclabel u:r:sensors:s0
++    user system
++    group input
++    oneshot
++
++# Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
++service watchdogd /sbin/watchdogd 10 20
++    class core
++    seclabel u:r:watchdogd:s0
++
++service dhcpcd_wlan0 /system/bin/dhcpcd -aABDKL
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_p2p /system/bin/dhcpcd -aABKL
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_eth0 /system/bin/dhcpcd -ABKL eth0
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_bt-pan /system/bin/dhcpcd -ABKL
++    class main
++    disabled
++    oneshot
++
++service iprenew_wlan0 /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++service iprenew_p2p /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++service iprenew_eth0 /system/bin/dhcpcd -n eth0
++    class main
++    disabled
++    oneshot
++
++service iprenew_bt-pan /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++# bugreport is triggered by holding down volume down, volume up and power
++service bugreport /system/bin/dumpstate -d -p -B -z \
++        -o /data/user_de/0/com.android.shell/files/bugreports/bugreport
++    class main
++    disabled
++    oneshot
++    keycodes 114 115 116
++
++on boot
++    start audioserver
++    start mediadrm
++    start media
++    start drm
++
++on fs
++# mount ext4 partitions
++    mount_all /vendor/etc/fstab.freescale
++
++    # Adjust parameters for dm-verity device
++    write /sys/block/dm-0/queue/read_ahead_kb 4096
++
++    # Update dm-verity state and set partition.*.verified properties
++    verity_update_state
++
++on verity-logging
++    exec u:r:slideshow:s0 -- /sbin/slideshow warning/verity_red_1 warning/verity_red_2
++
++on post-fs
++    # Set netd memlock rlimit to 8MB
++    setrlimit 8 8388608 8388608
++
++    # Turn on swap
++    swapon_all /vendor/etc/fstab.freescale
++
++    # Swap in only 1 page at a time
++    write /proc/sys/vm/page-cluster 0
++
++on post-fs-data
++    setprop vold.post_fs_data_done 1
++    # create temp node for secure storage proxy
++    mkdir /data/vendor/ss 0700 system system
++
++    # tmp dir for opencl Compiler
++    setprop TMPDIR /data/vendor/.opencl-cache
++    mkdir /data/vendor/.opencl-cache 0771 camera camera
++
++on zygote-start
++    # Create the directories used by the Wireless subsystem
++    mkdir /data/misc/wifi 0770 wifi wifi
++    mkdir /data/misc/wifi/wpa_supplicant 0770 wifi wifi
++    mkdir /data/vendor/wifi 0771 wifi wifi
++    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
++    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
++    mkdir /data/misc/dhcp 0770 dhcp dhcp
++    chown dhcp dhcp /data/misc/dhcp
++
++service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg sys.all.early_init.ready
++    class main
++    user root
++    group root system
++    disabled
++    oneshot
++
++on property:sys.boot_completed=1 && property:vendor.storageproxyd=trusty
++    start storageproxyd
++
++service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk2rpmb -d /dev/trusty-ipc-dev0
++   group system
++
++on property:ro.boot.vendor.sysrq=1
++    write /proc/sys/kernel/sysrq 1
+diff --git a/imx8m/evk_a100/init.usb.rc b/imx8m/evk_a100/init.usb.rc
+deleted file mode 120000
+index 963ccb5c..00000000
+--- a/imx8m/evk_a100/init.usb.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.usb.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/init.usb.rc b/imx8m/evk_a100/init.usb.rc
+new file mode 100644
+index 00000000..12fe7841
+--- /dev/null
++++ b/imx8m/evk_a100/init.usb.rc
+@@ -0,0 +1,52 @@
++#
++# Copyright (C) 2016 The Android Open-Source Project
++# Copyright 2018 NXP
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++
++on early-boot
++    mount configfs none /config
++    mkdir /config/usb_gadget/g1 0770
++    mkdir /config/usb_gadget/g1/strings/0x409 0770
++    write /config/usb_gadget/g1/bcdUSB 0x0200
++    write /config/usb_gadget/g1/idVendor 0x18d1
++    write /config/usb_gadget/g1/bcdDevice 0x0440
++    write /config/usb_gadget/g1/strings/0x409/serialnumber ${ro.serialno}
++    write /config/usb_gadget/g1/strings/0x409/manufacturer ${ro.product.manufacturer}
++    write /config/usb_gadget/g1/strings/0x409/product ${ro.product.model}
++    mkdir /config/usb_gadget/g1/functions/mass_storage.0
++    mkdir /config/usb_gadget/g1/functions/accessory.gs2
++    mkdir /config/usb_gadget/g1/functions/audio_source.gs3
++    mkdir /config/usb_gadget/g1/functions/rndis.gs4
++    mkdir /config/usb_gadget/g1/functions/midi.gs5
++    mkdir /config/usb_gadget/g1/functions/ffs.adb
++    mkdir /config/usb_gadget/g1/functions/ffs.mtp
++    mkdir /config/usb_gadget/g1/functions/ffs.ptp
++    mkdir /config/usb_gadget/g1/configs/b.1 0770
++    mkdir /config/usb_gadget/g1/configs/b.1/strings/0x409 0770
++    write /config/usb_gadget/g1/os_desc/b_vendor_code 0x1
++    write /config/usb_gadget/g1/os_desc/qw_sign "MSFT100"
++    mkdir /dev/usb-ffs 0775 shell shell
++    mkdir /dev/usb-ffs/adb 0770 shell shell
++    mount functionfs adb /dev/usb-ffs/adb rmode=0770,fmode=0660,uid=2000,gid=2000
++    mkdir /dev/usb-ffs/mtp 0770 mtp mtp
++    mkdir /dev/usb-ffs/ptp 0770 mtp mtp
++    mount functionfs mtp /dev/usb-ffs/mtp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
++    mount functionfs ptp /dev/usb-ffs/ptp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
++    setprop sys.usb.mtp.device_type 3
++    setprop vendor.usb.config "38100000.usb"
++    write /sys/module/libcomposite/parameters/disable_l1_for_hs "y"
++    symlink /config/usb_gadget/g1/configs/b.1 /config/usb_gadget/g1/os_desc/b.1
++
++on boot
++    setprop sys.usb.configfs 2
+diff --git a/imx8m/evk_a300/AndroidBoard.mk b/imx8m/evk_a300/AndroidBoard.mk
+deleted file mode 120000
+index ad73751c..00000000
+--- a/imx8m/evk_a300/AndroidBoard.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/AndroidBoard.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/AndroidBoard.mk b/imx8m/evk_a300/AndroidBoard.mk
+new file mode 100644
+index 00000000..84e328fe
+--- /dev/null
++++ b/imx8m/evk_a300/AndroidBoard.mk
+@@ -0,0 +1,7 @@
++LOCAL_PATH := $(call my-dir)
++
++include device/idtech/common/build/dtbo.mk
++include device/idtech/common/build/imx-recovery.mk
++include device/idtech/common/build/gpt.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a300/AndroidTee.mk b/imx8m/evk_a300/AndroidTee.mk
+deleted file mode 120000
+index 0ff11c87..00000000
+--- a/imx8m/evk_a300/AndroidTee.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/AndroidTee.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/AndroidTee.mk b/imx8m/evk_a300/AndroidTee.mk
+new file mode 100644
+index 00000000..632f4b3f
+--- /dev/null
++++ b/imx8m/evk_a300/AndroidTee.mk
+@@ -0,0 +1,13 @@
++# uboot.imx in android combine scfw.bin and uboot.bin
++MAKE += SHELL=/bin/bash
++
++define build_uboot_w_tee
++	$(MAKE) -C bootable/bootloader/arm-trusted-firmware/ -B CROSS_COMPILE=aarch64-linux-android- PLAT=imx8mq V=1 SPD=opteed DECRYPTED_BUFFER_START=$(DECRYPTED_BUFFER_START) DECRYPTED_BUFFER_LEN=$(DECRYPTED_BUFFER_LEN) DECODED_BUFFER_START=$(DECODED_BUFFER_START) DECODED_BUFFER_LEN=$(DECODED_BUFFER_LEN) bl31; \
++	cp bootable/bootloader/arm-trusted-firmware/build/imx8mq/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.;\
++	aarch64-linux-android-objcopy -O binary out/target/product/evk_a300/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
++	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M  flash_hdmi_spl_uboot; \
++	cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(PRODUCT_OUT)/u-boot-$(strip $(2)).imx;
++endef
++
++
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+deleted file mode 120000
+index 96f690dd..00000000
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/BoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+new file mode 100644
+index 00000000..084c5962
+--- /dev/null
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -0,0 +1,150 @@
++#
++# SoC-specific compile-time definitions.
++#
++
++BOARD_SOC_TYPE := IMX8MQ
++BOARD_TYPE := EVK_A300
++BOARD_HAVE_VPU := true
++BOARD_VPU_TYPE := hantro
++HAVE_FSL_IMX_GPU2D := false
++HAVE_FSL_IMX_GPU3D := true
++HAVE_FSL_IMX_IPU := false
++HAVE_FSL_IMX_PXP := false
++BOARD_KERNEL_BASE := 0x40400000
++TARGET_GRALLOC_VERSION := v3
++TARGET_HIGH_PERFORMANCE := true
++TARGET_USES_HWC2 := true
++TARGET_HWCOMPOSER_VERSION := v2.0
++USE_OPENGL_RENDERER := true
++TARGET_HAVE_VULKAN := true
++ENABLE_CFI=false
++
++SOONG_CONFIG_IMXPLUGIN += \
++                          BOARD_HAVE_VPU \
++                          BOARD_VPU_TYPE
++
++SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MQ
++SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = true
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
++
++#
++# Product-specific compile-time definitions.
++#
++
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a300
++
++include device/idtech/imx8m/BoardConfigCommon.mk
++ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
++-include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
++endif
++
++BUILD_TARGET_FS ?= ext4
++TARGET_USERIMAGES_USE_EXT4 := true
++
++TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
++
++# Support gpt
++<<<<<<< HEAD:imx8m/evk_8mq/BoardConfig.mk
++ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++else
++BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab.bpt
++ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++endif
++
++
++# Vendor Interface manifest and compatibility
++DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
++
++TARGET_BOOTLOADER_BOARD_NAME := EVK
++
++USE_OPENGL_RENDERER := true
++
++BOARD_WLAN_DEVICE            := bcmdhd
++WPA_SUPPLICANT_VERSION       := VER_0_8_X
++BOARD_WPA_SUPPLICANT_DRIVER  := NL80211
++BOARD_HOSTAPD_DRIVER         := NL80211
++BOARD_HOSTAPD_PRIVATE_LIB           := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++BOARD_WPA_SUPPLICANT_PRIVATE_LIB    := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++
++WIFI_DRIVER_FW_PATH_PARAM := "/sys/module/brcmfmac/parameters/alternative_fw_path"
++
++#WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
++
++BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
++
++# BCM 1CX BT
++BOARD_HAVE_BLUETOOTH_BCM := true
++
++BOARD_USE_SENSOR_FUSION := true
++
++# we don't support sparse image.
++TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
++
++BOARD_HAVE_USB_CAMERA := true
++
++USE_ION_ALLOCATOR := true
++USE_GPU_ALLOCATOR := false
++
++BOARD_AVB_ENABLE := true
++TARGET_USES_MKE2FS := true
++BOARD_AVB_ALGORITHM := SHA256_RSA4096
++# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++
++# define frame buffer count
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++
++ifeq ($(PRODUCT_IMX_DRM),true)
++CMASIZE=736M
++else
++CMASIZE=1280M
++endif
++
++BOARD_KERNEL_CMDLINE := init=/init androidboot.gui_resolution=1080p androidboot.console=ttymxc0 androidboot.hardware=freescale androidboot.fbTileSupport=enable cma=$(CMASIZE) androidboot.primary_display=imx-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7
++
++# Set the density to 213 tvdpi to match CDD.
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=213
++
++# Default wificountrycode
++BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
++
++ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
++ifeq ($(TARGET_USERIMAGES_USE_EXT4),true)
++$(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open in same time, please only choose one target file system image")
++endif
++endif
++
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a300/dtbo-imx8mq.img
++ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk-no-product.dtb
++else
++# imx8mq with HDMI display
++TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk.dtb
++# imx8mq with MIPI-HDMI display
++TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb
++# imx8mq with HDMI and MIPI-HDMI display
++TARGET_BOARD_DTS_CONFIG += imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
++# imx8mq with MIPI panel display
++TARGET_BOARD_DTS_CONFIG += imx8mq-mipi-panel:fsl-imx8mq-evk-dcss-rm67191.dtb
++endif
++
++BOARD_SEPOLICY_DIRS := \
++       device/idtech/imx8m/sepolicy \
++       $(IMX_DEVICE_PATH)/sepolicy
++
++ifeq ($(PRODUCT_IMX_DRM),true)
++BOARD_SEPOLICY_DIRS += \
++       $(IMX_DEVICE_PATH)/sepolicy_drm
++endif
++
++TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
++
++ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
++
+diff --git a/imx8m/evk_a300/UbootKernelBoardConfig.mk b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+deleted file mode 120000
+index dc760fdb..00000000
+--- a/imx8m/evk_a300/UbootKernelBoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/UbootKernelBoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/UbootKernelBoardConfig.mk b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+new file mode 100644
+index 00000000..887f16a7
+--- /dev/null
++++ b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+@@ -0,0 +1,25 @@
++TARGET_BOOTLOADER_POSTFIX := bin
++UBOOT_POST_PROCESS := true
++
++# u-boot target for imx8mq_evk
++TARGET_BOOTLOADER_CONFIG := imx8mq:imx8mq_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-dual:imx8mq_evk_android_dual_defconfig
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty:imx8mq_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-secure-unlock:imx8mq_evk_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-dual:imx8mq_evk_android_trusty_dual_defconfig
++endif
++
++# u-boot target used by uuu for imx8mq_evk
++TARGET_BOOTLOADER_CONFIG += imx8mq-evk-uuu:imx8mq_evk_android_uuu_defconfig
++
++TARGET_KERNEL_DEFCONFIG := android_defconfig
++# TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
++
++
++# absolute path is used, not the same as relative path used in AOSP make
++TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
++
++# define bootloader rollback index
++BOOTLOADER_RBINDEX ?= 0
++
+diff --git a/imx8m/evk_a300/evk_8mq.mk b/imx8m/evk_a300/evk_8mq.mk
+deleted file mode 120000
+index bca14368..00000000
+--- a/imx8m/evk_a300/evk_8mq.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/evk_8mq.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/evk_8mq_drm.mk b/imx8m/evk_a300/evk_8mq_drm.mk
+deleted file mode 120000
+index 679fd410..00000000
+--- a/imx8m/evk_a300/evk_8mq_drm.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/evk_8mq_drm.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+new file mode 100644
+index 00000000..66ba6c88
+--- /dev/null
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -0,0 +1,309 @@
++# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
++# It will inherit from FSL core product which in turn inherit from Google generic
++
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a300
++
++# configs shared between uboot, kernel and Android rootfs
++include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
++
++-include device/idtech/common/imx_path/ImxPathConfig.mk
++$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
++
++ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab_nand.freescale),)
++$(shell touch $(IMX_DEVICE_PATH)/fstab_nand.freescale)
++endif
++
++ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
++$(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
++endif
++
++# Overrides
++PRODUCT_NAME := evk_a300
++PRODUCT_DEVICE := evk_a300
++PRODUCT_MODEL := EVK_A300
++
++PRODUCT_FULL_TREBLE_OVERRIDE := true
++
++#Enable this to choose 32 bit user space build
++#IMX8_BUILD_32BIT_ROOTFS := true
++
++# Include keystore attestation keys and certificates.
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++-include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
++endif
++
++# Copy device related config and binary to board
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml \
++    $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++    $(IMX_DEVICE_PATH)/input-port-associations.xml:$(TARGET_COPY_OUT_VENDOR)/etc/input-port-associations.xml \
++    $(IMX_DEVICE_PATH)/fstab.freescale:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.freescale \
++    $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mq.rc \
++    $(IMX_DEVICE_PATH)/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg \
++    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.rc \
++    $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.usb.rc \
++    $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
++    $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
++    $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_COPY_FILES += \
++    device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    device/idtech/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++endif
++
++# ONLY devices that meet the CDD's requirements may declare these features
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
++    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
++    frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
++    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
++    frameworks/native/data/etc/android.hardware.ethernet.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.ethernet.xml \
++    frameworks/native/data/etc/android.hardware.screen.landscape.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.landscape.xml \
++    frameworks/native/data/etc/android.hardware.screen.portrait.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.portrait.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.xml \
++    frameworks/native/data/etc/android.hardware.usb.accessory.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.accessory.xml \
++    frameworks/native/data/etc/android.hardware.usb.host.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.host.xml \
++    frameworks/native/data/etc/android.hardware.vulkan.level-0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.level-0.xml \
++    frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
++    frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
++    frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
++    frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
++    frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
++    frameworks/native/data/etc/android.software.managed_users.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.managed_users.xml \
++    frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml \
++    frameworks/native/data/etc/android.software.sip.voip.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.sip.voip.xml \
++    frameworks/native/data/etc/android.software.verified_boot.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.verified_boot.xml \
++    frameworks/native/data/etc/android.software.voice_recognizers.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.voice_recognizers.xml \
++    frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
++    frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
++
++# Vendor seccomp policy files for media components:
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/seccomp/mediacodec-seccomp.policy:vendor/etc/seccomp_policy/mediacodec.policy \
++    $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
++
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a300/powerhint_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mq.json
++
++# fastboot_imx_flashall scripts, fsl-sdcard-partition script and uuu_imx_android_flash scripts
++PRODUCT_COPY_FILES += \
++    device/idtech/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    device/idtech/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    device/idtech/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
++    device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++
++USE_XML_AUDIO_POLICY_CONF := 1
++
++DEVICE_PACKAGE_OVERLAYS := $(IMX_DEVICE_PATH)/overlay
++
++PRODUCT_CHARACTERISTICS := tablet
++
++PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi
++
++# GPU openCL g2d
++PRODUCT_COPY_FILES += \
++    $(IMX_PATH)/imx/opencl-2d/cl_g2d.cl:$(TARGET_COPY_OUT_VENDOR)/etc/cl_g2d.cl
++
++# GPU openCL SDK header file
++-include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/include/CL/cl_sdk.mk
++
++# GPU openVX SDK header file
++-include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/include/nnxc_kernels/nnxc_kernels.mk
++
++# GPU openCL icdloader config file
++-include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/gpu-viv/icdloader/icdloader.mk
++
++# HWC2 HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.composer@2.3-service
++
++# Gralloc HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.mapper@2.0-impl-2.1 \
++    android.hardware.graphics.allocator@2.0-impl \
++    android.hardware.graphics.allocator@2.0-service
++
++# RenderScript HAL
++PRODUCT_PACKAGES += \
++    android.hardware.renderscript@1.0-impl
++
++PRODUCT_PACKAGES += \
++        libEGL_VIVANTE \
++        libGLESv1_CM_VIVANTE \
++        libGLESv2_VIVANTE \
++        gralloc_viv.imx8 \
++        libGAL \
++        libGLSLC \
++        libVSC \
++        libgpuhelper \
++        libSPIRV_viv \
++        libvulkan_VIVANTE \
++        vulkan.imx8 \
++        libCLC \
++        libLLVM_viv \
++        libOpenCL \
++        libg2d-opencl \
++        libg2d-viv \
++        libOpenVX \
++        libOpenVXU \
++        libNNVXCBinary-evis \
++        libNNVXCBinary-lite \
++        libOvx12VXCBinary-evis \
++        libOvx12VXCBinary-lite \
++        libNNGPUBinary-evis \
++        libNNGPUBinary-lite \
++        gatekeeper.imx8
++
++PRODUCT_PACKAGES += \
++    android.hardware.audio@5.0-impl:32 \
++    android.hardware.audio@2.0-service \
++    android.hardware.audio.effect@5.0-impl:32 \
++    android.hardware.power@1.3-service.imx \
++    android.hardware.light@2.0-impl \
++    android.hardware.light@2.0-service \
++    android.hardware.configstore@1.1-service \
++    configstore@1.1.policy
++
++# Thermal HAL
++PRODUCT_PACKAGES += \
++    android.hardware.thermal@2.0-service.imx
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a300/thermal_info_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mq.json
++
++# Neural Network HAL and lib
++PRODUCT_PACKAGES += \
++    libovxlib \
++    libnnrt \
++    android.hardware.neuralnetworks@1.2-service-vsi-npu-server
++
++# Usb HAL
++PRODUCT_PACKAGES += \
++    android.hardware.usb@1.1-service.imx
++
++# Bluetooth HAL
++PRODUCT_PACKAGES += \
++    android.hardware.bluetooth@1.0-impl \
++    android.hardware.bluetooth@1.0-service
++
++# WiFi HAL
++PRODUCT_PACKAGES += \
++    android.hardware.wifi@1.0-service \
++    wifilogd \
++    wificond
++
++# BCM Bluetooth vendor config
++PRODUCT_PACKAGES += \
++    bt_vendor.conf
++
++# BCM 1CX Bluetooth Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/BCM4354A2.1CX.hcd:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/CYW4354A2.1CX.hcd
++
++# BCM 1CX Wifi Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.bin \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.clm_blob \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.txt
++
++# hardware backed keymaster service
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.keymaster@3.0-service.trusty
++endif
++
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/evk_a300/camera_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mq.json
++
++# Keymaster HAL
++PRODUCT_PACKAGES += \
++    android.hardware.keymaster@3.0-impl \
++    android.hardware.keymaster@3.0-service
++
++# DRM HAL
++TARGET_ENABLE_MEDIADRM_64 := true
++PRODUCT_PACKAGES += \
++    android.hardware.drm@1.0-impl \
++    android.hardware.drm@1.0-service
++
++# new gatekeeper HAL
++PRODUCT_PACKAGES += \
++    android.hardware.gatekeeper@1.0-impl \
++    android.hardware.gatekeeper@1.0-service
++
++# Add Trusty OS backed gatekeeper and secure storage proxy
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    gatekeeper.trusty \
++    storageproxyd
++endif
++
++#Dumpstate HAL 1.0 support
++PRODUCT_PACKAGES += \
++    android.hardware.dumpstate@1.0-service.imx
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++#Oemlock HAL 1.0 support
++PRODUCT_PACKAGES += \
++    android.hardware.oemlock@1.0-service.imx
++endif
++
++ifneq ($(BUILD_TARGET_FS),ubifs)
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.internel.storage_size=/sys/block/mmcblk0/size \
++    ro.frp.pst=/dev/block/by-name/presistdata
++endif
++
++# ro.product.first_api_level indicates the first api level the device has commercially launched on.
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.product.first_api_level=28
++
++PRODUCT_PACKAGES += \
++    libg1 \
++    libhantro \
++    libcodec
++
++# Add oem unlocking option in settings.
++PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
++PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
++
++# Tensorflow lite camera demo
++PRODUCT_PACKAGES += \
++                    tflitecamerademo
++
++# Multi-Display launcher
++PRODUCT_PACKAGES += \
++    MultiDisplay
++
++# Specify rollback index for bootloader and for AVB
++ifneq ($(AVB_RBINDEX),)
++BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)
++else
++BOARD_AVB_ROLLBACK_INDEX := 0
++endif
++
++#DRM Widevine 1.2 L3 support
++PRODUCT_PACKAGES += \
++    android.hardware.drm@1.0-impl \
++    android.hardware.drm@1.0-service \
++    android.hardware.drm@1.2-service.widevine \
++    android.hardware.drm@1.2-service.clearkey \
++    libwvdrmcryptoplugin \
++    libwvhidl \
++    libwvdrmengine \
++
++ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
++$(call inherit-product, $(SRC_TARGET_DIR)/product/gsi_keys.mk)
++PRODUCT_PACKAGES += \
++    adb_debug.prop
++endif
++
++IMX-DEFAULT-G2D-LIB := libg2d-viv
+diff --git a/imx8m/evk_a300/evk_a300_drm.mk b/imx8m/evk_a300/evk_a300_drm.mk
+new file mode 100644
+index 00000000..8ec77222
+--- /dev/null
++++ b/imx8m/evk_a300/evk_a300_drm.mk
+@@ -0,0 +1,72 @@
++# This is a FSL Android Reference Design platform based on i.MX8MQ board
++# It will inherit from FSL core product which in turn inherit from Google generic
++
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a300
++
++PRODUCT_IMX_DRM := true
++
++# copy drm specific files before inherit evk_a300.mk, otherwise copy is ignored
++PRODUCT_COPY_FILES += \
++	$(IMX_DEVICE_PATH)/audio_policy_configuration_drm.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++	$(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mq.main.rc \
++	$(IMX_DEVICE_PATH)/init.imx8mq.drm.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mq.rc \
++	$(TOPDIR)device/idtech/imx8m/tee-supplicant.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/tee-supplicant.rc \
++
++
++$(call inherit-product, $(TOPDIR)device/idtech/imx8m/optee-packages.mk)
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/evk_a300.mk)
++
++TARGET_KERNEL_DEFCONFIG := android_defconfig
++
++
++# Overrides
++PRODUCT_NAME := evk_a300_drm
++
++CFG_DRM_SECURE_DATA_PATH ?= y
++CFG_RDC_SECURE_DATA_PATH ?= y
++
++ifeq ($(CFG_DRM_SECURE_DATA_PATH),y)
++CFG_SECURE_DATA_PATH := y
++SOONG_CONFIG_IMXPLUGIN += CFG_SECURE_DATA_PATH
++SOONG_CONFIG_IMXPLUGIN_CFG_SECURE_DATA_PATH = y
++CFG_TEE_SDP_MEM_BASE := 0xcc000000
++CFG_TEE_SDP_MEM_SIZE := 0x02000000
++ifeq ($(CFG_RDC_SECURE_DATA_PATH),y)
++DECRYPTED_BUFFER_START	:= $(CFG_TEE_SDP_MEM_BASE)
++DECRYPTED_BUFFER_LEN	:= $(CFG_TEE_SDP_MEM_SIZE)
++DECODED_BUFFER_START	:= 0xCE000000
++DECODED_BUFFER_LEN		:= 0x30000000
++endif
++endif
++
++TARGET_BOARD_DTS_CONFIG := imx8mq:fsl-imx8mq-evk-drm.dtb imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
++
++# Exoplayer
++PRODUCT_PACKAGES += \
++	exoplayer \
++
++# Playready
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/playready/Samples/devcert.dat:$(TARGET_COPY_OUT_VENDOR)/playready/devcert.dat \
++	vendor/nxp/drm_artifacts/playready/Samples/priv.dat:$(TARGET_COPY_OUT_VENDOR)/playready/priv.dat \
++	vendor/nxp/drm_artifacts/playready/bgroupcert.dat:$(TARGET_COPY_OUT_VENDOR)/playready/bgroupcert.dat \
++	vendor/nxp/drm_artifacts/playready/zgpriv_protected.dat:$(TARGET_COPY_OUT_VENDOR)/playready/zgpriv_protected.dat \
++
++ifneq ($(CFG_BUILD_DRM_FROM_SOURCES),y)
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/playready/ta/82dbae9c-9ce0-47e0-a1cb4048cfdb84aa.ta:$(TARGET_COPY_OUT_VENDOR)/lib/optee_armtz/82dbae9c-9ce0-47e0-a1cb4048cfdb84aa.ta \
++	vendor/nxp/drm_artifacts/playready/libdrmplayreadyplugin.so:$(TARGET_COPY_OUT_VENDOR)/lib64/mediadrm/libdrmplayreadyplugin.so \
++	vendor/nxp/drm_artifacts/playready/optee_playready_test:$(TARGET_COPY_OUT_VENDOR)/bin/optee_playready_test
++endif
++
++ifneq ($(CFG_BUILD_DRM_FROM_SOURCES),y)
++# Widevine
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/widevine/lib/liboemcrypto.so:$(TARGET_COPY_OUT_VENDOR)/lib/liboemcrypto.so \
++	vendor/nxp/drm_artifacts/widevine/lib/libwvdrmengine.so:$(TARGET_COPY_OUT_VENDOR)/lib/mediadrm/libwvdrmengine.so \
++	vendor/nxp/drm_artifacts/widevine/lib/libvtswidevine.so:$(TARGET_COPY_OUT_VENDOR)/lib/drm-vts-test-libs/libvtswidevine.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/liboemcrypto.so:$(TARGET_COPY_OUT_VENDOR)/lib64/liboemcrypto.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/libwvdrmengine.so:$(TARGET_COPY_OUT_VENDOR)/lib64/mediadrm/libwvdrmengine.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/libvtswidevine.so:$(TARGET_COPY_OUT_VENDOR)/lib64/drm-vts-test-libs/libvtswidevine.so \
++	vendor/nxp/drm_artifacts/widevine/ta/706f6574-7765-6469-77656e6942656665.ta:$(TARGET_COPY_OUT_VENDOR)/lib/optee_armtz/706f6574-7765-6469-77656e6942656665.ta
++endif
+diff --git a/imx8m/evk_a300/fstab.freescale b/imx8m/evk_a300/fstab.freescale
+deleted file mode 120000
+index 46c035ef..00000000
+--- a/imx8m/evk_a300/fstab.freescale
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/fstab.freescale
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/fstab.freescale b/imx8m/evk_a300/fstab.freescale
+new file mode 100644
+index 00000000..c7b49b56
+--- /dev/null
++++ b/imx8m/evk_a300/fstab.freescale
+@@ -0,0 +1,11 @@
++# Android fstab file.
++#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
++# The filesystem that contains the filesystem checker binary (typically /system) cannot
++# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
++
++/devices/platform/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
++/dev/block/by-name/system      /      ext4    ro,barrier=1                                                                           wait,slotselect
++/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
++/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
++/dev/block/zram0 none swap defaults zramsize=629145600
++
+diff --git a/imx8m/evk_a300/init.rc b/imx8m/evk_a300/init.rc
+deleted file mode 120000
+index bb665639..00000000
+--- a/imx8m/evk_a300/init.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/init.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/init.rc b/imx8m/evk_a300/init.rc
+new file mode 100644
+index 00000000..98a45187
+--- /dev/null
++++ b/imx8m/evk_a300/init.rc
+@@ -0,0 +1,286 @@
++import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
++import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++
++on early-init
++    # mount the debugfs
++    mount debugfs none /sys/kernel/debug/ mode=0755
++
++on early-init
++    start early_init_sh
++
++    # Due keymaster start very early so set prop here
++    # Also gatekeeper share same role for keymaster
++    setprop ro.hardware.keystore ${ro.boot.keystore}
++    setprop ro.hardware.gatekeeper ${ro.boot.keystore}
++    setprop vendor.storageproxyd ${ro.boot.keystore}
++
++on init
++    start watchdogd
++
++    # Support legacy paths
++    symlink /sdcard /mnt/sdcard
++    symlink /sdcard /storage/sdcard0
++
++    # setup the global environment
++    export CORE_REGISTER_FILE /vendor/etc/core_register
++    export COMPONENT_REGISTER_FILE /vendor/etc/component_register
++    export CONTENTPIPE_REGISTER_FILE /vendor/etc/contentpipe_register
++
++    # disable cursor blink for fbcon, if no splash screen support
++    write /sys/class/graphics/fbcon/cursor_blink 0
++
++    # deattch the fbcon as hdmi hotplug conflict with fbcon
++    write /sys/class/vtconsole/vtcon1/bind 0
++
++    chown system system /dev/stune/top-app/schedtune.boost
++    chmod 664 /dev/stune/top-app/schedtune.boost
++    chown system system /dev/stune/top-app/schedtune.prefer_idle
++    chmod 664 /dev/stune/top-app/schedtune.prefer_idle
++    chown system system /dev/stune/foreground/schedtune.boost
++    chmod 664 /dev/stune/foreground/schedtune.boost
++    chown system system /dev/stune/foreground/schedtune.prefer_idle
++    chmod 664 /dev/stune/foreground/schedtune.prefer_idle
++    chown system system /dev/stune/schedtune.boost
++    chmod 664 /dev/stune/schedtune.boost
++
++    # set default schedTune value for foreground/top-app (only affects EAS)
++    write /dev/stune/foreground/schedtune.boost 10
++    write /dev/stune/foreground/schedtune.prefer_idle 1
++    write /dev/stune/top-app/schedtune.boost 40
++    write /dev/stune/top-app/schedtune.prefer_idle 1
++    write /dev/stune/rt/schedtune.boost 50
++    write /dev/stune/rt/schedtune.prefer_idle 1
++
++on late-fs
++    # Start keymaster service
++    start vendor.keymaster-3-0-${ro.boot.keystore}
++    setprop vendor.powerhal.init 1
++
++on late-fs && property:vendor.storageproxyd=trusty
++    start vendor.oemlock-1-0
++
++on early-boot
++    # For evk_8mq, when swap used about 400M, upgrade the level.
++    setprop ro.lmk.upgrade_pressure 87
++    setprop ro.lmk.downgrade_pressure 95
++    setprop ro.lmk.critical_upgrade true
++
++    # Set the host name which used in console
++    export HOSTNAME evk_a300
++
++    # Set permission for IIM node
++    symlink /dev/mxs_viim /dev/mxc_mem
++
++    # Enable Tethering in the Settings
++    setprop ro.tether.denied false
++
++    setprop sys.hwc.disable     1
++    setprop vendor.2d.composition 0
++    setprop hwc.stretch.filter  1
++
++    #viv sdk dir
++    setprop VIVANTE_SDK_DIR /vendor/etc/viv_sdk
++
++    # fsl omx graphic manager media framework property
++    setprop rw.VIDEO_RENDER_NAME video_render.surface
++    setprop media.fsl_codec.flag 7
++    setprop debug.stagefright.ccodec 0
++
++    setprop camera.disable_zsl_mode 1
++
++   # Tweak the mmc device read ahead buffer size
++    write /sys/block/mmcblk0/queue/read_ahead_kb 2048
++    write /sys/block/mmcblk1/queue/read_ahead_kb 2048
++
++    # Set period_us for usb audio
++    setprop ro.audio.usb.period_us 20000
++
++    # Wifi firmware reload path
++    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
++
++    # Prepare for wifi
++    setprop wifi.interface wlan0
++
++    setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
++
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
++
++    # Prepare for RIL
++    setprop ro.ril.wake_lock_timeout 300
++
++    # Use ro.boot.lcd_density to override ro.sf.lcd_density
++    setprop ro.sf.lcd_density ${ro.boot.lcd_density}
++
++    # Disable surfaceflinger back pressure propagate
++    setprop debug.sf.disable_backpressure 1
++
++    # Set tracefs permission to 755
++    chmod 0755 /sys/kernel/debug/tracing
++
++    # Set sw_sync group to graphics and set permission to 664
++    chown root graphics /sys/kernel/debug/sync/sw_sync
++    chmod 0664 /sys/kernel/debug/sync/sw_sync
++
++    # Default backlight device
++    setprop hw.backlight.dev "30a00000.mipi_dsi_bridge.0"
++    # Chmod/chown FSL specific sys entry
++    chown system system /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
++    chmod 0660 /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
++
++    # Set light sensor sysfs path and light sensor threshold lux value
++    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
++    setprop ro.lightsensor.threshold  20
++
++    # Dectect DSF streams when scanning media
++    setprop ro.FSL_DSF_PARSER 1
++
++    # Allow DSD file(duration larger than 10s) can play
++    setprop audio.offload.min.duration.secs 10
++
++    # Enlarge limition of audio buffer allocation
++    setprop ro.af.client_heap_size_kbyte 32768
++
++    # enlarge media max memory size to 3G.
++    setprop ro.media.maxmem 3221225471
++
++    setprop wifi.direct.interface p2p-dev-wlan0
++    start vendor.wifi_hal_legacy
++
++on boot
++    start audioserver
++    start mediadrm
++    start media
++    start drm
++
++service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
++    -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
++    -g@android:wpa_wlan0
++    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
++    class main
++    socket wpa_wlan0 dgram 660 wifi wifi
++    disabled
++    oneshot
++
++service sensor_fusion /vendor/bin/fsl_sensor_fusion
++    class late_start
++    seclabel u:r:sensors:s0
++    user system
++    group input
++    oneshot
++
++# Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
++service watchdogd /sbin/watchdogd 10 20
++    class core
++    seclabel u:r:watchdogd:s0
++
++service dhcpcd_wlan0 /system/bin/dhcpcd -aABDKL
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_p2p /system/bin/dhcpcd -aABKL
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_eth0 /system/bin/dhcpcd -ABKL eth0
++    class main
++    disabled
++    oneshot
++
++service dhcpcd_bt-pan /system/bin/dhcpcd -ABKL
++    class main
++    disabled
++    oneshot
++
++service iprenew_wlan0 /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++service iprenew_p2p /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++service iprenew_eth0 /system/bin/dhcpcd -n eth0
++    class main
++    disabled
++    oneshot
++
++service iprenew_bt-pan /system/bin/dhcpcd -n
++    class main
++    disabled
++    oneshot
++
++# bugreport is triggered by holding down volume down, volume up and power
++service bugreport /system/bin/dumpstate -d -p -B -z \
++        -o /data/user_de/0/com.android.shell/files/bugreports/bugreport
++    class main
++    disabled
++    oneshot
++    keycodes 114 115 116
++
++on fs
++# mount ext4 partitions
++    mount_all /vendor/etc/fstab.freescale
++
++    # Adjust parameters for dm-verity device
++    write /sys/block/dm-0/queue/read_ahead_kb 4096
++
++    # Update dm-verity state and set partition.*.verified properties
++    verity_update_state
++
++on verity-logging
++    exec u:r:slideshow:s0 -- /sbin/slideshow warning/verity_red_1 warning/verity_red_2
++
++on post-fs
++    # Set netd memlock rlimit to 8MB
++    setrlimit 8 8388608 8388608
++
++    # Turn on swap
++    swapon_all /vendor/etc/fstab.freescale
++
++    # Swap in only 1 page at a time
++    write /proc/sys/vm/page-cluster 0
++
++on post-fs-data
++    setprop vold.post_fs_data_done 1
++    # create temp node for secure storage proxy
++    mkdir /data/vendor/ss 0700 system system
++
++    # tmp dir for opencl Compiler
++    setprop TMPDIR /data/vendor/.opencl-cache
++    mkdir /data/vendor/.opencl-cache 0771 camera camera
++
++on zygote-start
++    # Create the directories used by the Wireless subsystem
++    mkdir /data/misc/wifi 0770 wifi wifi
++    mkdir /data/misc/wifi/wpa_supplicant 0770 wifi wifi
++    mkdir /data/vendor/wifi 0771 wifi wifi
++    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
++    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
++    mkdir /data/misc/dhcp 0770 dhcp dhcp
++    chown dhcp dhcp /data/misc/dhcp
++
++service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg sys.all.early_init.ready
++    class main
++    user root
++    group root system
++    disabled
++    oneshot
++
++on property:sys.boot_completed=1 && property:vendor.storageproxyd=trusty
++    start storageproxyd
++
++service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk0rpmb -d /dev/trusty-ipc-dev0
++   group system
++
++
++on property:ro.boot.vendor.sysrq=1
++    write /proc/sys/kernel/sysrq 1
+diff --git a/imx8m/evk_a300/manifest.xml b/imx8m/evk_a300/manifest.xml
+deleted file mode 120000
+index 3584342f..00000000
+--- a/imx8m/evk_a300/manifest.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/manifest.xml
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/manifest.xml b/imx8m/evk_a300/manifest.xml
+new file mode 100644
+index 00000000..9dda3ac4
+--- /dev/null
++++ b/imx8m/evk_a300/manifest.xml
+@@ -0,0 +1,249 @@
++<manifest version="1.0" type="device" target-level="4">
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.3</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.keymaster</name>
++        <transport>hwbinder</transport>
++        <version>3.0</version>
++        <interface>
++            <name>IKeymasterDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.drm</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ICryptoFactory</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IDrmFactory</name>
++            <instance>default</instance>
++        </interface>
++        <fqname>@1.2::ICryptoFactory/clearkey</fqname>
++        <fqname>@1.2::IDrmFactory/clearkey</fqname>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>2.1</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.configstore</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>ISurfaceFlingerConfigs</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi</name>
++       <transport>hwbinder</transport>
++       <version>1.3</version>
++       <interface>
++           <name>IWifi</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi.supplicant</name>
++       <transport>hwbinder</transport>
++       <version>1.2</version>
++       <interface>
++           <name>ISupplicant</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.wifi.hostapd</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IHostapd</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.camera.provider</name>
++	<transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.4</version>
++	<interface>
++	    <name>ICameraProvider</name>
++	    <instance>legacy/0</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.light</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>ILight</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>5.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++        <version>5.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IUsb</name>
++            <instance>default</instance>
++          </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb.gadget</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IUsbGadget</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.boot</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBootControl</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.oemlock</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOemLock</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.health</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>IHealth</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.neuralnetworks</name>
++        <transport>hwbinder</transport>
++        <version>1.2</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>vsi-npu</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/evk_a300/ueventd.freescale.rc b/imx8m/evk_a300/ueventd.freescale.rc
+deleted file mode 120000
+index 6eaac422..00000000
+--- a/imx8m/evk_a300/ueventd.freescale.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mq/ueventd.freescale.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a300/ueventd.freescale.rc b/imx8m/evk_a300/ueventd.freescale.rc
+new file mode 100644
+index 00000000..f861288e
+--- /dev/null
++++ b/imx8m/evk_a300/ueventd.freescale.rc
+@@ -0,0 +1,20 @@
++/dev/block/platform/30b50000\.usdhc/by-name/presistdata 0600   system     system
++/dev/block/platform/30b40000\.usdhc/by-name/presistdata 0600   system     system
++/dev/ttymxc2              0660   bluetooth  bluetooth
++/dev/snd/*                0660   system     audio
++/dev/video*               0660   system     camera
++/dev/mxc_hantro           0660   media      drmrpc
++/dev/imxdpu               0660   media      drmrpc
++/dev/uinput               0660   system     bluetooth
++/dev/ion                  0666   media      drmrpc
++/dev/galcore              0666 	 system     graphics
++/dev/graphics/fb0         0660   system     graphics
++/dev/watchdog             0660   system     root
++/dev/mmcblk0rpmb          0600   system     system
++/dev/trusty-ipc-dev0      0660   system     drmrpc
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_temp 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_temp 0660 system system
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
+diff --git a/imx8m/optee-packages.mk b/imx8m/optee-packages.mk
+index 671ac447..3853d4d9 100644
+--- a/imx8m/optee-packages.mk
++++ b/imx8m/optee-packages.mk
+@@ -1,8 +1,5 @@
+ OPTEE_PLATFORM ?= imx
+-ifeq ($(TARGET_PRODUCT),$(filter $(TARGET_PRODUCT),evk_8mm evk_8mm_drm))
+-OPTEE_PLATFORM_FLAVOR ?= mx8mmevk
+-else
+-ifeq ($(TARGET_PRODUCT),$(filter $(TARGET_PRODUCT),evk_8mq evk_8mq_drm))
++ifeq ($(TARGET_PRODUCT),$(filter $(TARGET_PRODUCT),vp6820_8mq vp6820_8mq_drm))
+ OPTEE_PLATFORM_FLAVOR ?= mx8mqevk
+ else
+ $(error Invalid platform $(TARGET_PRODUCT))
+diff --git a/verity/Android.mk b/verity/Android.mk
+index 84933091..e0589be1 100644
+--- a/verity/Android.mk
++++ b/verity/Android.mk
+@@ -27,7 +27,7 @@ LOCAL_PATH := $(call my-dir)
+ 
+ define _add-warning-image
+ include $$(CLEAR_VARS)
+-LOCAL_MODULE := warning_$(notdir $(1))
++LOCAL_MODULE := idt_warning_$(notdir $(1))
+ LOCAL_MODULE_STEM := $(notdir $(1))
+ _img_modules += $$(LOCAL_MODULE)
+ LOCAL_SRC_FILES := $1
+@@ -43,7 +43,7 @@ $(foreach _img, $(call find-subdir-subdir-files, "images", "*.png"), \
+   $(eval $(call _add-warning-image,$(_img))))
+ 
+ include $(CLEAR_VARS)
+-LOCAL_MODULE := verity_warning_images
++LOCAL_MODULE := verity_warning_images_idt
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_REQUIRED_MODULES := $(_img_modules)
+ include $(BUILD_PHONY_PACKAGE)

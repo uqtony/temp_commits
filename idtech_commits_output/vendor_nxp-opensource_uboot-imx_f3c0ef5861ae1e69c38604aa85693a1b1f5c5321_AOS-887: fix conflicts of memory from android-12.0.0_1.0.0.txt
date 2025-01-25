@@ -1,0 +1,111 @@
+f3c0ef5861 George.Huang 2022-02-26
+
+AOS-887: fix conflicts of memory from android-12.0.0_1.0.0
+
+Change-Id: Ib617de6140c885540cbf37052b8fd219a9d2539d
+
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index f82c2a3195..1bb5268c8e 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -216,7 +216,6 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ 
+ 	*size = PHYS_SDRAM_SIZE;
+ 
+-<<<<<<< HEAD
+ #if defined(CONFIG_IDT_MULTIPLE_DDR)
+ 	unsigned int mem_size = PHYS_SDRAM_SIZE;
+ 	memcpy((void *)&mem_size, (void *)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+@@ -224,10 +223,11 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ 
+ 	idt_adjust_mem_map(mem_map, size);
+ 	*size = idt_banksize_1st(*size);
+-=======
++	return 0;
++#endif
++
+ #ifdef PHYS_SDRAM_2_SIZE
+ 	*size += PHYS_SDRAM_2_SIZE;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ #endif
+ 	return 0;
+ }
+@@ -247,22 +247,11 @@ int dram_init(void)
+ 	else
+ 		gd->ram_size = sdram_size;
+ 
+-<<<<<<< HEAD
+-	/* also update the SDRAM size in the mem_map used externally */
+-	imx8m_mem_map[entry].size = sdram_size;
+-
+ #if defined(CONFIG_IDT_MULTIPLE_DDR)
+ 	gd->ram_size = sdram_size + idt_banksize_2nd(mem_map);
+-	imx8m_mem_map[entry].size = gd->ram_size;
+ 	return 0;
+ #endif
+ 
+-#ifdef PHYS_SDRAM_2_SIZE
+-	gd->ram_size += PHYS_SDRAM_2_SIZE;
+-#endif
+-
+-=======
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 	return 0;
+ }
+ 
+@@ -313,16 +302,10 @@ int dram_init_banksize(void)
+ 		}
+ 		gd->bd->bi_dram[bank].start = 0x100000000UL;
+ 		gd->bd->bi_dram[bank].size = sdram_b2_size;
+-	}
+-<<<<<<< HEAD
+-	gd->bd->bi_dram[bank].start = PHYS_SDRAM_2;
+-	gd->bd->bi_dram[bank].size = PHYS_SDRAM_2_SIZE;
+ #if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	gd->bd->bi_dram[bank].size = gd->ram_size - sdram_size;
+-#endif
++		gd->bd->bi_dram[bank].size = gd->ram_size - sdram_size;
+ #endif
+-=======
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
++	}
+ 
+ 	return 0;
+ }
+@@ -332,6 +315,11 @@ phys_size_t get_effective_memsize(void)
+ 	int ret;
+ 	phys_size_t sdram_size;
+ 	phys_size_t sdram_b1_size;
++
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	return idt_banksize_1st(gd->ram_size);
++#endif
++
+ 	ret = board_phys_sdram_size(&sdram_size);
+ 	if (!ret) {
+ 		/* Bank 1 can't cross over 4GB space */
+@@ -341,16 +329,6 @@ phys_size_t get_effective_memsize(void)
+ 			sdram_b1_size = sdram_size;
+ 		}
+ 
+-<<<<<<< HEAD
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	return idt_banksize_1st(gd->ram_size);
+-#endif
+-#ifdef PHYS_SDRAM_2_SIZE
+-	return gd->ram_size - PHYS_SDRAM_2_SIZE;
+-#else
+-	return gd->ram_size;
+-#endif
+-=======
+ 		if (rom_pointer[1]) {
+ 			/* We will relocate u-boot to Top of dram1. Tee position has two cases:
+ 			 * 1. At the top of dram1,  Then return the size removed optee size.
+@@ -364,7 +342,6 @@ phys_size_t get_effective_memsize(void)
+ 	} else {
+ 		return PHYS_SDRAM_SIZE;
+ 	}
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ }
+ 
+ static u32 get_cpu_variant_type(u32 type)

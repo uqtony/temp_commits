@@ -1,0 +1,62 @@
+61deb926 max.yang 2020-03-05
+
+AOS-106: [AB OTA][Bootloader] Enable selinux permissions for AB OTA bootloader.img
+
+  1. add bootloader into AB_OTA_PARTITIONS so that otatool could handle it
+  2. If we didn't create new type for file node, then it is block_device type
+     And google neverallow update_engine to open/read/write block_device type,
+     so we should create another one or use existing type like boot_block_device,
+     here we select the former approch.
+  3. Allow update_engine common to access bootloader_block_device type
+
+Modified from this patch on Android 9:
+  https://gerrit.idtechproducts.com/c/android-imx/device/idtech/+/1122
+
+Change-Id: I7624ec86a87e87a189ee2e10b59a92387552ef22
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 7a4bb766..f37c9b66 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -104,9 +104,9 @@ BOARD_GPU_LIBDRM := libdrm_imx
+ 
+ AB_OTA_UPDATER := true
+ ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader
+ else
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader
+ endif
+ BOARD_BUILD_SYSTEM_ROOT_IMAGE := true
+ TARGET_NO_RECOVERY := true
+diff --git a/imx8m/sepolicy/device.te b/imx8m/sepolicy/device.te
+index 2d1e18bd..e0aa0aeb 100644
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@ -8,3 +8,4 @@ type diag_device, dev_type, mlstrustedobject;
+ type sysfs_block_devices, sysfs_type, fs_type;
+ type mmc_rpmb_char_device, dev_type;
+ type latency_device, dev_type;
++type bootloader_block_device, dev_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index d00d4137..3a28e0f2 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -88,3 +88,9 @@
+ /vendor/bin/hw/android\.hardware\.dumpstate@1\.0-service\.imx      u:object_r:hal_dumpstate_impl_exec:s0
+ /dev/cpu_dma_latency u:object_r:latency_device:s0
+ /vendor/bin/hw/android\.hardware\.oemlock@1\.0-service\.imx      u:object_r:hal_oemlock_impl_exec:s0
++
++# bootloader
++/dev/block/mmcblk0boot0        u:object_r:bootloader_block_device:s0
++/dev/block/mmcblk0boot0p1      u:object_r:bootloader_block_device:s0
++/dev/block/mmcblk0boot1        u:object_r:bootloader_block_device:s0
++/dev/block/mmcblk0boot1p1      u:object_r:bootloader_block_device:s0
+diff --git a/imx8m/sepolicy/update_engine_common.te b/imx8m/sepolicy/update_engine_common.te
+index c8bb23e0..03964b39 100644
+--- a/imx8m/sepolicy/update_engine_common.te
++++ b/imx8m/sepolicy/update_engine_common.te
+@@ -1 +1,2 @@
+ allow update_engine_common vbmeta_block_device:blk_file rw_file_perms;
++allow update_engine_common bootloader_block_device:blk_file rw_file_perms;

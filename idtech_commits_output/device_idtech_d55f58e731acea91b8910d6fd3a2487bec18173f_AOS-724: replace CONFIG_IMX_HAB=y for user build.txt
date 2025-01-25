@@ -1,0 +1,44 @@
+d55f58e7 AndrewS 2021-09-08
+
+AOS-724: replace CONFIG_IMX_HAB=y for user build
+
+Change-Id: I15434daac417c6262a9eeb31f6e90bc69db38d42
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index aff753ae..a91bc949 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -118,9 +118,7 @@ $(UBOOTENVSH): | $(UBOOT_OUT)
+ 		echo 'export ROLLBACK_INDEX_IN_CONTAINER=' >> $@; \
+ 	fi
+ 
+-ifeq (user,$(TARGET_BUILD_VARIANT))
+-IDTECH_BUILD := SECURE_BOOT=1
+-else
++ifeq (userdebug,$(TARGET_BUILD_VARIANT))
+ IDTECH_BUILD := USERDEBUG=1
+ endif
+ 
+@@ -199,11 +197,20 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 	$(hide) for ubootplat in $(TARGET_BOOTLOADER_CONFIG); do \
+ 		UBOOT_PLATFORM=`echo $$ubootplat | cut -d':' -f1`; \
+ 		UBOOT_CONFIG=`echo $$ubootplat | cut -d':' -f2`; \
++		UBOOT_CONFIG_IDT=merged_`echo $$UBOOT_CONFIG`; \
++		cp $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG_IDT; \
++		if [ "$(TARGET_BUILD_VARIANT)" = "user" ]; then \
++		    echo "append CONFIG_IMX_HAB for user build" ; \
++		    grep -q CONFIG_IMX_HAB= $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG_IDT && \
++		    sed -i "s|CONFIG_IMX_HAB=.*|CONFIG_IMX_HAB=y|g" $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG_IDT || \
++		    echo "CONFIG_IMX_HAB=y" >> $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG_IDT; \
++		fi; \
+ 		UBOOT_FEATURE=`echo $$UBOOT_PLATFORM | rev | cut -d '-' -f1 | rev`; \
+ 		PROD_KEY=`echo $$UBOOT_PLATFORM | sed "s|-|
+|g" | grep -e '^prod$$'`; \
+ 		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) mrproper; \
+-		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) $$UBOOT_CONFIG; \
++		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) $$UBOOT_CONFIG_IDT; \
+ 		$(MAKE) -s -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" AVB_PUBKEY=$$PROD_KEY $(IDTECH_BUILD) O=$(realpath $(UBOOT_OUT)) 1>/dev/null || exit 1; \
++		rm -f $(UBOOT_IMX_PATH)/uboot-imx/configs/$$UBOOT_CONFIG_IDT; \
+ 		if [ "$(UBOOT_POST_PROCESS)" = "true" ]; then \
+ 			echo "build post process" ; \
+ 			. $(UBOOTENVSH); \

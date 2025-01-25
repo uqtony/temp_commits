@@ -1,0 +1,1064 @@
+d8404d7f George.Huang 2021-04-28
+
+Merge tag 'android-11.0.0_2.0.0' into HEAD
+
+android-11.0.0_2.0.0
+
+Change-Id: I1bb4ed777d3c64948a737521b2e6d3c75377e00c
+
+diff --cc common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
+index c08d9ada,add6c823..f4aa517c
+--- a/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
++++ b/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt
+@@@ -2,15 -2,9 +2,15 @@@
+      "settings": {
+          "disk_size": "13 GiB",
+          "disk_alignment": 2097152,
+-         "first_partition_offset": 8388608
++         "partitions_offset_begin": 8388608
+      },
+      "partitions": [
+ +        {
+ +            "label": "board_info",
+ +            "size": "1 MiB",
+ +            "guid": "auto",
+ +            "type_guid": "brillo_vendor_specific"
+ +        },
+          {
+              "ab": true,
+              "label": "bootloader",
+diff --cc common/partition/device-partitions-13GB-ab.bpt
+index 049ac1e2,8b7c2259..d8a12c8b
+--- a/common/partition/device-partitions-13GB-ab.bpt
++++ b/common/partition/device-partitions-13GB-ab.bpt
+@@@ -2,15 -2,9 +2,15 @@@
+      "settings": {
+          "disk_size": "13 GiB",
+          "disk_alignment": 2097152,
+-         "first_partition_offset": 8388608
++         "partitions_offset_begin": 8388608
+      },
+      "partitions": [
+ +        {
+ +            "label": "board_info",
+ +            "size": "1 MiB",
+ +            "guid": "auto",
+ +            "type_guid": "brillo_vendor_specific"
+ +        },
+          {
+              "ab": true,
+              "label": "dtbo",
+diff --cc common/tools/fastboot_imx_flashall.bat
+index f030e4b7,573729ae..f4e3bc0c
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@@ -91,9 -64,9 +91,15 @@@ set board_type
+  :: board running different set of images(android and automative for a example), so misuse the features of one set of
+  :: images when flash another set of images can not be detect early with this scenario.
+  set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+++<<<<<<< HEAD
+ +set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed
+ +set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+ +set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+++=======
++ set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4
++ set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave
++ set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+++>>>>>>> android-11.0.0_2.0.0
+  set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+  set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen
+  set imx7ulp_uboot_feature=evk-uuu
+@@@ -293,11 -255,11 +299,15 @@@ echo                           ©¦   soc
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+  echo                           ©¦   imx8mm       ©¦  dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty      ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ -echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4                              ©¦
+ +echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed           ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+++<<<<<<< HEAD
+ +echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             ©¦
+++=======
++ echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave                     ©¦
+++>>>>>>> android-11.0.0_2.0.0
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ -echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                ©¦
+ +echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+  echo                           ©¦   imx8qxp      ©¦  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                           ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+diff --cc common/tools/fastboot_imx_flashall.sh
+index 82e8d5f9,9a4225d2..8eb94f9b
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@@ -36,11 -36,11 +36,15 @@@ options
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                             â”‚   imx8mm       â”‚  dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty      â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+ -                           â”‚   imx8mn       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4                              â”‚
+ +                           â”‚   imx8mn       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed           â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+++<<<<<<< HEAD
+ +                           â”‚   imx8mp       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             â”‚
+++=======
++                            â”‚   imx8mp       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave                     â”‚
+++>>>>>>> android-11.0.0_2.0.0
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+ -                           â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                â”‚
+ +                           â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                             â”‚   imx8qxp      â”‚  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                           â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+@@@ -494,9 -318,9 +498,15 @@@ board_type="
+  # board running different set of images(android and automative for a example), so misuse the features of one set of
+  # images when flash another set of images can not be detect early with this scenario.
+  imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+++<<<<<<< HEAD
+ +imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed)
+ +imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+ +imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+++=======
++ imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4)
++ imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
++ imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave)
+++>>>>>>> android-11.0.0_2.0.0
+  imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+  imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen)
+  imx7ulp_uboot_feature=(evk-uuu)
+diff --cc common/tools/imx-make.sh
+index 8a3f9d47,dfc906d8..0955e6cf
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@@ -126,7 -131,13 +131,17 @@@ if [ -n "${build_kernel}" ] && [ ${TARG
+      build_kernel_module_flag=1;
+  fi
+  
+++<<<<<<< HEAD
+ +product_makefile=`pwd`/`find device/idtech -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++=======
++ # mlan.ko and moal.ko need build with kernel each time to make sure "insmod mlan.ko" and "insmod moal.ko" works
++ if [ -n "${build_kernel}" ]; then
++     build_mxmwifi="mxmwifi";
++     build_kernel_module_flag=1;
++ fi
++ 
++ product_makefile=`pwd`/`find device/nxp -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++>>>>>>> android-11.0.0_2.0.0
+  product_path=${product_makefile%/*}
+  soc_path=${product_path%/*}
+  nxp_git_path=${soc_path%/*}
+diff --cc common/tools/uuu_imx_android_flash.bat
+index e9af2042,363653a9..64d41180
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@@ -1,8 -1,7 +1,12 @@@
+  :: Do not output the command
+  @echo off
+  
+++<<<<<<< HEAD
+ +set uuu_version=1.4.43
+ +echo This script is validated with uuu %uuu_version% version, it is recommended to align with this version.
+++=======
++ echo This script is validated with uuu 1.4.72 version, it is recommended to align with this version.
+++>>>>>>> android-11.0.0_2.0.0
+  
+  ::---------------------------------------------------------------------------------
+  ::Variables
+@@@ -113,9 -80,9 +117,15 @@@ if not [%tmp_dir%] == [] 
+  :: board running different set of images(android and automative for a example), so misuse the features of one set of
+  :: images when flash another set of images can not be detect early with this scenario.
+  set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+++<<<<<<< HEAD
+ +set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed
+ +set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+ +set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+++=======
++ set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4
++ set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave
++ set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+++>>>>>>> android-11.0.0_2.0.0
+  set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+  set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen
+  set imx7ulp_uboot_feature=evk-uuu
+@@@ -594,11 -510,10 +604,11 @@@ goto :eo
+  
+  :help
+  echo.
+- echo Version: 1.7
+- echo Last change: generate super.img when flash images with dynamic partition feature
+- echo currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, aiy_8mq, mek_8q, mek_8q_car
++ echo Version: 1.8
++ echo Last change: recommend new version of uuu
++ echo currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+  echo.
+ +echo eg: uuu_imx_android_flash.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+  echo eg: uuu_imx_android_flash.bat -f imx8qm -a -e -D C:\Users\user_01\imagesndroid10\mek_8q\ -t emmc -u trusty -d mipi-panel
+  echo.
+  echo Usage: %script_name% ^<option^>
+@@@ -626,11 -541,11 +636,15 @@@ echo                           ©¦   soc
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+  echo                           ©¦   imx8mm       ©¦  dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty      ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ -echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4                              ©¦
+ +echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed           ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+++<<<<<<< HEAD
+ +echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             ©¦
+++=======
++ echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave                     ©¦
+++>>>>>>> android-11.0.0_2.0.0
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ -echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock                                                      ©¦
+ +echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+  echo                           ©¦   imx8qxp      ©¦  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                          ©¦
+  echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+@@@ -722,7 -634,7 +736,11 @@@ if [%board%] == [] 
+  goto :eof
+  
+  :uuu_load_uboot
+++<<<<<<< HEAD
+ +echo uuu_version %uuu_version% > %tmp_dir%uuu.lst
+++=======
++ echo uuu_version 1.4.72 > %tmp_dir%uuu.lst
+++>>>>>>> android-11.0.0_2.0.0
+  
+  if exist %tmp_dir%%bootloader_used_by_uuu%.link (
+      del %tmp_dir%%bootloader_used_by_uuu%.link
+diff --cc common/tools/uuu_imx_android_flash.sh
+index 504aa2ff,18fb5bc4..f3445279
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@@ -5,11 -5,10 +5,11 @@@ help() 
+  bn=`basename $0`
+  cat << EOF
+  
+- Version: 1.7
+- Last change: generate super.img when flash images with dynamic partition feature
+- currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, aiy_8mq, evk_8mp, mek_8q, mek_8q_car
++ Version: 1.8
++ Last change: recommend new version of uuu
++ currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+  
+ +eg: ./uuu_imx_android_flash.sh -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+  eg: ./uuu_imx_android_flash.sh -f imx8qm -a -e -D ~/android10/mek_8q/ -t emmc -u trusty -d mipi-panel
+  
+  Usage: $bn <option>
+@@@ -37,11 -36,11 +37,15 @@@ options
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                             â”‚   imx8mm       â”‚  dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty      â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+ -                           â”‚   imx8mn       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4                              â”‚
+ +                           â”‚   imx8mn       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed           â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+ -                           â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                â”‚
+ +                           â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+++<<<<<<< HEAD
+ +                           â”‚   imx8mp       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed                             â”‚
+++=======
++                            â”‚   imx8mp       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave                     â”‚
+++>>>>>>> android-11.0.0_2.0.0
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                             â”‚   imx8qxp      â”‚  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                           â”‚
+                             â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+@@@ -118,7 -113,7 +122,11 @@@ function whether_in_arra
+  
+  function uuu_load_uboot
+  {
+++<<<<<<< HEAD
+ +    echo uuu_version ${uuu_version} > /tmp/uuu.lst
+++=======
++     echo uuu_version 1.4.72 > /tmp/uuu.lst
+++>>>>>>> android-11.0.0_2.0.0
+      rm -f /tmp/${bootloader_used_by_uuu}
+      ln -s ${sym_link_directory}${bootloader_used_by_uuu} /tmp/${bootloader_used_by_uuu}
+      echo ${sdp}: boot -f ${bootloader_used_by_uuu} >> /tmp/uuu.lst
+@@@ -516,9 -367,9 +524,15 @@@ max_download_size=0x1900000
+  # board running different set of images(android and automative for a example), so misuse the features of one set of
+  # images when flash another set of images can not be detect early with this scenario.
+  imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+++<<<<<<< HEAD
+ +imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed)
+ +imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+ +imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+++=======
++ imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4)
++ imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
++ imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave)
+++>>>>>>> android-11.0.0_2.0.0
+  imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+  imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen)
+  imx7ulp_uboot_feature=(evk-uuu)
+@@@ -532,8 -383,7 +546,12 @@@ imx8qm_dtb_feature=(hdmi hdmi-rx mipi-p
+  imx7ulp_dtb_feature=(evk-mipi evk mipi)
+  
+  
+++<<<<<<< HEAD
+ +uuu_version="1.4.43"
+ +echo -e This script is validated with ${RED}uuu ${uuu_version}${STD} version, it is recommended to align with this version.
+++=======
++ echo -e This script is validated with ${RED}uuu 1.4.72${STD} version, it is recommended to align with this version.
+++>>>>>>> android-11.0.0_2.0.0
+  
+  if [ $# -eq 0 ]; then
+      echo -e >&2 ${RED}please provide more information with command script options${STD}
+diff --cc imx8m/BoardConfigCommon.mk
+index 20e2616a,8037cf14..dad281e7
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@@ -66,64 -64,37 +64,37 @@@ endi
+  
+  BOARD_MKBOOTIMG_ARGS = --kernel_offset $(BOARD_KERNEL_OFFSET) --ramdisk_offset $(BOARD_RAMDISK_OFFSET) --header_version $(BOARD_BOOT_HEADER_VERSION)
+  
+- #BOARD_USES_GENERIC_AUDIO := true
+- BOARD_USES_ALSA_AUDIO := true
+- BOARD_HAVE_BLUETOOTH := true
+- USE_CAMERA_STUB := false
++ BOARD_USES_RECOVERY_AS_BOOT := true
+  
+- BOARD_HAVE_IMX_CAMERA := true
+- BOARD_HAVE_USB_CAMERA := false
+- BOARD_HAVE_USB_MJPEG_CAMERA := false
++ # kernel module's copy to vendor need this folder setting
++ KERNEL_OUT ?= $(OUT_DIR)/target/product/$(PRODUCT_DEVICE)/obj/KERNEL_OBJ
+  
+- # Enable dex-preoptimization to speed up first boot sequence
+- ifeq ($(HOST_OS),linux)
+-    ifeq ($(TARGET_BUILD_VARIANT),user)
+- 	ifeq ($(WITH_DEXPREOPT),)
+- 	    WITH_DEXPREOPT := true
+- 	endif
+-    endif
+- endif
++ PRODUCT_COPY_FILES += \
++     $(KERNEL_OUT)/arch/$(TARGET_KERNEL_ARCH)/boot/$(KERNEL_NAME):kernel
+  
+- PREBUILT_FSL_IMX_OMX := false
+- PREBUILT_FSL_IMX_GPU := true
+- PREBUILT_FSL_IMX_SENSOR_FUSION := true
+- SOONG_CONFIG_IMXPLUGIN_PREBUILT_FSL_IMX_GPU = true
++ TARGET_BOARD_KERNEL_HEADERS := $(CONFIG_REPO_PATH)/common/kernel-headers
+  
+- # override some prebuilt setting if DISABLE_FSL_PREBUILT is define
+- ifeq ($(DISABLE_FSL_PREBUILT),GPU)
+- PREBUILT_FSL_IMX_GPU := false
+- SOONG_CONFIG_IMXPLUGIN_PREBUILT_FSL_IMX_GPU = false
+- else ifeq ($(DISABLE_FSL_PREBUILT),SENSOR_FUSION)
+- PREBUILT_FSL_IMX_SENSOR_FUSION := false
+- else ifeq ($(DISABLE_FSL_PREBUILT),ALL)
+- PREBUILT_FSL_IMX_GPU := false
+- PREBUILT_FSL_IMX_SENSOR_FUSION := false
+- SOONG_CONFIG_IMXPLUGIN_PREBUILT_FSL_IMX_GPU = false
++ # -------@block_app-------
++ # Enable dex-preoptimization to speed up first boot sequence
++ ifeq ($(HOST_OS),linux)
++   ifeq ($(TARGET_BUILD_VARIANT),user)
++     ifeq ($(WITH_DEXPREOPT),)
++       WITH_DEXPREOPT := true
++     endif
++   endif
+  endif
+  
+- # Indicate use vivante drm based egl and gralloc
+- BOARD_GPU_DRIVERS := vivante
+- 
+- # Indicate use NXP libdrm-imx or Android external/libdrm
+- BOARD_GPU_LIBDRM := libdrm_imx
+- 
+- # for kernel/user space split
+- # comment out for 1g/3g space split
+- # TARGET_KERNEL_2G := true
+- 
++ # -------@block_storage-------
+  AB_OTA_UPDATER := true
+  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+ -AB_OTA_PARTITIONS += dtbo boot system system_ext vendor vbmeta
+ +AB_OTA_PARTITIONS := dtbo boot system system_ext vendor vbmeta bootloader spl mem_info
+  else
+  ifeq ($(TARGET_USE_VENDOR_BOOT),true)
+ -AB_OTA_PARTITIONS += dtbo boot vendor_boot system system_ext vendor vbmeta product
+ +AB_OTA_PARTITIONS += dtbo boot vendor_boot system system_ext vendor vbmeta product bootloader spl mem_info
+  else
+ -AB_OTA_PARTITIONS += dtbo boot system system_ext vendor vbmeta product
+ +AB_OTA_PARTITIONS += dtbo boot system system_ext vendor vbmeta product bootloader spl mem_info
+  endif
+  endif
+- TARGET_NO_RECOVERY := true
+- BOARD_USES_RECOVERY_AS_BOOT := true
+- TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
+  
+  BOARD_DTBOIMG_PARTITION_SIZE := 4194304
+  BOARD_BOOTIMAGE_PARTITION_SIZE := 67108864
+@@@ -147,13 -117,6 +118,16 @@@ BOARD_SYSTEM_EXTIMAGE_FILE_SYSTEM_TYPE 
+  TARGET_COPY_OUT_SYSTEM_EXT := system_ext
+  
+  BOARD_FLASH_BLOCK_SIZE := 4096
+++<<<<<<< HEAD
+ +TARGET_RECOVERY_UI_LIB := librecovery_ui_imx_idt
+ +
+ +BOARD_VNDK_VERSION := current
+ +
+ +ifeq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+ +  BOARD_PCI_SECURE := secure
+ +endif
+++=======
+++>>>>>>> android-11.0.0_2.0.0
+  
+  ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+    BOARD_SUPER_PARTITION_GROUPS := nxp_dynamic_partitions
+diff --cc imx8m/ProductConfigCommon.mk
+index 79d1c53e,d8a1b2f5..aa0399b7
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@@ -19,142 -22,33 +22,129 @@@ PRODUCT_PACKAGES += 
+  PRODUCT_BRAND := Android
+  PRODUCT_MANUFACTURER := nxp
+  
+++<<<<<<< HEAD
+ +ifneq ($(PRODUCT_IMX_CAR),true)
+ +PRODUCT_PACKAGES += \
+ +    Camera \
+ +    Gallery2 \
+ +    SoundRecorder
+ +endif
+ +
+ +# watermark only enabled by pcidev build
+ +ifeq (pcidev, $(findstring pcidev, $(TARGET_PRODUCT)))
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/common/watermark/setup.conf:/system/etc/setup.conf
+ +endif
+ +
+ +# Android infrastructures
+ +PRODUCT_PACKAGES += \
+ +    ExtractorPkg \
+ +    charger_res_images \
+ +    charger \
+ +    libedid \
+ +    libion \
+ +    slideshow \
+ +    verity_warning_images_idt \
+ +
+ +# HAL
+ +PRODUCT_PACKAGES += \
+ +    copybit.imx \
+ +    gralloc.imx \
+ +    hwcomposer.imx \
+ +    lights.imx \
+ +    overlay.imx \
+ +    power.imx
+ +
+ +# A/B OTA
+ +PRODUCT_PACKAGES += \
+ +    android.hardware.boot@1.1-impl \
+ +    android.hardware.boot@1.1-impl.recovery \
+ +    android.hardware.boot@1.1-service \
+ +    update_engine \
+ +    update_engine_client \
+ +    update_engine_sideload \
+ +    update_verifier
+++=======
++ # related to the definition and load of library modules
++ TARGET_BOARD_PLATFORM := imx
+++>>>>>>> android-11.0.0_2.0.0
+  
+- PRODUCT_HOST_PACKAGES += \
+-     brillo_update_payload \
+-     nxp.hardware.display@1.0
+- 
+- # audio
+- PRODUCT_PACKAGES += \
+-     audio.a2dp.default \
+-     audio.primary.imx \
+-     audio.r_submix.default \
+-     audio.usb.default \
+-     tinycap \
+-     tinymix \
+-     tinyplay \
+-     tinypcminfo
++ PRODUCT_SHIPPING_API_LEVEL := 30
+  
+- # LDAC codec
+- PRODUCT_PACKAGES += \
+-     libldacBT_enc \
+-     libldacBT_abr
++ # -------@block_app-------
+  
+- # wifi
+- PRODUCT_PACKAGES += \
+-     hostapd \
+-     hostapd_cli \
+-     wpa_supplicant \
+-     wpa_supplicant.conf
++ PRODUCT_PROPERTY_OVERRIDES += \
++     pm.dexopt.boot=quicken
+  
+- PRODUCT_PACKAGES += \
+-     netutils-wrapper-1.0
++ # Enforce privapp-permissions whitelist
++ PRODUCT_PROPERTY_OVERRIDES += \
++     ro.control_privapp_permissions=enforce
+  
+++<<<<<<< HEAD
+ +# sensor
+ +PRODUCT_PACKAGES += \
+ +    fsl_sensor_fusion \
+ +    sensors.imx \
+ +    libbt-vendor
+ +
+ +# add memtrack only in userdebug build
+ +ifneq (,$(filter userdebug, $(TARGET_BUILD_VARIANT)))
+ +# memtrack
+ +PRODUCT_PACKAGES += \
+ +    android.hardware.memtrack@1.0-impl \
+ +    android.hardware.memtrack@1.0-service \
+ +    memtrack.imx
+ +endif
+++=======
+  
+- # camera
+- ifneq ($(PRODUCT_IMX_CAR),true)
+- PRODUCT_PACKAGES += \
+-     android.hardware.camera.provider@2.6-service-google \
+-     android.hardware.camera.provider@2.6-impl-google \
+-     libgooglecamerahal \
+-     libgooglecamerahalutils \
+-     lib_profiler \
+-     libimxcamerahwl_impl
++ # -------@block_multimedia_codec-------
+++>>>>>>> android-11.0.0_2.0.0
+  
++ ifneq ($(PRODUCT_IMX_CAR),true)
+  PRODUCT_PACKAGES += \
+-     android.hardware.camera.provider@2.4-external-service \
+-     android.hardware.camera.provider@2.4-impl \
+-     camera.device@1.0-impl \
+-     camera.device@3.2-impl
++     Gallery2
+  endif
+  
+++<<<<<<< HEAD
+ +PRODUCT_PACKAGES += \
+ +    android.hardware.fastboot@1.0-impl-mock \
+ +    fastboot.default
+ +
+ +# health
+ +PRODUCT_PACKAGES += \
+ +    android.hardware.health@2.1-service \
+ +    android.hardware.health@2.1-impl-imx
+ +
+ +# display
+ +PRODUCT_PACKAGES += \
+ +    libdrm_android \
+ +    libfsldisplay
+ +
+ +# drm
+ +PRODUCT_PACKAGES += \
+ +    libdrmpassthruplugin \
+ +    libfwdlockengine
+ +
+ +# vivante libdrm support
+ +PRODUCT_PACKAGES += \
+ +    libdrm_vivante
+ +
+ +# add gpu debug tool only in userdebug build
+ +ifneq (,$(filter userdebug, $(TARGET_BUILD_VARIANT)))
+ +# gpu debug tool
+ +PRODUCT_PACKAGES += \
+ +    gmem_info \
+ +    gpu-top
+ +endif
+ +
+ +# Omx related libs, please align to device/idtech/proprietary/omx/fsl-omx.mk
+++=======
++ PRODUCT_PACKAGES += \
++     vsidaemon \
++     CactusPlayer
++ 
++ # Omx related libs
+++>>>>>>> android-11.0.0_2.0.0
+  PRODUCT_PACKAGES += \
+      lib_aac_dec_v2_arm12_elinux \
+      lib_aacd_wrap_arm12_elinux_android \
+@@@ -236,65 -152,168 +248,202 @@@ PRODUCT_HOST_PACKAGES += 
+  PRODUCT_PACKAGES += \
+      fastbootd \
+  
+- # vndservicemanager
++ # enable incremental installation
++ PRODUCT_PROPERTY_OVERRIDES += \
++     ro.incremental.enable=1
++ 
++ # -------@block_power-------
++ 
+  PRODUCT_PACKAGES += \
+-     vndservicemanager
++     charger_res_images \
++     charger
++ 
++ # health
++ PRODUCT_PACKAGES += \
++     android.hardware.health@2.1-service \
++     android.hardware.health@2.1-impl-imx
++ # -------@block_ethernet-------
++ 
++ PRODUCT_PACKAGES += \
++     ethernet
++ 
++ # -------@block_camera-------
++ ifneq ($(PRODUCT_IMX_CAR),true)
++ PRODUCT_PACKAGES += \
++     android.hardware.camera.provider@2.6-service-google \
++     android.hardware.camera.provider@2.6-impl-google \
++     libgooglecamerahal \
++     libgooglecamerahalutils \
++     lib_profiler \
++     libimxcamerahwl_impl
++ 
++ PRODUCT_PACKAGES += \
++     android.hardware.camera.provider@2.4-external-service \
++     android.hardware.camera.provider@2.4-impl \
++     camera.device@1.0-impl \
++     camera.device@3.2-impl
++ endif
++ 
++ # -------@block_display-------
++ ifneq ($(PRODUCT_IMX_CAR),true)
++ PRODUCT_PACKAGES += \
++     CubeLiveWallpapers \
++     LiveWallpapersPicker
++ endif
++ 
++ PRODUCT_PACKAGES += \
++     libedid
++ 
++ # HAL
++ PRODUCT_PACKAGES += \
++     gralloc.imx \
++     hwcomposer.imx
++ 
++ PRODUCT_PACKAGES += \
++     libdrm_android \
++     libdisplayutils \
++     libfsldisplay
++ 
++ PRODUCT_HOST_PACKAGES += \
++     nxp.hardware.display@1.0
++ 
++ PRODUCT_SOONG_NAMESPACES += external/mesa3d
++ 
++ # -------@block_gpu-------
++ # vivante libdrm support
++ PRODUCT_PACKAGES += \
++     libdrm_vivante
++ 
++ # gpu debug tool
++ PRODUCT_PACKAGES += \
++     gmem_info \
++     gpu-top
++ 
++ 
++ # -------@block_memory-------
++ PRODUCT_PACKAGES += \
++     libion
++ 
++ # memtrack
++ PRODUCT_PACKAGES += \
++     android.hardware.memtrack@1.0-impl \
++     android.hardware.memtrack@1.0-service \
++     memtrack.imx
++ 
++ # include a google recommand heap config file.
++ include frameworks/native/build/tablet-10in-xhdpi-2048-dalvik-heap.mk
++ 
++ # -------@block_security-------
++ # drm
++ PRODUCT_PACKAGES += \
++     libdrmpassthruplugin \
++     libfwdlockengine
++ 
++ PRODUCT_DEFAULT_DEV_CERTIFICATE := \
++     $(CONFIG_REPO_PATH)/common/security/testkey
++ 
++ #OEM Unlock reporting
++ PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
++     ro.oem_unlock_supported=1
++ 
++ # -------@block_audio-------
++ ifneq ($(PRODUCT_IMX_CAR),true)
++ PRODUCT_PACKAGES += \
++     SoundRecorder
++ endif
++ 
++ PRODUCT_PACKAGES += \
++     audio.a2dp.default \
++     audio.primary.imx \
++     audio.r_submix.default \
++     audio.usb.default \
++     tinycap \
++     tinymix \
++     tinyplay \
++     tinypcminfo
++ 
+  
+- # Copy soc related config and binary to board
+  PRODUCT_COPY_FILES += \
+++<<<<<<< HEAD
+ +    device/idtech/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
+ +    device/idtech/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+ +    device/idtech/common/input/matrix-keypad.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/matrix-keypad.kl: \
+ +    device/idtech/common/input/touchscreen/FW_TDDI_TRUNK_FB.ili:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/FW_TDDI_TRUNK_FB.ili \
+ +    device/idtech/common/input/touchscreen/TM050JYHS11_TM_500_20190614.hex:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/TM050JYHS11_TM_500_20190614 \
+++=======
+++>>>>>>> android-11.0.0_2.0.0
+      frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
+      frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+      frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+      frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+-     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
++     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml
+  
+++<<<<<<< HEAD
+ +# Copy framework display settings file
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/common/display-settings/display_settings.xml:$(TARGET_COPY_OUT_VENDOR)/etc/display_settings.xml
+ +
+ +# Copy soc related config and binary to board
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/imx8m/init.idt.common.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/init.idt.common.rc \
+ +    device/idtech/imx8m/check_modem.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/check_modem.sh \
+ +
+ +# Copy the latest uuu tool
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/common/tools/uuu:uuu \
+ +    device/idtech/common/tools/uuu_aarch64:uuu_aarch64 \
+ +    device/idtech/common/tools/uuu.exe:uuu.exe
+++=======
++ # -------@block_wifi-------
++ PRODUCT_PACKAGES += \
++     hostapd \
++     hostapd_cli \
++     wpa_supplicant \
++     wpa_supplicant.conf
++ 
++ PRODUCT_PACKAGES += \
++     netutils-wrapper-1.0
+++>>>>>>> android-11.0.0_2.0.0
+  
+ -# wifionly device
+  PRODUCT_PROPERTY_OVERRIDES += \
+ -    ro.radio.noril=yes
+ +    pm.dexopt.boot=quicken
+  
+- PRODUCT_PROPERTY_OVERRIDES += \
+-     ro.mediacomponents.package=com.nxp.extractorpkg
+  
+- # Set c2 codec in default
+- PRODUCT_PROPERTY_OVERRIDES += \
+-     debug.stagefright.ccodec=4  \
+-     debug.stagefright.omx_default_rank=0x200 \
+-     debug.stagefright.c2-poolmask=0x70000
++ # -------@block_bluetooth-------
+  
+- # enable incremental installation
+- PRODUCT_PROPERTY_OVERRIDES += \
+-     ro.incremental.enable=1
++ PRODUCT_PACKAGES += \
++      libbt-vendor
+  
+- # we have enough storage space to hold precise GC data
+- PRODUCT_TAGS += dalvik.gc.type-precise
++ # LDAC codec
++ PRODUCT_PACKAGES += \
++     libldacBT_enc \
++     libldacBT_abr
+  
+++<<<<<<< HEAD
+ +PRODUCT_DEFAULT_DEV_CERTIFICATE := \
+ +    device/idtech/common/security/testkey
+++=======
++ # -------@block_sensor-------
++ PRODUCT_PACKAGES += \
++     fsl_sensor_fusion
+++>>>>>>> android-11.0.0_2.0.0
+  
++ # -------@block_input-------
++ 
++ PRODUCT_COPY_FILES += \
++     $(CONFIG_REPO_PATH)/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
++     $(CONFIG_REPO_PATH)/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
++     $(CONFIG_REPO_PATH)/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
++     $(CONFIG_REPO_PATH)/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
++     $(CONFIG_REPO_PATH)/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
++     $(CONFIG_REPO_PATH)/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc
++ 
++ # -------@block_debug-------
+  # In userdebug, add minidebug info the the boot image and the system server to support
+  # diagnosing native crashes.
+  ifneq (,$(filter userdebug, $(TARGET_BUILD_VARIANT)))
+@@@ -304,45 -323,13 +453,37 @@@
+      # Note: we cannot use PRODUCT_SYSTEM_SERVER_JARS, as it has not been expanded at this point.
+      $(call add-product-dex-preopt-module-config,services,--generate-mini-debug-info)
+      $(call add-product-dex-preopt-module-config,wifi-service,--generate-mini-debug-info)
+ +
+ +    # idtech idg spi console tool for test & debug
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_tool
+ +
+ +    # idtech idg spi service daemon
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_service
+ +
+ +    # idtech idg spi client
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_client
+ +
+ +    # idtech idg console tool
+ +    PRODUCT_PACKAGES += \
+ +        idg_console_tool
+  endif
+  
+- PRODUCT_AAPT_CONFIG := normal mdpi
+- PRODUCT_SHIPPING_API_LEVEL := 30
+- 
+- # Enforce privapp-permissions whitelist
+- PRODUCT_PROPERTY_OVERRIDES += \
+-     ro.control_privapp_permissions=enforce
+- 
+- #OEM Unlock reporting
+- PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
+-     ro.oem_unlock_supported=1
+- 
+- # include a google recommand heap config file.
+- include frameworks/native/build/tablet-10in-xhdpi-2048-dalvik-heap.mk
+- 
+- -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_real_dec/fsl_real_dec.mk
+- -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_ms_codec/fsl_ms_codec.mk
+- 
+- PREBUILT_FSL_IMX_CODEC := true
++ #Dumpstate HAL 1.1 support
++ PRODUCT_PACKAGES += \
++     android.hardware.dumpstate@1.1-service.imx
+  
+++<<<<<<< HEAD
+ +PRODUCT_SOONG_NAMESPACES += external/mesa3d
+ +
+ +# IDT common properties
+ +PRODUCT_PROPERTY_OVERRIDES += \
+ +    persist.idt.enable_externalsource=0
+++=======
++ # -------@block_treble-------
++ # vndservicemanager
++ PRODUCT_PACKAGES += \
++     vndservicemanager
+++>>>>>>> android-11.0.0_2.0.0
+diff --cc imx8m/sepolicy/bootanim.te
+index 7fef8cda,3b0e36a7..b30ba09a
+--- a/imx8m/sepolicy/bootanim.te
++++ b/imx8m/sepolicy/bootanim.te
+@@@ -5,6 -3,4 +5,10 @@@ get_prop(bootanim, vendor_default_prop
+  allow bootanim ashmem_device:chr_file {execute};
+  allow bootanim self:process execmem;
+  allow bootanim rootfs:lnk_file {getattr};
+++<<<<<<< HEAD
+ +allow bootanim hal_configstore_default:binder { call };
+ +allow bootanim idtech_data_file:dir search;
+ +allow bootanim idtech_data_file:file { map open read };
+++=======
++ allow bootanim hal_graphics_allocator_default_tmpfs:file { read write };
+++>>>>>>> android-11.0.0_2.0.0
+diff --cc imx8m/sepolicy/device.te
+index 027d902f,b8dad3af..b7a96283
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@@ -8,8 -8,6 +8,14 @@@ type diag_device, dev_type, mlstrustedo
+  type sysfs_block_devices, sysfs_type, fs_type;
+  type mmc_rpmb_char_device, dev_type;
+  type latency_device, dev_type;
+++<<<<<<< HEAD
+ +type bootloader_block_device, dev_type;
+ +type spl_block_device, dev_type;
+ +type rild_device, dev_type;
+ +type ptr_device, dev_type;
+ +type idtechdata_block_device, dev_type;
+++=======
++ type emmc_boot0, dev_type;
++ type sdcard, dev_type;
++ type vsi_daemon_ctrl_device, dev_type;
+++>>>>>>> android-11.0.0_2.0.0
+diff --cc imx8m/sepolicy/file.te
+index f73a59ca,51726424..1f0ed3ab
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@@ -3,7 -3,4 +3,11 @@@ type debugfs_dma, debugfs_type, fs_type
+  type debugfs_sw_sync, debugfs_type, fs_type;
+  type sysfs_soc, sysfs_type, fs_type;
+  type proc_util_clamp, fs_type, proc_type;
+++<<<<<<< HEAD
+ +type sysfs_usb_uevent, sysfs_type, fs_type;
+ +type idtech_data_file, file_type, data_file_type, core_data_file_type;
+ +type idtech_orientation_data_file, file_type, data_file_type, core_data_file_type;
+ +type idtech_bootmedia_data_file, file_type, data_file_type, core_data_file_type;
+++=======
++ type pps_socket, file_type;
+++>>>>>>> android-11.0.0_2.0.0
+diff --cc imx8m/sepolicy/file_contexts
+index c3dbb04f,ec87ea84..4e6e7347
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@@ -102,21 -109,10 +114,31 @@@
+  
+  /vendor/bin/hw/android\.hardware\.camera\.provider@2\.6-service-google       u:object_r:hal_camera_default_exec:s0
+  
+++<<<<<<< HEAD
+ +# lsusb command
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +
+ +#quectel port
+ +#/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+ +#/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+ +/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+ +#/system/socket/rild              u:object_r:rild_socket:s0
+ +#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+ +/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+ +/system/bin/chat                 u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up            u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-down          u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up-vpn        u:object_r:ppp_exec:s0
+ +/dev/usb/lp0                     u:object_r:ptr_device:s0
+++=======
++ # allocator 4.0
++ /(vendor|system/vendor)/bin/hw/android\.hardware\.graphics\.allocator@4\.0-service.imx   u:object_r:hal_graphics_allocator_default_exec:s0
++ 
++ # hantro v4l2 daemon
++ /vendor/bin/vsidaemon                         u:object_r:vsidaemon_exec:s0
++ /dev/vsi_daemon_ctrl                          u:object_r:vsi_daemon_ctrl_device:s0
++ /data/vendor/vsi(/.*)?                        u:object_r:vsi_data_file:s0
+++>>>>>>> android-11.0.0_2.0.0
+diff --cc imx8m/sepolicy/platform_app.te
+index 7043d8e6,6a97e242..cfe09cd6
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@@ -1,17 -1,3 +1,22 @@@
+++<<<<<<< HEAD
+ +typeattribute platform_app mlstrustedsubject;
+ +typeattribute platform_app system_writes_vendor_properties_violators;
+ +typeattribute platform_app system_writes_mnt_vendor_violators;
+ +
+ +allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
+ +allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
+ +allow platform_app idtech_data_file:dir { add_name write };
+ +allow platform_app ptr_device:chr_file rw_file_perms;
+ +allow platform_app vendor_idtech_prop:property_service  { set };
+ +allow platform_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
+ +allow platform_app idtech_bootmedia_data_file:dir { create_dir_perms rw_dir_perms };
+ +allow platform_app idtech_bootmedia_data_file:file { create_file_perms rw_file_perms };
+ +allow platform_app idtech_bootmedia_data_file:dir { add_name write };
+ +allow platform_app mnt_vendor_file:dir { search };
+ +
+ +get_prop(platform_app, vendor_idtech_prop)
+++=======
++ allow platform_app hal_graphics_allocator_default_tmpfs:file { read write };
++ 
+++>>>>>>> android-11.0.0_2.0.0
+  get_prop(platform_app, vendor_default_prop)
+diff --cc imx8m/sepolicy/property_contexts
+index bbc29601,8deccfee..f1eee7ef
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@@ -174,11 -175,9 +175,15 @@@ ro.boot.soc_rev                     u:o
+  ro.boot.boot_device_root            u:object_r:vendor_public_default_prop:s0
+  ro.hardware.gralloc_viv             u:object_r:vendor_public_default_prop:s0
+  vendor.media.fsl_codec.flag         u:object_r:vendor_public_default_prop:s0
+- ro.media.maxmem                     u:object_r:vendor_public_default_prop:s0
+  vendor.gki.enable                   u:object_r:vendor_public_default_prop:s0
+++<<<<<<< HEAD
+ +hwc.debug.dump_refresh_rate         u:object_r:vendor_public_default_prop:s0
+ +hwc.drm.fbTileSupport               u:object_r:vendor_public_default_prop:s0
+ +media.log.level                     u:object_r:vendor_public_default_prop:s0
+++=======
++ vendor.hwc.debug.dump_refresh_rate  u:object_r:vendor_public_default_prop:s0
++ vendor.hwc.drm.fbTileSupport        u:object_r:vendor_public_default_prop:s0
+++>>>>>>> android-11.0.0_2.0.0
+  
+  ro.boot.gui_resolution              u:object_r:vendor_default_prop:s0
+  ro.boot.primary_display             u:object_r:vendor_default_prop:s0
+@@@ -192,38 -190,16 +196,51 @@@ vendor.rw.camera.test               u:o
+  vendor.audio.lpa.hold_second        u:object_r:vendor_default_prop:s0
+  vendor.audio.lpa.period_ms          u:object_r:vendor_default_prop:s0
+  vendor.qcom.bluetooth.soc           u:object_r:vendor_default_prop:s0
+++<<<<<<< HEAD
+ +hwc.debug.dump_compose              u:object_r:vendor_default_prop:s0
+ +hwc.debug.dump_bitmap               u:object_r:vendor_default_prop:s0
+ +hwc.debug.dump_split_area           u:object_r:vendor_default_prop:s0
+ +hwc.stretch.filter                  u:object_r:vendor_default_prop:s0
+ +hwc.debug.disable_compression       u:object_r:vendor_default_prop:s0
+ +vendor.persist.audio.pass.through   u:object_r:vendor_default_prop:s0
+ +vendor.rw.VIDEO_RENDER_NAME         u:object_r:vendor_default_prop:s0
+ +sys.SECOND_DISPLAY_ENABLED          u:object_r:vendor_default_prop:s0
+ +ro.mediacomponents.package          u:object_r:vendor_default_prop:s0
+ +AQROOT                              u:object_r:vendor_default_prop:s0
+ +CL_NOPREPROCESS                     u:object_r:vendor_default_prop:s0
+ +back_camera_name                    u:object_r:vendor_default_prop:s0
+ +back_camera_orient                  u:object_r:vendor_default_prop:s0
+ +front_camera_name                   u:object_r:vendor_default_prop:s0
+ +front_camera_orient                 u:object_r:vendor_default_prop:s0
+ +ro.rfkilldisabled                   u:object_r:vendor_default_prop:s0
+ +
+ +# serial number for mdnsd broadcast
+ +ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+ +
+ +ro.radio.noril                      u:object_r:radio_prop:s0 exact string
+ +vendor.rild.                        u:object_r:radio_prop:s0
+ +rild.                               u:object_r:radio_prop:s0
+ +net.eth0.                           u:object_r:radio_prop:s0
+ +net.ppp0.dns1                       u:object_r:radio_prop:s0
+ +net.ppp0.dns2                       u:object_r:radio_prop:s0
+ +net.ppp0.local-ip                   u:object_r:radio_prop:s0
+ +net.ppp0.remote-ip                  u:object_r:radio_prop:s0
+ +net.ppp0.gw                         u:object_r:radio_prop:s0
+ +
+ +# create new property header for IDTECH products
+ +persist.idt.                        u:object_r:vendor_idtech_prop:s0
+++=======
++ vendor.hwc.debug.dump_compose              u:object_r:vendor_default_prop:s0
++ vendor.hwc.debug.dump_bitmap               u:object_r:vendor_default_prop:s0
++ vendor.hwc.debug.dump_split_area           u:object_r:vendor_default_prop:s0
++ vendor.hwc.stretch.filter                  u:object_r:vendor_default_prop:s0
++ vendor.hwc.debug.disable_compression       u:object_r:vendor_default_prop:s0
++ vendor.persist.audio.pass.through          u:object_r:vendor_default_prop:s0
++ vendor.rw.VIDEO_RENDER_NAME                u:object_r:vendor_default_prop:s0
++ vendor.sys.SECOND_DISPLAY_ENABLED          u:object_r:vendor_default_prop:s0
++ vendor.AQROOT                              u:object_r:vendor_default_prop:s0
++ vendor.CL_NOPREPROCESS                     u:object_r:vendor_default_prop:s0
+++>>>>>>> android-11.0.0_2.0.0
+  
+  # vendor_wifi_version
+  vendor.wlan.driver.version    u:object_r:vendor_wifi_version:s0
+diff --cc imx8m/sepolicy/system_app.te
+index 42dbaf54,1147dbf5..96bccbed
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@@ -12,11 -10,6 +12,15 @@@ allow system_app ctl_default_prop:prope
+  allow system_app dhcp_prop:property_service  { set };
+  allow system_app update_engine:binder { call transfer };
+  allow system_app fs_bpf:dir { search };
+++<<<<<<< HEAD
+ +allow system_app ota_package_file:dir rw_dir_perms;
+ +allow system_app ota_package_file:file { create_file_perms relabelfrom };
+ +allow system_app media_rw_data_file:file relabelto;
+ +allow system_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
+ +allow system_app apk_data_file:dir { write };
+++=======
++ allow system_app hal_graphics_allocator_default_tmpfs:file { read write };
+++>>>>>>> android-11.0.0_2.0.0
+  
+  get_prop(system_app, vendor_default_prop)
+ +set_prop(system_app, vendor_idtech_prop)

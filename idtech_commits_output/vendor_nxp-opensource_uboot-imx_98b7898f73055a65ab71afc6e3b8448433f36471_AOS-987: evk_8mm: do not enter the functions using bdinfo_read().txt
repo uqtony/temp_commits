@@ -1,0 +1,205 @@
+98b7898f73 George.Huang 2022-04-15
+
+AOS-987: evk_8mm: do not enter the functions using bdinfo_read()
+
+- bdinfo_read() is idtech projects only, not for nxp projects
+- below 2 functions are defined but not used
+  bool idt_get_board_rotation(char *buf, size_t buf_size);
+  bool idt_get_board_hdmi_resolution(char *buf, size_t buf_size);
+
+Change-Id: I32183788a9fc0bd85820f8a73b1a4194a5b31a16
+
+diff --git a/common/image-android.c b/common/image-android.c
+index 6355b46b0f..83454f3270 100644
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@ -188,6 +188,7 @@ static void append_androidboot_args(char *args, uint32_t *len)
+ 		strncat(args, args_buf, *len - strlen(args));
+ 	}
+ 
++#ifdef CONFIG_IDT_BOARD_INFO_PARSER
+ 	/* append board type into bootargs */
+ 	char idt_board_type[BDINFO_DATA_SIZE] = "";
+ 
+@@ -222,6 +223,7 @@ static void append_androidboot_args(char *args, uint32_t *len)
+ 		sprintf(args_buf, " androidboot.idt.display_id=%s", idt_display_id);
+ 		strncat(args, args_buf, *len - strlen(args));
+ 	}
++#endif /* CONFIG_IDT_BOARD_INFO_PARSER */
+ 
+ 	sprintf(args_buf,
+ 			" androidboot.boot_device_root=mmcblk%d", mmc_map_to_kernel_blk(mmc_get_env_dev()));
+diff --git a/common/splash.c b/common/splash.c
+index dbf22d247a..c6d2de7368 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -230,11 +230,13 @@ int splash_display(void)
+ 
+ 	addr = simple_strtoul(s, NULL, 16);
+ 
++#ifdef CONFIG_IDT_ROTATION
+ 	/* read display orientation from idtechdata partition before prepare splash */
+ 	if (!read_orientation_file()) {
+ 		/* if orientation fil not found, get main display orientation from bdinfo */
+ 		read_orientation_bdinfo();
+ 	}
++#endif /* CONFIG_IDT_ROTATION */
+ 
+ 	ret = splash_screen_prepare();
+ #ifdef CONFIG_IDT_ROTATION
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index d35049a9db..7938381de9 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -644,6 +644,8 @@ bool __weak is_power_key_pressed(void) {
+ 	return false;
+ }
+ 
++#ifdef CONFIG_IDT_LINUX_DTB
++
+ #define GET_BYTE(x, n)  ((x & (0xff << 8 * n)) >> 8 * n)
+ #define FDT_ID_SIZE	128 /* the maximun size of idt,prod-id is 128 */
+ 
+@@ -730,6 +732,7 @@ find_out:
+ 
+ 	return fdt_idx;
+ }
++#endif /* CONFIG_IDT_LINUX_DTB */
+ 
+ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+ 
+@@ -764,9 +767,11 @@ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+ 
+ 	check_hab_status();
+ 
++#ifdef CONFIG_IDT_BOARD_INFO_PARSER
+ 	if (!is_bdinfo_som_set()) {
+ 		goto fail;
+ 	}
++#endif /* CONFIG_IDT_BOARD_INFO_PARSER */
+ 
+ 	/* get bootmode, default to boot "boot" */
+ 	if (argc > 1) {
+@@ -1155,14 +1160,6 @@ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+ 			goto fail;
+ 		}
+ 	}
+-#else /* !CONFIG_IDT_LINUX_DTB */
+-	entry_idx = find_dtb_in_dtbo(dt_img);
+-	if (entry_idx < 1) {
+-		puts("boota: no avaliable dtb
+");
+-		retry_boot = true;
+-		goto fail;
+-	}
+-#endif /* CONFIG_IDT_LINUX_DTB */
+ 	dt_entry = (struct dt_table_entry *)
+ 		   ((ulong)dt_img +
+ 		    fdt32_to_cpu(dt_img->dt_entries_offset) *
+@@ -1170,6 +1167,13 @@ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+ 	fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+ 	memcpy((void *)(ulong)fdt_addr, (void *)((ulong)dt_img +
+ 			fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
++#else /* !CONFIG_IDT_LINUX_DTB */
++	dt_entry = (struct dt_table_entry *)((ulong)dt_img +
++			be32_to_cpu(dt_img->dt_entries_offset));
++	fdt_size = be32_to_cpu(dt_entry->dt_size);
++	memcpy((void *)(ulong)fdt_addr, (void *)((ulong)dt_img +
++			be32_to_cpu(dt_entry->dt_offset)), fdt_size);
++#endif /* CONFIG_IDT_LINUX_DTB */
+ 
+ 	/* Combine cmdline */
+ 	if (boot_header_version == 4) {
+diff --git a/include/persist_idt.h b/include/persist_idt.h
+index 7863aad33f..d912e42150 100644
+--- a/include/persist_idt.h
++++ b/include/persist_idt.h
+@@ -171,10 +171,6 @@ void idt_get_board_serial(char *serialnr);
+ 
+ bool idt_get_board_type(char *buf, size_t buf_size);
+ 
+-bool idt_get_board_rotation(char *buf, size_t buf_size);
+-
+-bool idt_get_board_hdmi_resolution(char *buf, size_t buf_size);
+-
+ bool idt_get_board_display_id(char *buf, size_t buf_size);
+ 
+ #ifdef __cplusplus
+diff --git a/lib/persist_idt/persist_idt.c b/lib/persist_idt/persist_idt.c
+index 5142c02665..1a1c6bc315 100644
+--- a/lib/persist_idt/persist_idt.c
++++ b/lib/persist_idt/persist_idt.c
+@@ -575,9 +575,10 @@ IdtInfoResult handle_bdinfo_var(bool do_set, char *cmd, char *arg, char *buffer,
+ 
+ 	/* load bdinfo_data */
+ 	ret = bdinfo_read(&bdinfo_data, buffer, size);
+-	if (ret != IDTINFO_RESULT_OK)
++	if (ret != IDTINFO_RESULT_OK) {
++		printf("Error: bdinfo read failed: 
+");
+ 		return ret;
+-
++	}
+ 	if (!strcmp_l1("som-model", cmd)) {
+ 		if (do_set) strlcpy((char *)bdinfo_data.som_model, arg, BDINFO_DATA_SIZE);
+ 		snprintf(var, BDINFO_DATA_SIZE, "%s", (char *)bdinfo_data.som_model);
+@@ -657,10 +658,11 @@ void idt_get_board_serial(char *serialnr) {
+ 
+ 	if (ret != IDTINFO_RESULT_OK) {
+ 		printf("Error: bdinfo read failed: %s
+", err_msg);
++		avb_memcpy(serialnr, (char *)"123A456789", BDINFO_DATA_SIZE);
++	} else {
++		avb_memcpy(serialnr, (char *)bdinfo_data.dev_serial, BDINFO_DATA_SIZE);
+ 	}
+ 
+-	avb_memcpy(serialnr, (char *)bdinfo_data.dev_serial, BDINFO_DATA_SIZE);
+-
+ 	return;
+ }
+ 
+@@ -681,40 +683,6 @@ bool idt_get_board_type(char *buf, size_t buf_size)
+ 	return true;
+ }
+ 
+-bool idt_get_board_rotation(char *buf, size_t buf_size)
+-{
+-	if (!buf || buf_size < BDINFO_DATA_SIZE) {
+-		printf("Error: wrong input buffer or size
+");
+-		return false;
+-	}
+-	BoardInfoData bdinfo_data;
+-	char response[FASTBOOT_RESPONSE_LEN];
+-
+-	if (bdinfo_read(&bdinfo_data, response, FASTBOOT_RESPONSE_LEN) != 0) {
+-		printf("Error: bdinfo read failed: %s
+", response);
+-		return false;
+-	}
+-	avb_memcpy(buf, (char *)bdinfo_data.disp_rotation, buf_size);
+-	return true;
+-}
+-
+-bool idt_get_board_hdmi_resolution(char *buf, size_t buf_size)
+-{
+-	if (!buf || buf_size < BDINFO_DATA_SIZE) {
+-		printf("Error: wrong input buffer or size
+");
+-		return false;
+-	}
+-	BoardInfoData bdinfo_data;
+-	char response[FASTBOOT_RESPONSE_LEN];
+-
+-	if (bdinfo_read(&bdinfo_data, response, FASTBOOT_RESPONSE_LEN) != 0) {
+-		printf("Error: bdinfo read failed: %s
+", response);
+-		return false;
+-	}
+-	avb_memcpy(buf, (char *)bdinfo_data.hdmi_resolution, buf_size);
+-	return true;
+-}
+-
+ bool idt_get_board_display_id(char *buf, size_t buf_size)
+ {
+ 	if (!buf || buf_size < BDINFO_DATA_SIZE) {

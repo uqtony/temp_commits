@@ -1,0 +1,71 @@
+d8efbee3c371 Sergii Postulga 2020-06-15
+
+arm64: dts: idt_imx8mq_evt-0_evk_mipipanel: Disable dynamic partitions
+
+Temporary patch until we enable dynamic partitions.
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: Id7b335749491a566760af76b3eca454a0c23bb87
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0.dts
+index 53724e1852e7..967fbc1ccdce 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_mipipanel-0.dts
+@@ -9,6 +9,57 @@
+ 
+ #include "imx8mq-evk-dcss-rm67191.dts"
+ 
++/ {
++	firmware {
++		android {
++			compatible = "android,firmware";
++			/* default emmc node used for GSI */
++			boot_devices = "soc@0/soc@0:bus@30800000/30b40000.mmc";
++			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++			boot_devices_mmcblk0 = "soc@0/soc@0:bus@30800000/30b40000.mmc";
++			fstab {
++				compatible = "android,fstab";
++				system {
++					compatible = "android,system";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/system";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb/q-gsi.avbpubkey:/avb/r-gsi.avbpubkey:/avb/s-gsi.avbpubkey";
++				};
++				vendor {
++					compatible = "android,vendor";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/vendor";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb";
++				};
++				product {
++					compatible = "android,product";
++					/* default emmc node used for GSI */
++					dev = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
++					/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++					dev_mmcblk0 = "/dev/block/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/by-name/product";
++					type = "ext4";
++					mnt_flags = "ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb";
++				};
++			};
++			vbmeta {
++				/*we need use FirstStageMountVBootV2 if we enable avb*/
++				compatible = "android,vbmeta";
++				/*parts means the partition witch can be mount in first stage*/
++				parts = "vbmeta,dtbo,boot,system,vendor,product";
++			};
++		};
++	};
++};
++
+ / {
+ 	idt,prod-id = "idt_imx8mq_evt-0_evk_mipipanel-0";
+ };

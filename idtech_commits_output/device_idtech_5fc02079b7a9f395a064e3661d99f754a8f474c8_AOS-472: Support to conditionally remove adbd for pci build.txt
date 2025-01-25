@@ -1,0 +1,57 @@
+5fc02079 max.yang 2021-02-17
+
+AOS-472: Support to conditionally remove adbd for pci build
+
+Symptom: Device keep crashing after removing adb apex module
+Root Cause:
+   1. Adbd changed from /system/bin/ to a stand alone apex module
+   2. Removing adb apex will remove shared libraries and crash on accessing
+Solution:
+   1. Shoule keep apex module, but physically remove adbd binary
+   2. Since adbd apex is build by Androi.bp, no conditional expression like
+      "ifeq", so we need to hook on .go parser function for additional control
+
+Change-Id: I01715dd9a689680577d888f7ecc29da8b593512a
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index bb432877..8f805932 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -199,3 +199,7 @@ PRODUCT_COPY_FILES += \
+ -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_real_dec/BoardConfig.mk
+ 
+ ENABLE_VENDOR_RIL_SERVICE := true
++
++SOONG_CONFIG_NAMESPACES += IDT
++SOONG_CONFIG_IDT += PCI_RM_ADBD
++SOONG_CONFIG_IDT_PCI_RM_ADBD ?= false
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn_pci.mk b/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
+index 5e76ca07..61c1e794 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
+@@ -6,3 +6,5 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mn.mk)
+ 
+ # Overrides
+ PRODUCT_NAME := vp6820_8mn_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp_pci.mk b/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
+index 01ae62a4..623fa871 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
+@@ -6,3 +6,5 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mp.mk)
+ 
+ # Overrides
+ PRODUCT_NAME := vp6820_8mp_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_pci.mk b/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
+index e9e9d003..246bc98f 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
+@@ -6,3 +6,5 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
+ 
+ # Overrides
+ PRODUCT_NAME := vp6820_8mq_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true

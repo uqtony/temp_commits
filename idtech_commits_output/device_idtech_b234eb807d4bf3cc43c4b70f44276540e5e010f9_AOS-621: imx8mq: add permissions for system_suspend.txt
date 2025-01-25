@@ -1,0 +1,106 @@
+b234eb80 George.Huang 2021-05-28
+
+AOS-621: imx8mq: add permissions for system_suspend
+
+Error Log:
+avc: denied { set } for property=vendor.display.state pid=384 uid=1000 gid=1003 scontext=u:r:hal_graphics_composer_default:s0 tcontext=u:object_r:vendor_default_prop:s0 tclass=property_service
+avc: denied { read } for comm="Binder:255_2" name="wakeup7" dev="sysfs" ino=30986 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:255_2" name="wakeup3" dev="sysfs" ino=23304 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:255_2" name="wakeup4" dev="sysfs" ino=23399 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:255_2" name="wakeup6" dev="sysfs" ino=27378 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_net:s0 tclass=dir permissive=0
+avc: denied { open } for comm="Binder:248_2" path="/sys/devices/virtual/power_supply/usb/wakeup4" dev="sysfs" scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir
+avc: denied { open } for comm="Binder:255_2" path="/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup2" dev="sysfs" scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir
+avc: denied { open } for comm="Binder:255_2" path="/sys/devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup9" dev="sysfs" scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir
+
+Change-Id: Ief471b8d74e2d992ec809f1b21536f461d1c446a
+
+diff --git a/imx8m/bigcypress_8mq/sepolicy/genfs_contexts b/imx8m/bigcypress_8mq/sepolicy/genfs_contexts
+index 46f70e2c..3976cabe 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/genfs_contexts
++++ b/imx8m/bigcypress_8mq/sepolicy/genfs_contexts
+@@ -14,12 +14,19 @@ genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0001:00/0001:00:00.0/000
+ 
+ # android.system.suspend@1.0-service
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup0                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup6                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup3                 u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup      u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/virtual/power_supply/battery/wakeup3                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/virtual/power_supply/usb/wakeup4                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+-genfscon sysfs /devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6          u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup7          u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup9                           u:object_r:sysfs_wakeup:s0
+ 
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
++
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+index 4f53c329..2438310e 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+@@ -15,10 +15,12 @@ genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0001:00/0001:00:00.0/000
+ # android.system.suspend@1.0-service
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup0                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup5                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup6                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup2                 u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup3                 u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup      u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup3                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup4                                                                           u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 0e2e693c..fb5f2f62 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -135,6 +135,7 @@
+ /sys/devices/platform/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb1/1-1/1-1.4/1-1.4:1.4/uevent  u:object_r:sysfs_usb_uevent:s0
+ 
+ #quectel port
+ #/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 2eeac2c0..156a8e5a 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -179,6 +179,7 @@ vendor.gki.enable                   u:object_r:vendor_public_default_prop:s0
+ vendor.hwc.debug.dump_refresh_rate  u:object_r:vendor_public_default_prop:s0
+ vendor.hwc.drm.fbTileSupport        u:object_r:vendor_public_default_prop:s0
+ media.log.level                     u:object_r:vendor_public_default_prop:s0
++vendor.display.state                u:object_r:vendor_public_default_prop:s0
+ 
+ ro.boot.gui_resolution              u:object_r:vendor_default_prop:s0
+ ro.boot.primary_display             u:object_r:vendor_default_prop:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/genfs_contexts b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+index 4bea6a6c..8d547075 100644
+--- a/imx8m/vp6820_8mq/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+@@ -15,16 +15,19 @@ genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0001:00/0001:00:00.0/000
+ # android.system.suspend@1.0-service
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup0                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup5                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup6                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup2                 u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup3                 u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup      u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup3                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup4                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup8                           u:object_r:sysfs_wakeup:s0
+ 
+ # vp6820 chip as external connection
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a40000.i2c/i2c-2/2-0067/extcon   u:object_r:sysfs_extcon:s0

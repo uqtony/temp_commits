@@ -1,0 +1,46 @@
+1374fa94 Arthur Chen 2020-11-12
+
+AOS-400: For secure build about evk under vp6820_mq.
+
+    -symptom: can't boot with fused i.mx8mq evk board about secure, hab enabled
+    system image.
+
+    -log:
+    ...
+    Normal Boot
+    Trying to boot from MMC1
+    Magic is incorrect.
+    Error validating A/B metadata from disk.
+    Resetting and writing new A/B metadata to disk.
+    hwpart=1, slot_part=1
+
+    Authenticate image from DDR location 0x401fcdc0...
+    spl: ERROR:  image authentication unsuccessful
+    Error validating A/B metadata from disk.
+
+    -root cause: sign_imx_uboot progress is not support DTB of U-boot selection.
+    Can't find proper DTB of U-boot to sign in progress for
+    android hab verification.
+
+    -according design of AOS-338, u-boot splash screen won't be showing in evk
+    because vp6820_mq's configure is separated for A300.
+
+    -solution: copy & rename the proper DTB of U-boot to be default hardcoded one
+    for imx-mkimage packaging progress about NXP orgin design to match previous
+    idtech signing image progress.
+
+Change-Id: Ie3279e06b57fd59dc32e9027e9c0688b883a572c
+
+diff --git a/imx8m/vp6820_8mq/AndroidUboot.mk b/imx8m/vp6820_8mq/AndroidUboot.mk
+index 06a2fe2a..587fb8d5 100644
+--- a/imx8m/vp6820_8mq/AndroidUboot.mk
++++ b/imx8m/vp6820_8mq/AndroidUboot.mk
+@@ -13,7 +13,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	cp $(UBOOT_OUT)/arch/arm/dts/imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/imx8mq-evk.dtb; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \

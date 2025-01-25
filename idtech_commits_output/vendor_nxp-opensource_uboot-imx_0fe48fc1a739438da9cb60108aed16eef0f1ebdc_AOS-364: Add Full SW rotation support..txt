@@ -1,0 +1,295 @@
+0fe48fc1a7 Arthur Chen 2020-10-21
+
+AOS-364: Add Full SW rotation support.
+
+    - add orientation features about x-flip, y-flip and clockwise 90, 180
+    and 270 rotation by SW,
+    the framebuffer rendering control with algorithm.
+    - add buffer clear initialization to avoid display noise.
+
+Change-Id: Iac1f4da14bbd59f999b91a1c26c88e639d429d0e
+
+diff --git a/lib/image_idt/image_idt.c b/lib/image_idt/image_idt.c
+index c8c2c75477..dffa01187b 100644
+--- a/lib/image_idt/image_idt.c
++++ b/lib/image_idt/image_idt.c
+@@ -7,19 +7,20 @@
+ #include <linux/string.h>
+ #include <image_idt.h>
+ 
++/* globally used pointer: externed frame buffer by idtech */
+ void *idt_fb;
+-
++/* globally used pointer: the U-boot frame buffer pointer */
+ void *target_fb;
+ 
+ int idt_fb_init(int size)
+ {
+-	int ret;
++	int ret = -1;
+ 
+ 	idt_fb = malloc(size);
+-	if (idt_fb != NULL)
++	if (idt_fb) {
++		memset(idt_fb, 0x0, size);
+ 		ret = 0;
+-	else
+-		ret = -1;
++	}
+ 
+ 	return ret;
+ }
+@@ -75,12 +76,143 @@ void idt_image_sync(struct udevice *dev)
+ 	}
+ }
+ 
++int idt_raw_x_flip(uchar *target, int size, int base, int degree)
++{
++	uchar *tmp;
++	int i, j, count;
++	int t_count = 0, s_count = 0;
++
++	tmp = malloc(size);
++	if (!tmp) {
++		printf("idt_raw_x_flip fail
+");
++		return -1;
++	}
++
++	memcpy(tmp, target, size);
++	for (i = 0; i < base; ++i) {
++		count = 4*(i+1)*base;
++		for (j = 0; j < base; j++) {
++			s_count = count - 4;
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++			count -= 4;
++		}
++	}
++	free(tmp);
++
++	return 0;
++}
++
++int idt_raw_y_flip(uchar *target, int size, int base, int degree)
++{
++	uchar *tmp;
++	int i, j, count;
++	int t_count = 0, s_count = 0;
++	int ret = 0;
++
++	tmp = malloc(size);
++	if (!tmp) {
++		printf("idt_raw_y_flip fail
+");
++		return -1;
++	}
++
++	memcpy(tmp, target, size);
++	count = size - 4*base;
++	for (i = 0; i < base; ++i) {
++		s_count = count - 4*i*base;
++		for (j = 0; j < base; j++) {
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++			target[t_count++] = tmp[s_count++];
++		}
++	}
++	free(tmp);
++
++	return 0;
++}
++
++int idt_raw_rotate(uchar *target, int size, int base, int degree)
++{
++	uchar *tmp;
++	int i, j, count, r_count;
++	int t_count = 0, s_count = 0;
++	int ret = 0;
++
++	tmp = malloc(size);
++	if (!tmp) {
++		printf("idt_raw_rotate fail
+");
++		return -1;
++	}
++
++	memcpy(tmp, target, size);
++	switch (degree) {
++	case 90:
++		count = 0;
++		r_count = 0;
++		for (i = 0; i < base; ++i) {
++			s_count = r_count;
++			count = 4*base*(i + 1);
++			for (j = 0; j < base; j++) {
++				t_count = count - 4;
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				s_count += 4*(base - 1);
++				count -= 4;
++			}
++			r_count += 4;
++		}
++		break;
++	case 180:
++		count = 0;
++		r_count = size;
++		t_count = count;
++		for (i = 0; i < base; ++i) {
++			for (j = 0; j < base; j++) {
++				s_count = r_count - 4;
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				r_count -= 4;
++			}
++		}
++		break;
++	case 270:
++		count = size - 4*base;
++		r_count = 0;
++		for (i = 0; i < base; ++i) {
++			s_count = r_count;
++			t_count = count - 4*base*i;
++			for (j = 0; j < base; j++) {
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				target[t_count++] = tmp[s_count++];
++				s_count += 4*(base - 1);
++			}
++			r_count += 4;
++		}
++		break;
++	default:
++		/* keep orginal orienation */
++		break;
++	}
++
++	free(tmp);
++
++	return ret;
++}
++
+ int idt_image_rotate(struct udevice *dev, int degree)
+ {
+ 	struct video_priv *priv = dev_get_uclass_priv(dev);
+ 	uchar *fb;
+ 	int i, j, ret;
+-	int line_length;
+ 	int fb_size;
+ 	int width = video_get_xsize(dev);
+ 	int height = video_get_ysize(dev);
+@@ -100,62 +232,60 @@ int idt_image_rotate(struct udevice *dev, int degree)
+ 			offset = height - width;
+ 			base = width;
+ 		}
+-		line_length = priv->line_length;
+ 		fb_size = priv->fb_size;
+-		switch (degree) {
+-		case 90:
+-			__raw_writel((line_length << 16) | BIT(0),
+-				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+-			break;
+-		case 180:
+-			__raw_writel((line_length << 16) | BIT(1) | BIT(0),
+-				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+-			idt_image_sync(dev);
+-			ret = 0;
+-			goto image_rotate_out;
+-			break;
+-		case 270:
+-			__raw_writel((line_length << 16) | BIT(1),
+-				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+-			break;
+-		default:
+-			__raw_writel((line_length << 16),
+-				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+-			idt_image_sync(dev);
+-			ret = 0;
+-			goto image_rotate_out;
+-			break;
+-		}
+-
+ 		img = malloc(fb_size);
+ 		memcpy(img, idt_fb, fb_size);
+ 		ract_img = malloc(base*base*4);
+-		for (i = 0; i < base; ++i) {
+-			ro_count += offset*2;
+-			for (j = 0; j < base; j++) {
+-				ract_img[count++] = img[ro_count++];
+-				ract_img[count++] = img[ro_count++];
+-				ract_img[count++] = img[ro_count++];
+-				ract_img[count++] = img[ro_count++];
++		memset(ract_img, 0x0, base*base*4);
++		if (width >= height) {
++			for (i = 0; i < base; ++i) {
++				ro_count += offset*2;
++				for (j = 0; j < base; j++) {
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++				}
++				ro_count += offset*2;
++			}
++		} else {
++			ro_count += offset*base*2;
++			for (i = 0; i < base; ++i) {
++				for (j = 0; j < base; j++) {
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++					ract_img[count++] = img[ro_count++];
++				}
+ 			}
+-			ro_count += offset*2;
+ 		}
+ 		priv->fb = target_fb;
+ 		fb = (uchar *)(priv->fb);
+ 		ro_count = 0;
++		idt_raw_rotate(ract_img, (base*base*4), base, degree);
+ 		target = ract_img;
+-		for (i = 0; i < base; ++i) {
+-			count = ro_count;
+-			fb += offset*2;
+-			for (j = 0; j < base; j++) {
+-				*(fb++) = target[count++];
+-				*(fb++) = target[count++];
+-				*(fb++) = target[count++];
+-				*(fb++) = target[count++];
+-				count += 4*(base - 1);
++		count = ro_count;
++		if (width >= height) {
++			for (i = 0; i < base; ++i) {
++				fb += offset*2;
++				for (j = 0; j < base; j++) {
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++				}
++				fb += offset*2;
++			}
++		} else {
++			fb += offset*base*2;
++			for (i = 0; i < base; ++i) {
++				for (j = 0; j < base; j++) {
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++					*(fb++) = target[count++];
++				}
+ 			}
+-			fb += offset*2;
+-			ro_count += 4;
+ 		}
+ 		video_sync(dev, false);
+ 		free(img);

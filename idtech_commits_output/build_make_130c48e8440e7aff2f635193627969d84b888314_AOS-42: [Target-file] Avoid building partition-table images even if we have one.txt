@@ -1,0 +1,24 @@
+130c48e84 max.yang 2019-12-09
+
+AOS-42: [Target-file] Avoid building partition-table images even if we have one
+
+We already copy partition-table images into IMAGES/ folder, this patch skip the
+build process when it find it inside.
+
+Change-Id: I16df87e73a8520fe5f0a085a093ac21ade9e4f1a
+
+diff --git a/tools/releasetools/add_img_to_target_files.py b/tools/releasetools/add_img_to_target_files.py
+index f68976ebc..5dd95b493 100755
+--- a/tools/releasetools/add_img_to_target_files.py
++++ b/tools/releasetools/add_img_to_target_files.py
+@@ -429,6 +429,10 @@ def AddPartitionTable(output_zip):
+   bpt = OutputFile(
+       output_zip, OPTIONS.input_tmp, "IMAGES", "partition-table.bpt")
+ 
++  if os.path.exists(img.input_name) and os.path.exists(bpt.input_name):
++   print("partition-table already exists; not rebuilding...")
++   return img.input_name
++
+   # use BPTTOOL from environ, or "bpttool" if empty or not set.
+   bpttool = os.getenv("BPTTOOL") or "bpttool"
+   cmd = [bpttool, "make_table", "--output_json", bpt.name,

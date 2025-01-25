@@ -1,0 +1,320 @@
+1ac620bbfbd7 owen.wen 2021-12-20
+
+AOS-845: fix build time warning
+
+Change-Id: Iebef89b15b500484d881645db581579aa66a8a92
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index ac147722c201..276105926a49 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -244,15 +244,20 @@ static ssize_t idgv5_spi_tty_read(struct file *file, char __user *user_buffer,
+ {
+ 	struct spi_device *idg_tty;
+ 	struct idg_spi_device *idg_dev;
+-	unsigned char buf[MAX_BUFFER_SIZE];
++	unsigned char *buf = NULL;
+ 	int ret;
+ 
++	buf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!buf)
++		return -ENOMEM;
+ 	idg_tty = (struct spi_device *)file->private_data;
+ 	idg_dev = spi_get_drvdata(idg_tty);
+ 	ret = fifo_get_msg(idg_dev->v5_fifo, buf);
+ 	if (copy_to_user(user_buffer, buf, ret))
+ 		ret = -EFAULT;
+ 
++	if (buf != NULL)
++		kfree(buf);
+ 	return ret;
+ }
+ 
+@@ -265,15 +270,18 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
+ 	int status;
++#if IDG_DEBUG_INFO
+ 	int i;
++#endif /* IDG_DEBUG_INFO */
+ #if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+ 	int ch4msb, ch4lsb;
+ 	int cmdcheck = 0;
+-	char user_buf[MAX_BUFFER_SIZE] = "";
++	int j = 0;
++	char *user_buf = NULL;
+ #endif /* IDG_INPUT_HEX_NUMBER */
+-	char idg_tx[MAX_BUFFER_SIZE] = "";
+-	char idg_rx[MAX_BUFFER_SIZE] = "";
++	char *idg_tx = NULL;
++	char *idg_rx = NULL;
+ 
+ 	spi_message_init(&m);
+ 	idg_tty = (struct spi_device *)file->private_data;
+@@ -290,10 +298,24 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		pr_err("%s: idgv5 spi tty write failed(%d)", DRVNAME, status);
+ 		goto ttyv5_write_out;
+ 	}
+-
+ 	x = x_init;
++	idg_tx = kmalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!x_init->ptp_sts) {
++		status = -ENOMEM;
++		goto ttyv5_write_out;
++	}
++	idg_rx = kmalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!idg_rx) {
++		status = -ENOMEM;
++		goto ttyv5_write_out;
++	}
+ #if IDG_INPUT_HEX_NUMBER
+ 	memcpy(idg_tx, CLIENT_NEOII_Header_V5, IDG_HEADER_LEN);
++	user_buf = kmalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!user_buf) {
++		status = -ENOMEM;
++		goto ttyv5_write_out;
++	}
+ 	if (copy_from_user(user_buf, buffer, count)) {
+ 		status = -EIO;
+ 		goto ttyv5_write_out;
+@@ -304,17 +326,17 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
+-	for (i = 0; i < count; i += 2) {
+-		ch4msb = idg_char2hex(user_buf[i]);
++	for (j = 0; j < count; j += 2) {
++		ch4msb = idg_char2hex(user_buf[j]);
+ 		if (ch4msb < 0)
+ 			cmdcheck++;
+ 
+-		ch4lsb = idg_char2hex(user_buf[i + 1]);
++		ch4lsb = idg_char2hex(user_buf[j + 1]);
+ 		if (ch4lsb < 0)
+ 			cmdcheck++;
+ 
+-		idg_tx[IDG_HEADER_LEN + (i/2)] = (user_buf[i] - ch4msb) << 4;
+-		idg_tx[IDG_HEADER_LEN + (i/2)] += (user_buf[i + 1] - ch4lsb);
++		idg_tx[IDG_HEADER_LEN + (j/2)] = (user_buf[j] - ch4msb) << 4;
++		idg_tx[IDG_HEADER_LEN + (j/2)] += (user_buf[j + 1] - ch4lsb);
+ 	}
+ 	if (cmdcheck)
+ 		dev_info(&idg_tty->dev, "not hex number string input
+");
+@@ -363,6 +385,14 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 
+ 	kfree(x_init->ptp_sts);
+ 	kfree(x_init);
++	if (idg_tx != NULL)
++		kfree(idg_tx);
++	if (idg_rx != NULL)
++		kfree(idg_rx);
++#if IDG_INPUT_HEX_NUMBER
++	if (user_buf != NULL)
++		kfree(user_buf);
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 
+ 	return status;
+ }
+@@ -442,15 +472,20 @@ static ssize_t idg_spi_tty_read(struct file *file, char __user *user_buffer,
+ {
+ 	struct spi_device *idg_tty;
+ 	struct idg_spi_device *idg_dev;
+-	unsigned char buf[MAX_BUFFER_SIZE];
++	unsigned char *buf = NULL;
+ 	int ret;
+ 
++	buf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!buf)
++		return -ENOMEM;
+ 	idg_tty = (struct spi_device *)file->private_data;
+ 	idg_dev = spi_get_drvdata(idg_tty);
+ 	ret = fifo_get_msg(idg_dev->v2_fifo, buf);
+ 	if (copy_to_user(user_buffer, buf, ret))
+ 		ret = -EFAULT;
+ 
++	if (buf != NULL)
++		kfree(buf);
+ 	return ret;
+ }
+ 
+@@ -463,15 +498,18 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
+ 	int status;
++#if IDG_DEBUG_INFO
+ 	int i;
++#endif /* IDG_DEBUG_INFO */
+ #if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+ 	int ch4msb, ch4lsb;
+ 	int cmdcheck = 0;
+-	char user_buf[MAX_BUFFER_SIZE] = "";
++	char *user_buf = NULL;
++	int j = 0;
+ #endif /* IDG_INPUT_HEX_NUMBER */
+-	char idg_tx[MAX_BUFFER_SIZE] = "";
+-	char idg_rx[MAX_BUFFER_SIZE] = "";
++	char *idg_tx = NULL;
++	char *idg_rx = NULL;
+ 
+ 	spi_message_init(&m);
+ 	idg_tty = (struct spi_device *)file->private_data;
+@@ -489,8 +527,23 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		goto tty_write_out;
+ 	}
+ 	x = x_init;
++	idg_tx = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!idg_tx) {
++		status = -ENOMEM;
++		goto tty_write_out;
++	}
++	idg_rx = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!idg_rx) {
++		status = -ENOMEM;
++		goto tty_write_out;
++	}
+ #if IDG_INPUT_HEX_NUMBER
+ 	memcpy(idg_tx, CLIENT_NEOII_Header_V2, IDG_HEADER_LEN);
++	user_buf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!user_buf) {
++		status = -ENOMEM;
++		goto tty_write_out;
++	}
+ 	if (copy_from_user(user_buf, buffer, count)) {
+ 		status = -EIO;
+ 		goto tty_write_out;
+@@ -501,17 +554,17 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
+-	for (i = 0; i < count; i += 2) {
+-		ch4msb = idg_char2hex(user_buf[i]);
++	for (j = 0; j < count; j += 2) {
++		ch4msb = idg_char2hex(user_buf[j]);
+ 		if (ch4msb < 0)
+ 			cmdcheck++;
+ 
+-		ch4lsb = idg_char2hex(user_buf[i + 1]);
++		ch4lsb = idg_char2hex(user_buf[j + 1]);
+ 		if (ch4lsb < 0)
+ 			cmdcheck++;
+ 
+-		idg_tx[IDG_HEADER_LEN + (i/2)] = (user_buf[i] - ch4msb) << 4;
+-		idg_tx[IDG_HEADER_LEN + (i/2)] += (user_buf[i + 1] - ch4lsb);
++		idg_tx[IDG_HEADER_LEN + (j/2)] = (user_buf[j] - ch4msb) << 4;
++		idg_tx[IDG_HEADER_LEN + (j/2)] += (user_buf[j + 1] - ch4lsb);
+ 	}
+ 	if (cmdcheck)
+ 		dev_info(&idg_tty->dev, "not hex number string input
+");
+@@ -560,6 +613,14 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 
+ 	kfree(x_init->ptp_sts);
+ 	kfree(x_init);
++	if (idg_tx != NULL)
++		kfree(idg_tx);
++	if (idg_rx != NULL)
++		kfree(idg_rx);
++#if IDG_INPUT_HEX_NUMBER
++	if (user_buf != NULL)
++		kfree(user_buf);
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 
+ 	return status;
+ }
+@@ -612,17 +673,17 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	struct spi_message m;
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
+-	char idg_tx[BASE_READ_SIZE] = "";
+-	char idg_rx[BASE_READ_SIZE] = "";
++	char *idg_tx = NULL;
++	char *idg_rx = NULL;
+ 
+ 	struct spi_message m_s;
+ 	struct spi_transfer *x_s_init;
+ 	struct spi_transfer *x_s;
+-	char idg_tx_s[MAX_BUFFER_SIZE] = "";
+-	char idg_rx_s[MAX_BUFFER_SIZE] = "";
+-	char data[(BASE_READ_SIZE + MAX_BUFFER_SIZE)] = "";
++	char *idg_tx_s = NULL;
++	char *idg_rx_s = NULL;
++	char *data = NULL;
+ #if IDG_V5_ISSUE_RECOVERY
+-	char recover[(BASE_READ_SIZE + MAX_BUFFER_SIZE)] = "";
++	char *recover = NULL;
+ 	bool recovered = false;
+ 	int idg_start_pos = 0;
+ 	int idg_size_re;
+@@ -657,6 +718,36 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		goto spi_report_out;
+ 	}
+ 	x_s = x_s_init;
++	idg_tx = kzalloc(BASE_READ_SIZE, GFP_KERNEL);
++	if (!idg_tx) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	idg_rx = kzalloc(BASE_READ_SIZE, GFP_KERNEL);
++	if (!idg_rx) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	idg_tx_s = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!idg_tx_s) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	idg_rx_s = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!idg_rx_s) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	data = kzalloc(BASE_READ_SIZE + MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!data) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
++	recover = kzalloc(BASE_READ_SIZE + MAX_BUFFER_SIZE, GFP_KERNEL);
++	if (!recover) {
++		status = -ENOMEM;
++		goto spi_report_out;
++	}
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -1099,6 +1190,18 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		kfree(x_s_init->ptp_sts);
+ 		kfree(x_s_init);
+ 	}
++	if (idg_tx != NULL)
++		kfree(idg_tx);
++	if (idg_rx != NULL)
++		kfree(idg_rx);
++	if (idg_tx_s != NULL)
++		kfree(idg_tx_s);
++	if (idg_rx_s != NULL)
++		kfree(idg_rx_s);
++	if (data != NULL)
++		kfree(data);
++	if (recover != NULL)
++		kfree(recover);
+ 
+ }
+ 
+@@ -1271,6 +1374,9 @@ static int idg_spi_probe(struct spi_device *spi)
+ 		enable_irq(idg_dev->idg_irq);
+ 		idg_dev->irq_en = true;
+ 	}
++	dev_info(&spi->dev, "sizeof(struct idg_spi_device): %d
+", sizeof(struct idg_spi_device));
++	dev_info(&spi->dev, "sizeof(*idg_dev): %d
+", sizeof(*idg_dev));
++	dev_info(&spi->dev, "sizeof(idg_dev): %d
+", sizeof(idg_dev));
+ 	dev_info(&spi->dev, "idg_spi driver probed
+");
+ 
+ 	return 0;

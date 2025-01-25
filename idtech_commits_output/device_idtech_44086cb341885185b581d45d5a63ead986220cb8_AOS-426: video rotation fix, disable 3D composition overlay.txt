@@ -1,0 +1,26 @@
+44086cb3 owen.wen 2020-12-07
+
+AOS-426: video rotation fix, disable 3D composition overlay
+
+Symptom: video didn't rotate as expectation when display rotate 90 or 270 degrees
+Root Cause: NXP 3D composition problem
+Solution: disable 3D composition
+
+below is the thread about this symptom
+https://community.nxp.com/t5/NXP-ID-Tech-Qisda-Portal-190925/IMX8MQ-rotate-video-via-user-rotation-got-some-problem/m-p/1193448#M408
+
+Change-Id: I567247d69cf89755ab5c016687ce769bbbba8d88
+
+diff --git a/imx8m/vp6820_8mq/init.imx8mq.rc b/imx8m/vp6820_8mq/init.imx8mq.rc
+index 038c07d6..a5422c27 100755
+--- a/imx8m/vp6820_8mq/init.imx8mq.rc
++++ b/imx8m/vp6820_8mq/init.imx8mq.rc
+@@ -19,6 +19,8 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
++    # disable 3D composition overlay to fix video rotate problem
++    setprop hwc.enable.overlay 0
+ 
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor

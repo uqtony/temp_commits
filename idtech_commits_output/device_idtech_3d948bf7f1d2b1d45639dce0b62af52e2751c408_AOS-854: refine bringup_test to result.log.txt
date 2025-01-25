@@ -1,0 +1,262 @@
+3d948bf7 owen.wen 2021-12-29
+
+AOS-854: refine bringup_test to result.log
+
+Symptom: factory need a simple method to know if device hardware OK or not
+
+below result with on EVT2
+(front camera, barcode camera, display, p sensor all plugged)
+
+$ adb shell cat /data/local/tmp/result.log
+modem:                                   OK
+uart /dev/ttymxc0:                       OK
+uart /dev/ttymxc1:                       OK
+uart /dev/ttymxc2:                       OK
+PCI:                                     OK
+eth:                                     OK
+USB:                                     OK
+IDG:                                     OK
+front camera flash LED:                  OK
+front camera status LED:                 OK
+device status LED:                       OK
+Proxmity Sensor:                         OK
+Ambient Light Sensor:                    OK
+I2C 0 0x0008 pfuze100:                   OK
+I2C 0 0x0020 tps65994:                   OK
+I2C 0 0x0024 XXXXXX:                     OK
+I2C 0 0x0055 st1633:                     OK
+I2C 1 0x0010 s5k5e9:                     OK
+I2C 1 0x002c XXXXXX:                     OK
+I2C 1 0x0036 lm3697:                     OK
+I2C 1 0x0037 gc02m2_mipi:                OK
+I2C 1 0x0051 vcnl4200:                   OK
+I2C 2 0x0018 tlv320aic3110:              OK
+I2C 2 0x0045 opt3001:                    OK
+I2C 2 0x004e XXXXXX:                     OK
+I2C 2 0x0068 XXXXXX:                     OK
+
+Change-Id: I3a049a20fdd3c4aef726d0e3516b0dc18b4cc58e
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index f6e5f21d..de01340a 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -1,7 +1,11 @@
+ #!/system/bin/sh
+ 
+ LOG_TAG="bringup_test"
++RST_TAG="result"
+ LOG_PATH="/data/local/tmp/${LOG_TAG}.log"
++RST_PATH="/data/local/tmp/${RST_TAG}.log"
++
++rm -f $RST_PATH
+ 
+ logi() {
+ #  echo "I $LOG_TAG: $1" >> ${LOG_PATH}
+@@ -13,6 +17,10 @@ loge() {
+   echo "$1" |sed "s|^|E ${LOG_TAG}: |g" >> ${LOG_PATH}
+ }
+ 
++log_rst() {
++  printf "%-40s %s
+" "$1" "$2" >> ${RST_PATH}
++}
++
+ check_modem() {
+   logi "== check_modem: lsusb |grep -q 'ID OOOO:XXXX'"
+   idx=0
+@@ -32,6 +40,7 @@ check_modem() {
+     done
+     if [ $ret -eq 0 ]; then
+       logi "modem is found"
++      log_rst "modem:" "OK"
+       break
+     else
+       sleep 1
+@@ -39,6 +48,7 @@ check_modem() {
+   done
+   if [ $ret -ne 0 ]; then
+     loge "modem not found"
++    log_rst "modem:" "FAIL"
+   fi
+   logi ""
+ }
+@@ -51,9 +61,13 @@ check_uart() {
+   logi "== check_uart: ${uart_node}[0-2]"
+   for ii in $(seq 0 2); do
+     test_node="${uart_node}${ii}"
+-    [ -e "${test_node}" ] &&
+-    logi "${test_node} is found" ||
+-    loge "${test_node} not found"
++    if [ -e "${test_node}" ]; then
++      logi "${test_node} is found"
++      log_rst "uart ${test_node}:" "OK"
++    else
++      loge "${test_node} not found"
++      log_rst "uart ${test_node}:" "FAIL"
++    fi
+   done
+   logi ""
+ }
+@@ -62,9 +76,13 @@ check_pcie() {
+ # lspci
+   logi "== check_pcie: lspci"
+   pcie_num=`lspci |wc -l`
+-  [ $pcie_num -ge 1 ] &&
+-  logi "${pcie_num} pcie devices are found" ||
+-  loge "${pcie_num} pcie devices are found"
++  if [ $pcie_num -ge 1 ]; then
++    logi "${pcie_num} pcie devices are found"
++    log_rst "PCI:" "OK"
++  else
++    loge "${pcie_num} pcie devices are not found"
++    log_rst "PCI:" "FAIL"
++  fi
+   logi "`lspci`"
+   logi ""
+ }
+@@ -73,9 +91,13 @@ check_eth() {
+ # ifconfig
+   logi "== check_eth: ifconfig"
+   pcie_num=`ifconfig -S eth0 |wc -l`
+-  [ $pcie_num -ge 1 ] &&
+-  logi "eth0 is found" ||
+-  loge "eth0 is not found"
++  if [ $pcie_num -ge 1 ]; then
++    logi "eth0 is found"
++    log_rst "eth:" "OK"
++  else
++    loge "eth0 is not found"
++    log_rst "eth:" "FAIL"
++  fi
+   logi "`ifconfig -S`"
+   logi ""
+ }
+@@ -104,6 +126,12 @@ check_i2c() {
+       dev_status="skipped"
+     else
+       dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00`
++      ret=$?
++      if [ "$ret" = 0 ]; then
++        log_rst "I2C $i2c_addr 0x${dev_addr} $dev_name:" "OK"
++      else
++        log_rst "I2C $i2c_addr 0x${dev_addr} $dev_name:" "FAIL"
++      fi
+     fi
+     [ -z "$dev_status" ] && dev_status="XXXX"
+     logi "${dev_path}: ${dev_name}: ${dev_status}"
+@@ -117,15 +145,88 @@ check_i2c() {
+ check_usb() {
+ # /sys/bus/usb/devices/*/product
+   logi "== check_usb: cat /sys/bus/usb/devices/XX/product"
++  usb_found=0
+   for dev_path in `ls -d /sys/bus/usb/devices/*`; do
+     [ ! -f "${dev_path}/manufacturer" ] && continue
+     dev_vendor=`cat ${dev_path}/manufacturer`
+     dev_product=`cat ${dev_path}/product`
+     logi "${dev_path}: ${dev_vendor}: ${dev_product}"
++    usb_found=1
+   done
++  if [ $usb_found = "1" ];then
++    log_rst "USB:" "OK"
++  else
++    log_rst "USB:" "FAIL"
++  fi
+   logi ""
+ }
+ 
++check_led() {
++  logi "== check_led:"
++  logi "echo 255 > /sys/class/leds/front-cam:flash/brightness"
++  echo 255 > /sys/class/leds/front-cam:flash/brightness
++  ret=$?
++  if [ "$ret" = 0 ]; then
++    logi "front camera flash LED: OK"
++    log_rst "front camera flash LED:" "OK"
++  else
++    logi "front camera flash LED: FAIL"
++    log_rst "front camera flash LED:" "FAIL"
++  fi
++  sleep 1
++  echo 0 > /sys/class/leds/front-cam:flash/brightness
++
++  logi "echo 255 > /sys/class/leds/front-cam:status/brightness"
++  echo 255 > /sys/class/leds/front-cam:status/brightness
++  ret=$?
++  if [ "$ret" = 0 ]; then
++    logi "front camera status LED: OK"
++    log_rst "front camera status LED:" "OK"
++  else
++    logi "front camera status LED: FAIL"
++    log_rst "front camera status LED:" "FAIL"
++  fi
++  sleep 1
++  echo 0 > /sys/class/leds/front-cam:status/brightness
++
++  logi "echo 255 > /sys/class/leds/device:status/brightness"
++  echo 255 > /sys/class/leds/device:status/brightness
++  ret=$?
++  if [ "$ret" = 0 ]; then
++    logi "device status LED: OK"
++    log_rst "device status LED:" "OK"
++  else
++    logi "device status LED: FAIL"
++    log_rst "device status LED:" "FAIL"
++  fi
++  sleep 1
++  echo 0 > /sys/class/leds/device:status/brightness
++}
++
++check_sensor() {
++  logi "== check_sensor:"
++
++  logi "cat /sys/bus/iio/devices/iio:device0/in_proximity_raw"
++  logi "`cat /sys/bus/iio/devices/iio:device0/in_proximity_raw`"
++  cat /sys/bus/iio/devices/iio:device0/in_proximity_raw
++  ret=$?
++  if [ "$ret" = 0 ]; then
++    log_rst "Proxmity Sensor:" "OK"
++  else
++    log_rst "Proxmity Sensor:" "FAIL"
++  fi
++
++  logi "cat /sys/bus/iio/devices/iio:device1/in_illuminance_input"
++  logi "`cat /sys/bus/iio/devices/iio:device1/in_illuminance_input`"
++  cat /sys/bus/iio/devices/iio:device1/in_illuminance_input
++  ret=$?
++  if [ "$ret" = 0 ]; then
++    log_rst "Ambient Light Sensor:" "OK"
++  else
++    log_rst "Ambient Light Sensor:" "FAIL"
++  fi
++}
++
+ check_bringup() {
+   logi "==== START ===="
+   check_modem
+@@ -134,8 +235,10 @@ check_bringup() {
+   check_eth
+   check_sdcard 1000 0
+   check_usb
+-  check_i2c
+   check_idg_version
++  check_led
++  check_sensor
++  check_i2c
+   logi "====  END  ===="
+ }
+ 
+@@ -168,6 +271,13 @@ check_idg_version() {
+   logi "== check idg version"
+   logi "idg_console_tool 2 29000000" # get version
+   logi "`idg_console_tool 2 29000000`"
++  idg_console_tool 2 29000000 | grep -q AP6800
++  ret=$?
++  if [ $ret = "0" ];then
++    log_rst "IDG:" "OK"
++  else
++    log_rst "IDG:" "FAIL"
++  fi
+   logi ""
+ }
+ 

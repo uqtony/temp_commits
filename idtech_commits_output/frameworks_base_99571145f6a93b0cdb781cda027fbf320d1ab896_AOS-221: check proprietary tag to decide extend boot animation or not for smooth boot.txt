@@ -1,0 +1,48 @@
+99571145f6a9 AndrewS 2020-06-23
+
+AOS-221: check proprietary tag to decide extend boot animation or not for smooth boot
+
+Change-Id: I7d2db4c46f96fc222c4db0b098658c9d307de116
+
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index f67b4fe78f58..6cc1332a4da2 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -3263,6 +3263,16 @@ public class WindowManagerService extends IWindowManager.Stub
+     public void performBootTimeout() {
+         synchronized (mGlobalLock) {
+             if (mDisplayEnabled) {
++                // if extend boot animation property be set, we have to set "service.bootanim.exit" here.
++                boolean extendBootAnim = (SystemProperties.getInt("ro.idt.extend_boot_anim", 0) == 1);
++                if (!mBootAnimationStopped && extendBootAnim) {
++                    Trace.asyncTraceBegin(TRACE_TAG_WINDOW_MANAGER, "Stop bootanim", 0);
++                    // stop boot animation
++                    // formerly we would just kill the process, but we now ask it to exit so it
++                    // can choose where to stop the animation.
++                    SystemProperties.set("service.bootanim.exit", "1");
++                    mBootAnimationStopped = true;
++                }
+                 return;
+             }
+             Slog.w(TAG_WM, "***** BOOT TIMEOUT: forcing display enabled");
+@@ -3303,8 +3313,9 @@ public class WindowManagerService extends IWindowManager.Stub
+                     && getDefaultDisplayContentLocked().checkWaitingForWindows()) {
+                 return;
+             }
+-
+-            if (!mBootAnimationStopped) {
++            // check property to see if we need to extend boot animation.
++            boolean extendBootAnim = (SystemProperties.getInt("ro.idt.extend_boot_anim", 0) == 1);
++            if (!mBootAnimationStopped && !extendBootAnim) {
+                 Trace.asyncTraceBegin(TRACE_TAG_WINDOW_MANAGER, "Stop bootanim", 0);
+                 // stop boot animation
+                 // formerly we would just kill the process, but we now ask it to exit so it
+@@ -3313,7 +3324,7 @@ public class WindowManagerService extends IWindowManager.Stub
+                 mBootAnimationStopped = true;
+             }
+ 
+-            if (!mForceDisplayEnabled && !checkBootAnimationCompleteLocked()) {
++            if (!mForceDisplayEnabled && !checkBootAnimationCompleteLocked() && !extendBootAnim) {
+                 if (DEBUG_BOOT) Slog.i(TAG_WM, "performEnableScreen: Waiting for anim complete");
+                 return;
+             }

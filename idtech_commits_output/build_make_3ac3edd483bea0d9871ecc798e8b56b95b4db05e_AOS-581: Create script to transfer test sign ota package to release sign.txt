@@ -1,0 +1,242 @@
+3ac3edd48 max.yang 2021-04-22
+
+AOS-581: Create script to transfer test sign ota package to release sign
+
+Change-Id: I6bbe02ff6d6e2e45fe3e95c84c283a6577ac754b
+
+diff --git a/tools/releasetools/idt_sign_ota_package.py b/tools/releasetools/idt_sign_ota_package.py
+new file mode 100644
+index 000000000..961ad20be
+--- /dev/null
++++ b/tools/releasetools/idt_sign_ota_package.py
+@@ -0,0 +1,207 @@
++import sys
++import os
++import tempfile
++import zipfile
++import shutil
++import common
++import ota_from_target_files
++import idt_web_service
++from hashlib import sha256
++
++PAYLOAD_BIN = 'payload.bin'
++PAYLOAD_PROPERTIES_TXT = 'payload_properties.txt'
++METADATA_NAME = 'META-INF/com/android/metadata'
++OTACERT_NAME  = 'META-INF/com/android/otacert'
++idt_temp_key = "device/idtech/common/security/idt_testkey_rsa2048.pem"
++WS = None
++
++def usage():
++  print('Usage:')
++  print('    python releasetools/idt_sign_ota_package.py [DEMO|PROD] [OTA_PACKAGE]')
++  print('Output locates in the same folder as input package, with postfix "release"')
++  sys.exit(1)
++
++def sign_hash_by_ca(data, key):
++  sig_hex = WS.doSign(key, data.encode('hex'), 1)
++  sig = sig_hex.decode('hex')
++  assert len(sig) == 256
++
++  return sig
++
++def handle_payload_files(orig_payload, output_zip):
++  # Get the hash
++  payload_hash = common.MakeTempFile(prefix="hash-", suffix=".bin")
++  metadata_hash = common.MakeTempFile(prefix="hash-", suffix=".bin")
++  cmd = ["brillo_update_payload", "hash",
++         "--unsigned_payload", orig_payload,
++         "--signature_size", str(256),
++         "--metadata_hash_file", metadata_hash,
++         "--payload_hash_file", payload_hash]
++  common.RunAndCheckOutput(cmd)
++
++  # Sign the hash
++  payload_sig = common.MakeTempFile(prefix="sig-", suffix=".bin")
++  metadata_sig = common.MakeTempFile(prefix="sig-", suffix=".bin")
++
++  with open(payload_hash, "rb") as f_phash, open(metadata_hash, "rb") as f_mhash:
++    phash = f_phash.read()
++    mhash = f_mhash.read()
++  with open(payload_sig, "wb") as f_psig, open(metadata_sig, "wb") as f_msig:
++    f_psig.write(sign_hash_by_ca(phash, "SYS_Release"))
++    f_msig.write(sign_hash_by_ca(mhash, "SYS_Release"))
++
++  # Write back to payload
++  signed_payload_file = common.MakeTempFile(prefix="signed-payload-", suffix=".bin")
++  cmd = ["brillo_update_payload", "sign",
++         "--unsigned_payload", orig_payload,
++         "--payload", signed_payload_file,
++         "--signature_size", str(256),
++         "--metadata_signature_file", metadata_sig,
++         "--payload_signature_file", payload_sig]
++  common.RunAndCheckOutput(cmd)
++
++  # Payload properties
++  properties_file = common.MakeTempFile(prefix="payload-properties-", suffix=".txt")
++  cmd = ["brillo_update_payload", "properties",
++         "--payload", signed_payload_file,
++         "--properties_file", properties_file]
++  common.RunAndCheckOutput(cmd)
++
++  # Write payload files into zip
++  common.ZipWrite(output_zip, signed_payload_file, arcname=PAYLOAD_BIN,
++                                      compress_type=zipfile.ZIP_STORED)
++  common.ZipWrite(output_zip, properties_file, arcname=PAYLOAD_PROPERTIES_TXT,
++                                      compress_type=zipfile.ZIP_STORED)
++def load_metadata(data):
++  d = {}
++  for line in data.split("
+"):
++    if not line or line.startswith("#"):
++      continue
++    if "=" in line:
++      name, value = line.split("=", 1)
++      d[name] = value
++  return d
++
++def do_presigning(output_file, cert_dir):
++  pub_cert = cert_dir + "SYS_Release.x509.pem"
++  temp_key_pk8 = common.MakeTempFile(suffix=".pk8")
++  cmd = ['openssl', 'pkcs8', '-topk8',
++         '-inform', 'PEM', '-outform', 'DER', '-nocrypt',
++         '-in', idt_temp_key,
++         '-out', temp_key_pk8]
++  common.RunAndCheckOutput(cmd)
++
++  unsigned_file = common.MakeTempFile()
++  shutil.move(output_file, unsigned_file)
++  cmd = ['java', '-Xmx2048m', '-Djava.library.path=./lib64',
++         '-jar', './framework/signapk.jar',
++         '-w',
++         pub_cert,
++         temp_key_pk8,
++         unsigned_file, output_file]
++  common.RunAndCheckOutput(cmd)
++
++def handle_metadata_file(input_zip, output_zip, cert_dir):
++  output_file = output_zip.filename
++  needed_property_files = (
++      ota_from_target_files.AbOtaPropertyFiles(),
++      ota_from_target_files.StreamingPropertyFiles(),
++  )
++
++  data = input_zip.read(METADATA_NAME)
++  info = load_metadata(data)
++
++  for property_file in needed_property_files:
++    info[property_file.name] = property_file.Compute(output_zip)
++  ota_from_target_files.WriteMetadata(info, output_zip)
++
++  common.ZipClose(output_zip)
++  do_presigning(output_file, cert_dir)
++
++  output_zip = zipfile.ZipFile(output_file, 'a')
++  for property_file in needed_property_files:
++    info[property_file.name] = property_file.Finalize(output_zip, len(info[property_file.name]))
++
++  common.ZipClose(output_zip)
++  common.ZipDelete(output_file, METADATA_NAME)
++  output_zip = zipfile.ZipFile(output_file, 'a')
++  ota_from_target_files.WriteMetadata(info, output_zip)
++
++  common.ZipClose(output_zip)
++  do_presigning(output_file, cert_dir)
++
++  # Verify zip data
++  with zipfile.ZipFile(output_file) as output_zip:
++    for property_file in needed_property_files:
++      property_file.Verify(output_zip, info[property_file.name].strip())
++
++def replace_ca_signature(package):
++  with open(package, 'rb') as package_file:
++    package_bytes = package_file.read()
++
++  length = len(package_bytes)
++  footer = bytearray(package_bytes[-6:])
++  signature_start_from_end = (footer[1] << 8) + footer[0]
++  signature_start = length - signature_start_from_end
++
++  comment_len = (footer[5] << 8) + footer[4]
++  signed_len = length - comment_len - 2
++
++  h = sha256()
++  h.update(package_bytes[:signed_len])
++  package_digest = h.hexdigest()
++
++  sig = sign_hash_by_ca(package_digest.decode('hex'), "SYS_Release")
++  with open(package, 'rb+') as package_file:
++    package_file.seek(length - 6 - 256, 0) # footer and signature size
++    package_file.write(sig)
++
++def main(argv):
++  if len(argv) != 2 or (argv[0] != "DEMO" and argv[0] != "PROD"):
++    usage()
++  if not os.path.exists(argv[1]):
++    print('Cannot find input file')
++    sys.exit(1)
++  if argv[0] == "PROD":
++    idt_cert_dir = "device/idtech/common/security/IDT_CA_OFFICIAL/"
++  else:
++    idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING/"
++
++  # PATH environment, otatools/bin should put at front, or it will use system's mke2fs
++  os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
++  print('PATH: {}'.format(os.environ["PATH"]))
++
++  global WS
++  WS = idt_web_service.web_service(argv[0])
++  WS.dual_login()
++  WS.regist_socket()
++
++  input_file  = argv[1]
++  output_file = os.path.splitext(input_file)[0] + "_" + argv[0] + "_release.zip"
++
++  input_zip = zipfile.ZipFile(input_file, "r")
++  output_zip = zipfile.ZipFile(output_file, "w", compression=zipfile.ZIP_DEFLATED)
++
++  # Extract payload.img
++  tmp_folder = tempfile.mkdtemp()
++  print('Working directory: {}'.format(tmp_folder))
++  input_zip.extract(PAYLOAD_BIN, tmp_folder)
++
++  # handle payload.img, payload_properties.txt
++  handle_payload_files(tmp_folder + "/" + PAYLOAD_BIN, output_zip)
++
++  # Update metadata, close zip
++  handle_metadata_file(input_zip, output_zip, idt_cert_dir)
++
++  # Sign Whole Package
++  replace_ca_signature(output_file)
++
++  shutil.rmtree(tmp_folder)
++  common.ZipClose(input_zip)
++
++  print('*************************************************')
++  print('Signing OTA PACKAGE process finished successfully')
++
++if __name__ == "__main__":
++  main(sys.argv[1:])
++
+diff --git a/tools/releasetools/idt_web_service.py b/tools/releasetools/idt_web_service.py
+index a6e78b273..785033d57 100644
+--- a/tools/releasetools/idt_web_service.py
++++ b/tools/releasetools/idt_web_service.py
+@@ -59,7 +59,7 @@ class web_service(object):
+     self.passwd2 = getpass.getpass("Password:")
+     self.token2  = self.doAuth(self.user2, self.passwd2)
+ 
+-  def doSign(self, RT, RF):
++  def doSign(self, RT, RF, is_hash=0):
+     sign_header = { "accept" : "*/*",
+                     "Content-Type": "application/json",
+                     "Authorization": self.token1
+@@ -68,7 +68,7 @@ class web_service(object):
+                     "rt": RT,
+                     "rf": RF,
+                     "ca": self.WSCA,
+-                    "hs": self.WSHS,
++                    "hs": self.WSHS if is_hash == 0 else "0",
+                     "rg": self.WSRG,
+                     "za": self.WSZA,
+                   }

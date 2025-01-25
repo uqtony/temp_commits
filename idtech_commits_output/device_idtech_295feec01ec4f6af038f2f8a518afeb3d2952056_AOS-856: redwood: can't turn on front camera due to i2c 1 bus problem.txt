@@ -1,0 +1,40 @@
+295feec0 George.Huang 2021-12-30
+
+AOS-856: redwood: can't turn on front camera due to i2c 1 bus problem
+
+Symptom: can't turn on front camera
+
+Root Cause:
+- i2cget tool use the protocol which not fit dw9714.
+  (10bit Resolution VCM)
+- after executing "i2cget -f -y 1 0x000c 0x00", it failed to
+  communicate with i2c 1 bus again.
+
+Solution: do not use i2cget on dw9714 address 0x0c
+Change-Id: I91183b88992d3b3dc52a1c5c09922031cf1a7aa1
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 90fa1b12..f6e5f21d 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -88,6 +88,7 @@ check_i2c() {
+                "1-000c" "1-0010" "1-002c" "1-0036" "1-0037" "1-0051" \
+                "2-0018" "2-0045" "2-004e" "2-0068")
+     i2c_num=${#i2c_array[@]}
++    dev_exception="1-000c"
+   fi
+   if [ -z $i2c_num ]; then
+     i2c_array=(`ls /sys/bus/i2c/devices/`)
+@@ -99,7 +100,11 @@ check_i2c() {
+     dev_name=`cat ${dev_path}/name`
+     [ -z "$dev_name" ] && dev_name="XXXXXX"
+     dev_addr=`echo ${i2c_array[$i]} |cut -d'-' -f2`
+-    dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00`
++    if [ "${i2c_array[$i]}" == "${dev_exception}" ]; then
++      dev_status="skipped"
++    else
++      dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00`
++    fi
+     [ -z "$dev_status" ] && dev_status="XXXX"
+     logi "${dev_path}: ${dev_name}: ${dev_status}"
+   done

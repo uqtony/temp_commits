@@ -1,0 +1,48 @@
+c1cd83c8202d AndrewS 2022-03-16
+
+AOS-807: correct DATA register for different port
+
+Change-Id: Iab25ce1dc61fd60c12f454fd4847e518de0f7209
+
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 1f6baf4ed8d0..bda772909840 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -371,8 +371,7 @@ static void tps65994_disconnect(struct tps65994 *tps, u32 status)
+ 	power_supply_changed(tps->psy);
+ }
+ 
+-static int tps65994_cmd_write(struct tps65994 *tps, const char *cmd,
+-			      enum tps65994_typec_port port)
++static int tps65994_cmd_write(struct tps65994 *tps, const char *cmd)
+ {
+ 	struct i2c_client *client = tps->i2c_client;
+ 	int cmd_reg = (tps->main_port) ? TPS_REG_CMD1 : TPS_REG_CMD2;
+@@ -407,23 +406,22 @@ static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
+ 			     size_t out_len, u8 *out_data)
+ {
+ 	struct i2c_client *client = tps->i2c_client;
++	int data_reg = (tps->main_port) ? TPS_REG_DATA1 : TPS_REG_DATA2;
+ 	u32 val = 0;
+ 	int ret;
+ 
+ 	if (in_len) {
+-		ret = tps65994_i2c_write(client, TPS_REG_DATA1,
+-					 in_data, in_len);
++		ret = tps65994_i2c_write(client, data_reg, in_data, in_len);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	ret = tps65994_cmd_write(tps, cmd, TPS65994_TYPEC_PORT_A);
++	ret = tps65994_cmd_write(tps, cmd);
+ 	if (ret)
+ 		return ret;
+ 
+ 	if (out_len) {
+-		ret = tps65994_i2c_read(client, TPS_REG_DATA1,
+-					out_data, NULL);
++		ret = tps65994_i2c_read(client, data_reg, out_data, NULL);
+ 		if (ret)
+ 			return ret;
+ 		val = out_data[0];

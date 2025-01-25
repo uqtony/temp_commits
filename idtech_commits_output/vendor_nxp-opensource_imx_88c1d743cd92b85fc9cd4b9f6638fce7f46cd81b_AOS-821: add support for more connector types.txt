@@ -1,0 +1,31 @@
+88c1d74 AndrewS 2021-12-13
+
+AOS-821: add support for more connector types
+
+Unrecognized connector types would be set as DISPLAY_LDB, and
+system takes all DISPLAY_LDB as internal display, we will see
+more than one 'Built-in Screen' if there's more than one
+display with unrecognized connector types connected, which cause
+system abnormal in input routing.
+
+Change-Id: I5d48784d0b77197c2796a0dc42743e05b733de7a
+
+diff --git a/display/display/KmsDisplay.cpp b/display/display/KmsDisplay.cpp
+index c3e5e40..ea79a30 100644
+--- a/display/display/KmsDisplay.cpp
++++ b/display/display/KmsDisplay.cpp
+@@ -1702,12 +1702,14 @@ int KmsDisplay::readType()
+     }
+ 
+     switch (pConnector->connector_type) {
++        case DRM_MODE_CONNECTOR_DPI:
+         case DRM_MODE_CONNECTOR_LVDS:
+             mType = DISPLAY_LDB;
+             break;
+         case DRM_MODE_CONNECTOR_HDMIA:
+         case DRM_MODE_CONNECTOR_HDMIB:
+         case DRM_MODE_CONNECTOR_TV:
++        case DRM_MODE_CONNECTOR_DisplayPort:
+             mType = DISPLAY_HDMI;
+             break;
+         case DRM_MODE_CONNECTOR_DVII:

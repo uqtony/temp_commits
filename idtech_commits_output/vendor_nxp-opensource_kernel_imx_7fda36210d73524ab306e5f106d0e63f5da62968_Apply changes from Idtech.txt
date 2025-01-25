@@ -1,0 +1,126 @@
+7fda36210d73 George.Huang 2020-06-01
+
+Apply changes from Idtech
+
+Change-Id: If47c6597ab209870f4db4c76ca4f435e1b1f457e
+
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk-idtech-spi.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk-idtech-spi.dts
+index 21a425a57825..23b395e13025 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk-idtech-spi.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk-idtech-spi.dts
+@@ -10,6 +10,7 @@
+ #include "imx8mq.dtsi"
+ 
+ / {
++	idt,prod-id = "idt_imx8mq_evt-1_evk_dvt-1";
+ 	firmware {
+ 		android {
+ 			compatible = "android,firmware";
+@@ -401,23 +402,6 @@ &sai5 {
+ 	status = "okay";
+ };
+ 
+-&spdif1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_spdif1>;
+-	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF1>;
+-	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
+-	assigned-clock-rates = <24576000>;
+-	clocks = <&clk IMX8MQ_CLK_IPG_ROOT>, <&clk IMX8MQ_CLK_25M>,
+-		<&clk IMX8MQ_CLK_SPDIF1>, <&clk IMX8MQ_CLK_DUMMY>,
+-		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_CLK_DUMMY>,
+-		<&clk IMX8MQ_CLK_IPG_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
+-		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_CLK_DUMMY>,
+-		<&clk IMX8MQ_AUDIO_PLL1_OUT>, <&clk IMX8MQ_AUDIO_PLL2_OUT>;
+-	clock-names = "core", "rxtx0", "rxtx1", "rxtx2", "rxtx3", "rxtx4",
+-		      "rxtx5", "rxtx6", "rxtx7", "spba", "pll8k", "pll11k";
+-	status = "okay";
+-};
+-
+ &spdif2 {
+ 	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF2>;
+ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
+@@ -437,6 +421,32 @@ wl-reg-on {
+ 	};
+ };
+ 
++&ecspi2 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	fsl,spi-num-chipselects = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi2>;
++	cs-gpios = <&gpio5 4 GPIO_ACTIVE_LOW>;
++	dmas = <&sdma2 3 7 1>, <&sdma2 4 7 2>;
++	dma-names = "rx", "tx";
++	status = "okay";
++
++	/* for ttyIDG & ttyIDGV5 device entry */
++	idg_spi@0 {
++		reg = <0>;
++		compatible = "idtech,idg-spi";
++		interrupt-parent = <&gpio5>;
++		interrupts = <3 0>; /* preliminary test */
++		spi-max-frequency = <4000000>; /* 4 MHz */
++		spi-bits-per-word = <8>; /* 8 bits */
++		spi-working-mode = <0>; /* SPI_MODE_0 */
++		idg-low-triggered; /* interrupt work with low level triggered */
++		/* idg-keep-sense */
++		status = "okay";
++	};
++};
++
+ &i2c1 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
+@@ -684,20 +694,6 @@ &pcie0 {
+ 	status = "okay";
+ };
+ 
+-&pcie1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pcie1>;
+-	disable-gpio = <&gpio5 10 GPIO_ACTIVE_LOW>;
+-	reset-gpio = <&gpio5 12 GPIO_ACTIVE_LOW>;
+-	clocks = <&clk IMX8MQ_CLK_PCIE2_ROOT>,
+-		 <&clk IMX8MQ_CLK_PCIE2_AUX>,
+-		 <&clk IMX8MQ_CLK_PCIE2_PHY>,
+-		 <&pcie1_refclk>;
+-	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
+-	reserved-region = <&rpmsg_reserved>;
+-	status = "okay";
+-};
+-
+ &pgc_gpu {
+ 	power-supply = <&sw1a_reg>;
+ };
+@@ -897,11 +893,11 @@ MX8MQ_IOMUXC_UART4_RXD_GPIO5_IO28		0x16
+ 		>;
+ 	};
+ 
+-	pinctrl_pcie1: pcie1grp {
++	pinctrl_ecspi2: ecspi2grp {
+ 		fsl,pins = <
+-			MX8MQ_IOMUXC_I2C4_SDA_PCIE2_CLKREQ_B		0x76 /* open drain, pull up */
+-			MX8MQ_IOMUXC_ECSPI2_SCLK_GPIO5_IO10		0x16
+-			MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12		0x16
++			MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK		0x82
++			MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI		0x82
++			MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO		0x82
+ 		>;
+ 	};
+ 
+@@ -995,13 +991,6 @@ MX8MQ_IOMUXC_SAI5_RXD3_SAI5_RX_DATA3    0xd6
+ 		>;
+ 	};
+ 
+-	pinctrl_spdif1: spdif1grp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_SPDIF_TX_SPDIF1_OUT	0xd6
+-			MX8MQ_IOMUXC_SPDIF_RX_SPDIF1_IN		0xd6
+-		>;
+-	};
+-
+ 	pinctrl_ss_sel: usb3ssgrp{
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15		0x16

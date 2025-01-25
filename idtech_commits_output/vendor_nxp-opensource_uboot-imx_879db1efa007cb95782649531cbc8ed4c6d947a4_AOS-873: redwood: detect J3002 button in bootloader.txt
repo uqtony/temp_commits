@@ -1,0 +1,109 @@
+879db1efa0 tonyshih 2022-02-22
+
+AOS-873: redwood: detect J3002 button in bootloader
+
+1. Will enter FASTBOOT if GPIO detected in bootloader.
+2. Hook at board_init_r()#initr_check_fastboot.
+3. Implement GPIO detection at drivers/fastboot/fb_fsl/fb_fsl_command.c
+4. Specify GPIO at device tree.
+
+Note:
+1.Device tree format
+        gpio-fastboot {
+                compatible = "gpio-fastboot";
+                gpio=<&gpio5 4 GPIO_ACTIVE_LOW>;
+        };
+
+2. Test with Continuous splash: Device can show logo when enter Fastboot mode by pressing J3002.
+
+Change-Id: Iba100c71d47c8fe36f967caa184f1ab0e8db1b72
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index 9eb184352a..cbfe4d96c6 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -15,8 +15,11 @@
+ #include <sparse_format.h>
+ #include <image-sparse.h>
+ #include <image.h>
++#include <asm-generic/gpio.h>
+ #include <asm/mach-imx/boot_mode.h>
++#include <asm/mach-imx/gpio.h>
+ #include <asm/arch/sys_proto.h>
++#include <asm/global_data.h>
+ #include <asm/setup.h>
+ #include <env.h>
+ #ifdef CONFIG_ANDROID_RECOVERY
+@@ -89,6 +92,31 @@ static void enable_recovery_fastboot(void)
+ }
+ #endif
+ 
++static int is_fastboot_key_pressing(void)
++{
++	int ret = 0;
++	ofnode node;
++	struct gpio_desc fastboot_gpio_desc;
++
++	node = ofnode_path("/");
++	if (!ofnode_valid(node)) {
++		//("Fastboot: GPIO-FASTBOOT# Root Node is invalid
+");
++		return 0;
++	}
++	node = ofnode_by_compatible(node, "gpio-fastboot");
++	if (!ofnode_valid(node)) {
++		//("Fastboot: GPIO-FASTBOOT# Node is invalid
+");
++		return 0;
++	}
++	if (gpio_request_by_name_nodev(node, "gpio", 0, &fastboot_gpio_desc, GPIOD_IS_IN)) {
++		//("%s: could not find a gpio-fastboot/gpio
+", __func__);
++		return 0;
++	}
++	ret = dm_gpio_get_value(&fastboot_gpio_desc);
++	dm_gpio_free(NULL, &fastboot_gpio_desc);
++	return ret;
++}
++
+ /* Get the Boot mode from BCB cmd or Key pressed */
+ static FbBootMode fastboot_get_bootmode(void)
+ {
+@@ -99,6 +127,11 @@ static FbBootMode fastboot_get_bootmode(void)
+ 		return boot_mode;
+ 	}
+ #endif
++	if (is_fastboot_key_pressing()) {
++		boot_mode = BOOTMODE_FASTBOOT_KEY_PRESSED;
++		return boot_mode;
++	}
++
+ #ifdef CONFIG_BCB_SUPPORT
+ 	int ret = 0;
+ 	char command[32];
+@@ -129,6 +162,10 @@ void fastboot_run_bootmode(void)
+ {
+ 	FbBootMode boot_mode = fastboot_get_bootmode();
+ 	switch(boot_mode){
++	case BOOTMODE_FASTBOOT_KEY_PRESSED:
++		puts("Fastboot: Got Fastboot key pressing!
+");
++		run_command("fastboot 0", 0);
++		break;
+ 	case BOOTMODE_FASTBOOT_BCB_CMD:
+ 		/* Make the boot into fastboot mode*/
+ 		puts("Fastboot: Got bootloader commands!
+");
+diff --git a/include/fb_fsl.h b/include/fb_fsl.h
+index 05476eaeef..6008f88cbf 100644
+--- a/include/fb_fsl.h
++++ b/include/fb_fsl.h
+@@ -167,6 +167,8 @@ typedef enum {
+ 	/* Recovery boot due to boot-recovery cmd in misc parition */
+ 	BOOTMODE_RECOVERY_BCB_CMD,
+ #endif
++	/* Fastboot boot due to combo keys pressed */
++	BOOTMODE_FASTBOOT_KEY_PRESSED,
+ 	/* Fastboot boot due to bootonce-bootloader cmd in misc parition */
+ 	BOOTMODE_FASTBOOT_BCB_CMD,
+ 	/* Normal boot */

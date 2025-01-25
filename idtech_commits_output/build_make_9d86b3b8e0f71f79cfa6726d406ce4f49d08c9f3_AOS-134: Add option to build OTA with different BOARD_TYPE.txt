@@ -1,0 +1,181 @@
+9d86b3b8e George.Huang 2020-04-02
+
+AOS-134: Add option to build OTA with different BOARD_TYPE
+
+1. GetTargetFilesZipWithBoardType() will generate new target-file.zip
+   with exchanged bootloader.img
+
+2. Support IDT_DUAL_BOOTLOADER and NXP_DUAL_BOOTLOADER
+   IDT_DUAL_BOOTLOADER:
+     Exchange IMAGES/bootloader.img with IMAGES/u-boot-imx8mq-devboard.imx
+   NXP_DUAL_BOOTLOADER:
+     Exchange IMAGES/spl.img with IMAGES/spl-imx8mq-devboard-dual.bin
+     Exchange IMAGES/bootloader.img with IMAGES/bootloader-imx8mq-devboard-dual.img
+
+3. Force to set bootloader as an empty file in source target-file
+   It will cause the full update for bootloader/spl, not diff update
+
+4. the board_type could be evk / devboard / devboard-dual
+
+Verify Steps:
+Verify Steps for evk diff OTA:
+==========================================================
+$ ./build/tools/releasetools/ota_from_target_files
+  --board_type evk -v
+  -i ./vp6820_8mq-target_files-base.zip
+  ./vp6820_8mq-target_files-target.zip
+  ./ota_diff_evk.zip 2>&1 |tee ota.log
+
+...
+INFO    : Exchange IMAGES/bootloader.img with IMAGES/u-boot-imx8mq-evk.imx
+INFO    : Exchange IMAGES/bootloader.img with IMAGES/u-boot-imx8mq-evk.imx
+...
+[0407/112928.305540:INFO:delta_diff_generator.cc(88)] Partition name: bootloader
+[0407/112928.305566:INFO:delta_diff_generator.cc(104)] Using generator FullUpdateGenerator().
+...
+
+Verify Steps for devboard-dual diff OTA:
+==========================================================
+$ ./build/tools/releasetools/ota_from_target_files
+  --board_type devboard-dual -v
+  -i ./vp6820_8mq-target_files-base.zip
+  ./vp6820_8mq-target_files-target.zip
+  ./ota_diff_devboard-dual.zip 2>&1 |tee ota.log
+
+...
+INFO    : Exchange IMAGES/spl.img with IMAGES/spl-imx8mq-devboard-dual.bin
+INFO    : Exchange IMAGES/bootloader.img with IMAGES/bootloader-imx8mq-devboard-dual.img
+INFO    : Exchange IMAGES/spl.img with IMAGES/spl-imx8mq-devboard-dual.bin
+INFO    : Exchange IMAGES/bootloader.img with IMAGES/bootloader-imx8mq-devboard-dual.img
+...
+[0407/113951.723687:INFO:delta_diff_generator.cc(88)] Partition name: bootloader
+[0407/113951.723698:INFO:delta_diff_generator.cc(104)] Using generator FullUpdateGenerator().
+...
+
+Change-Id: I51c68a55420f3b9a98dda5196e89397d915507fa
+
+diff --git a/tools/releasetools/ota_from_target_files.py b/tools/releasetools/ota_from_target_files.py
+index 8b55f034b..011628f90 100755
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@ -78,6 +78,10 @@ Common options that apply to both of non-A/B and A/B OTAs
+       Write a copy of the metadata to a separate file. Therefore, users can
+       read the post build fingerprint without extracting the OTA package.
+ 
++  --board_type <type>
++      assign board_type for specific uboot, exmaple: devboard, evk,
++      (default empty)
++
+ Non-A/B OTA specific options
+ 
+   -b  (--binary) <file>
+@@ -184,6 +188,7 @@ from __future__ import print_function
+ import logging
+ import multiprocessing
+ import os.path
++import os
+ import shlex
+ import shutil
+ import struct
+@@ -234,6 +239,7 @@ OPTIONS.skip_postinstall = False
+ OPTIONS.retrofit_dynamic_partitions = False
+ OPTIONS.skip_compatibility_check = False
+ OPTIONS.output_metadata_path = None
++OPTIONS.board_type = None
+ 
+ 
+ METADATA_NAME = 'META-INF/com/android/metadata'
+@@ -1914,6 +1920,60 @@ def GetTargetFilesZipWithoutPostinstallConfig(input_file):
+   return target_file
+ 
+ 
++def GetTargetFilesZipWithBoardType(input_file, product, board_type, set_empty=False):
++  """Returns a target-files.zip that's with specific board_type.
++
++  This allows to re-asign bootloader.img with u-boot-*-<board_type>.imx
++
++  Args:
++    input_file: the input target-files.zip filename.
++    product: product name, ex: 8mq.
++    board_type: asigned board_type for u-boot image, ex: devobard or evk.
++    set_empty: set as True for source_file to use FullUpdateGenerator().
++
++  Returns:
++    The filename of target-files.zip that replaced bootloader.img with specific
++    board_type.
++  """
++  target_file = common.MakeTempFile(prefix="targetfiles-", suffix=".zip")
++  shutil.copyfile(input_file, target_file)
++
++  with zipfile.ZipFile(input_file, 'r') as input_zip:
++    namelist = input_zip.namelist()
++
++  src_spl = "IMAGES/spl-imx{}-{}.bin".format(product, board_type)
++  tgt_spl = "IMAGES/spl.img"
++  if src_spl in namelist:
++    src_bootloader = "IMAGES/bootloader-imx{}-{}.img".format(product, board_type)
++    tgt_bootloader = "IMAGES/bootloader.img"
++    replace = {src_bootloader: tgt_bootloader, src_spl: tgt_spl}
++  else:
++    src_bootloader = "IMAGES/u-boot-imx{}-{}.imx".format(product, board_type)
++    tgt_bootloader = "IMAGES/bootloader.img"
++    replace = {src_bootloader: tgt_bootloader}
++
++  # unzip src images
++  input_tmp = common.UnzipTemp(input_file, replace.keys())
++  # delete tgt images
++  common.ZipDelete(target_file, replace.values())
++  target_zip = zipfile.ZipFile(target_file, 'a', allowZip64=True)
++
++  for src, dst in replace.items():
++    logger.info("Exchange %s with %s", dst, src)
++    assert src in namelist, \
++          'Missing {} in {}; {} cannot be written'.format(src, input_file, dst)
++    unzipped_file = os.path.join(input_tmp, *src.split('/'))
++    if set_empty:
++      # set src images as an empty file
++      os.remove(unzipped_file)
++      open(unzipped_file, 'a').close()
++    common.ZipWrite(target_zip, unzipped_file, arcname=dst)
++
++  common.ZipClose(target_zip)
++
++  return target_file
++
++
+ def GetTargetFilesZipForRetrofitDynamicPartitions(input_file,
+                                                   super_block_devices,
+                                                   dynamic_partition_list):
+@@ -2026,6 +2086,15 @@ def WriteABOTAPackageWithBrilloScript(target_file, output_file,
+   elif OPTIONS.skip_postinstall:
+     target_file = GetTargetFilesZipWithoutPostinstallConfig(target_file)
+ 
++  if OPTIONS.board_type:
++    target_file = GetTargetFilesZipWithBoardType(target_file,
++        target_info.GetBuildProp('ro.build.product').split('_')[-1],
++        OPTIONS.board_type)
++  if OPTIONS.board_type and source_file is not None:
++    source_file = GetTargetFilesZipWithBoardType(source_file,
++        target_info.GetBuildProp('ro.build.product').split('_')[-1],
++        OPTIONS.board_type, True)
++
+   # Generate payload.
+   payload = Payload()
+ 
+@@ -2163,6 +2232,8 @@ def main(argv):
+       OPTIONS.skip_compatibility_check = True
+     elif o == "--output_metadata_path":
+       OPTIONS.output_metadata_path = a
++    elif o == "--board_type":
++      OPTIONS.board_type = a
+     else:
+       return False
+     return True
+@@ -2197,6 +2268,7 @@ def main(argv):
+                                  "retrofit_dynamic_partitions",
+                                  "skip_compatibility_check",
+                                  "output_metadata_path=",
++                                 "board_type=",
+                              ], extra_option_handler=option_handler)
+ 
+   if len(args) != 2:

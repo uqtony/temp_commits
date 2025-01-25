@@ -1,0 +1,47 @@
+2f6d8206 George.Huang 2021-11-29
+
+AOS-800: redwood: ETH not work on USB HUB
+
+Symptom: redwood can't use ethernet from usb hub
+
+Root Cause:
+- ethernet usb driver (0bda:8153) is ready as eth1:
+  http://linux-hardware.org/?id=usb:0bda-8153
+  CONFIG_USB_RTL8152=y
+  CONFIG_USB_NET_DRIVERS=y
+  CONFIG_USB_USBNET=y
+  CONFIG_REALTEK_PHY=y
+
+- but frameworks will only check eth0 (fec)
+  and ignore others eth1 (r8152)
+
+Solution:
+- let frameworks recognizes multiple ethernet interfaces
+
+Change-Id: I786f192ef0b3a87f6b736f85e164bf43166aa1ce
+
+diff --git a/imx8m/redwood_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/redwood_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 53b2aa2b..463db6a7 100644
+--- a/imx8m/redwood_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/redwood_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -22,7 +22,7 @@
+ <resources>
+ 
+     <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++    <string translatable="false" name="config_ethernet_iface_regex">eth\d</string>
+ 
+     <!-- List of regexpressions describing the interface (if any) that represent tetherable
+          USB interfaces.  If the device doesn't want to support tething over USB this should
+diff --git a/imx8m/redwood_8mq/sepolicy/file_contexts b/imx8m/redwood_8mq/sepolicy/file_contexts
+index 25a503ef..b6196271 100644
+--- a/imx8m/redwood_8mq/sepolicy/file_contexts
++++ b/imx8m/redwood_8mq/sepolicy/file_contexts
+@@ -22,5 +22,7 @@
+ /sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
+ /sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0020/power_supply/tps65994-source-psy-0-0020/wakeup[0-9]*(/.*)?                     u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup[0-9]*(/.*)?                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/38200000.usb/xhci-hcd.1.auto/usb2/2-1/2-1.2/2-1.2.[0-9]/wakeup/wakeup[0-9]*(/.*)?                                     u:object_r:sysfs_wakeup:s0

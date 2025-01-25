@@ -1,0 +1,53 @@
+7df6dcca George.Huang 2021-04-06
+
+AOS-572: ibr210: change bluetooth service for usb hci
+
+Change-Id: I953afb08e65252111b7812015a0cd59ab008eb87
+
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index 401add5c..98c8ec58 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -270,8 +270,7 @@ PRODUCT_PACKAGES += \
+ 
+ # Bluetooth HAL
+ PRODUCT_PACKAGES += \
+-    android.hardware.bluetooth@1.0-impl \
+-    android.hardware.bluetooth@1.0-service
++    android.hardware.bluetooth@1.1-service.btlinux
+ 
+ # WiFi HAL
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/kingscanyon_8mq/manifest.xml b/imx8m/kingscanyon_8mq/manifest.xml
+index ce13861d..beb600ef 100644
+--- a/imx8m/kingscanyon_8mq/manifest.xml
++++ b/imx8m/kingscanyon_8mq/manifest.xml
+@@ -146,7 +146,7 @@
+     <hal format="hidl">
+         <name>android.hardware.bluetooth</name>
+         <transport>hwbinder</transport>
+-        <version>1.0</version>
++        <version>1.1</version>
+         <interface>
+             <name>IBluetoothHci</name>
+             <instance>default</instance>
+diff --git a/imx8m/sepolicy/hal_bluetooth_btlinux.te b/imx8m/sepolicy/hal_bluetooth_btlinux.te
+new file mode 100644
+index 00000000..c118f129
+--- /dev/null
++++ b/imx8m/sepolicy/hal_bluetooth_btlinux.te
+@@ -0,0 +1,14 @@
++allow hal_bluetooth_btlinux sysfs:file { write };
++allow hal_bluetooth_btlinux bluetooth_data_file:file { write read append getattr };
++allow hal_bluetooth_btlinux hal_bluetooth_btlinux:unix_stream_socket { ioctl };
++
++# connect to the UART
++allow hal_bluetooth_btlinux wcnss_filter:unix_stream_socket {connectto};
++
++# vendor.wc_transport.start_hci and friends
++set_prop(hal_bluetooth_btlinux, vendor_wc_prop)
++set_prop(hal_bluetooth_btlinux, vendor_bluetooth_prop)
++
++# talk to system_server to set priority
++allow hal_bluetooth_btlinux fwk_scheduler_hwservice:hwservice_manager {find};
++allow hal_bluetooth_btlinux system_server:binder {call};

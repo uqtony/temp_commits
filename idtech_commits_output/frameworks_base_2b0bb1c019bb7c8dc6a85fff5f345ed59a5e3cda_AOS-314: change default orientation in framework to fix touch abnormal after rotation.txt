@@ -1,0 +1,104 @@
+2b0bb1c019bb AndrewS 2020-09-02
+
+AOS-314: change default orientation in framework to fix touch abnormal after rotation
+
+Change-Id: I6e151f2d295f16247a2db601bac98ab41141af45
+
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index 2850dc6d0753..9a0b7308da6a 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -280,11 +280,26 @@ status_t BootAnimation::readyToRun() {
+     if (status)
+         return -1;
+ 
++    // check property to see if we need to change orientation
++    char value[PROPERTY_VALUE_MAX];
++    property_get("ro.boot.idt_orientation", value, "0");
++    int orientation = atoi(value)/90;
++    if ((orientation == DISPLAY_ORIENTATION_90) || (orientation == DISPLAY_ORIENTATION_270)) {
++        int temp = dinfo.h;
++        dinfo.h = dinfo.w;
++        dinfo.w = temp;
++    }
++
+     // create the native surface
+     sp<SurfaceControl> control = session()->createSurface(String8("BootAnimation"),
+             dinfo.w, dinfo.h, PIXEL_FORMAT_RGB_565);
+ 
+     SurfaceComposerClient::Transaction t;
++    // set projection if orientation property is set
++    if ((orientation > DISPLAY_ORIENTATION_0) && (orientation <= DISPLAY_ORIENTATION_270)) {
++        Rect destRect(dinfo.w, dinfo.h);
++        t.setDisplayProjection(mDisplayToken, orientation, destRect, destRect);
++    }
+     t.setLayer(control, 0x40000000)
+         .apply();
+ 
+diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
+index 3e7fea2ac203..2232a750e11b 100644
+--- a/services/core/java/com/android/server/wm/DisplayContent.java
++++ b/services/core/java/com/android/server/wm/DisplayContent.java
+@@ -174,6 +174,7 @@ import android.os.RemoteException;
+ import android.os.SystemClock;
+ import android.os.Trace;
+ import android.os.UserHandle;
++import android.os.SystemProperties;
+ import android.util.ArraySet;
+ import android.util.DisplayMetrics;
+ import android.util.Slog;
+@@ -361,7 +362,7 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+      *
+      * @see #updateRotationUnchecked()
+      */
+-    private int mRotation = 0;
++    private int mRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+ 
+     /**
+      * Last applied orientation of the display.
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index 282ed42468dd..a959d68bee3a 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -93,7 +93,7 @@ public class DisplayRotation {
+ 
+     private int mAllowAllRotations = -1;
+     private int mUserRotationMode = WindowManagerPolicy.USER_ROTATION_FREE;
+-    private int mUserRotation = Surface.ROTATION_0;
++    private int mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+ 
+     /**
+      * Flag that indicates this is a display that may run better when fixed to user rotation.
+@@ -551,6 +551,9 @@ public class DisplayRotation {
+         final boolean deskDockEnablesAccelerometer =
+                 mDisplayPolicy.isDeskDockEnablesAccelerometer();
+ 
++        // if property set, use property value as default orientation
++        int customized_orientation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
++
+         final int preferredRotation;
+         if (!isDefaultDisplay) {
+             // For secondary displays we ignore things like displays sensors, docking mode and
+@@ -635,6 +638,10 @@ public class DisplayRotation {
+             // of gravity and as NOSENSOR is never affected by gravity, then neither should
+             // NOSENSOR be affected by rotation lock (although it will be affected by docks).
+             preferredRotation = mUserRotation;
++        } else if (customized_orientation > Surface.ROTATION_0
++                && customized_orientation <= Surface.ROTATION_270) {
++            // set preferredRotation as customized orientation
++            preferredRotation = customized_orientation;
+         } else {
+             // No overriding preference.
+             // We will do exactly what the application asked us to do.
+@@ -852,9 +859,8 @@ public class DisplayRotation {
+             }
+ 
+             // Configure rotation lock.
+-            final int userRotation = Settings.System.getIntForUser(resolver,
+-                    Settings.System.USER_ROTATION, Surface.ROTATION_0,
+-                    UserHandle.USER_CURRENT);
++            // change userRotation value from value of user_rotation to value of ro.idt.orientation
++            final int userRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+             if (mUserRotation != userRotation) {
+                 mUserRotation = userRotation;
+                 shouldUpdateRotation = true;

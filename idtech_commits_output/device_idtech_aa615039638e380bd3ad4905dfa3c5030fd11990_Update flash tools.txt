@@ -1,0 +1,834 @@
+aa615039 George.Huang 2020-02-13
+
+Update flash tools
+
+Infected changes:
+  71fc7fe4 AOS-59: Support to flash bootloader1 partition
+  2753cc5f AOS-43: Add som/mb info into android-info.txt for flash checking
+  6d2556a1 AOS-43: Only keep dtbo.img/vbmeta.img
+  4d479e24 AOS-47: Extend map options for evk_a300, evk_a100 on win10
+  68a7a9b0 AOS-47: Extend map options for evk_a300, evk_a100
+  8c641ed7 AOS-24: Redefine -d board_info_file to choose correct board_info image on win10
+  bebbab1e AOS-24: Redefine -d board_info_file to choose correct board_info image
+  b2aef878 AOS-24: Enable to flash new board_info/dtbo/vbmeta images
+
+Change-Id: Ieae2c49025d0fd1e1ace807f9a7a45a302f618e7
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 034ce1f5..e12388c2 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -13,6 +13,17 @@ set script_first_argument=%script_first_argument:"=%
+ :: reserve last 25 characters, which is the lenght of the name of this script file.
+ set script_name=%script_first_argument:~-25%
+ 
++set som_model=
++set som_plc=
++set som_opt=
++set mb_model=
++set mb_plc=
++set mb_opt=
++set board_info_file=
++set board_info_temp=
++set dtbo_file=dtbo.img
++set vbmeta_file=vbmeta.img
++set android_info_file=android-info.txt
+ set soc_name=
+ set uboot_feature=
+ set dtb_feature=
+@@ -28,6 +39,8 @@ set /A support_recovery=0
+ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_dual_bootloader=0
++set /A support_board_info=0
++set /A support_idt_dual_bootloader=0
+ set dual_bootloader_partition=
+ set bootloader_flashed_to_board=
+ set uboot_proper_to_be_flashed=
+@@ -40,6 +53,7 @@ set product_partition=product
+ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
++set board_info_partition=board_info
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A lock=0
+@@ -97,6 +111,7 @@ if %1 == -e set /A erase=1 & shift & goto :parse_loop
+ if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+ if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+ if %1 == -tos set /A support_trusty=1 & shift & goto :parse_loop
++if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ echo %1 is an illegal option
+ call :help & goto :eof
+ :parse_end
+@@ -154,6 +169,9 @@ if not [%image_directory%] == [] if not %image_directory:~-1% == \ (
+ 
+ if not [%ser_num%] == [] set fastboot_tool=fastboot -s %ser_num%
+ 
++:: force to use imx8mq if user doesn't assign it
++if [%soc_name%] == [] set soc_name=imx8mq
++set som_model=%soc_name%
+ 
+ :: check whether provided spl/bootloader/uboot feature is legal
+ set uboot_feature_no_pre_hyphen=%uboot_feature:~1%
+@@ -208,10 +226,10 @@ goto :eof
+ ::----------------------------------------------------------------------------------
+ 
+ :help
+-echo Version: 1.4
++echo Version: 1.6
+ echo Last change: add "-u" option to specify which uboot or spl&bootloader image to flash
+ echo.
+-echo eg: fastboot_imx_flashall.bat -f imx8mm -a -D C:\Users\user_01ndroid10vk_8mm
++echo eg: fastboot_imx_flashall.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+ echo eg: fastboot_imx_flashall.bat -f imx7ulp -D C:\Users\user_01ndroid10vk_7ulp
+ echo.
+ echo Usage: %script_name% ^<option^>
+@@ -275,6 +293,8 @@ echo  -D directory      the directory of of images
+ echo                        No need to use this option if images are in current working directory
+ echo  -s ser_num        the serial number of board
+ echo                        If only one board connected to computer, no need to use this option
++echo  -bdinfo board_info_file  flash board_info with this board_info_file image
++echo                               If not set, use naming from current board_info partition
+ goto :eof
+ 
+ :: this function checks whether the value of first parameter is in the array value of second parameter.
+@@ -344,6 +364,30 @@ if not [%partition_to_be_flashed:recovery=%] == [%partition_to_be_flashed%] if n
+     set img_name=%local_str%-%soc_name%-%dtb_feature%.img
+     goto :start_to_flash
+ )
++if not [%partition_to_be_flashed:board_info=%] == [%partition_to_be_flashed%] (
++    set img_name=%board_info_file%
++    goto :start_to_flash
++)
++if not [%partition_to_be_flashed:vbmeta=%] == [%partition_to_be_flashed%] (
++    if not [%vbmeta_file%] == [] (
++        set img_name=%vbmeta_file%
++        goto :start_to_flash
++    )
++    (
++        set img_name=%local_str%-%soc_name%.img
++        goto :start_to_flash
++    )
++)
++if not [%partition_to_be_flashed:dtbo=%] == [%partition_to_be_flashed%] (
++    if not [%dtbo_file%] == [] (
++        set img_name=%dtbo_file%
++        goto :start_to_flash
++    )
++    (
++        set img_name=%local_str%-%soc_name%.img
++        goto :start_to_flash
++    )
++)
+ if not [%partition_to_be_flashed:bootloader=%] == [%partition_to_be_flashed%] (
+     set img_name=%bootloader_flashed_to_board%
+     goto :start_to_flash
+@@ -369,6 +413,7 @@ goto :eof
+ 
+ 
+ :flash_userpartitions
++if %support_board_info% == 1 call :flash_partition %board_info_partition% || set /A error_level=1 && goto :exit
+ if %support_dtbo% == 1 call :flash_partition %dtbo_partition% || set /A error_level=1 && goto :exit
+ if %support_recovery% == 1 call :flash_partition %recovery_partition% || set /A error_level=1 && goto :exit
+ call :flash_partition %boot_partition% || set /A error_level=1 && goto :exit
+@@ -389,11 +434,74 @@ set vbmeta_partition=vbmeta%1
+ set dtbo_partition=dtbo%1
+ goto :eof
+ 
++:check_board_info
++if not [%board_info_file%] == [] (
++    :: P1. if -d board_info_file is set, make sure it does exist
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%%board_info_file%`) DO (SET board_info_file=%%~nF.img)
++    FOR /F "tokens=2,3,4 delims=-" %%F IN ("%board_info_file%") DO (SET board_info_temp=%%F-%%G-%%H)
++)
++if not [%board_info_file%] == [] (
++    FOR /F "tokens=1 delims=_" %%F IN ("%board_info_temp%") DO (SET som_model=%%F)
++    FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
++    FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
++    FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
++)
++if not [%board_info_file%] == [] (
++    FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
++    FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
++)
++if [%board_info_file%] == [] (
++    :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
++    %fastboot_tool% oem getvar som-model 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-model: fastboot_oem.log') DO (SET som_model=%%F)
++    %fastboot_tool% oem getvar som-plc 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-plc: fastboot_oem.log') DO (SET som_plc=%%F)
++    %fastboot_tool% oem getvar mb-model 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-model: fastboot_oem.log') DO (SET mb_model=%%F)
++    %fastboot_tool% oem getvar mb-plc 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
++)
++if [%board_info_file%] == [] (
++    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-*_%mb_model%_%mb_plc%-*.img
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-*_%mb_model%_%mb_plc%-*.img`) DO (SET board_info_file=%%~nF.img)
++)
++if [%board_info_file%] == [] (
++    :: P3. Notify user to provide correct -d board_info_file
++    echo Error: Please add -d board_info_file option to find correct board_info image.
++    set /A error_level=2 && goto :exit
++)
++goto :eof
++
++:check_android_info
++IF NOT EXIST %image_directory%%android_info_file% (
++    echo Error: android-info.txt not found
++    set /A error_level=3 && goto :exit
++)
++FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android_info_file%') DO (SET som_opt=%%F)
++FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
++FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
++FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
++set /A match=0
++FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match+=1)
++FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match+=1)
++IF NOT [%match%] == [2] (
++    echo Error: %som_model% %mb_model% and values in android-info.txt are mismatched
++    set /A error_level=3 && goto :exit
++)
++goto :eof
++
+ :flash_android
++call :check_board_info
++if [%ERRORLEVEL%] == [2] goto :exit
++call :check_android_info
++if [%ERRORLEVEL%] == [3] goto :exit
++
+ call :flash_partition gpt || set /A error_level=1 && goto :exit
+ 
+ %fastboot_tool% getvar all 2> fastboot_var.log
+ find "bootloader_a" fastboot_var.log > nul && set /A support_dual_bootloader=1
++find "bootloader1" fastboot_var.log > nul && set /A support_idt_dual_bootloader=1
++find "board_info" fastboot_var.log > nul && set /A support_board_info=1
+ find "dtbo" fastboot_var.log > nul && set /A support_dtbo=1
+ 
+ find "recovery" fastboot_var.log > nul && set /A support_recovery=1
+@@ -419,6 +527,11 @@ call :flash_partition %bootloader_partition% || set /A error_level=1 && goto :ex
+ 
+ if %support_dualslot% == 0 set slot=
+ 
++if %support_idt_dual_bootloader% == 1 (
++    if %support_board_info% == 1 (
++        call :flash_partition bootloader1 || set /A error_level=1 && goto :exit
++    )
++)
+ 
+ :: if dual-bootloader feature is supported, we need to flash the u-boot proper then reboot to get hard-coded partition info
+ if %support_dual_bootloader% == 1 (
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 1ee00b94..b2b3dde7 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -5,11 +5,11 @@ help() {
+ bn=`basename $0`
+ cat << EOF
+ 
+-Version: 1.4
++Version: 1.6
+ Last change: add "-u" option to specify which uboot or spl&bootloader image to flash
+ 
+-eg: sudo ./fastboot_imx_flashall.sh -f imx8mm -a -D ~/android10/evk_8mm/
+-eg: sudo ./fastboot_imx_flashall.sh -f imx7ulp -D ~/android10/evk_7ulp/
++eg: sudo ./fastboot_imx_flashall.sh -f imx8mm -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
++eg: sudo ./fastboot_imx_flashall.sh -f imx7ulp -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+ 
+ Usage: $bn <option>
+ 
+@@ -73,6 +73,8 @@ options:
+   -s ser_num        the serial number of board
+                         If only one board connected to computer, no need to use this option
+   -R                with this option used, choose the u-boot about 1GB RAM setting.
++  -bdinfo board_info_file  flash board_info with this board_info_file image
++                               If not set, use naming from current board_info partition
+ EOF
+ 
+ }
+@@ -119,6 +121,16 @@ function flash_partition
+         fi
+     elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" -a "${dtb_feature}" != "" ]; then
+         img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
++    elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
++        img_name="${board_info_file}"
++    elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
++        if [ "${1%_*}" == "dtbo" -a -f "${dtbo_file}" ]; then
++            img_name="${dtbo_file}"
++        elif [ "${1%_*}" == "vbmeta" -a -f "${vbmeta_file}" ]; then
++            img_name="${vbmeta_file}"
++        else
++            img_name="${1%_*}-${soc_name}.img"
++        fi
+     elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+         img_name=${partition_file}
+     else
+@@ -131,6 +143,10 @@ function flash_partition
+ 
+ function flash_userpartitions
+ {
++    if [ ${support_board_info} -eq 1 ]; then
++        flash_partition ${board_info_partition}
++    fi
++
+     if [ ${support_dtbo} -eq 1 ]; then
+         flash_partition ${dtbo_partition}
+     fi
+@@ -158,14 +174,73 @@ function flash_partition_name
+     dtbo_partition="dtbo"${1}
+ }
+ 
++function check_board_info
++{
++    # 1. if -d board_info_file is set, make sure it does exist
++    if [ -n "${board_info_file}" ]; then
++        board_info_file="$(basename $(find ${image_directory}${board_info_file} |tail -n1))"
++        board_info_temp="${board_info_file#board_info-}"
++        som_model="$(echo $board_info_temp |cut -d'_' -f1)"
++        som_plc="$(echo $board_info_temp |cut -d'_' -f2 |cut -d'-' -f1)"
++        mb_model="$(echo $board_info_temp |cut -d'_' -f3)"
++        mb_plc="$(echo $board_info_temp |cut -d'_' -f4 |cut -d'-' -f1)"
++    fi
++    # 2. get som_model / som_plc / mb_model / mb_plc via fastboot
++    if [ -z "${board_info_file}" ]; then
++        result=`${fastboot_tool} oem getvar som-model 2>&1 |grep som-model:` || true
++        som_model=${result##* }
++        result=`${fastboot_tool} oem getvar som-plc 2>&1 |grep som-plc:` || true
++        som_plc=${result##* }
++        result=`${fastboot_tool} oem getvar mb-model 2>&1 |grep mb-model:` || true
++        mb_model=${result##* }
++        result=`${fastboot_tool} oem getvar mb-plc 2>&1 |grep mb-plc:` || true
++        mb_plc=${result##* }
++        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-*_${mb_model}_${mb_plc}-*.img |tail -n1))"
++        echo -e ${GREEN}Try to get board_info image via fastboot${STD} \
++                with board_info-${som_model}_${som_plc}-*_${mb_model}_${mb_plc}-*.img
++    fi
++    # 3. Notify user to provide correct -d board_info_file
++    if [ ! -f "${board_info_file}" ]; then
++        echo -e ${RED}Please add -d board_info_file option to find correct board_info image.${STD}
++        exit 1;
++    fi
++}
++
++function check_android_info
++{
++    match=0
++    if [ ! -f ${image_directory}${android_info_file} ]; then
++        echo -e ${RED}android-info.txt not found${STD}
++        exit 1;
++    fi
++    for val in `grep "som_model=" ${image_directory}${android_info_file} |sed "s|^som_model=||g" |sed "s|\|| |g"`;
++    do
++        [ "${som_model}" == "${val}" ] && match=$((match + 1))
++    done
++    for val in `grep "mb_model=" ${image_directory}${android_info_file} |sed "s|^mb_model=||g" |sed "s|\|| |g"`;
++    do
++        [ "${mb_model}" == "${val}" ] && match=$((match + 1))
++    done
++
++    if [ ! ${match} -eq 2 ]; then
++        echo -e ${RED}${som_model} ${mb_model} and values in android-info.txt are mismatched
++        exit 1
++    fi
++}
++
+ function flash_android
+ {
++    check_board_info
++    check_android_info
++
+     # a precondition: the location of gpt partition and the partition for uboot or spl(in dual bootloader condition)
+     # should be the same for the u-boot just boot up the board and the on to be flashed to the board
+     flash_partition "gpt"
+ 
+     ${fastboot_tool} getvar all 2>/tmp/fastboot_var.log
+     grep -q "bootloader_a" /tmp/fastboot_var.log && support_dual_bootloader=1
++    grep -q "bootloader1" /tmp/fastboot_var.log && support_idt_dual_bootloader=1
++    grep -q "board_info" /tmp/fastboot_var.log && support_board_info=1
+     grep -q "dtbo" /tmp/fastboot_var.log && support_dtbo=1
+     grep -q "recovery" /tmp/fastboot_var.log && support_recovery=1
+     # use boot_b to check whether current gpt support a/b slot
+@@ -187,6 +262,9 @@ function flash_android
+     else
+          flash_partition "bootloader"
+     fi
++    if [ ${support_idt_dual_bootloader} -eq 1 ] && [ ${support_board_info} -eq 1 ]; then
++         flash_partition "bootloader1"
++    fi
+ 
+     # if a platform doesn't support dual slot but a slot is selected, ignore it.
+     if [ ${support_dualslot} -eq 0 ] && [ "${slot}" != "" ]; then
+@@ -237,6 +315,15 @@ function flash_android
+ }
+ 
+ # parse command line
++som_model=""
++som_plc=""
++mb_model=""
++mb_plc=""
++board_info_file=""
++board_info_temp=""
++dtbo_file="dtbo.img"
++vbmeta_file="vbmeta.img"
++android_info_file="android-info.txt"
+ soc_name=""
+ uboot_feature=""
+ dtb_feature=""
+@@ -251,6 +338,8 @@ support_recovery=0
+ support_dualslot=0
+ support_mcu_os=0
+ support_dual_bootloader=0
++support_board_info=0
++support_idt_dual_bootloader=0
+ dual_bootloader_partition=""
+ bootloader_flashed_to_board=""
+ uboot_proper_to_be_flashed=""
+@@ -262,6 +351,7 @@ product_partition="product"
+ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
++board_info_partition="board_info"
+ flash_mcu=0
+ lock=0
+ erase=0
+@@ -271,6 +361,7 @@ fastboot_tool="fastboot"
+ RED='[0;31m'
+ STD='[0;0m'
+ GREEN='[0;32m'
++YELLOW='[0;33m'
+ ramsize=""
+ ramsizetest=0
+ 
+@@ -313,6 +404,7 @@ while [ $# -gt 0 ]; do
+         -D) image_directory=$2; shift;;
+         -s) ser_num=$2; shift;;
+         -R) ramsizetest=1 ;;
++        -bdinfo) board_info_file=$2; shift;;
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+             help; exit;;
+     esac
+@@ -372,6 +464,10 @@ if [ ${ramsizetest} -eq 1 ] ; then
+     ramsize="-ram1GB"
+ fi
+ 
++# force to use imx8mq if user doesn't assign it
++[ -z "$soc_name" ] && soc_name="imx8mq"
++som_model="${soc_name}"
++
+ # check whether provided spl/bootloader/uboot feature is legal
+ if [ -n "${uboot_feature}" ]; then
+     uboot_feature_no_pre_hyphen=${uboot_feature#-}
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index b32b9ea4..0ff84345 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -14,6 +14,17 @@ set script_first_argument=%script_first_argument:"=%
+ :: reserve last 13 characters, which is the lenght of the name of this script file.
+ set script_name=%script_first_argument:~-25%
+ 
++set som_model=
++set som_plc=
++set som_opt=
++set mb_model=
++set mb_plc=
++set mb_opt=
++set board_info_file=
++set board_info_temp=
++set dtbo_file=dtbo.img
++set vbmeta_file=vbmeta.img
++set android_info_file=android-info.txt
+ set soc_name=
+ set uboot_feature=
+ set dtb_feature=
+@@ -29,6 +40,8 @@ set /A support_recovery=0
+ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_trusty=0
++set /A support_board_info=0
++set /A support_idt_dual_bootloader=1
+ set boot_partition=boot
+ set recovery_partition=recovery
+ set system_partition=system
+@@ -37,12 +50,14 @@ set product_partition=product
+ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
++set board_info_partition=board_info
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A erase=0
+ set image_directory=
+ 
+ set target_dev=emmc
++set fastboot_tool=
+ set sdp=SDP
+ set /A uboot_env_start=0
+ set /A uboot_env_len=0
+@@ -163,6 +178,9 @@ if [%support_dual_bootloader%] equ [1] (
+     if %card_size% gtr 0 set partition_file=partition-table-%card_size%GB.img
+ )
+ 
++:: force to use imx8mq if user doesn't assign it
++if [%soc_name%] == [] set soc_name=imx8mq
++set som_model=%soc_name%
+ 
+ :: dump the partition table image file into text file and check whether some partition names are in it
+ if exist partition-table_1.txt (
+@@ -184,6 +202,8 @@ for /f "delims=" %%J in (partition-table_2.txt) do (
+ 
+ :: check whether there is "bootloader_b" in partition file
+ find "b.o.o.t.l.o.a.d.e.r._.b." partition-table_3.txt > nul && set /A support_dual_bootloader=1 && echo dual bootloader is supported
++:: check whether there is "board_info" in partition file
++find "b.o.a.r.d._.i.n.f.o." partition-table_3.txt > nul && set /A support_board_info=1 && echo board_info is supported
+ :: check whether there is "dtbo" in partition file
+ find "d.t.b.o." partition-table_3.txt > nul && set /A support_dtbo=1 && echo dtbo is supported
+ :: check whether there is "recovery" in partition file
+@@ -448,6 +468,7 @@ echo Version: 1.6
+ echo Last change: remove "-tos" and "-dboot" option, add "-u" option to specify which uboot or spl&bootloader image to flash
+ echo currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, aiy_8mq, mek_8q, mek_8q_car
+ echo.
++echo eg: uuu_imx_android_flash.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+ echo eg: uuu_imx_android_flash.bat -f imx8qm -a -e -D C:\Users\user_01\imagesndroid10\mek_8q\ -t emmc -u trusty -d mipi-panel
+ echo.
+ echo Usage: %script_name% ^<option^>
+@@ -519,6 +540,7 @@ echo  -i                with this option used, after uboot for uuu loaded and ex
+ echo                        This option is for users to manually flash the images to partitions they want to
+ echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
++echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ goto :eof
+ 
+ 
+@@ -649,6 +671,30 @@ if not [%partition_to_be_flashed:recovery=%] == [%partition_to_be_flashed%] if n
+     set img_name=%local_str%-%soc_name%-%dtb_feature%.img
+     goto :start_to_flash
+ )
++if not [%partition_to_be_flashed:board_info=%] == [%partition_to_be_flashed%] (
++    set img_name=%board_info_file%
++    goto :start_to_flash
++)
++if not [%partition_to_be_flashed:vbmeta=%] == [%partition_to_be_flashed%] (
++    if not [%vbmeta_file%] == [] (
++        set img_name=%vbmeta_file%
++        goto :start_to_flash
++    )
++    (
++        set img_name=%local_str%-%soc_name%.img
++        goto :start_to_flash
++    )
++)
++if not [%partition_to_be_flashed:dtbo=%] == [%partition_to_be_flashed%] (
++    if not [%dtbo_file%] == [] (
++        set img_name=%dtbo_file%
++        goto :start_to_flash
++    )
++    (
++        set img_name=%local_str%-%soc_name%.img
++        goto :start_to_flash
++    )
++)
+ if not [%partition_to_be_flashed:bootloader=%] == [%partition_to_be_flashed%] (
+     set img_name=%bootloader_flashed_to_board%
+     goto :start_to_flash
+@@ -678,6 +724,7 @@ goto :eof
+ 
+ 
+ :flash_userpartitions
++if %support_board_info% == 1 call :flash_partition %board_info_partition% || set /A error_level=1 && goto :exit
+ if %support_dual_bootloader% == 1 call :flash_partition %dual_bootloader_partition% || set /A error_level=1 && goto :exit
+ if %support_dtbo% == 1 call :flash_partition %dtbo_partition% || set /A error_level=1 && goto :exit
+ if %support_recovery% == 1 call :flash_partition %recovery_partition% || set /A error_level=1 && goto :exit
+@@ -700,7 +747,67 @@ set dtbo_partition=dtbo%1
+ if %support_dual_bootloader% == 1 set dual_bootloader_partition=bootloader%1
+ goto :eof
+ 
++:check_board_info
++if not [%board_info_file%] == [] (
++    :: P1. if -d board_info_file is set, make sure it does exist
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%%board_info_file%`) DO (SET board_info_file=%%~nF.img)
++    FOR /F "tokens=2,3,4 delims=-" %%F IN ("%board_info_file%") DO (SET board_info_temp=%%F-%%G-%%H)
++)
++if not [%board_info_file%] == [] (
++    FOR /F "tokens=1 delims=_" %%F IN ("%board_info_temp%") DO (SET som_model=%%F)
++    FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
++    FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
++    FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
++)
++if not [%board_info_file%] == [] (
++    FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
++    FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
++)
++if [%board_info_file%] == [] (
++    :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
++    %fastboot_tool% oem getvar som-model 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-model: fastboot_oem.log') DO (SET som_model=%%F)
++    %fastboot_tool% oem getvar som-plc 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-plc: fastboot_oem.log') DO (SET som_plc=%%F)
++    %fastboot_tool% oem getvar mb-model 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-model: fastboot_oem.log') DO (SET mb_model=%%F)
++    %fastboot_tool% oem getvar mb-plc 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
++)
++if [%board_info_file%] == [] (
++    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-*_%mb_model%_%mb_plc%-*.img
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-*_%mb_model%_%mb_plc%-*.img`) DO (SET board_info_file=%%~nF.img)
++)
++if [%board_info_file%] == [] (
++    :: P3. Notify user to provide correct -d board_info_file
++    echo Error: Please add -d board_info_file option to find correct board_info image.
++    set /A error_level=2 && goto :exit
++)
++goto :eof
++
++:check_android_info
++IF NOT EXIST %image_directory%%android_info_file% (
++    echo Error: android-info.txt not found
++    set /A error_level=3 && goto :exit
++)
++FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android_info_file%') DO (SET som_opt=%%F)
++FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
++FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
++FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
++set /A match=0
++FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match+=1)
++FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match+=1)
++IF NOT [%match%] == [2] (
++    echo Error: %som_model% %mb_model% and values in android-info.txt are mismatched
++    set /A error_level=3 && goto :exit
++)
++goto :eof
++
+ :flash_android
++call :check_board_info
++if [%ERRORLEVEL%] == [2] goto :exit
++call :check_android_info
++if [%ERRORLEVEL%] == [3] goto :exit
+ 
+ :: if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+ if %support_dual_bootloader% == 1 (
+@@ -721,6 +828,11 @@ if not [%dtb_feature%] == [xen] (
+     ) else (
+         call :flash_partition bootloader || set /A error_level=1 && goto :exit
+     )
++    if %support_idt_dual_bootloader% == 1 (
++        if %support_board_info% == 1 (
++            call :flash_partition bootloader1 || set /A error_level=1 && goto :exit
++        )
++    )
+ )
+ 
+ call :flash_partition gpt || set /A error_level=1 && goto :exit
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index fd1efb8d..d4648ad1 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -9,6 +9,7 @@ Version: 1.6
+ Last change: remove "-tos" and "-dboot" option, add "-u" option to specify which uboot or spl&bootloader image to flash
+ currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, aiy_8mq, mek_8q, mek_8q_car
+ 
++eg: ./uuu_imx_android_flash.sh -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+ eg: ./uuu_imx_android_flash.sh -f imx8qm -a -e -D ~/android10/mek_8q/ -t emmc -u trusty -d mipi-panel
+ 
+ Usage: $bn <option>
+@@ -81,6 +82,8 @@ options:
+   -R                with this option used, choose the u-boot about 1GB RAM setting.
+   -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
++  -bdinfo board_info_file  flash board_info with this board_info_file image
++                               If not set, use naming from current board_info partition
+ EOF
+ 
+ }
+@@ -163,6 +166,16 @@ function flash_partition
+         img_name="${soc_name}_mcu_demo.img"
+     elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" -a "${dtb_feature}" != "" ]; then
+         img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
++    elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
++        img_name="${board_info_file}"
++    elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
++        if [ "${1%_*}" == "dtbo" -a -f "${dtbo_file}" ]; then
++            img_name="${dtbo_file}"
++        elif [ "${1%_*}" == "vbmeta" -a -f "${vbmeta_file}" ]; then
++            img_name="${vbmeta_file}"
++        else
++            img_name="${1%_*}-${soc_name}.img"
++        fi
+     elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+         img_name=${partition_file}
+     else
+@@ -180,6 +193,9 @@ function flash_userpartitions
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+         flash_partition ${dual_bootloader_partition}
+     fi
++    if [ ${support_board_info} -eq 1 ]; then
++        flash_partition ${board_info_partition}
++    fi
+     if [ ${support_dtbo} -eq 1 ]; then
+         flash_partition ${dtbo_partition}
+     fi
+@@ -210,8 +226,64 @@ function flash_partition_name
+     fi
+ }
+ 
++function check_board_info
++{
++    # 1. if -d board_info_file is set, make sure it does exist
++    if [ -n "${board_info_file}" ]; then
++        board_info_file="$(basename $(find ${image_directory}${board_info_file} |tail -n1))"
++        board_info_temp="${board_info_file#board_info-}"
++        som_model="$(echo $board_info_temp |cut -d'_' -f1)"
++        som_plc="$(echo $board_info_temp |cut -d'_' -f2 |cut -d'-' -f1)"
++        mb_model="$(echo $board_info_temp |cut -d'_' -f3)"
++        mb_plc="$(echo $board_info_temp |cut -d'_' -f4 |cut -d'-' -f1)"
++    fi
++    # 2. get som_model / som_plc / mb_model / mb_plc via fastboot
++    if [ -z "${board_info_file}" ]; then
++        result=`${fastboot_tool} oem getvar som-model 2>&1 |grep som-model:` || true
++        som_model=${result##* }
++        result=`${fastboot_tool} oem getvar som-plc 2>&1 |grep som-plc:` || true
++        som_plc=${result##* }
++        result=`${fastboot_tool} oem getvar mb-model 2>&1 |grep mb-model:` || true
++        mb_model=${result##* }
++        result=`${fastboot_tool} oem getvar mb-plc 2>&1 |grep mb-plc:` || true
++        mb_plc=${result##* }
++        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-*_${mb_model}_${mb_plc}-*.img |tail -n1))"
++        echo -e ${GREEN}Try to get board_info image via fastboot${STD} \
++                with board_info-${som_model}_${som_plc}-*_${mb_model}_${mb_plc}-*.img
++    fi
++    # 3. Notify user to provide correct -d board_info_file
++    if [ ! -f "${board_info_file}" ]; then
++        echo -e ${RED}Please add -d board_info_file option to find correct board_info image.${STD}
++        exit 1;
++    fi
++}
++
++function check_android_info
++{
++    match=0
++    if [ ! -f ${image_directory}${android_info_file} ]; then
++        echo -e ${RED}android-info.txt not found${STD}
++        exit 1;
++    fi
++    for val in `grep "som_model=" ${image_directory}${android_info_file} |sed "s|^som_model=||g" |sed "s|\|| |g"`;
++    do
++        [ "${som_model}" == "${val}" ] && match=$((match + 1))
++    done
++    for val in `grep "mb_model=" ${image_directory}${android_info_file} |sed "s|^mb_model=||g" |sed "s|\|| |g"`;
++    do
++        [ "${mb_model}" == "${val}" ] && match=$((match + 1))
++    done
++
++    if [ ! ${match} -eq 2 ]; then
++        echo -e ${RED}${som_model} ${mb_model} and values in android-info.txt are mismatched
++        exit 1
++    fi
++}
+ function flash_android
+ {
++    check_board_info
++    check_android_info
++
+     # if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+         bootloader_flashed_to_board=spl-${soc_name}${uboot_feature}.bin
+@@ -229,6 +301,9 @@ function flash_android
+         else
+             flash_partition "bootloader"
+         fi
++        if [ ${support_idt_dual_bootloader} -eq 1 ] && [ ${support_board_info} -eq 1 ]; then
++            flash_partition "bootloader1"
++        fi
+     fi
+ 
+     flash_partition "gpt"
+@@ -279,6 +354,15 @@ function flash_android
+ 
+ 
+ # parse command line
++som_model=""
++som_plc=""
++mb_model=""
++mb_plc=""
++board_info_file=""
++board_info_temp=""
++dtbo_file="dtbo.img"
++vbmeta_file="vbmeta.img"
++android_info_file="android-info.txt"
+ soc_name=""
+ uboot_feature=""
+ dtb_feature=""
+@@ -293,6 +377,8 @@ support_recovery=0
+ support_dualslot=0
+ support_mcu_os=0
+ support_trusty=0
++support_board_info=0
++support_idt_dual_bootloader=0
+ boot_partition="boot"
+ recovery_partition="recovery"
+ system_partition="system"
+@@ -301,6 +387,7 @@ product_partition="product"
+ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
++board_info_partition="board_info"
+ 
+ flash_mcu=0
+ erase=0
+@@ -308,6 +395,8 @@ image_directory=""
+ target_dev="emmc"
+ RED='[0;31m'
+ STD='[0;0m'
++GREEN='[0;32m'
++YELLOW='[0;33m'
+ sdp="SDP"
+ uboot_env_start=0
+ uboot_env_len=0
+@@ -328,6 +417,8 @@ sym_link_directory=""
+ yocto_image_sym_link=""
+ daemon_mode=0
+ dryrun=0
++ramsize=""
++ramsizetest=0
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -345,8 +436,6 @@ imx8mq_dtb_feature=(dual mipi-panel mipi)
+ imx8qxp_dtb_feature=()
+ imx8qm_dtb_feature=(hdmi mipi-panel md xen)
+ imx7ulp_dtb_feature=(evk-mipi evk mipi)
+-ramsize=""
+-ramsizetest=0
+ 
+ 
+ echo -e This script is validated with ${RED}uuu 1.3.102${STD} version, please align with this version.
+@@ -376,6 +465,7 @@ while [ $# -gt 0 ]; do
+         -R) ramsizetest=1 ;;
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
++        -bdinfo) board_info_file=$2; shift;;
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+             help; exit;;
+     esac
+@@ -407,6 +497,10 @@ if [ ${ramsizetest} -eq 1 ] ; then
+     ramsize="-ram1GB"
+ fi
+ 
++# force to use imx8mq if user doesn't assign it
++[ -z "$soc_name" ] && soc_name="imx8mq"
++som_model="${soc_name}"
++
+ # for specified directory, make sure there is a slash at the end
+ if [[ "${image_directory}" != "" ]]; then
+      image_directory="${image_directory%/}/";
+@@ -468,6 +562,9 @@ sed ':a;N;$!ba;s/
+//g' /tmp/partition-table_2.txt > /tmp/partition-table_3.txt
+ # check whether there is "bootloader_b" in partition file
+ grep "62 00 6f 00 6f 00 74 00 6c 00 6f 00 61 00 64 00 65 00 72 00 5f 00 62 00" /tmp/partition-table_3.txt > /dev/null \
+         && support_dual_bootloader=1 && echo dual bootloader is supported
++# check whether there is "board_info" in partition file
++grep "62 00 6f 00 61 00 72 00 64 00 5f 00 69 00 6e 00 66 00 6f 00" /tmp/partition-table_3.txt > /dev/null \
++        && support_board_info=1 && echo board_info is supported
+ # check whether there is "dtbo" in partition file
+ grep "64 00 74 00 62 00 6f 00" /tmp/partition-table_3.txt > /dev/null \
+         && support_dtbo=1 && echo dtbo is supported

@@ -1,0 +1,76 @@
+a7ff550421 George.Huang 2020-09-15
+
+AOS-288: return the bootloader autherntication result
+
+In original design, board_spl_fit_post_load function will hang the device
+if it failed to authernticate current bootloader.
+
+But it's better to return the authernticate result back to libavb
+to determin to keep booting or switch slot to retry.
+
+Change-Id: I968626e8062309f2118bd98e23f55c2f48a1c1cb
+
+diff --git a/arch/arm/mach-imx/spl.c b/arch/arm/mach-imx/spl.c
+index 77f13f37d7..6e490b1f49 100644
+--- a/arch/arm/mach-imx/spl.c
++++ b/arch/arm/mach-imx/spl.c
+@@ -336,7 +336,7 @@ ulong board_spl_fit_size_align(ulong size)
+ 	return size;
+ }
+ 
+-void board_spl_fit_post_load(ulong load_addr, size_t length)
++int board_spl_fit_post_load(ulong load_addr, size_t length)
+ {
+ 	u32 offset = length - CONFIG_CSF_SIZE;
+ 
+@@ -344,8 +344,9 @@ void board_spl_fit_post_load(ulong load_addr, size_t length)
+ 				       offset + IVT_SIZE + CSF_PAD_SIZE,
+ 				       offset)) {
+ 		puts("spl: ERROR:  image authentication unsuccessful
+");
+-		hang();
++		return -1;
+ 	}
++	return 0;
+ }
+ #endif
+ 
+diff --git a/common/spl/spl_fit.c b/common/spl/spl_fit.c
+index dd887ded56..ef7c9d57c4 100644
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@ -24,7 +24,7 @@ DECLARE_GLOBAL_DATA_PTR;
+ #define CONFIG_SYS_BOOTM_LEN	(64 << 20)
+ #endif
+ 
+-__weak void board_spl_fit_post_load(ulong load_addr, size_t length)
++__weak int board_spl_fit_post_load(ulong load_addr, size_t length)
+ {
+ }
+ 
+@@ -723,8 +723,11 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
+ 	spl_image->flags |= SPL_FIT_FOUND;
+ 
+ #ifdef CONFIG_IMX_HAB
++	ret = 0;
+ 	if (!(spl_image->flags & SPL_FIT_BYPASS_POST_LOAD))
+-		board_spl_fit_post_load((ulong)fit, size);
++		ret = board_spl_fit_post_load((ulong)fit, size);
++	if (ret < 0)
++		return ret;
+ #endif
+ 
+ 	return 0;
+diff --git a/include/spl.h b/include/spl.h
+index 192878cabb..2129c5033d 100644
+--- a/include/spl.h
++++ b/include/spl.h
+@@ -519,7 +519,7 @@ int board_return_to_bootrom(struct spl_image_info *spl_image,
+  * board_spl_fit_post_load - allow process images after loading finished
+  *
+  */
+-void board_spl_fit_post_load(ulong load_addr, size_t length);
++int board_spl_fit_post_load(ulong load_addr, size_t length);
+ 
+ /**
+  * board_spl_fit_size_align - specific size align before processing payload

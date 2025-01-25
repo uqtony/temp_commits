@@ -1,0 +1,163 @@
+41e75c50bc max.yang 2020-08-18
+
+AOS-300: Dynamically assigning memory size from mem_info and adjusting mem banks
+
+Change-Id: Ia18a03175664cea2b1e1724d44d3b3efea98087b
+
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index b0451dc8eb..76d91bbfab 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -210,14 +210,8 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ 	memcpy((void *)&mem_size, (void *)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+ 	*size = (phys_size_t)mem_size * 1024;
+ 
+-#ifdef PHYS_SDRAM_2_SIZE
+-	/* Since dynamic dram feature will get total ram size from emmc, but by NXP's
+-	 * design, it divided ram to 2 or more mem_banks and plus size when bank2 is
+-	 * enabled.
+-	 * So here we minus the size, then function caller will added it back
+-	 */
+-	*size -= PHYS_SDRAM_2_SIZE;
+-#endif
++	idt_adjust_mem_map(mem_map, size);
++	*size = idt_banksize_1st(*size);
+ #endif
+ 	return 0;
+ }
+@@ -237,6 +231,11 @@ int dram_init(void)
+ 	else
+ 		gd->ram_size = sdram_size;
+ 
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	gd->ram_size += idt_banksize_2nd(mem_map);
++	return 0;
++#endif
++
+ #ifdef PHYS_SDRAM_2_SIZE
+ 	gd->ram_size += PHYS_SDRAM_2_SIZE;
+ #endif
+@@ -281,6 +280,9 @@ int dram_init_banksize(void)
+ 	}
+ 	gd->bd->bi_dram[bank].start = PHYS_SDRAM_2;
+ 	gd->bd->bi_dram[bank].size = PHYS_SDRAM_2_SIZE;
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	gd->bd->bi_dram[bank].size = gd->ram_size - sdram_size;
++#endif
+ #endif
+ 
+ 	return 0;
+@@ -292,6 +294,9 @@ phys_size_t get_effective_memsize(void)
+ 	if (rom_pointer[1])
+ 		return ((phys_addr_t)rom_pointer[0] - PHYS_SDRAM);
+ 
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	return idt_banksize_1st(gd->ram_size);
++#endif
+ #ifdef PHYS_SDRAM_2_SIZE
+ 	return gd->ram_size - PHYS_SDRAM_2_SIZE;
+ #else
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+index 893d1ff059..a06723a285 100644
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -151,3 +151,4 @@ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
++CONFIG_NR_DRAM_BANKS=2
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 87f7b8fc9f..9fe5e87608 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -28,6 +28,7 @@ obj-$(CONFIG_$(SPL_)REMOTEPROC) += remoteproc/
+ obj-$(CONFIG_$(SPL_TPL_)TPM) += tpm/
+ obj-$(CONFIG_$(SPL_TPL_)ACPI_PMC) += power/acpi_pmc/
+ obj-$(CONFIG_$(SPL_)BOARD) += board/
++obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
+ 
+ ifndef CONFIG_TPL_BUILD
+ ifdef CONFIG_SPL_BUILD
+diff --git a/drivers/idt/multiddr/Makefile b/drivers/idt/multiddr/Makefile
+index e158eaf04a..6d36b99502 100644
+--- a/drivers/idt/multiddr/Makefile
++++ b/drivers/idt/multiddr/Makefile
+@@ -3,5 +3,5 @@
+ #
+ 
+ ifdef CONFIG_IDT_MULTIPLE_DDR
+-obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt_ddr_select.o
++obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt_ddr_select.o idt_ddr_size.o
+ endif
+diff --git a/drivers/idt/multiddr/idt_ddr_size.c b/drivers/idt/multiddr/idt_ddr_size.c
+new file mode 100644
+index 0000000000..f5213e2041
+--- /dev/null
++++ b/drivers/idt/multiddr/idt_ddr_size.c
+@@ -0,0 +1,30 @@
++#include <idt_ddr_select.h>
++
++#define DRAM_BANK1_BASE     0x40000000UL
++#define DRAM_BANK1_SIZE_MAX 0xC0000000UL
++#define DRAM_BANK2_BASE     0x100000000UL
++
++void idt_adjust_mem_map(struct mm_region *mmap, phys_size_t *size)
++{
++	for (int i = 0; mmap[i].size || mmap[i].attrs; i++) {
++		if (mmap[i].virt == DRAM_BANK1_BASE)
++			mmap[i].size = (*size > DRAM_BANK1_SIZE_MAX) ? DRAM_BANK1_SIZE_MAX : *size;
++
++		if (mmap[i].virt == DRAM_BANK2_BASE)
++			mmap[i].size = (*size > DRAM_BANK1_SIZE_MAX) ? *size - DRAM_BANK1_SIZE_MAX : 0x0;
++	}
++}
++
++phys_size_t idt_banksize_1st(phys_size_t size)
++{
++	return (size > DRAM_BANK1_SIZE_MAX) ? DRAM_BANK1_SIZE_MAX : size;
++}
++
++phys_size_t idt_banksize_2nd(struct mm_region *mmap)
++{
++	for (int i = 0; mmap[i].size || mmap[i].attrs; i++) {
++		if (mmap[i].virt == DRAM_BANK2_BASE)
++			return mmap[i].size;
++	}
++	return 0;
++}
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+index 1b679811a5..1af81f6d7c 100644
+--- a/include/configs/imx8mq_a300.h
++++ b/include/configs/imx8mq_a300.h
+@@ -168,6 +168,9 @@
+ #define CONFIG_SYS_SDRAM_BASE           0x40000000
+ #define PHYS_SDRAM                      0x40000000
+ #define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
++/* IDT added SDRAM second bank */
++#define PHYS_SDRAM_2                    0x100000000
++#define PHYS_SDRAM_2_SIZE               0x0      /* IDT: init as 0, dynamically assign */
+ 
+ #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
+ #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
+diff --git a/include/idt_ddr_select.h b/include/idt_ddr_select.h
+index 5d662072d5..b049d787fc 100644
+--- a/include/idt_ddr_select.h
++++ b/include/idt_ddr_select.h
+@@ -2,6 +2,8 @@
+  * Copyright (C) 2020 ID TECH
+  */
+ 
++#include <asm/types.h>
++#include <asm/armv8/mmu.h>
+ #include <persist_idt.h>
+ 
+ #ifndef __IDT_DDR_SELECT_H__
+@@ -49,4 +51,8 @@ struct idt_mem_root {
+ 	struct idt_mem_obj mem_obj_ary[];
+ };
+ 
++void idt_adjust_mem_map(struct mm_region *mmap, phys_size_t *size);
++phys_size_t idt_banksize_1st(phys_size_t size);
++phys_size_t idt_banksize_2nd(struct mm_region *mmap);
++
+ #endif //__IDT_DDR_SELECT_H__

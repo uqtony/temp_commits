@@ -1,0 +1,46 @@
+3421a6c7279f Brian Lee 2022-02-18
+
+AOS-843: Show all connected devices in mediaoutput dialog
+
+Show all connected device, include builtin speaker.
+This fixed show only one connected wired device in mediaoutput dialog.
+
+Change-Id: I1b0f5cae26fc546545488e8f011d5f34126f8194
+
+diff --git a/packages/SettingsLib/src/com/android/settingslib/media/LocalMediaManager.java b/packages/SettingsLib/src/com/android/settingslib/media/LocalMediaManager.java
+index 72a6074ff89c..6eeb58efe5fb 100644
+--- a/packages/SettingsLib/src/com/android/settingslib/media/LocalMediaManager.java
++++ b/packages/SettingsLib/src/com/android/settingslib/media/LocalMediaManager.java
+@@ -413,7 +413,7 @@ public class LocalMediaManager implements BluetoothCallback {
+                         return device;
+                     }
+                 } else if (device instanceof PhoneMediaDevice) {
+-                    connectedDevice = device;
++                    return device;
+                 }
+             }
+         }
+diff --git a/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java b/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
+index 4f7af9469668..06a977faa6e1 100644
+--- a/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
++++ b/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
+@@ -278,6 +278,11 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
+ 
+     private void updateProviderState() {
+         MediaRoute2ProviderInfo.Builder builder = new MediaRoute2ProviderInfo.Builder();
++
++        if (mDefaultRoute != null && mDefaultRoute.getType() != mDeviceRoute.getType()) {
++            builder.addRoute(mDefaultRoute);
++        }
++
+         builder.addRoute(mDeviceRoute);
+         if (mBtRouteProvider != null) {
+             for (MediaRoute2Info route : mBtRouteProvider.getAllBluetoothRoutes()) {
+@@ -317,6 +322,7 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
+                     .setProviderId(mUniqueId)
+                     .build();
+             builder.addSelectedRoute(mSelectedRouteId);
++            builder.addTransferableRoute(DEFAULT_ROUTE_ID);
+ 
+             if (mBtRouteProvider != null) {
+                 for (MediaRoute2Info route : mBtRouteProvider.getTransferableRoutes()) {

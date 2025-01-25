@@ -1,0 +1,180 @@
+968587c5787e Jay 2021-12-23
+
+AOS-835: resize camera resolution for input rotation
+
+This is workaround for rotation.
+
+In capture mode, post-processing in android framework only support
+square. Outputted data is incorrect if input data is not square image
+and we enable rotation feature.
+
+In preview mode, GPU will rotate and stretch data to fit display,
+so output image has deformation.
+
+Workaround is resize camera resolution to square image.
+
+Change-Id: I41d78dd7fa1a2d11f187870cd497c76a35e16d8c
+
+diff --git a/drivers/media/i2c/s5k5e9.c b/drivers/media/i2c/s5k5e9.c
+index e022f9d20568..f25735d9da4e 100644
+--- a/drivers/media/i2c/s5k5e9.c
++++ b/drivers/media/i2c/s5k5e9.c
+@@ -55,9 +55,9 @@ enum {
+ 
+ enum s5k5e9_mode {
+ 	s5k5e9_mode_MIN = 0,
+-	s5k5e9_mode_2400_1440 = 0,
+-	s5k5e9_mode_1600_960,
+-	s5k5e9_mode_800_480,
++	s5k5e9_mode_1600_1600 = 0,
++	s5k5e9_mode_1200_1200,
++	s5k5e9_mode_800_800,
+ 	s5k5e9_mode_MAX,
+ 	s5k5e9_mode_INIT = 0xff, /*only for sensor init*/
+ };
+@@ -68,9 +68,9 @@ struct s5k5e9_res {
+ };
+ 
+ struct s5k5e9_res s5k5e9_res[] = {
+-	[0] = {2000, 1200},
+-	[1] = {1600, 960},
+-	[2] = {800, 480},
++	[0] = {1600, 1600},
++	[1] = {1200, 1200},
++	[2] = {800, 800},
+ };
+ 
+ #define RES_SIZE (ARRAY_SIZE(s5k5e9_res))
+@@ -218,64 +218,64 @@ static struct sensor_reg_value s5k5e9_capture_setting[] = {
+ 	{0x0215, 0xB8},
+ };
+ 
+-static struct sensor_reg_value s5k5e9_cap_res_2400_1440_setting[] = {
++static struct sensor_reg_value s5k5e9_cap_res_1600_1600_setting[] = {
+ 	{0x0344, 0x01},
+-	{0x0345, 0x30},
++	{0x0345, 0xF8},
+ 
+-	{0x0346, 0x01},
+-	{0x0347, 0x7C},
++	{0x0346, 0x00},
++	{0x0347, 0xB4},
+ 
+ 	{0x0348, 0x08},
+-	{0x0349, 0xFF},
++	{0x0349, 0x37},
+ 
+ 	{0x034A, 0x06},
+-	{0x034B, 0x2B},
++	{0x034B, 0xF3},
+ 
+-	{0x034C, 0x07},
+-	{0x034D, 0xD0},
++	{0x034C, 0x06},
++	{0x034D, 0x40},
+ 
+-	{0x034E, 0x04},
+-	{0x034F, 0xB0},
++	{0x034E, 0x06},
++	{0x034F, 0x40},
+ };
+ 
+-static struct sensor_reg_value s5k5e9_cap_res_1600_960_setting[] = {
+-	{0x0344, 0x01},
+-	{0x0345, 0xF8},
++static struct sensor_reg_value s5k5e9_cap_res_1200_1200_setting[] = {
++	{0x0344, 0x02},
++	{0x0345, 0xC0},
+ 
+ 	{0x0346, 0x01},
+-	{0x0347, 0xF4},
++	{0x0347, 0x7C},
+ 
+-	{0x0348, 0x08},
+-	{0x0349, 0x37},
++	{0x0348, 0x07},
++	{0x0349, 0x6F},
+ 
+-	{0x034A, 0x05},
+-	{0x034B, 0xB3},
++	{0x034A, 0x06},
++	{0x034B, 0x2B},
+ 
+-	{0x034C, 0x06},
+-	{0x034D, 0x40},
++	{0x034C, 0x04},
++	{0x034D, 0xB0},
+ 
+-	{0x034E, 0x03},
+-	{0x034F, 0xC0},
++	{0x034E, 0x04},
++	{0x034F, 0xB0},
+ };
+ 
+-static struct sensor_reg_value s5k5e9_cap_res_800_480_setting[] = {
++static struct sensor_reg_value s5k5e9_cap_res_800_800_setting[] = {
+ 	{0x0344, 0x03},
+ 	{0x0345, 0x88},
+ 
+ 	{0x0346, 0x02},
+-	{0x0347, 0xE4},
++	{0x0347, 0x44},
+ 
+ 	{0x0348, 0x06},
+ 	{0x0349, 0xA7},
+ 
+-	{0x034A, 0x04},
+-	{0x034B, 0xC3},
++	{0x034A, 0x05},
++	{0x034B, 0x63},
+ 
+ 	{0x034C, 0x03},
+ 	{0x034D, 0x20},
+ 
+-	{0x034E, 0x01},
+-	{0x034F, 0xE0},
++	{0x034E, 0x03},
++	{0x034F, 0x20},
+ };
+ 
+ static const char * const s5k5e9_supply_names[] = {
+@@ -630,17 +630,17 @@ static int s5k5e9_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
+ 		sensor->streamcap.timeperframe.denominator = S5K5E9_DEFAULT_FPS;
+ 		sensor->streamcap.timeperframe.numerator = 1;
+ 		switch (a->parm.capture.capturemode) {
+-		case s5k5e9_mode_2400_1440:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_2400_1440_setting,
+-				sizeof(s5k5e9_cap_res_2400_1440_setting)/sizeof(struct sensor_reg_value));
++		case s5k5e9_mode_1600_1600:
++			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_1600_1600_setting,
++				sizeof(s5k5e9_cap_res_1600_1600_setting)/sizeof(struct sensor_reg_value));
+ 			break;
+-		case s5k5e9_mode_1600_960:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_1600_960_setting,
+-				sizeof(s5k5e9_cap_res_1600_960_setting)/sizeof(struct sensor_reg_value));
++		case s5k5e9_mode_1200_1200:
++			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_1200_1200_setting,
++				sizeof(s5k5e9_cap_res_1200_1200_setting)/sizeof(struct sensor_reg_value));
+ 			break;
+-		case s5k5e9_mode_800_480:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_800_480_setting,
+-				sizeof(s5k5e9_cap_res_800_480_setting)/sizeof(struct sensor_reg_value));
++		case s5k5e9_mode_800_800:
++			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_800_800_setting,
++				sizeof(s5k5e9_cap_res_800_800_setting)/sizeof(struct sensor_reg_value));
+ 			break;
+ 		}
+ 
+@@ -795,8 +795,8 @@ static int s5k5e9_probe(struct i2c_client *client)
+ 	if (ret)
+ 		dev_err(sensor->dev, "%s: array write capture setting %d
+", __func__, ret);
+ 
+-	ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_800_480_setting,
+-				     sizeof(s5k5e9_cap_res_800_480_setting)/sizeof(struct sensor_reg_value));
++	ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_800_800_setting,
++				     sizeof(s5k5e9_cap_res_800_800_setting)/sizeof(struct sensor_reg_value));
+ 	if (ret)
+ 		dev_err(sensor->dev, "%s: array write capture resolution %d
+", __func__, ret);
+ 

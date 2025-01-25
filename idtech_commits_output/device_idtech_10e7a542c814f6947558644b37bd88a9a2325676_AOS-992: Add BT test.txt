@@ -1,0 +1,70 @@
+10e7a542 Brian Lee 2022-04-25
+
+AOS-992: Add BT test
+
+Steps as below,
+01/ enable/disable bluetooth
+02/ dumpsys bluetooth_manager
+03/ check state, enable -> ON, disable -> OFF
+
+Change-Id: I5d02dcdf82d0a817f5cc445079982ccafe6f86f2
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 45c07678..210eba97 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -602,6 +602,45 @@ check_func_youtube_video() {
+   fi
+ }
+ 
++check_func_bt() {
++  logi "== check_func_bt"
++  unset_test_array
++
++  test_key="func_bt_on"
++
++  # Enable BT
++  logi "Enable BT"
++  svc bluetooth enable
++  sleep 2
++
++  result=$(dumpsys bluetooth_manager| grep "state: "| awk '{print $2}')
++
++  if [[ "${result}" == "ON" ]]; then
++    logi "BT enable PASS"
++    log_rst "${test_key}:" "OK"
++  else
++    logi "BT enable FAIL -> ${result}"
++    log_rst "${test_key}:" "FAIL_enable_${result}"
++  fi
++
++  test_key="func_bt_off"
++
++  # Disable BT
++  logi "Disable BT"
++  svc bluetooth disable
++  sleep 2
++
++  result=$(dumpsys bluetooth_manager| grep "state: "| awk '{print $2}')
++
++  if [[ "${result}" == "OFF" ]]; then
++    logi "BT disable PASS"
++    log_rst "${test_key}:" "OK"
++  else
++    logi "BT disable FAIL -> ${result}"
++    log_rst "${test_key}:" "FAIL_disable_${result}"
++  fi
++}
++
+ check_func_wlan() {
+   logi "== check_func_wlan"
+   unset_test_array
+@@ -716,7 +755,7 @@ check_bringup_stage1_func() {
+   check_light_sensor "input"
+   check_func_lte_operator
+   check_func_lte_signal
+-# check_func_bt
++  check_func_bt
+ # check_audio
+   check_func_rs232
+   check_func_eth 0 2          # eth0 / delay 2sec

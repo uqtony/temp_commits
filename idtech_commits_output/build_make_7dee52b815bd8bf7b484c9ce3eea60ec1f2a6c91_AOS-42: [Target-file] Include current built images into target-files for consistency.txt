@@ -1,0 +1,48 @@
+7dee52b81 max.yang 2019-12-09
+
+AOS-42: [Target-file] Include current built images into target-files for consistency
+
+1. To avoid generating two different images in out/ and target-file's IMAGES/ folder,
+   we reuse current images to keep them consistent.
+2. Add dependencies to build vbmeta and partition table first.
+
+Change-Id: I1ef9f8144d7eba83e26dc392d6459a6f4e4ec580
+
+diff --git a/core/Makefile b/core/Makefile
+index a81fe12bc..1af72eda0 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -2572,6 +2572,8 @@ $(BUILT_TARGET_FILES_PACKAGE): \
+ 		$(BUILD_IMAGE_SRCS) \
+ 		$(BUILT_VENDOR_MANIFEST) \
+ 		$(BUILT_VENDOR_MATRIX) \
++		$(IMX_INSTALLED_VBMETAIMAGE_TARGET) \
++		$(INSTALLED_BPTIMAGE_TARGET) \
+ 		| $(ACP)
+ 	@echo "Package target files: $@"
+ 	$(call create-system-vendor-symlink)
+@@ -2826,6 +2828,24 @@ ifdef BOARD_AVB_DTBO_KEY_PATH
+ endif # BOARD_AVB_DTBO_KEY_PATH
+ endif # BOARD_AVB_ENABLE
+ endif # BOARD_PREBUILT_DTBOIMAGE
++
++	# IDtech added for image consistency
++	$(hide) mkdir -p $(zip_root)/IMAGES
++	# boot image
++	$(hide) cp $(INSTALLED_BOOTIMAGE_TARGET) $(zip_root)/IMAGES/
++	# vendor image and vendor.map
++	$(hide) cp $(INSTALLED_VENDORIMAGE_TARGET) $(zip_root)/IMAGES/
++	$(hide) cp $(vendorimage_intermediates)/vendor.map $(zip_root)/IMAGES/
++	# system image and system.map
++	$(hide) cp $(INSTALLED_SYSTEMIMAGE) $(zip_root)/IMAGES/
++	$(hide) cp $(systemimage_intermediates)/system.map $(zip_root)/IMAGES/
++	# IDtech specific dtbo/vbmeta image
++	cp $(PRODUCT_OUT)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img $(zip_root)/IMAGES/dtbo.img
++	cp $(PRODUCT_OUT)/vbmeta-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img $(zip_root)/IMAGES/vbmeta.img
++	# partition table
++	cp $(BUILT_BPTIMAGE_TARGET) $(zip_root)/IMAGES/
++	cp $(BUILT_BPTJSON_TARGET) $(zip_root)/IMAGES/
++
+ 	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+ 	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+ 	@# INSTALLED_RADIOIMAGE_TARGET.

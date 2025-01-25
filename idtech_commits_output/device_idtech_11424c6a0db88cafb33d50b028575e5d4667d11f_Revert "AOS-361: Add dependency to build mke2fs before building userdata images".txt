@@ -1,0 +1,33 @@
+11424c6a George.Huang 2021-02-24
+
+Revert "AOS-361: Add dependency to build mke2fs before building userdata images"
+
+This reverts commit 4196a0edff583b6f5c48f302c86e6f5c200b5600.
+
+Reason for revert:
+  commit f3223baec7708318b3941c598999d65d0f86bb05
+  Author: faqiang.zhu <faqiang.zhu@nxp.com>
+  Date: Fri Aug 14 10:59:19 2020 +0800
+
+  MA-17582 disable sdcardfs and enable casefold and project id
+
+  These two features are used when sdcardfs is disabled, and they need
+  some more format parameters when format the userdata partition. when
+  flash images, do not use "fastboot format userdata", just erase the
+  partition and leave the format work being done when boot up.
+
+Change-Id: Id4cca2f69f49241d53110e8d7688faa736cf464a
+
+diff --git a/common/build/userdata.mk b/common/build/userdata.mk
+index 6b170769..8e70f6f9 100644
+--- a/common/build/userdata.mk
++++ b/common/build/userdata.mk
+@@ -19,7 +19,7 @@ define build-userdataimage-target
+ endef
+ 
+ USERDATAIMAGE_TARGET := $(USERDATA_DEFAULT_TARGET)
+-$(USERDATAIMAGE_TARGET): $(BOARD_BPT_INPUT_FILES) $(IMX_INSTALLED_BPTIMAGE_TARGET) $(HOST_OUT)/bin/mke2fs.conf $(HOST_OUT)/bin/mke2fs
++$(USERDATAIMAGE_TARGET): $(BOARD_BPT_INPUT_FILES) $(IMX_INSTALLED_BPTIMAGE_TARGET)
+ 	$(build-userdataimage-target)
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(USERDATAIMAGE_TARGET)

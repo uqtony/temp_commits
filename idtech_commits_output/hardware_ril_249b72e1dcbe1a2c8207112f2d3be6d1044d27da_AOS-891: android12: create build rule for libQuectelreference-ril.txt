@@ -1,0 +1,35 @@
+249b72e owen.wen 2022-04-06
+
+AOS-891: android12: create build rule for libQuectelreference-ril
+
+change filename to linreference-ril.so to fix below build time error
+error: DT_SONAME "libreference-ril.so" must be equal to the file name "libQuectelreference-ril".
+
+Change-Id: Ia3e3695cd1285c9063e665c1c39ac353a1dcc7b8
+
+diff --git a/reference-ril/Android.mk b/reference-ril/Android.mk
+index 8aeba23..d8eb9df 100644
+--- a/reference-ril/Android.mk
++++ b/reference-ril/Android.mk
+@@ -41,7 +41,7 @@ ifeq (foo,foo)
+   LOCAL_SHARED_LIBRARIES += \
+       libcutils libutils
+   LOCAL_CFLAGS += -DRIL_SHLIB
+-  LOCAL_MODULE:= libreference-ril
++  LOCAL_MODULE:= libreference-ril_remove
+   LOCAL_LICENSE_KINDS:= SPDX-license-identifier-Apache-2.0
+   LOCAL_LICENSE_CONDITIONS:= notice
+   LOCAL_NOTICE_FILE:= $(LOCAL_PATH)/NOTICE
+diff --git a/rild/rild.rc b/rild/rild.rc
+index 73f159c..df35df0 100644
+--- a/rild/rild.rc
++++ b/rild/rild.rc
+@@ -5,7 +5,7 @@
+ #    capabilities BLOCK_SUSPEND NET_ADMIN NET_RAW
+ 
+ # group vpn is for /dev/ppp
+-service ril-daemon /vendor/bin/hw/rild -l /vendor/lib64/libQuectelreference-ril.so
++service ril-daemon /vendor/bin/hw/rild -l /vendor/lib64/libreference-ril.so
+     class main
+     disabled
+     user root

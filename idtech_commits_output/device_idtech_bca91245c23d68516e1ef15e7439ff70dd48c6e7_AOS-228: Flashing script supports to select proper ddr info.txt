@@ -1,0 +1,268 @@
+bca91245 max.yang 2020-07-10
+
+AOS-228: Flashing script supports to select proper ddr info
+
+  1. for dtbo.img, we find only dts (original will find dts/dtsi name)
+  2. update new format mem_info.*, contains memroy size information
+  3. flashing script modified according to item#2
+  4. For fastboot_flash_all scripts, we need to move flashing board_info
+     and mem_info forward because mem_info is part of SPL
+
+Change-Id: Ic9ac291b9d22907fe165a1e36340987797de15bb
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index 8153e645..0de08f4a 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -37,8 +37,8 @@ TARGET_MTDTBOIMAGE_CONFIG_PATH=$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/arch/$(TAR
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ idt_dts_list := $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(LOWER_BOARD_SOC_TYPE)*evk* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
+-idt_dts_list := $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*devboard* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
+-idt_dts_list += $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*$(LOWER_BOARD_TYPE)* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list := $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*devboard*.dts | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list += $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*$(LOWER_BOARD_TYPE)*.dts | xargs -n 1 basename | sed 's/\(.*\)\..*//')
+ 
+ $(foreach idt_dts,$(idt_dts_list),$(eval TARGET_BOARD_DTS_CONFIG += $(idt_dts):$(idt_dts).dtb))
+ 
+diff --git a/common/prebuilts/mem_info.img b/common/prebuilts/mem_info.img
+index 6bf9d61e..69fc2d38 100644
+Binary files a/common/prebuilts/mem_info.img and b/common/prebuilts/mem_info.img differ
+diff --git a/common/prebuilts/mem_info.txt b/common/prebuilts/mem_info.txt
+index a5aa235a..e8ca47d4 100644
+--- a/common/prebuilts/mem_info.txt
++++ b/common/prebuilts/mem_info.txt
+@@ -1,2 +1,2 @@
+-devboard-evt-1-33
+-evk-evk-34-24
++a300-evt-devboard-evt-ktc2g-1-33
++imx8mq-evt-evk-evk-mic3g-34-24
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 291ede58..d38302ff 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -21,6 +21,7 @@ set mb_model=
+ set mb_plc=
+ set mb_rev=
+ set mb_opt=
++set dev_ddr=
+ set board_info_file=
+ set board_info_temp=
+ set mem_info_file=mem_info.img
+@@ -516,12 +517,14 @@ if not [%board_info_file%] == [] (
+     FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
+     FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
+     FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
++    FOR /F "tokens=5 delims=_" %%F IN ("%board_info_temp%") DO (SET dev_ddr=%%F)
+ )
+ if not [%board_info_file%] == [] (
+     FOR /F "tokens=2 delims=-" %%F IN ("%som_plc%") DO (SET som_rev=%%F)
+     FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
+     FOR /F "tokens=2 delims=-" %%F IN ("%mb_plc%") DO (SET mb_rev=%%F)
+     FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
++    FOR /F "tokens=1 delims=." %%F IN ("%dev_ddr%") DO (SET dev_ddr=%%F)
+ )
+ if [%board_info_file%] == [] (
+     :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
+@@ -537,10 +540,12 @@ if [%board_info_file%] == [] (
+     FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
+     %fastboot_tool% oem getvar mb-rev 2> fastboot_oem.log
+     FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-rev: fastboot_oem.log') DO (SET mb_rev=%%F)
++    %fastboot_tool% oem getvar dev-ddr 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR dev-ddr: fastboot_oem.log') DO (SET dev_ddr=%%F)
+ )
+ if [%board_info_file%] == [] (
+-    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%.img
+-    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%.img`) DO (SET board_info_file=%%~nF.img)
++    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img`) DO (SET board_info_file=%%~nF.img)
+ )
+ if [%board_info_file%] == [] (
+     :: P3. Notify user to provide correct -d board_info_file
+@@ -631,6 +636,13 @@ if %support_dual_bootloader% == 1 (
+         %fastboot_tool% set_active a
+     )
+ )
++
++if %support_board_info% == 1 (
++    call :flash_partition board_info || set /A error_level=1 && goto :exit
++)
++if %support_mem_info% == 1 (
++    call :flash_partition mem_info || set /A error_level=1 && goto :exit
++)
+ :: full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+ %fastboot_tool% reboot bootloader
+ :: pause for about 5 second
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 44a25b57..7899c485 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -215,7 +215,8 @@ function check_board_info
+         som_rev="$(echo $board_info_temp |cut -d'-' -f2 |cut -d'_' -f1)"
+         mb_model="$(echo $board_info_temp |cut -d'_' -f3)"
+         mb_plc="$(echo $board_info_temp |cut -d'_' -f4 |cut -d'-' -f1)"
+-        mb_rev="$(echo $board_info_temp |cut -d'-' -f3 |cut -d'.' -f1)"
++        mb_rev="$(echo $board_info_temp |cut -d'-' -f3 |cut -d'_' -f1)"
++        dev_ddr="$(echo $board_info_temp |cut -d'_' -f5 |cut -d'.' -f1)"
+     fi
+     # 2. get som_model / som_plc / mb_model / mb_plc via fastboot
+     if [ -z "${board_info_file}" ]; then
+@@ -231,9 +232,11 @@ function check_board_info
+         mb_plc=${result##* }
+         result=`${fastboot_tool} oem getvar mb-rev 2>&1 |grep mb-rev:` || true
+         mb_rev=${result##* }
+-        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}.img |tail -n1))"
++        result=`${fastboot_tool} oem getvar dev-ddr 2>&1 |grep dev-ddr:` || true
++        dev_ddr=${result##* }
++        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img |tail -n1))"
+         echo -e ${GREEN}Try to get board_info image via fastboot${STD} \
+-                with board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}.img
++                with board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img
+     fi
+     # 3. Notify user to provide correct -d board_info_file
+     if [ ! -f "${image_directory}${board_info_file}" ]; then
+@@ -336,6 +339,14 @@ function flash_android
+         fi
+     fi
+ 
++    if [ ${support_board_info} -eq 1 ]; then
++        flash_partition "board_info"
++    fi
++
++    if [ ${support_mem_info} -eq 1 ]; then
++        flash_partition "mem_info"
++    fi
++
+     # full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+     ${fastboot_tool} reboot bootloader
+     sleep 5
+@@ -424,6 +435,7 @@ som_rev=""
+ mb_model=""
+ mb_plc=""
+ mb_rev=""
++dev_ddr=""
+ board_info_file=""
+ board_info_temp=""
+ mem_info_file="mem_info.img"
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 7027da4d..32db743b 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -22,6 +22,7 @@ set mb_model=
+ set mb_plc=
+ set mb_rev=
+ set mb_opt=
++set dev_ddr=
+ set board_info_file=
+ set board_info_temp=
+ set mem_info_file=mem_info.img
+@@ -883,12 +884,14 @@ if not [%board_info_file%] == [] (
+     FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
+     FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
+     FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
++    FOR /F "tokens=5 delims=_" %%F IN ("%board_info_temp%") DO (SET dev_ddr=%%F)
+ )
+ if not [%board_info_file%] == [] (
+     FOR /F "tokens=2 delims=-" %%F IN ("%som_plc%") DO (SET som_rev=%%F)
+     FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
+     FOR /F "tokens=2 delims=-" %%F IN ("%mb_plc%") DO (SET mb_rev=%%F)
+     FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
++    FOR /F "tokens=1 delims=." %%F IN ("%dev_ddr%") DO (SET dev_ddr=%%F)
+ )
+ if [%board_info_file%] == [] (
+     :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
+@@ -904,10 +907,12 @@ if [%board_info_file%] == [] (
+     FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
+     %fastboot_tool% oem getvar mb-rev 2> fastboot_oem.log
+     FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-rev: fastboot_oem.log') DO (SET mb_rev=%%F)
++    %fastboot_tool% oem getvar dev-ddr 2> fastboot_oem.log
++    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR dev-ddr: fastboot_oem.log') DO (SET dev_ddr=%%F)
+ )
+ if [%board_info_file%] == [] (
+-    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%.img
+-    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%.img`) DO (SET board_info_file=%%~nF.img)
++    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img
++    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img`) DO (SET board_info_file=%%~nF.img)
+ )
+ if [%board_info_file%] == [] (
+     :: P3. Notify user to provide correct -d board_info_file
+@@ -929,11 +934,14 @@ IF EXIST %mem_object%.link (
+ )
+ setlocal enabledelayedexpansion
+ FOR /F "tokens=*" %%A IN (%image_directory%%mem_info_txt%) DO (
+-    FOR /F "tokens=1 delims=-" %%F IN ("%%A") DO (SET mem_plat=%%F)
+-    FOR /F "tokens=2 delims=-" %%F IN ("%%A") DO (SET mem_feature=%%F)
+-    FOR /F "tokens=3 delims=-" %%F IN ("%%A") DO (SET mem_boff=%%F)
+-    FOR /F "tokens=4 delims=-" %%F IN ("%%A") DO (SET mem_bsize=%%F)
+-    IF [!mem_plat!] == [%mb_model%] IF [!mem_feature!] == [%mb_plc%] (
++    FOR /F "tokens=1 delims=-" %%F IN ("%%A") DO (SET m_som_model=%%F)
++    FOR /F "tokens=2 delims=-" %%F IN ("%%A") DO (SET m_som_plc=%%F)
++    FOR /F "tokens=3 delims=-" %%F IN ("%%A") DO (SET m_mb_model=%%F)
++    FOR /F "tokens=4 delims=-" %%F IN ("%%A") DO (SET m_mb_plc=%%F)
++    FOR /F "tokens=5 delims=-" %%F IN ("%%A") DO (SET m_ddr_t=%%F)
++    FOR /F "tokens=6 delims=-" %%F IN ("%%A") DO (SET mem_boff=%%F)
++    FOR /F "tokens=7 delims=-" %%F IN ("%%A") DO (SET mem_bsize=%%F)
++    IF [!m_som_model!] == [%som_model%] IF [!m_som_plc!] == [%som_plc%] IF [!m_mb_model!] == [%mb_model%] IF [!m_mb_plc!] == [%mb_plc%] IF [!m_ddr_t!] == [%dev_ddr%] (
+         SET /A "mem_start=512*(!mem_boff!)"
+         SET /A "mem_end=512*(!mem_boff!+!mem_bsize!)"
+         COPY %image_directory%%mem_info_file%  %image_directory%%mem_object%-!mem_start!
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index edc1e494..def69fb2 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -266,7 +266,8 @@ function check_board_info
+         som_rev="$(echo $board_info_temp |cut -d'-' -f2 |cut -d'_' -f1)"
+         mb_model="$(echo $board_info_temp |cut -d'_' -f3)"
+         mb_plc="$(echo $board_info_temp |cut -d'_' -f4 |cut -d'-' -f1)"
+-        mb_rev="$(echo $board_info_temp |cut -d'-' -f3 |cut -d'.' -f1)"
++        mb_rev="$(echo $board_info_temp |cut -d'-' -f3 |cut -d'_' -f1)"
++        dev_ddr="$(echo $board_info_temp |cut -d'_' -f5 |cut -d'.' -f1)"
+     fi
+     # 2. get som_model / som_plc / mb_model / mb_plc via fastboot
+     if [ -z "${board_info_file}" ]; then
+@@ -282,9 +283,11 @@ function check_board_info
+         mb_plc=${result##* }
+         result=`${fastboot_tool} oem getvar mb-rev 2>&1 |grep mb-rev:` || true
+         mb_rev=${result##* }
+-        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}.img |tail -n1))"
++        result=`${fastboot_tool} oem getvar dev-ddr 2>&1 |grep dev-ddr:` || true
++        dev_ddr=${result##* }
++        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img |tail -n1))"
+         echo -e ${GREEN}Try to get board_info image via fastboot${STD} \
+-                with board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}.img
++                with board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img
+     fi
+     # 3. Notify user to provide correct -d board_info_file
+     if [ ! -f "${image_directory}${board_info_file}" ]; then
+@@ -304,12 +307,17 @@ function check_mem_info
+ 
+     cat ${image_directory}${mem_info_txt} | while read line;
+     do
+-        mem_plat="$(echo $line |cut -d'-' -f1)"
+-        mem_feature="$(echo $line |cut -d'-' -f2)"
+-        mem_boff="$(echo $line |cut -d'-' -f3)"
+-        mem_bsize="$(echo $line |cut -d'-' -f4)"
+-
+-        if [ "${mem_plat}" == "${mb_model}" ] && [ "${mem_feature}" == "${mb_plc}" ]; then
++        m_som_model="$(echo $line |cut -d'-' -f1)"
++        m_som_plc="$(echo $line |cut -d'-' -f2)"
++        m_mb_model="$(echo $line |cut -d'-' -f3)"
++        m_mb_plc="$(echo $line |cut -d'-' -f4)"
++        m_ddr_t="$(echo $line |cut -d'-' -f5)"
++        mem_boff="$(echo $line |cut -d'-' -f6)"
++        mem_bsize="$(echo $line |cut -d'-' -f7)"
++
++        if [ "${m_som_model}" == "${som_model}" ] && [ "${m_som_plc}" == "${som_plc}" ] \
++                && [ "${m_mb_model}" == "${mb_model}" ] && [ "${m_mb_plc}" == "${mb_plc}" ] \
++                && [ "${m_ddr_t}" == "${dev_ddr}" ]; then
+             dd if=${image_directory}${mem_info_file} of=${image_directory}${mem_object} bs=512 skip=${mem_boff} count=${mem_bsize}
+             ln -s ${sym_link_directory}${mem_object} /tmp/${mem_object}
+         fi
+@@ -480,6 +488,7 @@ som_rev=""
+ mb_model=""
+ mb_plc=""
+ mb_rev=""
++dev_ddr=""
+ board_info_file=""
+ board_info_temp=""
+ mem_info_file="mem_info.img"

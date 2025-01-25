@@ -1,0 +1,47 @@
+e77b326aee7b jay deng 2021-02-08
+
+AOS-493: ibr210: Support USB OTG feature
+
+cherry-pick ibase patch 7a58cbf47172
+Porting USB OTG power suply driver and fixed OTG cannot
+work problem.
+
+Change-Id: I55f1019ed50024b8b070b158ed2d4f943e99abcb
+
+diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+index 98b5afa5b615..0489d96e688a 100644
+--- a/drivers/extcon/extcon-usb-gpio.c
++++ b/drivers/extcon/extcon-usb-gpio.c
+@@ -28,6 +28,7 @@ struct usb_extcon_info {
+ 
+ 	struct gpio_desc *id_gpiod;
+ 	struct gpio_desc *vbus_gpiod;
++	struct gpio_desc *vbus_power;
+ 	int id_irq;
+ 	int vbus_irq;
+ 
+@@ -79,9 +80,13 @@ static void usb_extcon_detect_cable(struct work_struct *work)
+ 
+ 	if (!id) {
+ 		extcon_set_state_sync(info->edev, EXTCON_USB_HOST, true);
++		if (info->vbus_power)
++			gpiod_set_value(info->vbus_power, 1);
+ 	} else {
+ 		if (vbus)
+ 			extcon_set_state_sync(info->edev, EXTCON_USB, true);
++		if (info->vbus_power)
++			gpiod_set_value(info->vbus_power, 0);
+ 	}
+ }
+ 
+@@ -114,6 +119,9 @@ static int usb_extcon_probe(struct platform_device *pdev)
+ 	info->vbus_gpiod = devm_gpiod_get_optional(&pdev->dev, "vbus",
+ 						   GPIOD_IN);
+ 
++	info->vbus_power = devm_gpiod_get_optional(&pdev->dev, "vbus-power",
++						   GPIOD_OUT_LOW);
++
+ 	if (!info->id_gpiod && !info->vbus_gpiod) {
+ 		dev_err(dev, "failed to get gpios
+");
+ 		return -ENODEV;

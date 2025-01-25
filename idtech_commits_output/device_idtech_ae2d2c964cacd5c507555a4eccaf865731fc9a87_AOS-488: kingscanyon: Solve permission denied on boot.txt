@@ -1,0 +1,30 @@
+ae2d2c96 George.Huang 2021-04-09
+
+AOS-488: kingscanyon: Solve permission denied on boot
+
+Error Log:
+avc: denied { open } for comm="Binder:258_2" path="/sys/devices/platform/soc@0/38200000.usb/xhci-hcd.1.auto/usb1/1-1/1-1.1/1-1.1:1.2/0003:046D:C52B.0003/0003:046D:401B.0004/power_supply/hidpp_battery_0/wakeup5" dev="sysfs" ino=33206 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir permissive=0
+avc: denied { open } for comm="Binder:258_2" path="/sys/devices/platform/soc@0/38200000.usb/xhci-hcd.1.auto/usb1/1-1/1-1.1/1-1.1:1.2/0003:046D:C52B.0003/0003:046D:4016.0005/power_supply/hidpp_battery_1/wakeup19" dev="sysfs" ino=33265 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir permissive=0
+avc: denied { read } for name="wakeup7" dev="sysfs" ino=31278 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir permissive=0
+
+Change-Id: Id44697190d56e815e0098129b284dce9d9763e92
+
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+index ce149099..ffeab638 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+@@ -27,6 +27,6 @@ genfscon sysfs /devices/virtual/power_supply/usb/wakeup4
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0
+-
++genfscon sysfs /devices/platform/soc@0/38200000.usb/xhci-hcd.1.auto/usb1/1-1/1-1.1/1-1.1:1.2/0003:046D:C52B.0003/0003:046D:[a-fA-F0-9]*.[a-fA-F0-9]*/power_supply/hidpp_battery_[01]/wakeup[0-9]* u:object_r:sysfs_wakeup:s0
+ # ibr210 as external connection
+ genfscon sysfs /devices/platform/usb-id/extcon          u:object_r:sysfs_extcon:s0
+diff --git a/imx8m/sepolicy_system/private/system_suspend.te b/imx8m/sepolicy_system/private/system_suspend.te
+new file mode 100644
+index 00000000..659ff049
+--- /dev/null
++++ b/imx8m/sepolicy_system/private/system_suspend.te
+@@ -0,0 +1 @@
++allow system_suspend sysfs:dir { read };

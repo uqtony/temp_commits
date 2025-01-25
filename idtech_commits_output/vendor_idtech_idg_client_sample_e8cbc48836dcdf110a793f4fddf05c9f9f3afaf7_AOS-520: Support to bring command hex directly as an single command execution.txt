@@ -1,0 +1,51 @@
+e8cbc48 max.yang 2021-05-14
+
+AOS-520: Support to bring command hex directly as an single command execution
+
+Change-Id: I28046cea7e391fbc4fa60d144afc836df4f60e12
+
+diff --git a/idg_console_tool/main.c b/idg_console_tool/main.c
+index f387197..f8813e3 100644
+--- a/idg_console_tool/main.c
++++ b/idg_console_tool/main.c
+@@ -167,6 +167,7 @@ int main(int argc, char const *argv[])
+ #endif /* IDG_DRIVER_WRITE_WITHOUT_FRAME */
+ 		break;
+ 	case 2:
++	case 3:
+ 		if (*argv[1] == '2') {
+ 			fd = open(LOCAL_DRIVER_V2, O_RDWR);
+ 			printf("path: %s, ttyfd = %d
+", LOCAL_DRIVER_V2, fd);
+@@ -199,9 +200,14 @@ int main(int argc, char const *argv[])
+ 	ret = pthread_create(&read_th, NULL, get_data, (void *)channel);
+ 
+ 	while (1) {
+-		puts("Please enter IDG command"
+-		     "(hex number only, no space):
+");
+-		scanf("%s", buffer);
++		if (argc != 3) {
++			puts("Please enter IDG command"
++			     "(hex number only, no space):
+");
++			scanf("%s", buffer);
++		} else {
++			/* Third argv is command itself */
++			sprintf(buffer, "%s", argv[2]);
++		}
+ #if IDG_DRIVER_WRITE_WITHOUT_FRAME
+ 		count = strlen(buffer);
+ 		if (idgv == 2)
+@@ -239,6 +245,10 @@ int main(int argc, char const *argv[])
+ 		else
+ 			puts("IDG data sent
+");
+ 
++		if (argc == 3) {
++			sleep(1);
++			goto idg_tool_out;
++		}
+ 	}
+ 	pthread_join(read_th, NULL);
+ 	ret = 0;

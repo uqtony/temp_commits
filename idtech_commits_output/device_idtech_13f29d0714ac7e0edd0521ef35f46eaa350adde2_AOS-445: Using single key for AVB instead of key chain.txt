@@ -1,0 +1,110 @@
+13f29d07 max.yang 2021-01-20
+
+AOS-445: Using single key for AVB instead of key chain
+
+  This patch reverts the patch at below
+  1. Key chain uses multiple keys for AVB
+     - AVB key to validate vbmeta.img
+     - boot key(public) to load from vbmeta.img and validate boot image
+  2. To create new key which only for boot.img makes flow complex, NXP uses
+     Google's test key directly to avoid making new key
+  3. Using same idt's vbmeta key for vbmeta/boot didn't gain more security
+     but increases boot time
+
+  commit 4da9cffcaf673274a4b8b0378fce5b3352182986
+  Author: Ji Luo <ji.luo@nxp.com>
+  Date:   Wed Oct 28 12:06:29 2020 +0800
+
+      MA-18169 Build boot partition as chained partition
+
+      As the GKI boot image from Google will be chained partition in vbmeta,
+      so we build the boot image as chained partition to align with it. This
+      is not set as default for automotive as it will increase the boot time.
+
+Change-Id: I28076da6bc1899d51655fc00ee18fc70699401ef
+
+diff --git a/imx8m/bigcypress_8mp/BoardConfig.mk b/imx8m/bigcypress_8mp/BoardConfig.mk
+index 16a1d7a9..8979d83a 100644
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@ -107,9 +107,9 @@ BOARD_AVB_ENABLE := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+-BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+-BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+-BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++#BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++#BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++#BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ TARGET_USES_MKE2FS := true
+ 
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index 00e8330c..f0877f70 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -106,9 +106,9 @@ TARGET_USES_MKE2FS := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+-BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+-BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+-BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++#BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++#BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++#BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index 1c99a592..910444cf 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -100,9 +100,9 @@ BOARD_AVB_ENABLE := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+-BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+-BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+-BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++#BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++#BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++#BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ TARGET_USES_MKE2FS := true
+ 
+diff --git a/imx8m/vp6820_8mp/BoardConfig.mk b/imx8m/vp6820_8mp/BoardConfig.mk
+index 04aaadb7..c3d5b69b 100644
+--- a/imx8m/vp6820_8mp/BoardConfig.mk
++++ b/imx8m/vp6820_8mp/BoardConfig.mk
+@@ -107,9 +107,9 @@ BOARD_AVB_ENABLE := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+-BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+-BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+-BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++#BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++#BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++#BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ TARGET_USES_MKE2FS := true
+ 
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index cffd5f65..dd1c1cb1 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -106,9 +106,9 @@ TARGET_USES_MKE2FS := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+-BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+-BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+-BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++#BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++#BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++#BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3

@@ -1,0 +1,662 @@
+cc5955fbe3 George.Huang 2020-10-26
+
+AOS-379: Fix conflicts from merging android-10.0.0_2.5.0
+
+Change-Id: If00e2bc6b44b57f5a9c2f90544d0c50b279f3da2
+
+diff --git a/board/freescale/imx8mn_evk/Kconfig b/board/freescale/imx8mn_evk/Kconfig
+index 8312aa14a5..d2a58ea9ae 100644
+--- a/board/freescale/imx8mn_evk/Kconfig
++++ b/board/freescale/imx8mn_evk/Kconfig
+@@ -9,7 +9,6 @@ config SYS_VENDOR
+ config SYS_CONFIG_NAME
+ 	default "imx8mn_evk"
+ 
+-<<<<<<< HEAD
+ config IDT_VALID_AVBKEY
+ 	bool "IDT validate avb key before booting"
+ 	help
+@@ -35,11 +34,10 @@ config IDT_BACKUP_SPL
+ 
+ config IDT_RAM_1GB
+         bool "1GB RAM configuration for A100"
+-=======
++
+ config IMX8MN_LOW_DRIVE_MODE
+ 	bool "Enable the low drive mode of iMX8MN on EVK board"
+ 	default n
+->>>>>>> 4719a2a5e6
+ 
+ source "board/freescale/common/Kconfig"
+ 
+diff --git a/board/freescale/imx8mn_evk/Makefile b/board/freescale/imx8mn_evk/Makefile
+index db32086ca7..56d0a1ccbf 100644
+--- a/board/freescale/imx8mn_evk/Makefile
++++ b/board/freescale/imx8mn_evk/Makefile
+@@ -8,14 +8,12 @@ obj-y += imx8mn_evk.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+-<<<<<<< HEAD
+-ifdef CONFIG_IDT_RAM_1GB
+-obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_1g.o
+-=======
+ ifdef CONFIG_IMX8MN_LOW_DRIVE_MODE
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_ld.o
+ obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing_ld.o
+->>>>>>> 4719a2a5e6
++else
++ifdef CONFIG_IDT_RAM_1GB
++obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_1g.o
+ else
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
+ endif
+diff --git a/common/image-android.c b/common/image-android.c
+index 42be18e1a3..90964539be 100644
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@ -65,21 +65,13 @@ static void append_kernel_cmdline(char *commandline)
+ 	struct tag_serialnr serialnr;
+ 	get_board_serial(&serialnr);
+ 
+-<<<<<<< HEAD
+ 	/* IDTech modified to pass idt serial number to kernel */
+ 	char idt_serial[BDINFO_DATA_SIZE] = "";
+ 	idt_get_board_serial(idt_serial);
+ 
+ 	sprintf(newbootargs, " androidboot.serialno=%s", idt_serial);
+ 
+-	strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+-=======
+-	sprintf(newbootargs,
+-					" androidboot.serialno=%08x%08x",
+-					serialnr.high,
+-					serialnr.low);
+ 	strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
+->>>>>>> 4719a2a5e6
+ 
+ 	if (serialnr.high + serialnr.low != 0) {
+ 		char bd_addr[16]={0};
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index b7b9e46fee..4cea262502 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -659,19 +659,16 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	int entry_idx;
+ 	bool check_image_arm64 =  false;
+ 	bool is_recovery_mode = false;
+-<<<<<<< HEAD
+ 	bool retry_boot =  false;
+ #ifdef CONFIG_ANDROID_AB_SUPPORT
+ 	int retry_count_before_avb = -1, retry_count_after_avb = -1;
+ #endif
+-=======
+ 	bool gki_is_supported = false;
+ 
+ 	/* 'hdr' should point to boot.img */
+ 	struct andr_img_hdr *hdr = NULL;
+ 	struct boot_img_hdr_v3 *hdr_v3 = NULL;
+ 	struct vendor_boot_img_hdr_v3 *vendor_boot_hdr = NULL;
+->>>>>>> 4719a2a5e6
+ 
+ 	AvbABFlowResult avb_result;
+ 	AvbSlotVerifyData *avb_out_data = NULL;
+@@ -744,13 +741,10 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	/* get the duration of avb */
+ 	metrics.avb = get_timer(avb_metric);
+ 
+-<<<<<<< HEAD
+ 	if (avb_result == AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS)
+ 		goto fail;
+ 
+-=======
+ 	/* Parse the avb data */
+->>>>>>> 4719a2a5e6
+ 	if ((avb_result == AVB_AB_FLOW_RESULT_OK) ||
+ 			(avb_result == AVB_AB_FLOW_RESULT_OK_WITH_VERIFICATION_ERROR)) {
+ 		assert(avb_out_data != NULL);
+@@ -773,28 +767,22 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		assert(avb_loadpart != NULL);
+ 
+ 		/* boot image is already read by avb */
+-<<<<<<< HEAD
+-		hdr = (struct andr_img_hdr *)avb_loadpart->data;
+-		if (android_image_check_header(hdr)) {
+-			printf("boota: bad boot image magic
+");
+-			retry_boot = true;
+-			goto fail;
+-=======
+ 		if (gki_is_supported) {
+ 			assert(avb_vendorboot != NULL);
+ 			hdr_v3 = (struct boot_img_hdr_v3 *)avb_loadpart->data;
+ 			vendor_boot_hdr = (struct vendor_boot_img_hdr_v3 *)avb_vendorboot->data;
+ 			if (android_image_check_header_v3(hdr_v3, vendor_boot_hdr)) {
+ 				printf("boota: bad boot/vendor_boot image magic
+");
++				retry_boot = true;
+ 				goto fail;
+ 			}
+ 		} else {
+ 			hdr = (struct andr_img_hdr *)avb_loadpart->data;
+ 			if (android_image_check_header(hdr)) {
+ 				printf("boota: bad boot image magic
+");
++				retry_boot = true;
+ 				goto fail;
+ 			}
+->>>>>>> 4719a2a5e6
+ 		}
+ 
+ 		if (avb_result == AVB_AB_FLOW_RESULT_OK)
+@@ -839,6 +827,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		if (lock_status == FASTBOOT_LOCK)
+ 			printf(" verify FAIL, state: LOCK
+");
+ 
++		retry_boot = true;
+ 		goto fail;
+ 	}
+ 
+@@ -884,34 +873,6 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		memcpy((void *)(ulong)(hdr->kernel_addr - hdr->page_size), (void *)hdr,
+ 				hdr->page_size + ALIGN(hdr->kernel_size, hdr->page_size));
+ #endif /* CONFIG_ARCH_IMX8 || CONFIG_ARCH_IMX8M */
+-<<<<<<< HEAD
+-	} else {
+-		/* Fall into fastboot mode if get unacceptable error from avb
+-		 * or verify fail in lock state.
+-		 */
+-		if (lock_status == FASTBOOT_LOCK)
+-			printf(" verify FAIL, state: LOCK
+");
+-
+-		retry_boot = true;
+-		goto fail;
+-	}
+-
+-	/* Show orange warning for unlocked device, press power button to skip. */
+-#ifdef CONFIG_AVB_WARNING_LOGO
+-	if (fastboot_get_lock_stat() == FASTBOOT_UNLOCK) {
+-		int count = 0;
+-#ifdef CONFIG_IMX_HAB
+-		idt_show_red_warning_and_shutdown();
+-#endif
+-		printf("Device is unlocked, press power key to skip warning logo... 
+");
+-		if (display_unlock_warning())
+-			printf("can't show unlock warning.
+");
+-		while ( (count < 10 * CONFIG_AVB_WARNING_TIME_LAST) && !is_power_key_pressed()) {
+-			mdelay(100);
+-			count++;
+-		}
+-=======
+->>>>>>> 4719a2a5e6
+ 	}
+ 
+ 	/*
+@@ -948,78 +909,6 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		fdt_addr = (ulong)((ulong)(vendor_boot_hdr->kernel_addr) + MAX_KERNEL_LEN);
+ 	else
+ 		fdt_addr = (ulong)((ulong)(hdr->kernel_addr) + MAX_KERNEL_LEN);
+-<<<<<<< HEAD
+-#ifdef CONFIG_ANDROID_THINGS_SUPPORT
+-		if (find_partition_data_by_name("oem_bootloader",
+-					avb_out_data, &avb_loadpart)) {
+-			goto fail;
+-		} else
+-			dt_img = (struct dt_table_header *)avb_loadpart->data;
+-#elif defined(CONFIG_SYSTEM_RAMDISK_SUPPORT) /* It means boot.img(recovery) do not include dtb, it need load dtb from partition */
+-		if (find_partition_data_by_name("dtbo",
+-					avb_out_data, &avb_loadpart)) {
+-			goto fail;
+-		} else
+-			dt_img = (struct dt_table_header *)avb_loadpart->data;
+-#else /* recovery.img include dts while boot.img use dtbo */
+-		if (is_recovery_mode) {
+-			if (hdr->header_version != 1) {
+-				printf("boota: boot image header version error!
+");
+-				retry_boot = true;
+-				goto fail;
+-			}
+-
+-			dt_img = (struct dt_table_header *)((void *)(ulong)hdr +
+-						hdr->page_size +
+-						ALIGN(hdr->kernel_size, hdr->page_size) +
+-						ALIGN(hdr->ramdisk_size, hdr->page_size) +
+-						ALIGN(hdr->second_size, hdr->page_size));
+-		} else if (find_partition_data_by_name("dtbo",
+-						avb_out_data, &avb_loadpart)) {
+-			goto fail;
+-		} else
+-			dt_img = (struct dt_table_header *)avb_loadpart->data;
+-#endif
+-
+-		if (fdt32_to_cpu(dt_img->magic) != DT_TABLE_MAGIC) {
+-			printf("boota: bad dt table magic %08x
+",
+-					fdt32_to_cpu(dt_img->magic));
+-			retry_boot = true;
+-			goto fail;
+-		} else if (!fdt32_to_cpu(dt_img->dt_entry_count)) {
+-			printf("boota: no dt entries
+");
+-			retry_boot = true;
+-			goto fail;
+-		}
+-
+-		struct dt_table_entry *dt_entry;
+-
+-		printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
+-							    dt_entry_count));
+-		entry_idx = find_dtb_in_dtbo(dt_img);
+-		if (entry_idx < 1) {
+-			puts("boota: no avaliable dtb
+");
+-			retry_boot = true;
+-			goto fail;
+-		}
+-		dt_entry = (struct dt_table_entry *)
+-			   ((ulong)dt_img +
+-			    fdt32_to_cpu(dt_img->dt_entries_offset) *
+-			    entry_idx);
+-		fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+-		memcpy((void *)fdt_addr, (void *)((ulong)dt_img +
+-				fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
+-	} else {
+-		fdt_addr = (ulong)(hdr->second_addr);
+-		fdt_size = (ulong)(hdr->second_size);
+-		if (fdt_size && fdt_addr) {
+-			memcpy((void *)(ulong)fdt_addr,
+-				(void *)(ulong)hdr + hdr->page_size
+-				+ ALIGN(hdr->kernel_size, hdr->page_size)
+-				+ ALIGN(hdr->ramdisk_size, hdr->page_size),
+-				fdt_size);
+-		}
+-=======
+ 
+ #ifdef CONFIG_SYSTEM_RAMDISK_SUPPORT
+ 	/* It means boot.img(recovery) do not include dtb, it need load dtb from partition */
+@@ -1033,6 +922,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	if (is_recovery_mode) {
+ 		if (hdr->header_version != 1) {
+ 			printf("boota: boot image header version error!
+");
++			retry_boot = true;
+ 			goto fail;
+ 		}
+ 
+@@ -1048,22 +938,34 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		dt_img = (struct dt_table_header *)avb_loadpart->data;
+ #endif
+ 
+-	if (be32_to_cpu(dt_img->magic) != DT_TABLE_MAGIC) {
++	if (fdt32_to_cpu(dt_img->magic) != DT_TABLE_MAGIC) {
+ 		printf("boota: bad dt table magic %08x
+",
+-				be32_to_cpu(dt_img->magic));
++				fdt32_to_cpu(dt_img->magic));
++		retry_boot = true;
+ 		goto fail;
+-	} else if (!be32_to_cpu(dt_img->dt_entry_count)) {
++	} else if (!fdt32_to_cpu(dt_img->dt_entry_count)) {
+ 		printf("boota: no dt entries
+");
++		retry_boot = true;
+ 		goto fail;
+->>>>>>> 4719a2a5e6
+ 	}
+ 
+ 	struct dt_table_entry *dt_entry;
+-	dt_entry = (struct dt_table_entry *)((ulong)dt_img +
+-			be32_to_cpu(dt_img->dt_entries_offset));
+-	fdt_size = be32_to_cpu(dt_entry->dt_size);
++
++	printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
++						    dt_entry_count));
++	entry_idx = find_dtb_in_dtbo(dt_img);
++	if (entry_idx < 1) {
++		puts("boota: no avaliable dtb
+");
++		retry_boot = true;
++		goto fail;
++	}
++	dt_entry = (struct dt_table_entry *)
++		   ((ulong)dt_img +
++		    fdt32_to_cpu(dt_img->dt_entries_offset) *
++		    entry_idx);
++	fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+ 	memcpy((void *)(ulong)fdt_addr, (void *)((ulong)dt_img +
+-			be32_to_cpu(dt_entry->dt_offset)), fdt_size);
++			fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
+ 
+ 	/* Combine cmdline and Print image info  */
+ 	if (gki_is_supported) {
+@@ -1117,7 +1019,9 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ #ifdef CONFIG_AVB_WARNING_LOGO
+ 	if (fastboot_get_lock_stat() == FASTBOOT_UNLOCK) {
+ 		int count = 0;
+-
++#ifdef CONFIG_IMX_HAB
++		idt_show_red_warning_and_shutdown();
++#endif
+ 		printf("Device is unlocked, press power key to skip warning logo... 
+");
+ 		if (display_unlock_warning())
+ 			printf("can't show unlock warning.
+");
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index 62fd436697..afb3b111e3 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -49,11 +49,8 @@
+ #endif
+ 
+ #include "fb_fsl_common.h"
+-<<<<<<< HEAD
+-#include <persist_idt.h>
+-=======
+ #include "fb_fsl_virtual_ab.h"
+->>>>>>> 4719a2a5e6
++#include <persist_idt.h>
+ 
+ #define EP_BUFFER_SIZE			4096
+ 
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 750511ed2e..4befe70afc 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -123,24 +123,16 @@ static int _fastboot_parts_add_ptable_entry(int ptable_index,
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR_A) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_OEM_B) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR_B) ||
+-<<<<<<< HEAD
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT_A) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT_B) ||
+-	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DATA))
+-=======
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DATA) ||
+->>>>>>> 4719a2a5e6
+ #else
+ 	if (!strcmp((const char *)info.name, FASTBOOT_PARTITION_SYSTEM) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DATA) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DEVICE) ||
+-<<<<<<< HEAD
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT) ||
+-	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_CACHE))
+-=======
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_CACHE) ||
+->>>>>>> 4719a2a5e6
+ #endif
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_METADATA))
+ 		strcpy(ptable[ptable_index].fstype, "ext4");
+diff --git a/drivers/video/video_bmp.c b/drivers/video/video_bmp.c
+index 483d028a4e..002c4beb28 100644
+--- a/drivers/video/video_bmp.c
++++ b/drivers/video/video_bmp.c
+@@ -301,12 +301,8 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 			break;
+ 		}
+ #endif
+-<<<<<<< HEAD
+-		if (bpix == 8)
+-=======
+ 
+ 		if (bpix == 8 || bpix == 1)
+->>>>>>> 4719a2a5e6
+ 			byte_width = width;
+ 		else if (bpix == 16)
+ 			byte_width = width * 2;
+diff --git a/include/fsl_avb.h b/include/fsl_avb.h
+index 0cdb12afb0..5ba62d1e45 100644
+--- a/include/fsl_avb.h
++++ b/include/fsl_avb.h
+@@ -159,40 +159,11 @@ void fsl_set_key_version(AvbAtxOps* atx_ops,
+                          size_t rollback_index_location,
+                          uint64_t key_version);
+ 
+-<<<<<<< HEAD
+ /* Get the tries_remaining value from the current slot. this function
+  * can also decrease tries_remaining if need_to_decrease is set true.
+  */
+ int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease);
+ 
+-/* This is the fast version of avb_ab_flow(), this function will
+- * not check another slot if one slot can pass the verify (or verify
+- * fail is acceptable).
+- */
+-AvbABFlowResult avb_ab_flow_fast(AvbABOps* ab_ops,
+-                                 const char* const* requested_partitions,
+-                                 AvbSlotVerifyFlags flags,
+-                                 AvbHashtreeErrorMode hashtree_error_mode,
+-                                 AvbSlotVerifyData** out_data);
+-
+-/* This is for legacy i.mx6/7 which don't enable A/B but want to
+- * verify boot/recovery with AVB */
+-AvbABFlowResult avb_single_flow(AvbABOps* ab_ops,
+-                                 const char* const* requested_partitions,
+-                                 AvbSlotVerifyFlags flags,
+-                                 AvbHashtreeErrorMode hashtree_error_mode,
+-                                 AvbSlotVerifyData** out_data);
+-
+-/* Avb verify flow for dual bootloader, only the slot chosen by SPL will
+- * be verified.
+- */
+-AvbABFlowResult avb_flow_dual_uboot(AvbABOps* ab_ops,
+-                                    const char* const* requested_partitions,
+-                                    AvbSlotVerifyFlags flags,
+-                                    AvbHashtreeErrorMode hashtree_error_mode,
+-                                    AvbSlotVerifyData** out_data);
+-=======
+->>>>>>> 4719a2a5e6
+ /* Generates |num_bytes| random bytes and stores them in |output|,
+  * which must point to a buffer large enough to store the bytes.
+  *
+diff --git a/lib/avb/fsl/fsl_bootctrl.c b/lib/avb/fsl/fsl_bootctrl.c
+index cb260936de..f7c37e803e 100755
+--- a/lib/avb/fsl/fsl_bootctrl.c
++++ b/lib/avb/fsl/fsl_bootctrl.c
+@@ -9,13 +9,8 @@
+ 
+ #include <asm/io.h>
+ #include <common.h>
+-<<<<<<< HEAD:lib/avb/fsl/fsl_avb_ab_flow.c
+-#include <fb_fsl.h>
+-#include <fsl_avb.h>
+-=======
+ #include <stdlib.h>
+ #include <linux/string.h>
+->>>>>>> 4719a2a5e6:lib/avb/fsl/fsl_bootctrl.c
+ #include <mmc.h>
+ #include <spl.h>
+ #include <part.h>
+@@ -26,11 +21,9 @@
+ #include <hang.h>
+ #include "fsl_caam.h"
+ #include "fsl_avbkey.h"
+-<<<<<<< HEAD:lib/avb/fsl/fsl_avb_ab_flow.c
+-#include <idt_red_warning.h>
+-=======
+ #include "hang.h"
+ #include "fsl_bootctrl.h"
++#include <idt_red_warning.h>
+ 
+ /* Maximum values for slot data */
+ #define AVB_AB_MAX_PRIORITY 15
+@@ -39,7 +32,6 @@
+ #ifndef MAX_PTN
+ #define MAX_PTN 32
+ #endif
+->>>>>>> 4719a2a5e6:lib/avb/fsl/fsl_bootctrl.c
+ 
+ /* The bootloader_control struct is stored 2048 bytes into the 'misc' partition
+  * following the 'struct bootloader_message' field. The struct is compatible with
+@@ -771,27 +763,11 @@ int mmc_load_image_raw_sector_dual_uboot(struct spl_image_info *spl_image,
+ 
+ 		/* Set current slot to unbootable if load/verify fail. */
+ 		if (ret != 0) {
+-<<<<<<< HEAD:lib/avb/fsl/fsl_avb_ab_flow.c
+ 			printf("Load or verify bootloader%s fail, setting unbootable..
+",
+-			       slot_suffixes[target_slot]);
+-			fsl_slot_set_unbootable(&ab_data.slots[target_slot]);
++			       slot_suffix[target_slot]);
++			fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+ 			/* Switch to another slot. */
+ 			target_slot = (target_slot == 1 ? 0 : 1);
+-=======
+-			/* Reboot if current slot has booted succefully before, this prevents
+-			 * slot been marked as "unbootable" due to some random failures (like
+-			 * eMMC/DRAM access error at some critical temperature).
+-			 */
+-			if (ab_data.slot_info[target_slot].successful_boot)
+-				do_reset(NULL, 0, 0, NULL);
+-			else {
+-				printf("Load or verify bootloader%s fail, setting unbootable..
+",
+-				       slot_suffix[target_slot]);
+-				fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+-				/* Switch to another slot. */
+-				target_slot = (target_slot == 1 ? 0 : 1);
+-			}
+->>>>>>> 4719a2a5e6:lib/avb/fsl/fsl_bootctrl.c
+ 		} else {
+ 			slot_index_to_boot = target_slot;
+ 			n = 2;
+@@ -1020,40 +996,19 @@ AvbABFlowResult avb_flow_dual_uboot(AvbABOps* ab_ops,
+ 
+ 	if (set_slot_unbootable) {
+ 		avb_errorv("Error verifying slot ",
+-			   slot_suffixes[target_slot],
++			   slot_suffix[target_slot],
+ 			   " with result ",
+ 			   avb_slot_verify_result_to_string(verify_result),
+ 			   " - setting unbootable.
+",
+ 			   NULL);
+-		fsl_slot_set_unbootable(&ab_data.slots[target_slot]);
++		fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+ 
+ 		/* Only the slot chosen by SPL will be verified here so we
+ 		 * return AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS if the
+ 		 * slot should be set unbootable.
+ 		 */
+-<<<<<<< HEAD:lib/avb/fsl/fsl_avb_ab_flow.c
+ 		ret = AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS;
+ 		goto out;
+-=======
+-		if (ab_data.slot_info[target_slot].successful_boot)
+-			do_reset(NULL, 0, 0, NULL);
+-		else {
+-			avb_errorv("Error verifying slot ",
+-				   slot_suffix[target_slot],
+-				   " with result ",
+-				   avb_slot_verify_result_to_string(verify_result),
+-				   " - setting unbootable.
+",
+-				   NULL);
+-			fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+-
+-			/* Only the slot chosen by SPL will be verified here so we
+-			 * return AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS if the
+-			 * slot should be set unbootable.
+-			 */
+-			ret = AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS;
+-			goto out;
+-		}
+->>>>>>> 4719a2a5e6:lib/avb/fsl/fsl_bootctrl.c
+ 	}
+ 
+ 	/* Update stored rollback index only when the slot has been marked
+@@ -1360,37 +1315,14 @@ AvbABFlowResult avb_ab_flow_fast(AvbABOps* ab_ops,
+ 		}
+ 
+ 		if (set_slot_unbootable) {
+-<<<<<<< HEAD:lib/avb/fsl/fsl_avb_ab_flow.c
+ 			avb_errorv("Error verifying slot ",
+-				   slot_suffixes[target_slot],
++				   slot_suffix[target_slot],
+ 				   " with result ",
+ 				   avb_slot_verify_result_to_string(verify_result),
+ 				   " - setting unbootable.
+",
+ 				   NULL);
+-			fsl_slot_set_unbootable(&ab_data.slots[target_slot]);
++			fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+ 			set_slot_unbootable = false;
+-=======
+-			/* Reboot if current slot has booted succefully before, this prevents
+-			 * slot been marked as "unbootable" due to some random failures (like
+-			 * eMMC/DRAM access error at some critical temperature).
+-			 */
+-			if (ab_data.slot_info[target_slot].successful_boot)
+-				do_reset(NULL, 0, 0, NULL);
+-			else {
+-				avb_errorv("Error verifying slot ",
+-					   slot_suffix[target_slot],
+-					   " with result ",
+-					   avb_slot_verify_result_to_string(verify_result),
+-					   " - setting unbootable.
+",
+-					   NULL);
+-				fsl_slot_set_unbootable(&ab_data.slot_info[target_slot]);
+-				set_slot_unbootable = false;
+-			}
+-			if (slot_data[target_slot] != NULL) {
+-				avb_slot_verify_data_free(slot_data[target_slot]);
+-				slot_data[target_slot] = NULL;
+-			}
+->>>>>>> 4719a2a5e6:lib/avb/fsl/fsl_bootctrl.c
+ 		}
+ 		/* switch to another slot */
+ 		target_slot = (target_slot == 1 ? 0 : 1);
+@@ -1516,24 +1448,24 @@ int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease) {
+ 	}
+ 
+ 	printf("slot _a: priority: %d retry: %d
+",
+-			ab_data.slots[0].priority, ab_data.slots[0].tries_remaining);
++			ab_data.slot_info[0].priority, ab_data.slot_info[0].tries_remaining);
+ 	printf("slot _b: priority: %d retry: %d
+",
+-			ab_data.slots[1].priority, ab_data.slots[1].tries_remaining);
++			ab_data.slot_info[1].priority, ab_data.slot_info[1].tries_remaining);
+ 
+ 	slot_index_to_boot =
+-	    (ab_data.slots[1].priority > ab_data.slots[0].priority) ? 1 : 0;
++	    (ab_data.slot_info[1].priority > ab_data.slot_info[0].priority) ? 1 : 0;
+ 
+ 	if (! need_to_decrease)
+-		return ab_data.slots[slot_index_to_boot].tries_remaining;
++		return ab_data.slot_info[slot_index_to_boot].tries_remaining;
+ 
+-	if (ab_data.slots[slot_index_to_boot].tries_remaining == 0) {
++	if (ab_data.slot_info[slot_index_to_boot].tries_remaining == 0) {
+ 		printf("mark slot %s unbootable
+", (slot_index_to_boot == 0 ? "_a" : "_b"));
+-		fsl_slot_set_unbootable(&ab_data.slots[slot_index_to_boot]);
++		fsl_slot_set_unbootable(&ab_data.slot_info[slot_index_to_boot]);
+ 	}
+ 
+-	if (!ab_data.slots[slot_index_to_boot].successful_boot &&
+-			(ab_data.slots[slot_index_to_boot].tries_remaining > 0)) {
+-		ab_data.slots[slot_index_to_boot].tries_remaining -= 1;
++	if (!ab_data.slot_info[slot_index_to_boot].successful_boot &&
++			(ab_data.slot_info[slot_index_to_boot].tries_remaining > 0)) {
++		ab_data.slot_info[slot_index_to_boot].tries_remaining -= 1;
+ 	}
+ 
+ 	io_ret = fsl_save_metadata_if_changed(ab_ops, &ab_data, &ab_data_orig);
+@@ -1544,6 +1476,6 @@ int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease) {
+ 			return -4;
+ 		}
+ 	}
+-	return ab_data.slots[slot_index_to_boot].tries_remaining;
++	return ab_data.slot_info[slot_index_to_boot].tries_remaining;
+ }
+ #endif /* CONFIG_ANDROID_AB_SUPPORT */

@@ -1,0 +1,188 @@
+0b099adc5444 AndrewS 2021-11-30
+
+AOS-785: usb role switch - no irq from tps65994
+
+support usb role switch when there's no irq from type c controller
+
+register extcon device and notifier in type c controller's driver,
+when dwc3 get irq signals while usb device plugged in, its irq
+handler will call type c controller's notifier to do role switch
+
+Change-Id: I3f1b3251bdc8d0cf71f9fe6e67335b8e043efeff
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index e5c5901462c6..a112a727c2ec 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -689,7 +689,7 @@ tp_st1633i: st1633i@55 {
+ 		gpios = <&gpio3 18 GPIO_ACTIVE_LOW>;
+ 	};
+ 
+-	typec_pd: usb-pd@20 {
++	typec_tps65994: usb-pd@20 {
+ 		compatible = "ti,tps65994";
+ 		reg = <0x20>;
+ 
+@@ -955,6 +955,12 @@ &usb3_phy0 {
+ 
+ &usb_dwc3_0 {
+ 	dr_mode = "otg";
++	hnp-disable;
++	srp-disable;
++	adp-disable;
++	snps,dis-u1-entry-quirk;
++	snps,dis-u2-entry-quirk;
++	extcon = <&typec_tps65994>;
+ 	status = "okay";
+ 
+ 	port@0 {
+diff --git a/drivers/usb/dwc3/drd.c b/drivers/usb/dwc3/drd.c
+index a4bd2391319d..7b02f99702df 100644
+--- a/drivers/usb/dwc3/drd.c
++++ b/drivers/usb/dwc3/drd.c
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <linux/extcon.h>
++#include <linux/extcon-provider.h>
+ #include <linux/of_graph.h>
+ #include <linux/platform_device.h>
+ #include <linux/property.h>
+@@ -61,7 +62,10 @@ static irqreturn_t dwc3_otg_thread_irq(int irq, void *_dwc)
+ 
+ 	spin_unlock(&dwc->lock);
+ 
+-	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
++	if (dwc->edev)
++		extcon_sync(dwc->edev, EXTCON_USB);
++	else
++		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -603,6 +607,35 @@ int dwc3_drd_init(struct dwc3 *dwc)
+ 		}
+ 
+ 		dwc3_drd_update(dwc);
++
++		/* request irq for extcon */
++		dwc3_set_prtcap(dwc, DWC3_GCTL_PRTCAP_OTG);
++		dwc->current_dr_role = DWC3_GCTL_PRTCAP_OTG;
++
++		/* use OTG block to get ID event */
++		irq = dwc3_otg_get_irq(dwc);
++		if (irq < 0)
++			return irq;
++
++		dwc->otg_irq = irq;
++
++		/* disable all OTG IRQs */
++		dwc3_otg_disable_events(dwc, DWC3_OTG_ALL_EVENTS);
++		/* clear all events */
++		dwc3_otg_clear_events(dwc);
++
++		ret = request_threaded_irq(dwc->otg_irq, dwc3_otg_irq,
++					   dwc3_otg_thread_irq,
++					   IRQF_SHARED, "dwc3-otg", dwc);
++		if (ret) {
++			dev_err(dwc->dev, "failed to request irq #%d --> %d
+",
++				dwc->otg_irq, ret);
++			ret = -ENODEV;
++			return ret;
++		}
++
++		dwc3_otg_init(dwc);
++		dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_OTG);
+ 	} else {
+ 		dwc3_set_prtcap(dwc, DWC3_GCTL_PRTCAP_OTG);
+ 		dwc->current_dr_role = DWC3_GCTL_PRTCAP_OTG;
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 68fd946e5a08..021c055a5cd7 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -15,6 +15,7 @@
+ #include <linux/usb/typec_dp.h>
+ #include <linux/usb/typec.h>
+ #include <linux/usb/role.h>
++#include <linux/extcon-provider.h>
+ 
+ /* Register offsets */
+ #define TPS_REG_VID			0x00
+@@ -158,6 +159,15 @@ struct tps65994 {
+ 	unsigned char reg_addr;
+ 	unsigned char DP_i2c_addr;
+ 	unsigned char DP_reg_addr;
++
++	struct extcon_dev *extcon;
++	struct notifier_block tps65994_nb;
++};
++
++static const unsigned int tps_cables[] = {
++	EXTCON_USB,
++	EXTCON_USB_HOST,
++	EXTCON_NONE
+ };
+ 
+ static enum power_supply_property tps65994_psy_props[] = {
+@@ -1067,6 +1077,29 @@ static struct attribute_group tps65994_group = {
+ 	.attrs = tps65994_attrs,
+ };
+ 
++static int tps65994_notifier(struct notifier_block *nb, unsigned long val,
++				void *priv)
++{
++	struct tps65994 *tps = container_of(nb, struct tps65994, tps65994_nb);
++	int ret;
++	u8 status[5];
++
++	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS,
++				status, NULL);
++	if (ret)
++		return ret;
++
++	if (TPS_STATUS_DATAROLE(status[0]) == TYPEC_HOST) {
++		extcon_set_state_sync(tps->extcon, EXTCON_USB_HOST, true);
++		typec_set_data_role(tps->port, TYPEC_HOST);
++	} else {
++		extcon_set_state_sync(tps->extcon, EXTCON_USB_HOST, false);
++		typec_set_data_role(tps->port, TYPEC_DEVICE);
++	}
++
++	return NOTIFY_OK;
++}
++
+ static int tps65994_probe(struct i2c_client *client)
+ {
+ 	struct typec_capability typec_cap = { };
+@@ -1165,6 +1198,26 @@ static int tps65994_probe(struct i2c_client *client)
+ 
+ 	i2c_set_clientdata(client, tps);
+ 
++	tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
++	if (IS_ERR(tps->extcon)) {
++		dev_err(&client->dev, "failed to allocate extcon device
+");
++		ret = PTR_ERR(tps->extcon);
++		goto err_role_put;
++	}
++
++	ret = devm_extcon_dev_register(&client->dev, tps->extcon);
++	if (ret < 0) {
++		dev_err(&client->dev, "failed to register extcon device
+");
++		goto err_role_put;
++	}
++
++	tps->tps65994_nb.notifier_call = tps65994_notifier;
++	ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
++	if (ret < 0) {
++		dev_err(&client->dev, "couldn't register notifier
+");
++		goto err_role_put;
++	}
++
+ 	ret = sysfs_create_group(&tps->dev->kobj, &tps65994_group);
+ 	if (ret) {
+ 		dev_err(&client->dev, "failed to create group in sysfs
+");

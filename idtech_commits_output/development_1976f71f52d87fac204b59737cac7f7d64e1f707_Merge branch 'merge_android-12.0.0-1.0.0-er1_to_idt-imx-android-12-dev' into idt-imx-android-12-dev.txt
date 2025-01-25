@@ -1,0 +1,136 @@
+1976f71f5 jenkins 2022-02-21
+
+Merge branch 'merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev' into idt-imx-android-12-dev
+
+Change-Id: If7e572e65d05a722e5745f6611c2ac1c3d780b6c
+
+diff --cc tools/privapp_permissions/privapp_permissions.py
+index feac54bbe,6e8451c73..cd33b517f
+--- a/tools/privapp_permissions/privapp_permissions.py
++++ b/tools/privapp_permissions/privapp_permissions.py
+@@@ -156,14 -193,42 +193,50 @@@ class Resources(object)
+                  'You must either set up your build environment, or specify a '
+                  'device to run against. See --help for more info.')
+  
+++<<<<<<< HEAD
+ +        self.privapp_apks = self._resolve_apks(apks)
+ +        self.permissions_dir = self._resolve_sys_path('system/etc/permissions')
+ +        self.permissions_product_dir = self._resolve_sys_path('product/etc/permissions')
+ +        self.permissions_vendor_dir = self._resolve_sys_path('vendor/etc/permissions')
+ +        self.sysconfig_dir = self._resolve_sys_path('system/etc/sysconfig')
+++=======
++         if apks and (partitions == "all" or partitions.find(',') != -1):
++             # override the partition to "system
++             print('
+# Defaulting the target partition to "system". '
++                   'Use -p option to specify the target partition '
++                   '(must provide one target instead of a list).
+',
++                   file=sys.stderr)
++             partitions = "system"
++ 
++         if partitions == "all":
++             # This is the default scenario
++             # Find all the partitions where priv-app exists
++             self.partitions = self._get_partitions()
++         else:
++             # Initialize self.partitions with the specified partitions
++             self.partitions = []
++             for p in partitions.split(','):
++                 if p.endswith('/'):
++                     p = p[:-1]
++                 self.partitions.append(p)
++                 # Check if the directory exists
++                 self._check_dir(p + '/priv-app')
++ 
++         vprint(self.verbose,
++                 '# Examining the partitions: ' + str(self.partitions))
++ 
++         # Create dictionary of array (partition as the key)
++         self.privapp_apks = self._resolve_apks(apks, self.partitions)
++         self.permissions_dirs = self._resolve_sys_paths('etc/permissions',
++                                                        self.partitions)
++         self.sysconfig_dirs = self._resolve_sys_paths('etc/sysconfig',
++                                                      self.partitions)
++ 
++         # Always use the one in /system partition,
++         # as that is the only place we will find framework-res.apk
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+          self.framework_res_apk = self._resolve_sys_path('system/framework/'
+                                                          'framework-res.apk')
+- 
+      @staticmethod
+      def _resolve_adb(adb_path):
+          """Resolves ADB from either the cmdline argument or the os environment.
+@@@ -307,31 -427,28 +435,47 @@@
+              elif not os.path.isfile(apk):
+                  raise MissingResourceError('File "%s" does not exist.' % apk)
+              else:
+-                 ret_apks.append(apk)
+-         return ret_apks
++                results[p].append(apk)
++         return results
++ 
++     def _resolve_all_privapps(self, partition):
++         """Resolves all APKs in <partition>/priv-app
+  
+-     def _resolve_all_privapps(self):
+-         """Extract package name and requested permissions."""
+-         if self._is_android_env:
++         Returns:
++             Return all apks in <partition>/priv-app
++         Throws:
++             MissingResourceError <partition>/priv-app cannot be found.
++         """
++         if not self.adb.serial:
+              priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'],
+++<<<<<<< HEAD
+ +                                        'system/priv-app')
+ +            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')):
+ +                product_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')
+ +            else:
+ +                product_priv_app_dir = ''
+ +            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')):
+ +                vendor_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')
+ +            else:
+ +                vendor_priv_app_dir = ''
+++=======
++                                         partition + '/priv-app')
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+          else:
+              try:
+-                 priv_app_dir = self.adb.pull('/system/priv-app/')
++                 priv_app_dir = self.adb.pull(partition + '/priv-app/')
+              except subprocess.CalledProcessError:
+                  raise MissingResourceError(
+++<<<<<<< HEAD
+ +                    'Directory "/system/priv-app" could not be pulled from on '
+ +                    'device "%s".' % self.adb.serial)
+ +
+ +        return get_output('find %s %s %s -name "*.apk"' % (priv_app_dir, product_priv_app_dir, vendor_priv_app_dir)).split()
+++=======
++                     'Directory "%s/priv-app" could not be pulled from on '
++                     'device "%s".' % (partition, self.adb.serial))
++         return get_output('find %s -name "*.apk"' % priv_app_dir).split()
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+      def _resolve_sys_path(self, file_path):
+          """Resolves a path that is a part of an Android System Image."""
+@@@ -409,10 -617,10 +644,17 @@@ def generate_missing_permissions(resour
+      # Parse base XML files in /etc dir, permissions listed there don't have
+      # to be re-added
+      base_permissions = {}
+++<<<<<<< HEAD
+ +    base_xml_files = itertools.chain(list_xml_files(resources.permissions_dir),
+ +                                     list_xml_files(resources.permissions_product_dir),
+ +                                     list_xml_files(resources.permissions_vendor_dir),
+ +                                     list_xml_files(resources.sysconfig_dir))
+++=======
++     base_xml_files = itertools.chain(
++         list_xml_files(resources.permissions_dirs[partition]),
++         list_xml_files(resources.sysconfig_dirs[partition]))
++ 
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+      for xml_file in base_xml_files:
+          parse_config_xml(xml_file, base_permissions)
+  

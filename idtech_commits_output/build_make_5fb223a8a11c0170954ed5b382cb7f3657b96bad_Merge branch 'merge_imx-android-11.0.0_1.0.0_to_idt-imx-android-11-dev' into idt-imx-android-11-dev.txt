@@ -1,0 +1,1007 @@
+5fb223a8a jenkins 2020-12-21
+
+Merge branch 'merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev' into idt-imx-android-11-dev
+
+Change-Id: Ia1a9cd4f7af8f8de0590137f3614f24d9dba15e5
+
+diff --cc core/Makefile
+index 45fcddb36,45ad60f41..2f37a6249
+--- a/core/Makefile
++++ b/core/Makefile
+@@@ -2255,15 -2718,18 +2722,27 @@@ define build-systemimage-targe
+    @mkdir -p $(dir $(1)) $(systemimage_intermediates) && rm -rf $(systemimage_intermediates)/system_image_info.txt
+    $(call generate-image-prop-dictionary, $(systemimage_intermediates)/system_image_info.txt,system, \
+        skip_fsck=true)
+++<<<<<<< HEAD
+ +  $(hide) echo "system_block_list=$(systemimage_intermediates)/system.map" >> $(systemimage_intermediates)/system_image_info.txt
+ +  $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+ +      build/make/tools/releasetools/build_image.py \
+ +      $(TARGET_OUT) $(systemimage_intermediates)/system_image_info.txt $(1) $(TARGET_OUT) \
+ +      || ( mkdir -p $${DIST_DIR}; cp $(INSTALLED_FILES_FILE) $${DIST_DIR}/installed-files-rescued.txt; \
+ +           exit 1 )
+++=======
++   PATH=$(INTERNAL_USERIMAGES_BINARY_PATHS):$$PATH \
++       $(BUILD_IMAGE) \
++           $(TARGET_OUT) $(systemimage_intermediates)/system_image_info.txt $(1) $(TARGET_OUT) \
++           || ( mkdir -p $${DIST_DIR}; \
++                cp $(INSTALLED_FILES_FILE) $${DIST_DIR}/installed-files-rescued.txt; \
++                exit 1 )
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  endef
+  
+- $(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE) $(BUILD_IMAGE_SRCS)
++ ifeq ($(BOARD_AVB_ENABLE),true)
++ $(BUILT_SYSTEMIMAGE): $(BOARD_AVB_SYSTEM_KEY_PATH)
++ endif
++ $(BUILT_SYSTEMIMAGE): $(FULL_SYSTEMIMAGE_DEPS) $(INSTALLED_FILES_FILE)
+  	$(call build-systemimage-target,$@)
+  
+  INSTALLED_SYSTEMIMAGE_TARGET := $(PRODUCT_OUT)/system.img
+@@@ -2816,13 -3132,11 +3145,21 @@@ define build-vendorimage-targe
+    $(call create-vendor-odm-symlink)
+    @mkdir -p $(vendorimage_intermediates) && rm -rf $(vendorimage_intermediates)/vendor_image_info.txt
+    $(call generate-image-prop-dictionary, $(vendorimage_intermediates)/vendor_image_info.txt,vendor,skip_fsck=true)
+++<<<<<<< HEAD
+ +  $(hide) echo "vendor_block_list=$(vendorimage_intermediates)/vendor.map" >> $(vendorimage_intermediates)/vendor_image_info.txt
+ +  $(if $(BOARD_VENDOR_KERNEL_MODULES), \
+ +    $(call build-image-kernel-modules,$(BOARD_VENDOR_KERNEL_MODULES),$(TARGET_OUT_VENDOR),vendor/,$(call intermediates-dir-for,PACKAGING,depmod_vendor)))
+ +  $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+ +      build/make/tools/releasetools/build_image.py \
+ +      $(TARGET_OUT_VENDOR) $(vendorimage_intermediates)/vendor_image_info.txt $(INSTALLED_VENDORIMAGE_TARGET) $(TARGET_OUT)
+ +  $(hide) $(call assert-max-image-size,$(INSTALLED_VENDORIMAGE_TARGET),$(BOARD_VENDORIMAGE_PARTITION_SIZE))
+++=======
++   PATH=$(INTERNAL_USERIMAGES_BINARY_PATHS):$$PATH \
++       $(BUILD_IMAGE) \
++           $(TARGET_OUT_VENDOR) $(vendorimage_intermediates)/vendor_image_info.txt \
++           $(INSTALLED_VENDORIMAGE_TARGET) $(TARGET_OUT)
++   $(call assert-max-image-size,$(INSTALLED_VENDORIMAGE_TARGET) $(RECOVERY_FROM_BOOT_PATCH),$(BOARD_VENDORIMAGE_PARTITION_SIZE))
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  endef
+  
+  # We just build this directly to the install location.
+@@@ -3862,17 -4597,10 +4639,24 @@@ $(BUILT_TARGET_FILES_PACKAGE): 
+  	    $(SOONG_APEX_KEYS_FILE) \
+  	    $(SOONG_ZIP) \
+  	    $(HOST_OUT_EXECUTABLES)/fs_config \
+++<<<<<<< HEAD
+ +	    $(HOST_OUT_EXECUTABLES)/imgdiff \
+ +	    $(HOST_OUT_EXECUTABLES)/bsdiff \
+ +	    $(HOST_OUT_EXECUTABLES)/care_map_generator \
+ +	    $(HOST_OUT_EXECUTABLES)/apksigner \
+ +	    $(BUILD_IMAGE_SRCS) \
+ +	    $(BUILT_ASSEMBLED_FRAMEWORK_MANIFEST) \
+ +	    $(BUILT_ASSEMBLED_VENDOR_MANIFEST) \
+ +	    $(BUILT_SYSTEM_MATRIX) \
+ +	    $(BUILT_VENDOR_MATRIX) \
+ +	    $(IMX_INSTALLED_VBMETAIMAGE_TARGET) \
+ +	    $(INSTALLED_BPTIMAGE_TARGET) \
+++=======
++ 	    $(ADD_IMG_TO_TARGET_FILES) \
++ 	    $(MAKE_RECOVERY_PATCH) \
++ 	    $(BUILT_KERNEL_CONFIGS_FILE) \
++ 	    $(BUILT_KERNEL_VERSION_FILE) \
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  	    | $(ACP)
+  	@echo "Package target files: $@"
+  	$(call create-system-vendor-symlink)
+@@@ -4160,64 -4820,12 +4876,61 @@@ endi
+  ifdef BOARD_PREBUILT_DTBOIMAGE
+  	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+  	$(hide) cp $(INSTALLED_DTBOIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
+- 	$(hide) echo "has_dtbo=true" >> $(zip_root)/META/misc_info.txt
+- ifeq ($(BOARD_AVB_ENABLE),true)
+- 	$(hide) echo "dtbo_size=$(BOARD_DTBOIMG_PARTITION_SIZE)" >> $(zip_root)/META/misc_info.txt
+- 	$(hide) echo "avb_dtbo_add_hash_footer_args=$(BOARD_AVB_DTBO_ADD_HASH_FOOTER_ARGS)" >> $(zip_root)/META/misc_info.txt
+- ifdef BOARD_AVB_DTBO_KEY_PATH
+- 	$(hide) echo "avb_dtbo_key_path=$(BOARD_AVB_DTBO_KEY_PATH)" >> $(zip_root)/META/misc_info.txt
+- 	$(hide) echo "avb_dtbo_algorithm=$(BOARD_AVB_DTBO_ALGORITHM)" >> $(zip_root)/META/misc_info.txt
+- 	$(hide) echo "avb_dtbo_rollback_index_location=$(BOARD_AVB_DTBO_ROLLBACK_INDEX_LOCATION)" \
+- 	    >> $(zip_root)/META/misc_info.txt
+- endif # BOARD_AVB_DTBO_KEY_PATH
+- endif # BOARD_AVB_ENABLE
+  endif # BOARD_PREBUILT_DTBOIMAGE
+++<<<<<<< HEAD
+ +	$(call dump-dynamic-partitions-info,$(zip_root)/META/misc_info.txt)
+ +
+ +	# IDtech added for image consistency
+ +	$(hide) mkdir -p $(zip_root)/IMAGES
+ +	# boot image
+ +	$(hide) cp $(INSTALLED_BOOTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# vendor image and vendor.map
+ +	$(hide) cp $(INSTALLED_VENDORIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	$(hide) cp $(vendorimage_intermediates)/vendor.map $(zip_root)/IMAGES/
+ +	# system image and system.map
+ +	$(hide) cp $(INSTALLED_SYSTEMIMAGE) $(zip_root)/IMAGES/
+ +	$(hide) cp $(systemimage_intermediates)/system.map $(zip_root)/IMAGES/
+ +	# product image
+ +	$(hide) cp $(INSTALLED_PRODUCTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# IDtech specific dtbo/vbmeta image
+ +	cp $(PRODUCT_OUT)/dtbo.img $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/vbmeta.img $(zip_root)/IMAGES/
+ +	# partition table
+ +	cp $(PRODUCT_OUT)/partition-table*.img $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/partition-table*.bpt $(zip_root)/META/
+ +	cp $(PRODUCT_OUT)/userdata*.img $(zip_root)/IMAGES/
+ +
+ +	# Copy IDtech's images and scripts
+ +	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/mem_info.* $(zip_root)/IMAGES/
+ +	# Flashing script
+ +	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/lpmake* $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/uuu* $(zip_root)/IMAGES/
+ +	# U-boot
+ +	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
+ +	# For dual bootloader option
+ +	cp $(PRODUCT_OUT)/spl* $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/bootloader* $(zip_root)/IMAGES/
+ +	# U-boot for ota update
+ +	cp $(PRODUCT_OUT)/u-boot-$(LOWER_BOARD_SOC_TYPE)-lpddr4.imx $(zip_root)/IMAGES/bootloader.img
+ +	# Dual bootloader images for ota update
+ +	cp -f $(PRODUCT_OUT)/bootloader-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.img $(zip_root)/IMAGES/bootloader.img
+ +	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl.img
+ +	# backup spl images for ota update
+ +	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl_bak.img
+ +	# gather signed bootloader images used for post signing process
+ +	$(hide) mkdir -p $(zip_root)/TEST_SIGN
+ +	cp $(PRODUCT_OUT)/*signed* $(zip_root)/TEST_SIGN/
+ +
+++=======
++ ifneq ($(strip $(BOARD_CUSTOMIMAGES_PARTITION_LIST)),)
++ 	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
++ 	$(hide) $(foreach partition,$(BOARD_CUSTOMIMAGES_PARTITION_LIST), \
++ 	    $(foreach image,$(BOARD_AVB_$(call to-upper,$(partition))_IMAGE_LIST),cp $(image) $(zip_root)/PREBUILT_IMAGES/;))
++ endif # BOARD_CUSTOMIMAGES_PARTITION_LIST
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+  	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+  	@# INSTALLED_RADIOIMAGE_TARGET.
+@@@ -4650,33 -5258,12 +5363,42 @@@ name := $(name)-img-$(FILE_NAME_TAG
+  
+  INTERNAL_UPDATE_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
+  
+++<<<<<<< HEAD
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(ZIP2ZIP)
+ +
+ +ifeq (true,$(BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE))
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET): $(INTERNAL_SUPERIMAGE_DIST_TARGET)
+ +	@echo "Package: $@"
+ +	# Filter out super_empty and images in BOARD_SUPER_PARTITION_PARTITION_LIST.
+ +	# Filter out system_other for launch DAP devices because it is in super image.
+ +	# Include OTA/super_*.img for retrofit devices and super.img for non-retrofit
+ +	# devices.
+ +	$(hide) $(ZIP2ZIP) -i $(BUILT_TARGET_FILES_PACKAGE) -o $@ \
+ +	  -x IMAGES/super_empty.img \
+ +	  $(foreach partition,$(BOARD_SUPER_PARTITION_PARTITION_LIST), \
+ +	    -x IMAGES/$(partition).img) \
+ +	  $(if $(filter system, $(BOARD_SUPER_PARTITION_PARTITION_LIST)), \
+ +	    $(if $(filter true, $(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS)),, \
+ +	      -x IMAGES/system_other.img)) \
+ +	  $(if $(filter true,$(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS)), \
+ +	    $(foreach device,$(BOARD_SUPER_PARTITION_BLOCK_DEVICES), \
+ +	      OTA/super_$(device).img:super_$(device).img)) \
+ +	  OTA/android-info.txt:android-info.txt "IMAGES/*.img:."
+ +	$(if $(INTERNAL_SUPERIMAGE_DIST_TARGET), zip -q -j -u $@ $(INTERNAL_SUPERIMAGE_DIST_TARGET))
+ +else
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET):
+ +	@echo "Package: $@"
+ +	$(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+ +	    ./build/tools/releasetools/img_from_target_files.py $(BUILT_TARGET_FILES_PACKAGE) $@
+ +endif # BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE
+++=======
++ $(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(IMG_FROM_TARGET_FILES)
++ 	$(call pretty,"Package: $@")
++ 	PATH=$(INTERNAL_USERIMAGES_BINARY_PATHS):$(dir $(ZIP2ZIP)):$$PATH \
++ 	    $(IMG_FROM_TARGET_FILES) \
++ 	        --additional IMAGES/VerifiedBootParams.textproto:VerifiedBootParams.textproto \
++ 	        $(BUILT_TARGET_FILES_PACKAGE) $@
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+  .PHONY: updatepackage
+  updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
+diff --cc core/build_id.mk
+index 6569962f2,704149302..b3b3024ca
+--- a/core/build_id.mk
++++ b/core/build_id.mk
+@@@ -18,4 -18,4 +18,8 @@@
+  # (like "CRB01").  It must be a single word, and is
+  # capitalized by convention.
+  
+++<<<<<<< HEAD
+ +BUILD_ID=QQ3A.200805.001
+++=======
++ BUILD_ID=RP1A.201005.004
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+diff --cc core/main.mk
+index edb5bd361,357c70da3..dc96a4f14
+--- a/core/main.mk
++++ b/core/main.mk
+@@@ -1744,9 -1578,8 +1578,10 @@@ else # TARGET_BUILD_APP
+      $(INSTALLED_FILES_JSON_RECOVERY) \
+      $(INSTALLED_BUILD_PROP_TARGET) \
+      $(BUILT_TARGET_FILES_PACKAGE) \
+ +    $(BUILT_APKS_TO_SIGN_PACKAGE) \
+ +    $(BUILT_APEX_TO_SIGN_PACKAGE) \
+      $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
++     $(INSTALLED_MISC_INFO_TARGET) \
+      $(INSTALLED_RAMDISK_TARGET) \
+     )
+  
+diff --cc core/version_defaults.mk
+index 9f6408137,fc6a18fa8..a3ecbdcac
+--- a/core/version_defaults.mk
++++ b/core/version_defaults.mk
+@@@ -250,7 -240,7 +240,11 @@@ ifndef PLATFORM_SECURITY_PATC
+      #  It must be of the form "YYYY-MM-DD" on production devices.
+      #  It must match one of the Android Security Patch Level strings of the Public Security Bulletins.
+      #  If there is no $PLATFORM_SECURITY_PATCH set, keep it empty.
+++<<<<<<< HEAD
+ +      PLATFORM_SECURITY_PATCH := 2020-08-05
+++=======
++       PLATFORM_SECURITY_PATCH := 2020-10-05
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  endif
+  .KATI_READONLY := PLATFORM_SECURITY_PATCH
+  
+diff --cc target/product/base_system.mk
+index d3580892e,4569bceff..ed2c468af
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@@ -14,23 -14,9 +14,27 @@@
+  # limitations under the License.
+  #
+  
+ +# package removed on user build (production and pci)
+ +ifneq (user,$(TARGET_BUILD_VARIANT))
+ +PRODUCT_PACKAGES += \
+ +    monkey \
+ +    WallpaperBackup
+ +endif
+ +
+ +# adbd binary included by userdebug/production/pcidev, removed by pci-user
+ +ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
+ +PRODUCT_PACKAGES += adbd
+ +else ifeq (pcidev,$(findstring pcidev, $(TARGET_PRODUCT)))
+ +PRODUCT_PACKAGES += adbd
+ +endif
+ +
+  # Base modules and settings for the system partition.
+  PRODUCT_PACKAGES += \
+++<<<<<<< HEAD
+ +    abb \
+++=======
++     adbd_system_api \
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+      am \
+      android.hidl.allocator@1.0-service \
+      android.hidl.base-V1.0-java \
+@@@ -214,10 -205,10 +223,9 @@@
+      mediaextractor \
+      mediametrics \
+      media_profiles_V1_0.dtd \
+-     MediaProvider \
++     MediaProviderLegacy \
+      mediaserver \
+      mke2fs \
+ -    monkey \
+      mtpd \
+      ndc \
+      netd \
+@@@ -273,9 -268,10 +285,9 @@@
+      viewcompiler \
+      voip-common \
+      vold \
+ -    WallpaperBackup \
+      watchdogd \
+      wificond \
+-     wifi-service \
++     wifi.rc \
+      wm \
+  
+  # VINTF data for system image
+@@@ -329,17 -326,21 +342,24 @@@ PRODUCT_BOOT_JARS := 
+      ext \
+      telephony-common \
+      voip-common \
+-     ims-common \
+-     updatable-media
+- PRODUCT_UPDATABLE_BOOT_MODULES := conscrypt updatable-media
+- PRODUCT_UPDATABLE_BOOT_LOCATIONS := \
+-     /apex/com.android.conscrypt/javalib/conscrypt.jar \
+-     /apex/com.android.media/javalib/updatable-media.jar
++     ims-common
++ 
+++<<<<<<< HEAD
+++=======
++ PRODUCT_UPDATABLE_BOOT_JARS := \
++     com.android.conscrypt:conscrypt \
++     com.android.media:updatable-media \
++     com.android.mediaprovider:framework-mediaprovider \
++     com.android.os.statsd:framework-statsd \
++     com.android.permission:framework-permission \
++     com.android.sdkext:framework-sdkextensions \
++     com.android.wifi:framework-wifi \
++     com.android.tethering:framework-tethering
+  
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  PRODUCT_COPY_FILES += \
+-     system/core/rootdir/init.usb.rc:root/init.usb.rc \
+-     system/core/rootdir/init.usb.configfs.rc:root/init.usb.configfs.rc \
+-     system/core/rootdir/ueventd.rc:root/ueventd.rc \
++     system/core/rootdir/init.usb.rc:system/etc/init/hw/init.usb.rc \
++     system/core/rootdir/init.usb.configfs.rc:system/etc/init/hw/init.usb.configfs.rc \
+      system/core/rootdir/etc/hosts:system/etc/hosts
+  
+  # Add the compatibility library that is needed when android.test.base
+diff --cc target/product/handheld_product.mk
+index 156763943,2199c570a..bcf37ec18
+--- a/target/product/handheld_product.mk
++++ b/target/product/handheld_product.mk
+@@@ -17,32 -17,24 +17,41 @@@
+  # This makefile contains the product partition contents for
+  # a generic phone or tablet device. Only add something here if
+  # it definitely doesn't belong on other types of devices (if it
+- # does, use base_vendor.mk).
++ # does, use base_product.mk).
+  $(call inherit-product, $(SRC_TARGET_DIR)/product/media_product.mk)
+  
+ -# /product packages
+ +ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+  PRODUCT_PACKAGES += \
+ +    frameworks-base-overlays \
+ +    OneTimeInitializer \
+ +    DeskClock \
+      Browser2 \
+ +    Music \
+ +    Gallery2 \
+      Calendar \
+      Camera2 \
+      Contacts \
+ -    DeskClock \
+ -    Gallery2 \
+ +    QuickSearchBox \
+ +    WallpaperCropper
+ +endif
+ +
+ +# /product packages
+ +PRODUCT_PACKAGES += \
+      LatinIME \
+++<<<<<<< HEAD
+ +    Launcher3QuickStep \
+ +    Settings \
+ +    SettingsIntelligence \
+ +    StorageManager \
+ +    SystemUI
+++=======
++     Music \
++     OneTimeInitializer \
++     preinstalled-packages-platform-handheld-product.xml \
++     QuickSearchBox \
++     SettingsIntelligence \
++     frameworks-base-overlays
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+  PRODUCT_PACKAGES_DEBUG += \
+      frameworks-base-overlays-debug
+diff --cc target/product/telephony_product.mk
+index aaf7e5bb1,3ec954fe9..d112bdc17
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@@ -17,12 -17,6 +17,16 @@@
+  # This is the list of modules that are specific to products that have telephony
+  # hardware, and install to the product partition.
+  
+ +ifneq (user,$(TARGET_BUILD_VARIANT))
+ +PRODUCT_PACKAGES += \
+++<<<<<<< HEAD
+ +    EmergencyInfo \
+ +    Dialer
+ +endif
+ +
+  # /product packages
+  PRODUCT_PACKAGES += \
+ +    CarrierConfig
+++=======
++     Dialer \
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+diff --cc tools/releasetools/add_img_to_target_files.py
+index 649745d7a,f58b6978a..0025d2261
+mode 100755,100644..100644
+--- a/tools/releasetools/add_img_to_target_files.py
++++ b/tools/releasetools/add_img_to_target_files.py
+diff --cc tools/releasetools/build_image.py
+index 1bb4c76d4,8cf074147..c70b49182
+--- a/tools/releasetools/build_image.py
++++ b/tools/releasetools/build_image.py
+@@@ -564,7 -575,7 +575,11 @@@ def ImagePropFromGlobalDict(glob_dict, 
+      if not copy_prop("system_extfs_rsv_pct", "extfs_rsv_pct"):
+        d["extfs_rsv_pct"] = "0"
+      copy_prop("system_reserved_size", "partition_reserved_size")
+++<<<<<<< HEAD
+ +    copy_prop("system_block_list", "block_list")
+++=======
++     copy_prop("system_selinux_fc", "selinux_fc")
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+    elif mount_point == "system_other":
+      # We inherit the selinux policies of /system since we contain some of its
+      # files.
+@@@ -619,7 -636,7 +640,11 @@@
+      if not copy_prop("vendor_extfs_rsv_pct", "extfs_rsv_pct"):
+        d["extfs_rsv_pct"] = "0"
+      copy_prop("vendor_reserved_size", "partition_reserved_size")
+++<<<<<<< HEAD
+ +    copy_prop("vendor_block_list", "block_list")
+++=======
++     copy_prop("vendor_selinux_fc", "selinux_fc")
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+    elif mount_point == "product":
+      copy_prop("avb_product_hashtree_enable", "avb_hashtree_enable")
+      copy_prop("avb_product_add_hashtree_footer_args",
+diff --cc tools/releasetools/img_from_target_files.py
+index 244883d8a,ab38d0d7f..5fa1f5f2c
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@@ -45,109 -55,160 +55,179 @@@ logger = logging.getLogger(__name__
+  
+  OPTIONS = common.OPTIONS
+  
++ OPTIONS.additional_entries = []
++ OPTIONS.bootable_only = False
++ OPTIONS.put_super = None
++ OPTIONS.dynamic_partition_list = None
++ OPTIONS.super_device_list = None
++ OPTIONS.retrofit_dap = None
++ OPTIONS.build_super = None
++ OPTIONS.sparse_userimages = None
++ 
+  
+  def LoadOptions(input_file):
+-   """
+-   Load information from input_file to OPTIONS.
++   """Loads information from input_file to OPTIONS.
+  
+    Args:
+-     input_file: A Zipfile instance of input zip file, or path to the directory
+-       of extracted zip.
++     input_file: Path to the input target_files zip file.
+    """
+-   info = OPTIONS.info_dict = common.LoadInfoDict(input_file)
+- 
+-   OPTIONS.put_super = info.get("super_image_in_update_package") == "true"
+-   OPTIONS.dynamic_partition_list = info.get("dynamic_partition_list",
+-                                             "").strip().split()
+-   OPTIONS.super_device_list = info.get("super_block_devices",
+-                                        "").strip().split()
+-   OPTIONS.retrofit_dap = info.get("dynamic_partition_retrofit") == "true"
+-   OPTIONS.build_super = info.get("build_super_partition") == "true"
+-   OPTIONS.sparse_userimages = bool(info.get("extfs_sparse_flag"))
++   with zipfile.ZipFile(input_file) as input_zip:
++     info = OPTIONS.info_dict = common.LoadInfoDict(input_zip)
+  
++   OPTIONS.put_super = info.get('super_image_in_update_package') == 'true'
++   OPTIONS.dynamic_partition_list = info.get('dynamic_partition_list',
++                                             '').strip().split()
++   OPTIONS.super_device_list = info.get('super_block_devices',
++                                        '').strip().split()
++   OPTIONS.retrofit_dap = info.get('dynamic_partition_retrofit') == 'true'
++   OPTIONS.build_super = info.get('build_super_partition') == 'true'
++   OPTIONS.sparse_userimages = bool(info.get('extfs_sparse_flag'))
+  
+- def CopyInfo(input_tmp, output_zip):
+-   """Copy the android-info.txt file from the input to the output."""
+-   common.ZipWrite(
+-       output_zip, os.path.join(input_tmp, "OTA", "android-info.txt"),
+-       "android-info.txt")
+  
++ def CopyZipEntries(input_file, output_file, entries):
++   """Copies ZIP entries between input and output files.
+  
+- def CopyUserImages(input_tmp, output_zip):
++   Args:
++     input_file: Path to the input target_files zip.
++     output_file: Output filename.
++     entries: A list of entries to copy, in a format that's accepted by zip2zip
++         (e.g. 'OTA/android-info.txt:android-info.txt', which copies
++         `OTA/android-info.txt` from input_file into output_file as
++         `android-info.txt`. Refer to the `filespec` arg in zip2zip's help
++         message).
+    """
+-   Copy user images from the unzipped input and write to output_zip.
++   logger.info('Writing %d entries to archive...', len(entries))
++   cmd = ['zip2zip', '-i', input_file, '-o', output_file]
++   cmd.extend(entries)
++   common.RunAndCheckOutput(cmd)
++ 
++ 
++ def EntriesForUserImages(input_file):
++   """Returns the user images entries to be copied.
+  
+    Args:
+-     input_tmp: path to the unzipped input.
+-     output_zip: a ZipFile instance to write images to.
++     input_file: Path to the input target_files zip file.
+    """
+-   dynamic_images = [p + ".img" for p in OPTIONS.dynamic_partition_list]
++   dynamic_images = [p + '.img' for p in OPTIONS.dynamic_partition_list]
+  
+    # Filter out system_other for launch DAP devices because it is in super image.
+-   if not OPTIONS.retrofit_dap and "system" in OPTIONS.dynamic_partition_list:
+-     dynamic_images.append("system_other.img")
+- 
+-   images_path = os.path.join(input_tmp, "IMAGES")
+-   # A target-files zip must contain the images since Lollipop.
+-   assert os.path.exists(images_path)
+-   for image in sorted(os.listdir(images_path)):
+-     if OPTIONS.bootable_only and image not in ("boot.img", "recovery.img"):
++   if not OPTIONS.retrofit_dap and 'system' in OPTIONS.dynamic_partition_list:
++     dynamic_images.append('system_other.img')
++ 
++   entries = [
++       'OTA/android-info.txt:android-info.txt',
++   ]
++   with zipfile.ZipFile(input_file) as input_zip:
++     namelist = input_zip.namelist()
++ 
++   for image_path in [name for name in namelist if name.startswith('IMAGES/')]:
++     image = os.path.basename(image_path)
++     if OPTIONS.bootable_only and image not in ('boot.img', 'recovery.img'):
+        continue
+++<<<<<<< HEAD
+ +    if not image.endswith(".img") and not image.endswith(".sh") \
+ +       and not image.endswith(".imx") and not image.endswith(".bat") \
+ +       and not image.startswith("spl") \
+ +       and not image.startswith("lpmake") \
+ +       and not image.startswith("uuu") \
+ +       and not image == "mem_info.txt":
+ +      continue
+ +    if image == "recovery-two-step.img":
+++=======
++     if not image.endswith('.img'):
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+        continue
++     # Filter out super_empty and the images that are already in super partition.
+      if OPTIONS.put_super:
+-       if image == "super_empty.img":
++       if image == 'super_empty.img':
+          continue
+        if image in dynamic_images:
+          continue
+++<<<<<<< HEAD
+ +    logger.info("writing %s to archive...", os.path.join("IMAGES", image))
+ +    perm = 0o644
+ +    if image.endswith(".sh") or image.startswith("lpmake") or image.startswith("uuu"):
+ +      perm = 0o755
+ +    common.ZipWrite(output_zip, os.path.join(images_path, image), image, perm)
+++=======
++     entries.append('{}:{}'.format(image_path, image))
++   return entries
++ 
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
++ 
++ def EntriesForSplitSuperImages(input_file):
++   """Returns the entries for split super images.
+  
++   This is only done for retrofit dynamic partition devices.
+  
+- def WriteSuperImages(input_tmp, output_zip):
++   Args:
++     input_file: Path to the input target_files zip file.
+    """
+-   Write super images from the unzipped input and write to output_zip. This is
+-   only done if super_image_in_update_package is set to "true".
++   with zipfile.ZipFile(input_file) as input_zip:
++     namelist = input_zip.namelist()
++   entries = []
++   for device in OPTIONS.super_device_list:
++     image = 'OTA/super_{}.img'.format(device)
++     assert image in namelist, 'Failed to find {}'.format(image)
++     entries.append('{}:{}'.format(image, os.path.basename(image)))
++   return entries
++ 
++ 
++ def RebuildAndWriteSuperImages(input_file, output_file):
++   """Builds and writes super images to the output file."""
++   logger.info('Building super image...')
++ 
++   # We need files under IMAGES/, OTA/, META/ for img_from_target_files.py.
++   # However, common.LoadInfoDict() may read additional files under BOOT/,
++   # RECOVERY/ and ROOT/. So unzip everything from the target_files.zip.
++   input_tmp = common.UnzipTemp(input_file)
++ 
++   super_file = common.MakeTempFile('super_', '.img')
++   BuildSuperImage(input_tmp, super_file)
++ 
++   logger.info('Writing super.img to archive...')
++   with zipfile.ZipFile(
++       output_file, 'a', compression=zipfile.ZIP_DEFLATED,
++       allowZip64=not OPTIONS.sparse_userimages) as output_zip:
++     common.ZipWrite(output_zip, super_file, 'super.img')
+  
+-   - For retrofit dynamic partition devices, copy split super images from target
+-     files package.
+-   - For devices launched with dynamic partitions, build super image from target
+-     files package.
++ 
++ def ImgFromTargetFiles(input_file, output_file):
++   """Creates an image archive from the input target_files zip.
+  
+    Args:
+-     input_tmp: path to the unzipped input.
+-     output_zip: a ZipFile instance to write images to.
++     input_file: Path to the input target_files zip.
++     output_file: Output filename.
++ 
++   Raises:
++     ValueError: On invalid input.
+    """
+-   if not OPTIONS.build_super or not OPTIONS.put_super:
+-     return
+- 
+-   if OPTIONS.retrofit_dap:
+-     # retrofit devices already have split super images under OTA/
+-     images_path = os.path.join(input_tmp, "OTA")
+-     for device in OPTIONS.super_device_list:
+-       image = "super_%s.img" % device
+-       image_path = os.path.join(images_path, image)
+-       assert os.path.exists(image_path)
+-       logger.info("writing %s to archive...", os.path.join("OTA", image))
+-       common.ZipWrite(output_zip, image_path, image)
+-   else:
+-     # super image for non-retrofit devices aren't in target files package,
+-     # so build it.
+-     super_file = common.MakeTempFile("super_", ".img")
+-     logger.info("building super image %s...", super_file)
+-     BuildSuperImage(input_tmp, super_file)
+-     logger.info("writing super.img to archive...")
+-     common.ZipWrite(output_zip, super_file, "super.img")
++   if not zipfile.is_zipfile(input_file):
++     raise ValueError('%s is not a valid zipfile' % input_file)
++ 
++   logger.info('Building image zip from target files zip.')
++ 
++   LoadOptions(input_file)
++ 
++   # Entries to be copied into the output file.
++   entries = EntriesForUserImages(input_file)
++ 
++   # Only for devices that retrofit dynamic partitions there're split super
++   # images available in the target_files.zip.
++   rebuild_super = False
++   if OPTIONS.build_super and OPTIONS.put_super:
++     if OPTIONS.retrofit_dap:
++       entries += EntriesForSplitSuperImages(input_file)
++     else:
++       rebuild_super = True
++ 
++   # Any additional entries provided by caller.
++   entries += OPTIONS.additional_entries
++ 
++   CopyZipEntries(input_file, output_file, entries)
++ 
++   if rebuild_super:
++     RebuildAndWriteSuperImages(input_file, output_file)
+  
+  
+  def main(argv):
+diff --cc tools/releasetools/ota_from_target_files.py
+index 2395c76fa,3b68439d8..f05c96dd1
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@@ -78,9 -78,12 +78,18 @@@ Common options that apply to both of no
+        Write a copy of the metadata to a separate file. Therefore, users can
+        read the post build fingerprint without extracting the OTA package.
+  
+++<<<<<<< HEAD
+ +  --board_feature <feature>
+ +      assign board_feature for specific uboot, exmaple: lpddr4-dual-signed,
+ +      (default empty)
+++=======
++   --force_non_ab
++       This flag can only be set on an A/B device that also supports non-A/B
++       updates. Implies --two_step.
++       If set, generate that non-A/B update package.
++       If not set, generates A/B package for A/B device and non-A/B package for
++       non-A/B device.
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+  Non-A/B OTA specific options
+  
+@@@ -239,7 -263,9 +270,13 @@@ OPTIONS.skip_postinstall = Fals
+  OPTIONS.retrofit_dynamic_partitions = False
+  OPTIONS.skip_compatibility_check = False
+  OPTIONS.output_metadata_path = None
+++<<<<<<< HEAD
+ +OPTIONS.board_feature = None
+++=======
++ OPTIONS.disable_fec_computation = False
++ OPTIONS.force_non_ab = False
++ OPTIONS.boot_variable_file = None
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+  
+  METADATA_NAME = 'META-INF/com/android/metadata'
+@@@ -952,45 -805,13 +816,51 @@@ else if get_stage("%(bcb_dev)s") == "3/
+  
+    device_specific.FullOTA_InstallBegin()
+  
+-   system_progress = 0.75
+- 
++   # All other partitions as well as the data wipe use 10% of the progress, and
++   # the update of the system partition takes the remaining progress.
++   system_progress = 0.9 - (len(block_diff_dict) - 1) * 0.1
+    if OPTIONS.wipe_user_data:
+      system_progress -= 0.1
+++<<<<<<< HEAD
+ +  if HasVendorPartition(input_zip):
+ +    system_progress -= 0.1
+ +  if HasProductPartition(input_zip):
+ +    system_progress -= 0.1
+ +
+ +  script.ShowProgress(system_progress, 0)
+ +
+ +  def GetBlockDifference(partition):
+ +    # Full OTA is done as an "incremental" against an empty source image. This
+ +    # has the effect of writing new data from the package to the entire
+ +    # partition, but lets us reuse the updater code that writes incrementals to
+ +    # do it.
+ +    tgt = common.GetUserImage(partition, OPTIONS.input_tmp, input_zip,
+ +                              info_dict=target_info,
+ +                              reset_file_map=True)
+ +    diff = common.BlockDifference(partition, tgt, src=None)
+ +    return diff
+ +
+ +  device_specific_diffs = device_specific.FullOTA_GetBlockDifferences()
+ +  if device_specific_diffs:
+ +    assert all(isinstance(diff, common.BlockDifference)
+ +               for diff in device_specific_diffs), \
+ +        "FullOTA_GetBlockDifferences is not returning a list of " \
+ +        "BlockDifference objects"
+ +
+ +  progress_dict = dict()
+ +  block_diffs = [GetBlockDifference("system")]
+ +  if HasVendorPartition(input_zip):
+ +    block_diffs.append(GetBlockDifference("vendor"))
+ +    progress_dict["vendor"] = 0.1
+ +  if HasProductPartition(input_zip):
+ +     block_diffs.append(GetBlockDifference("product"))
+ +     progress_dict["product"] = 0.1
+ +  if device_specific_diffs:
+ +    block_diffs += device_specific_diffs
+++=======
++   progress_dict = {partition: 0.1 for partition in block_diff_dict}
++   progress_dict["system"] = system_progress
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+    if target_info.get('use_dynamic_partitions') == "true":
+      # Use empty source_info_dict to indicate that all partitions / groups must
+@@@ -1577,95 -1410,13 +1459,44 @@@ def WriteBlockIncrementalOTAPackage(tar
+    target_recovery = common.GetBootableImage(
+        "/tmp/recovery.img", "recovery.img", OPTIONS.target_tmp, "RECOVERY")
+  
+-   # See notes in common.GetUserImage()
+-   allow_shared_blocks = (source_info.get('ext4_share_dup_blocks') == "true" or
+-                          target_info.get('ext4_share_dup_blocks') == "true")
+-   system_src = common.GetUserImage("system", OPTIONS.source_tmp, source_zip,
+-                                    info_dict=source_info,
+-                                    allow_shared_blocks=allow_shared_blocks)
+- 
+-   hashtree_info_generator = verity_utils.CreateHashtreeInfoGenerator(
+-       "system", 4096, target_info)
+-   system_tgt = common.GetUserImage("system", OPTIONS.target_tmp, target_zip,
+-                                    info_dict=target_info,
+-                                    allow_shared_blocks=allow_shared_blocks,
+-                                    hashtree_info_generator=
+-                                    hashtree_info_generator)
+- 
+-   blockimgdiff_version = max(
+-       int(i) for i in target_info.get("blockimgdiff_versions", "1").split(","))
+-   assert blockimgdiff_version >= 3
+- 
+-   # Check the first block of the source system partition for remount R/W only
+-   # if the filesystem is ext4.
+-   system_src_partition = source_info["fstab"]["/system"]
+-   check_first_block = system_src_partition.fs_type == "ext4"
+-   # Disable using imgdiff for squashfs. 'imgdiff -z' expects input files to be
+-   # in zip formats. However with squashfs, a) all files are compressed in LZ4;
+-   # b) the blocks listed in block map may not contain all the bytes for a given
+-   # file (because they're rounded to be 4K-aligned).
+-   system_tgt_partition = target_info["fstab"]["/system"]
+-   disable_imgdiff = (system_src_partition.fs_type == "squashfs" or
+-                      system_tgt_partition.fs_type == "squashfs")
+-   system_diff = common.BlockDifference("system", system_tgt, system_src,
+-                                        check_first_block,
+-                                        version=blockimgdiff_version,
+-                                        disable_imgdiff=disable_imgdiff)
+- 
+-   if HasVendorPartition(target_zip):
+-     if not HasVendorPartition(source_zip):
+-       raise RuntimeError("can't generate incremental that adds /vendor")
+-     vendor_src = common.GetUserImage("vendor", OPTIONS.source_tmp, source_zip,
+-                                      info_dict=source_info,
+-                                      allow_shared_blocks=allow_shared_blocks)
+-     hashtree_info_generator = verity_utils.CreateHashtreeInfoGenerator(
+-         "vendor", 4096, target_info)
+-     vendor_tgt = common.GetUserImage(
+-         "vendor", OPTIONS.target_tmp, target_zip,
+-         info_dict=target_info,
+-         allow_shared_blocks=allow_shared_blocks,
+-         hashtree_info_generator=hashtree_info_generator)
+- 
+-     # Check first block of vendor partition for remount R/W only if
+-     # disk type is ext4
+-     vendor_partition = source_info["fstab"]["/vendor"]
+-     check_first_block = vendor_partition.fs_type == "ext4"
+-     disable_imgdiff = vendor_partition.fs_type == "squashfs"
+-     vendor_diff = common.BlockDifference("vendor", vendor_tgt, vendor_src,
+-                                          check_first_block,
+-                                          version=blockimgdiff_version,
+-                                          disable_imgdiff=disable_imgdiff)
+-   else:
+-     vendor_diff = None
++   block_diff_dict = GetBlockDifferences(target_zip=target_zip,
++                                         source_zip=source_zip,
++                                         target_info=target_info,
++                                         source_info=source_info,
++                                         device_specific=device_specific)
+  
+++<<<<<<< HEAD
+ +  if HasProductPartition(target_zip):
+ +    if not HasProductPartition(source_zip):
+ +      raise RuntimeError("can't generate incremental that adds /product")
+ +    product_src = common.GetUserImage("product", OPTIONS.source_tmp, source_zip,
+ +                                     info_dict=source_info,
+ +                                     allow_shared_blocks=allow_shared_blocks)
+ +    hashtree_info_generator = verity_utils.CreateHashtreeInfoGenerator(
+ +        "product", 4096, target_info)
+ +    product_tgt = common.GetUserImage(
+ +        "product", OPTIONS.target_tmp, target_zip,
+ +        info_dict=target_info,
+ +        allow_shared_blocks=allow_shared_blocks,
+ +        hashtree_info_generator=hashtree_info_generator)
+ +
+ +    # Check first block of product partition for remount R/W only if
+ +    # disk type is ext4
+ +    product_partition = source_info["fstab"]["/product"]
+ +    check_first_block = product_partition.fs_type == "ext4"
+ +    disable_imgdiff = product_partition.fs_type == "squashfs"
+ +    product_diff = common.BlockDifference("product", product_tgt, product_src,
+ +                                         check_first_block,
+ +                                         version=blockimgdiff_version,
+ +                                         disable_imgdiff=disable_imgdiff)
+ +  else:
+ +    product_diff = None
+ +
+ +  AddCompatibilityArchiveIfTrebleEnabled(
+ +      target_zip, output_zip, target_info, source_info)
+++=======
++   CheckVintfIfTrebleEnabled(OPTIONS.target_tmp, target_info)
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+    # Assertions (e.g. device properties check).
+    target_info.WriteDeviceAssertions(script, OPTIONS.oem_no_mount)
+@@@ -1729,16 -1480,11 +1560,22 @@@ else if get_stage("%(bcb_dev)s") != "3/
+    WriteFingerprintAssertion(script, target_info, source_info)
+  
+    # Check the required cache size (i.e. stashed blocks).
+++<<<<<<< HEAD
+ +  size = []
+ +  if system_diff:
+ +    size.append(system_diff.required_cache)
+ +  if vendor_diff:
+ +    size.append(vendor_diff.required_cache)
+ +  if product_diff:
+ +    size.append(product_diff.required_cache)
+ +
+++=======
++   required_cache_sizes = [diff.required_cache for diff in
++                           block_diff_dict.values()]
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+    if updating_boot:
+-     boot_type, boot_device = common.GetTypeAndDevice("/boot", source_info)
++     boot_type, boot_device_expr = common.GetTypeAndDeviceExpr("/boot",
++                                                               source_info)
+      d = common.Difference(target_boot, source_boot)
+      _, _, d = d.ComputePatch()
+      if d is None:
+@@@ -1779,37 -1529,12 +1620,45 @@@ els
+      # Stage 3/3: Make changes.
+      script.Comment("Stage 3/3")
+  
+++<<<<<<< HEAD
+ +  # Verify the existing partitions.
+ +  system_diff.WriteVerifyScript(script, touched_blocks_only=True)
+ +  if vendor_diff:
+ +    vendor_diff.WriteVerifyScript(script, touched_blocks_only=True)
+ +  if product_diff:
+ +    product_diff.WriteVerifyScript(script, touched_blocks_only=True)
+ +
+ +  device_specific_diffs = device_specific.IncrementalOTA_GetBlockDifferences()
+ +  if device_specific_diffs:
+ +    assert all(isinstance(diff, common.BlockDifference)
+ +               for diff in device_specific_diffs), \
+ +        "IncrementalOTA_GetBlockDifferences is not returning a list of " \
+ +        "BlockDifference objects"
+ +    for diff in device_specific_diffs:
+ +      diff.WriteVerifyScript(script, touched_blocks_only=True)
+ +
+++=======
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+    script.Comment("---- start making changes here ----")
+  
+    device_specific.IncrementalOTA_InstallBegin()
+  
+++<<<<<<< HEAD
+ +  block_diffs = [system_diff]
+ +  progress_dict = {"system": 0.7 if vendor_diff and product_diff else 0.8 if vendor_diff or product_diff else 0.9}
+ +  if vendor_diff:
+ +    block_diffs.append(vendor_diff)
+ +    progress_dict["vendor"] = 0.1
+ +  if product_diff:
+ +    block_diffs.append(product_diff)
+ +    progress_dict["product"] = 0.1
+ +
+ +  if device_specific_diffs:
+ +    block_diffs += device_specific_diffs
+++=======
++   progress_dict = {partition: 0.1 for partition in block_diff_dict}
++   progress_dict["system"] = 1 - len(block_diff_dict) * 0.1
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+  
+    if OPTIONS.source_info_dict.get("use_dynamic_partitions") == "true":
+      if OPTIONS.target_info_dict.get("use_dynamic_partitions") != "true":
+@@@ -2338,8 -2101,12 +2290,17 @@@ def main(argv)
+        OPTIONS.skip_compatibility_check = True
+      elif o == "--output_metadata_path":
+        OPTIONS.output_metadata_path = a
+++<<<<<<< HEAD
+ +    elif o == "--board_feature":
+ +      OPTIONS.board_feature = a
+++=======
++     elif o == "--disable_fec_computation":
++       OPTIONS.disable_fec_computation = True
++     elif o == "--force_non_ab":
++       OPTIONS.force_non_ab = True
++     elif o == "--boot_variable_file":
++       OPTIONS.boot_variable_file = a
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+      else:
+        return False
+      return True
+@@@ -2374,7 -2142,9 +2336,13 @@@
+                                   "retrofit_dynamic_partitions",
+                                   "skip_compatibility_check",
+                                   "output_metadata_path=",
+++<<<<<<< HEAD
+ +                                 "board_feature=",
+++=======
++                                  "disable_fec_computation",
++                                  "force_non_ab",
++                                  "boot_variable_file=",
+++>>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+                               ], extra_option_handler=option_handler)
+  
+    if len(args) != 2:
+diff --cc tools/releasetools/sign_target_files_apks.py
+index 0bfb551fe,47360c946..56a0cc50c
+--- a/tools/releasetools/sign_target_files_apks.py
++++ b/tools/releasetools/sign_target_files_apks.py
+@@@ -396,15 -458,11 +458,16 @@@ def ProcessTargetFiles(input_tf_zip, ou
+  
+    for info in input_tf_zip.infolist():
+      filename = info.filename
+ -    if filename.startswith("IMAGES/"):
+ +    if filename.startswith("IMAGES/") \
+ +      and not (filename.startswith("IMAGES/board_info") \
+ +               or filename.startswith("IMAGES/partition-table") \
+ +               or filename.endswith(".sh") \
+ +               or filename.endswith(".bat") \
+ +               or filename.endswith(".imx")):
+        continue
+  
+-     # Skip split super images, which will be re-generated during signing.
++     # Skip OTA-specific images (e.g. split super images), which will be
++     # re-generated during signing.
+      if filename.startswith("OTA/") and filename.endswith(".img"):
+        continue
+  

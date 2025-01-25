@@ -1,0 +1,165 @@
+729ca14581e2 Arthur Chen 2020-08-03
+
+AOS-219: amd64: Add DT source for tlv320aic3110.
+
+Change-Id: I8891bec0645ebd4fa08aa1c281c0f9834bcc6f79
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 71095fb703fd..bcb19db729e6 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -172,6 +172,7 @@ dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_evt-0_evk_evk-0_mic3g.dtb \
+ 			 idt_a300_evt-0_devboard_hdmi-0_ktc2g.dtb \
+ 			 idt_a300_evt-0_devboard_evt-1_ktc2g.dtb \
+ 			 idt_a300_evt-0_devboard_hdmi-1_ktc2g.dtb \
++			 idt_a300_evt-0_devboard_evt-2_ktc2g.dtb \
+ 			 idt_imx8mn_evt-0_evk_rpmsg-0_mic2g.dtb \
+ 			 idt_imx8mn_evt-0_evk_evk-0_mic2g.dtb \
+ 			 idt_a100_evt-0_devboard_evt-0_ktc2g.dtb \
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi
+new file mode 100644
+index 000000000000..d09a76946ba3
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi
+@@ -0,0 +1,120 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * A300 base DTS
++ * Copyright 2019 IDTech
++ */
++
++/dts-v1/;
++
++#include "idt_a300_evt-0_devboard_evt-1.dtsi"
++#include <dt-bindings/sound/tlv320aic31xx-micbias.h>
++
++/delete-node/ &rt5640;
++
++/ {
++/delete-node/ sound-rt5640;
++
++	reg_audio_hp_vdd: fixedregulator-ahvdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "hpvdd_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_audio_spr_vdd: fixedregulator-asrvdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "sprvdd_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_audio_spl_vdd: fixedregulator-aslvdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "splvdd_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_audio_a_vdd: fixedregulator-aavdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "avdd_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_audio_io_vdd: fixedregulator-aiovdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "iovdd_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_audio_d_vdd: fixedregulator-advdd {
++		pinctrl-names = "default";
++		compatible = "regulator-fixed";
++		regulator-name = "dvdd_supply";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	sound-tlv320aic31xx {
++		compatible = "fsl,imx-audio-tlv320aic31xx";
++		model = "tlv320aic3110-audio";
++		audio-cpu = <&sai2>;
++		audio-codec = <&tlv320aic31xx>;
++		audio-routing =
++			"Headphone", "HPL",
++			"Headphone", "HPR",
++			"Speaker", "SPL",
++			"Speaker", "SPR",
++			"AIF OUT", "Headphone Mic",
++			"MIC1RP", "AIF OUT";
++		status = "okay";
++	};
++
++};
++
++&i2c3 {
++	tlv320aic31xx: tlv320aic31xx@18 {
++		compatible = "ti,tlv320aic3110";
++		reg = <0x18>;
++		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
++		clock-names = "mclk";
++		ai31xx-micbias-vg = <MICBIAS_AVDDV>;
++		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
++
++		HPVDD-supply = <&reg_audio_hp_vdd>;
++		SPRVDD-supply = <&reg_audio_spr_vdd>;
++		SPLVDD-supply = <&reg_audio_spl_vdd>;
++		AVDD-supply = <&reg_audio_a_vdd>;
++		IOVDD-supply = <&reg_audio_io_vdd>;
++		DVDD-supply = <&reg_audio_d_vdd>;
++		status = "okay";
++	};
++};
++
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	assigned-clocks = <&clk IMX8MQ_CLK_SAI2>;
++	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++	assigned-clock-rates = <25000000>;
++	clocks = <&clk IMX8MQ_CLK_SAI2_IPG>, <&clk IMX8MQ_CLK_DUMMY>,
++		<&clk IMX8MQ_CLK_SAI2_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
++		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_CLK_25M>,
++		<&clk IMX8MQ_AUDIO_PLL2_OUT>;
++	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
++	status = "okay";
++};
++
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2_ktc2g.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2_ktc2g.dts
+new file mode 100644
+index 000000000000..e4ceca9d63af
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2_ktc2g.dts
+@@ -0,0 +1,15 @@
++/*
++ * Dummy device-tree based om EVK with IDTech ID's
++ *
++ * Copyright 2019 IDTech
++ *
++ */
++
++/dts-v1/;
++
++#include "idt_a300_evt-0_devboard_evt-2.dtsi"
++
++/ {
++	model = "IDTECH A300 EVT-0 DEVBOARD EVT-2";
++	idt,prod-id = "idt_a300_evt-0_devboard_evt-2_ktc2g";
++};

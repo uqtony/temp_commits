@@ -1,0 +1,33 @@
+ef6039c59add Arthur Chen 2020-04-17
+
+driver: video: To show single splashscreen.
+
+Change-Id: If2bc9d515fbad30da7db2c528dbe214bba7240a2
+
+diff --git a/drivers/video/fbdev/core/fbmem.c b/drivers/video/fbdev/core/fbmem.c
+index e7a8f9fb3327..9afa48a234dd 100644
+--- a/drivers/video/fbdev/core/fbmem.c
++++ b/drivers/video/fbdev/core/fbmem.c
+@@ -538,7 +538,7 @@ static int fb_show_logo_line(struct fb_info *info, int rotate,
+ 
+ #ifdef CONFIG_FB_LOGO_EXTRA
+ #ifdef CONFIG_SINGLE_LOGO
+-#define FB_LOGO_EX_NUM_MAX 1 /* To show single splash logo image */
++#define FB_LOGO_EX_NUM_MAX 1 /* To show single extra splash logo image */
+ #else
+ #define FB_LOGO_EX_NUM_MAX 10
+ #endif /* CONFIG_SINGLE_LOGO */
+@@ -682,8 +682,13 @@ int fb_show_logo(struct fb_info *info, int rotate)
+ {
+ 	int y;
+ 
++#ifdef CONFIG_SINGLE_LOGO
++	/* To show single splash logo image */
++	y = fb_show_logo_line(info, rotate, fb_logo.logo, 0, 1);
++#else
+ 	y = fb_show_logo_line(info, rotate, fb_logo.logo, 0,
+ 			      num_online_cpus());
++#endif /* CONFIG_SINGLE_LOGO */
+ 	y = fb_show_extra_logos(info, y, rotate);
+ 
+ 	return y;

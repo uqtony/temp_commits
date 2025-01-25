@@ -1,0 +1,42 @@
+ef4350c0b3 George.Huang 2021-05-19
+
+AOS-580: fix build warnings in persist_idt.c
+
+Error Log:
+  persist_idt.c:117:10: warning: ‘return’ with a value, in function returning void
+  persist_idt.c:196:6: warning: unused variable ‘copy_len’ [-Wunused-variable]
+  persist_idt.c:458:10: warning: implicit declaration of function ‘fuse_prog’;
+  did you mean ‘fdt_setprop’? [-Wimplicit-function-declaration]
+
+Change-Id: I5c7e2c2a7fbe57b20bbc77570879edda39321f8c
+
+diff --git a/lib/persist_idt/persist_idt.c b/lib/persist_idt/persist_idt.c
+index 846cd0f9b4..852f7ec67d 100644
+--- a/lib/persist_idt/persist_idt.c
++++ b/lib/persist_idt/persist_idt.c
+@@ -7,6 +7,7 @@
+ #include <mmc.h>
+ #include <fb_fsl.h>
+ #include <fs.h>
++#include <fuse.h>
+ #include <linux/string.h>
+ #include <linux/ctype.h>
+ #include <persist_idt.h>
+@@ -114,7 +115,7 @@ void read_orientation_bdinfo(void)
+ 	char response[FASTBOOT_RESPONSE_LEN];
+ 	if (bdinfo_read(&bdinfo_data, response, FASTBOOT_RESPONSE_LEN) != 0) {
+ 		printf("Error: bdinfo read failed: %s
+", response);
+-		return NULL;
++		return;
+ 	}
+ 
+ 	init_orientation_data();
+@@ -193,7 +194,6 @@ bool read_orientation_file(void)
+ 
+ 	char *ptr;
+ 	char *value;
+-	int copy_len;
+ 	int index = 0;
+ 
+ 	/* get display count */

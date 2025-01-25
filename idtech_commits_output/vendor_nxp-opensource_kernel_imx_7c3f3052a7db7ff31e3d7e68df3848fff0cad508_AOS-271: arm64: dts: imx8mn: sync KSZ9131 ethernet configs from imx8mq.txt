@@ -1,0 +1,90 @@
+7c3f3052a7db George.Huang 2020-09-01
+
+AOS-271: arm64: dts: imx8mn: sync KSZ9131 ethernet configs from imx8mq
+
+Sync from:
+  commit 28320679d0a6
+  ("AOS-271: arm64: dts: imx8mq: fix ethernet problem by adding KSZ9131 rxc clock delay timing")
+  commit c2516f3d60c2
+  ("AOS-271: arm64: dts: imx8mq: adjust ethernet pin values to lower the error rate")
+
+Symptom:
+  Ethernet RX packet error number is high
+  ping www.google.com will have packet loss
+  browsing web is unstable
+
+Root cause:
+  clock delay timing is not met to entire RGMII system timings
+  (PHY on-chip, PCB trace delay, MAC on-chip)
+
+Solution:
+  define a proper rxc timing delay rxc-skew-psec
+
+Test step:
+  adb root &&
+  adb push ~/Downloads/iperf /data/local/tmp/iperf &&
+  adb shell chmod +x /data/local/tmp/iperf &&
+  adb shell ifconfig eth0 &&
+  adb shell ping -c 30 www.google.com &&
+  adb shell ifconfig eth0 &&
+  adb shell /data/local/tmp/iperf -c 192.168.1.103 -w 100M -t 120 -i 20 &&
+  adb shell ifconfig eth0
+
+  scrcpy & (search youtube and play videos)
+  adb shell ifconfig eth0
+
+Test results:
+  Range of the value -700 to 2400, default value 0.
+  For A100 evt1 devboard: rxc-skew-psec = <900~1200> is acceptable
+  1000: RX packets:629466 errors:0 dropped:0 overruns:0 frame:0
+
+Change-Id: I3cce6352314ad6c9f06aa4c9dc514ecbff93ece8
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 88ae02875b86..efbe9b0e4473 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -324,18 +324,18 @@ pinctrl_fec1: fec1grp {
+ 			fsl,pins = <
+ 				MX8MN_IOMUXC_ENET_MDC_ENET1_MDC		0x3
+ 				MX8MN_IOMUXC_ENET_MDIO_ENET1_MDIO	0x3
+-				MX8MN_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x1f
+-				MX8MN_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x1f
+-				MX8MN_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x1f
+-				MX8MN_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x1f
+-				MX8MN_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x91
+-				MX8MN_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x91
+-				MX8MN_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x91
+-				MX8MN_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x91
+-				MX8MN_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x1f
+-				MX8MN_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x91
+-				MX8MN_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
+-				MX8MN_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
++				MX8MN_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x56
++				MX8MN_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x56
++				MX8MN_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x56
++				MX8MN_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x56
++				MX8MN_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x56
++				MX8MN_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x56
++				MX8MN_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x56
++				MX8MN_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x56
++				MX8MN_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x56
++				MX8MN_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x56
++				MX8MN_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x56
++				MX8MN_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x56
+ 				MX8MN_IOMUXC_SAI2_RXC_GPIO4_IO22	0x19
+ 			>;
+ 		};
+@@ -957,6 +957,12 @@ mdio {
+ 
+ 		ethphy0: ethernet-phy@0 {
+ 			compatible = "ethernet-phy-ieee802.3-c22";
++			rxen-skew-psec = <0>;
++			rxd0-skew-psec = <0>;
++			rxd1-skew-psec = <0>;
++			rxd2-skew-psec = <0>;
++			rxd3-skew-psec = <0>;
++			rxc-skew-psec = <1000>;
+ 			reg = <0>;
+ 			at803x,led-act-blind-workaround;
+ 			at803x,eee-disabled;

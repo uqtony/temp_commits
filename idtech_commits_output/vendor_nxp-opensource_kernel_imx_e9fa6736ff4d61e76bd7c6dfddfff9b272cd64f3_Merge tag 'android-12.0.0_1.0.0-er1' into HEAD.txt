@@ -1,0 +1,215 @@
+e9fa6736ff4d George.Huang 2022-02-23
+
+Merge tag 'android-12.0.0_1.0.0-er1' into HEAD
+
+android-12.0.0_1.0.0-er1
+
+Change-Id: I63b5fb927fad41275017e23795028403b14aeb2d
+
+diff --cc arch/arm64/boot/dts/freescale/imx8mn-evk.dtsi
+index 983a8a145326,ec68efe05d3e..42514d7459db
+--- a/arch/arm64/boot/dts/freescale/imx8mn-evk.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mn-evk.dtsi
+@@@ -28,14 -28,6 +28,17 @@@
+  		reg = <0x0 0x40000000 0 0x80000000>;
+  	};
+  
+++<<<<<<< HEAD
+ +	bt_rfkill {
+ +		compatible = "fsl,mxc_bt_rfkill";
+ +		bt-power-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
+ +		reset-delay-us = <2000>;
+ +		reset-post-delay-ms = <40>;
+ +		status = "okay";
+ +	};
+ +
+++=======
+++>>>>>>> android-12.0.0_1.0.0-er1
+  	ir_recv: ir-receiver {
+  		compatible = "gpio-ir-receiver";
+  		gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+diff --cc arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index 74639f238ddf,0ee680131e45..30f3d24cb849
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@@ -102,23 -102,12 +102,29 @@@
+  		reg = <0x00000000 0x40000000 0 0xc0000000>;
+  	};
+  
+++<<<<<<< HEAD
+ +	reserved-memory {
+ +		#address-cells = <2>;
+ +		#size-cells = <2>;
+ +		ranges;
+ +
+ +		rpmsg_reserved: rpmsg@0xb8000000 {
+ +			no-map;
+ +			reg = <0 0xb8000000 0 0x400000>;
+ +		};
+ +	};
+ +
+ +	bt_rfkill {
+ +		compatible = "fsl,mxc_bt_rfkill";
+ +		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+++=======
++ 	modem_reset: modem-reset {
++ 		compatible = "gpio-reset";
++ 		reset-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+++>>>>>>> android-12.0.0_1.0.0-er1
+  		reset-delay-us = <2000>;
+  		reset-post-delay-ms = <40>;
+ -		#reset-cells = <0>;
+ +		status ="okay";
+  	};
+  
+  	resmem: reserved-memory {
+diff --cc drivers/clk/imx/clk-imx8mq.c
+index 68c9a6ddafd8,90f41750bd89..52ac14b9264b
+--- a/drivers/clk/imx/clk-imx8mq.c
++++ b/drivers/clk/imx/clk-imx8mq.c
+@@@ -632,17 -631,7 +631,21 @@@ static int imx8mq_clocks_probe(struct p
+  	clk_set_parent(hws[IMX8MQ_CLK_CSI2_PHY_REF]->clk, hws[IMX8MQ_SYS2_PLL_1000M]->clk);
+  	clk_set_parent(hws[IMX8MQ_CLK_CSI2_ESC]->clk, hws[IMX8MQ_SYS1_PLL_800M]->clk);
+  
+++<<<<<<< HEAD
+ +	if (of_get_property(np, "display-pre-enable", NULL)) {
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_VIDEO_PLL1]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_VIDEO_PLL1_OUT]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_CLK_DC_PIXEL]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_CLK_LCDIF_PIXEL]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_CLK_DSI_PHY_REF]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_CLK_DSI_AHB]->clk);
+ +		idt_ignore_preenable_unused_clk(hws[IMX8MQ_CLK_DSI_IPG_DIV]->clk);
+ +	}
+ +
+ +	imx_register_uart_clocks();
+++=======
++ 	imx_register_uart_clocks(4);
+++>>>>>>> android-12.0.0_1.0.0-er1
+  
+  	return 0;
+  
+diff --cc drivers/gpu/drm/bridge/Kconfig
+index 2670e5620a4d,1dd8b0f6f4b3..54d9e246b643
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@@ -289,6 -279,12 +292,16 @@@ config DRM_ITE_IT626
+  	help
+  	  ITE IT6263 bridge chip driver.
+  
+++<<<<<<< HEAD
+ +source "drivers/gpu/drm/bridge/sn65dsi83/Kconfig"
+++=======
++ config DRM_ITE_IT6161
++ 	tristate "ITE IT6161 MIPI/HDMI bridge"
++ 	depends on OF
++ 	select DRM_KMS_HELPER
++ 	select REGMAP_I2C
++ 	help
++ 	  ITE IT6161 bridge chip driver.
+++>>>>>>> android-12.0.0_1.0.0-er1
+  
+  endmenu
+diff --cc drivers/gpu/drm/bridge/Makefile
+index 49a233b52e5f,a8420c81f773..c02d2dd8934e
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@@ -30,6 -29,6 +30,7 @@@ obj-y += analogix
+  obj-y += cadence/
+  obj-y += synopsys/
+  obj-$(CONFIG_DRM_ITE_IT6263) += it6263.o
++ obj-$(CONFIG_DRM_ITE_IT6263) += it6161.o
+  obj-$(CONFIG_DRM_SEC_MIPI_DSIM) += sec-dsim.o
+  obj-$(CONFIG_DRM_NXP_SEIKO_43WVFIG) += nxp-seiko-43wvfig.o
+ +obj-$(CONFIG_DRM_I2C_SN65DSI83) += sn65dsi83/
+diff --cc drivers/gpu/drm/bridge/cadence/cdns-dp-core.c
+index d8b96c367e1b,bee452effa9e..1d549904495b
+--- a/drivers/gpu/drm/bridge/cadence/cdns-dp-core.c
++++ b/drivers/gpu/drm/bridge/cadence/cdns-dp-core.c
+@@@ -176,26 -275,29 +275,51 @@@ cdns_dp_connector_detect(struct drm_con
+  	struct cdns_mhdp_device *mhdp = container_of(connector,
+  					struct cdns_mhdp_device, connector.base);
+  	u8 hpd = 0xf;
+++<<<<<<< HEAD
+ +	int count = 0;
+ +
+ +retry:
+ +	hpd = cdns_mhdp_read_hpd(mhdp);
+ +	if (hpd == 1)
+ +		/* Cable Connected */
+ +		return connector_status_connected;
+ +	else if (hpd == 0) {
+ +		if ((connector->status == connector_status_connected) && (count < 10)) {
+ +			msleep(200);
+ +			count++;
+ +			goto retry;
+ +		}
+ +		/* Cable Disconnedted */
+ +		return connector_status_disconnected;
+ +	} else {
+ +		/* Cable status unknown */
+ +		DRM_INFO("Unknow cable status, hdp=%u
+", hpd);
+ +		return connector_status_unknown;
+++=======
++ 	mutex_lock(&mhdp->lock);
++ 	hpd = cdns_mhdp_read_hpd(mhdp);
++ 	mutex_unlock(&mhdp->lock);
++ 	DRM_DEBUG_DRIVER("%s hpd = %d
+", __func__, hpd);
++ 
++ 	if (mhdp->force_disconnected_sts && (hpd == 1)) {
++ 		DRM_DEBUG_DRIVER("Returning disconnect status until ready
+");
++ 		return connector_status_disconnected;
+++>>>>>>> android-12.0.0_1.0.0-er1
+  	}
++ 	if (hpd == 0)
++ 		/* Cable Disconnedted */
++ 		return connector_status_disconnected;
++ 	else if (hpd == 3) {
++ 		/* Cable Connected and seen IRQ*/
++ 		DRM_DEBUG_DRIVER("Warning! Missed HPD IRQ event seen
+");
++ 		return connector_status_connected;
++ 	} else if (hpd == 1)
++ 		/* Cable Connected */
++ 		return connector_status_connected;
++ 
++ 	/* Cable status unknown */
++ 	DRM_DEBUG_DRIVER("Unknown cable status, hdp=%u
+", hpd);
++ 	return connector_status_unknown;
+  }
+  
+  static int cdns_dp_connector_get_modes(struct drm_connector *connector)
+@@@ -331,21 -486,18 +514,28 @@@ static void cdns_dp_bridge_mode_set(str
+  static void cdn_dp_bridge_enable(struct drm_bridge *bridge)
+  {
+  	struct cdns_mhdp_device *mhdp = bridge->driver_private;
++ 	struct drm_connector_state *conn_state = mhdp->connector.base.state;
+  	int ret;
+ +	int count = 0;
+  
+++<<<<<<< HEAD
+ +retry:
+++=======
++ 	mutex_lock(&mhdp->lock);
+++>>>>>>> android-12.0.0_1.0.0-er1
+  	/* Link trainning */
+  	ret = cdns_mhdp_train_link(mhdp);
+  	if (ret) {
+ +		if (count < 20) {
+ +			msleep(500);
+ +			count++;
+ +			goto retry;
+ +		}
+  		DRM_DEV_ERROR(mhdp->dev, "Failed link train %d
+", ret);
++ 		mutex_unlock(&mhdp->lock);
+  		return;
+  	}
++ 	mutex_unlock(&mhdp->lock);
+  
+  	ret = cdns_mhdp_set_video_status(mhdp, CONTROL_VIDEO_VALID);
+  	if (ret) {

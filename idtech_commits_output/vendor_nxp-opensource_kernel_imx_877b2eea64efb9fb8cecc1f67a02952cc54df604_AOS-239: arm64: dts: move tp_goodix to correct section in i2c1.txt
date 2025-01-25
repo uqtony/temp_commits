@@ -1,0 +1,87 @@
+877b2eea64ef George.Huang 2020-07-06
+
+AOS-239: arm64: dts: move tp_goodix to correct section in i2c1
+
+Change-Id: I00512f93313f62ea30c8afb8c397c4cf314ae741
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index e0a7c2449b00..2979db8232c7 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -677,6 +677,38 @@ &i2c1 {
+ 	sda-gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
++	tp_goodix:gt911_mipi1@5d{
++		compatible = "goodix,gt911";
++		reg = <0x5d>;
++		status = "okay";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
++		irq-gpio = <&gpio1 9 IRQ_TYPE_EDGE_RISING>;
++		reset-gpio = <&gpio5 21 GPIO_ACTIVE_HIGH>;
++		irq-flags = <2>;
++
++		touchscreen-max-id = <3>;
++		touchscreen-size-x = <720>;
++		touchscreen-size-y = <1280>;
++		touchscreen-max-w = <512>;
++		touchscreen-max-p = <512>;
++		touchscreen-key-map = <172>, <158>; /*KEY_HOMEPAGE=172, KEY_BACK=158,KEY_MENU=139*/
++
++		goodix,slide-wakeup = <0>;
++		goodix,type-a-report = <0>;
++		goodix,driver-send-cfg = <0>;
++		goodix,resume-in-workqueue = <0>;
++		goodix,int-sync = <1>;
++		goodix,swap-x2y = <0>;
++		goodix,esd-protect = <1>;
++		goodix,auto-update-cfg = <0>;
++		goodix,power-off-sleep = <0>;
++		goodix,pen-suppress-finger = <0>;
++		goodix,cfg-group0 = [
++			53 D0 02 00 05 05 F5 D5 21 48 2D 0F 5A 41 0E 05 00 00 32 32 20 00 05 14 14 1A 14 8B 2B 00
++		];
++	};
++
+ 	pmic: pca9450@25 {
+ 		reg = <0x25>;
+ 		compatible = "nxp,pca9450";
+@@ -791,37 +823,6 @@ ldo5_reg: regulator@10 {
+ 				regulator-max-microvolt = <3300000>;
+ 			};
+ 
+-			tp_goodix:gt911_mipi1@5d{
+-				compatible = "goodix,gt911";
+-				reg = <0x5d>;
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
+-				irq-gpio = <&gpio1 9 IRQ_TYPE_EDGE_RISING>;
+-				reset-gpio = <&gpio5 21 GPIO_ACTIVE_HIGH>;
+-				irq-flags = <2>;
+-
+-				touchscreen-max-id = <3>;
+-				touchscreen-size-x = <720>;
+-				touchscreen-size-y = <1280>;
+-				touchscreen-max-w = <512>;
+-				touchscreen-max-p = <512>;
+-				touchscreen-key-map = <172>, <158>; /*KEY_HOMEPAGE=172, KEY_BACK=158,KEY_MENU=139*/
+-
+-				goodix,slide-wakeup = <0>;
+-				goodix,type-a-report = <0>;
+-				goodix,driver-send-cfg = <0>;
+-				goodix,resume-in-workqueue = <0>;
+-				goodix,int-sync = <1>;
+-				goodix,swap-x2y = <0>;
+-				goodix,esd-protect = <1>;
+-				goodix,auto-update-cfg = <0>;
+-				goodix,power-off-sleep = <0>;
+-				goodix,pen-suppress-finger = <0>;
+-				goodix,cfg-group0 = [
+-					53 D0 02 00 05 05 F5 D5 21 48 2D 0F 5A 41 0E 05 00 00 32 32 20 00 05 14 14 1A 14 8B 2B 00
+-				];
+-			};
+ 		};
+ 	};
+ };

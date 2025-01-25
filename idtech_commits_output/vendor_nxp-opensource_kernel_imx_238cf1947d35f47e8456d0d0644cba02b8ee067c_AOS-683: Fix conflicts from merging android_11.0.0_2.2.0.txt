@@ -1,0 +1,173 @@
+238cf1947d35 George.Huang 2021-07-20
+
+AOS-683: Fix conflicts from merging android_11.0.0_2.2.0
+
+Change-Id: Ib093ccfc28a97646bccde6806194ae54434d8ac2
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index bf755a88b204..e2b9003c00f7 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1280,8 +1280,7 @@ static void clk_disable_unused_subtree(struct clk_core *core)
+ 		clk_core_disable_unprepare(core->parent);
+ }
+ 
+-<<<<<<< HEAD
+-static void __init idt_restore_preenable_unused_flag(struct clk_core *core)
++static void idt_restore_preenable_unused_flag(struct clk_core *core)
+ {
+ 	struct clk_core *child;
+ 
+@@ -1297,10 +1296,7 @@ static void __init idt_restore_preenable_unused_flag(struct clk_core *core)
+ }
+ 
+ 
+-static bool clk_ignore_unused __initdata;
+-=======
+ static bool clk_ignore_unused;
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ static int __init clk_ignore_unused_setup(char *__unused)
+ {
+ 	clk_ignore_unused = true;
+@@ -4573,13 +4569,12 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+ }
+ EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+ 
+-<<<<<<< HEAD
+ void idt_ignore_preenable_unused_clk(struct clk *tarClk)
+ {
+ 	tarClk->core->flags |= IDT_IGNORE_PREENABLE_UNUSED_CLK;
+ 	return;
+ }
+-=======
++
+ struct clk_notifier_devres {
+ 	struct clk *clk;
+ 	struct notifier_block *nb;
+@@ -4615,7 +4610,6 @@ int devm_clk_notifier_register(struct device *dev, struct clk *clk,
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(devm_clk_notifier_register);
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 
+ #ifdef CONFIG_OF
+ static void clk_core_reparent_orphans(void)
+diff --git a/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c b/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
+index 609baf3877de..ffdec26b453d 100644
+--- a/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
++++ b/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
+@@ -346,12 +346,7 @@ static int import_pfn_map(struct um_desc *um,
+ 
+     if (pageCount == pfn_count)
+     {
+-<<<<<<< HEAD
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
+-    && (defined(ARCH_HAS_SG_CHAIN) || defined(CONFIG_ARCH_HAS_SG_CHAIN))
+-=======
+ #if gcdUSE_Linux_SG_TABLE_API
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+         result = sg_alloc_table_from_pages(&um->sgt, pages, pfn_count,
+                         addr & ~PAGE_MASK, pfn_count * PAGE_SIZE, GFP_KERNEL | gcdNOWARN);
+ 
+@@ -371,12 +366,7 @@ static int import_pfn_map(struct um_desc *um,
+ 
+         if (unlikely(result != um->sgt.nents))
+         {
+-<<<<<<< HEAD
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
+-    && (defined(ARCH_HAS_SG_CHAIN) || defined(CONFIG_ARCH_HAS_SG_CHAIN))
+-=======
+ #if gcdUSE_Linux_SG_TABLE_API
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+             sg_free_table(&um->sgt);
+ #else
+             kfree(um->sgt.sgl);
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 779af164607f..9920392466d8 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -2742,49 +2742,6 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 			goto err_ret;
+ 		}
+ 		pci_imx_set_msi_en(&imx6_pcie->pci->pp);
+-<<<<<<< HEAD
+-
+-		/*
+-		 * If the L1SS is enabled, disable the over ride after link up.
+-		 * Let the CLK_REQ# controlled by HW L1SS automatically.
+-		 */
+-		ret = ((imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS) && !imx6_pcie->l1ss_support_disabled);
+-		if (IS_ENABLED(CONFIG_PCIEASPM_POWER_SUPERSAVE) && (ret > 0)) {
+-			switch (imx6_pcie->drvdata->variant) {
+-			case IMX8MQ:
+-			case IMX8MM:
+-			case IMX8MP:
+-			case IMX8MQ_EP:
+-			case IMX8MM_EP:
+-			case IMX8MP_EP:
+-				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+-					imx6_pcie_grp_offset(imx6_pcie),
+-					IMX8MQ_GPR_PCIE_CLK_REQ_OVERRIDE_EN,
+-					0);
+-				break;
+-			case IMX8QXP:
+-			case IMX8QXP_EP:
+-				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+-					IMX8QM_CSR_MISC_OFFSET,
+-					IMX8QM_MISC_CLKREQ_OVERRIDE_EN_1,
+-					0);
+-				break;
+-			case IMX8QM:
+-			case IMX8QM_EP:
+-				if (imx6_pcie->controller_id)
+-					reg = IMX8QM_MISC_CLKREQ_OVERRIDE_EN_1;
+-				else
+-					reg = IMX8QM_MISC_CLKREQ_OVERRIDE_EN_0;
+-				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+-					IMX8QM_CSR_MISC_OFFSET,
+-					reg, 0);
+-				break;
+-			default:
+-				break;
+-			};
+-		}
+-=======
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 		break;
+ 	case DW_PCIE_EP_TYPE:
+ 		if (!IS_ENABLED(CONFIG_PCI_IMX_EP))
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index b0002b578c21..ea53ac510873 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -1713,11 +1713,7 @@ int rproc_trigger_recovery(struct rproc *rproc)
+ 	/* load firmware */
+ 	if (!rproc->autonomous) {
+ 		/* generate coredump */
+-<<<<<<< HEAD
+-		rproc_coredump(rproc);
+-=======
+ 		rproc->ops->coredump(rproc);
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 
+ 		ret = request_firmware(&firmware_p, rproc->firmware, dev);
+ 		if (ret < 0) {
+diff --git a/drivers/video/fbdev/core/fbcon.c b/drivers/video/fbdev/core/fbcon.c
+index 85dbb19187c9..eddfd5e7beeb 100644
+--- a/drivers/video/fbdev/core/fbcon.c
++++ b/drivers/video/fbdev/core/fbcon.c
+@@ -1366,13 +1366,10 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
+ 
+ 	ops->cursor_flash = (mode == CM_ERASE) ? 0 : 1;
+ 
+-<<<<<<< HEAD
+-#if CONSOLE_CURSOR_SHOWING
+-=======
+ 	if (!ops->cursor)
+ 		return;
+ 
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
++#if CONSOLE_CURSOR_SHOWING
+ 	ops->cursor(vc, info, mode, get_color(vc, info, c, 1),
+ 		    get_color(vc, info, c, 0));
+ #endif /* CONSOLE_CURSOR_SHOWING */

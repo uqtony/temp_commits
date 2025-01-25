@@ -1,0 +1,131 @@
+6607d5b5c25e jay deng 2021-01-07
+
+AOS-420: Do not disable unused clock when clock is pre-enable
+
+Do not disable unused clock when clock is pre-enable in uboot
+and clock flag is set as IDT_IGNORE_PREENABLE_UNUSED_CLK.
+Skip disable step and restore flag.
+
+Change-Id: I7c75b2bc8b2fa0fda61b0f40fcf573f7c8819ad4
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 1bdbf9b384a5..f3c4dc0baefa 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1202,6 +1202,10 @@ static void clk_unprepare_unused_subtree(struct clk_core *core)
+ 	hlist_for_each_entry(child, &core->children, child_node)
+ 		clk_unprepare_unused_subtree(child);
+ 
++	if (core->flags & IDT_IGNORE_PREENABLE_UNUSED_CLK) {
++		return;
++	}
++
+ 	if (dev_has_sync_state(core->dev) &&
+ 	    !(core->flags & CLK_DONT_HOLD_STATE))
+ 		return;
+@@ -1237,6 +1241,10 @@ static void clk_disable_unused_subtree(struct clk_core *core)
+ 	hlist_for_each_entry(child, &core->children, child_node)
+ 		clk_disable_unused_subtree(child);
+ 
++	if (core->flags & IDT_IGNORE_PREENABLE_UNUSED_CLK) {
++		return;
++	}
++
+ 	if (dev_has_sync_state(core->dev) &&
+ 	    !(core->flags & CLK_DONT_HOLD_STATE))
+ 		return;
+@@ -1277,6 +1285,22 @@ static void clk_disable_unused_subtree(struct clk_core *core)
+ 		clk_core_disable_unprepare(core->parent);
+ }
+ 
++static void idt_restore_preenable_unused_flag(struct clk_core *core)
++{
++	struct clk_core *child;
++
++	lockdep_assert_held(&prepare_lock);
++
++	hlist_for_each_entry(child, &core->children, child_node)
++		idt_restore_preenable_unused_flag(child);
++
++	if (core->flags & IDT_IGNORE_PREENABLE_UNUSED_CLK) {
++		core->flags &= ~IDT_IGNORE_PREENABLE_UNUSED_CLK;
++		return;
++	}
++}
++
++
+ static bool clk_ignore_unused;
+ static int __init clk_ignore_unused_setup(char *__unused)
+ {
+@@ -1308,6 +1332,12 @@ static int clk_disable_unused(void)
+ 	hlist_for_each_entry(core, &clk_orphan_list, child_node)
+ 		clk_unprepare_unused_subtree(core);
+ 
++	hlist_for_each_entry(core, &clk_root_list, child_node)
++		idt_restore_preenable_unused_flag(core);
++
++	hlist_for_each_entry(core, &clk_orphan_list, child_node)
++		idt_restore_preenable_unused_flag(core);
++
+ 	clk_prepare_unlock();
+ 
+ 	return 0;
+@@ -4306,6 +4336,12 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+ }
+ EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+ 
++void idt_ignore_preenable_unused_clk(struct clk *tarClk)
++{
++	tarClk->core->flags |= IDT_IGNORE_PREENABLE_UNUSED_CLK;
++	return;
++}
++
+ #ifdef CONFIG_OF
+ static void clk_core_reparent_orphans(void)
+ {
+diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
+index 4842298643f5..b013dd89baab 100644
+--- a/drivers/clk/imx/clk-imx8mq.c
++++ b/drivers/clk/imx/clk-imx8mq.c
+@@ -619,6 +619,16 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
+ 	clk_set_parent(clks[IMX8MQ_CLK_CSI2_PHY_REF], clks[IMX8MQ_SYS2_PLL_1000M]);
+ 	clk_set_parent(clks[IMX8MQ_CLK_CSI2_ESC], clks[IMX8MQ_SYS1_PLL_800M]);
+ 
++	if (of_get_property(np, "display-pre-enable", NULL)) {
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_VIDEO_PLL1]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_VIDEO_PLL1_OUT]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_CLK_DC_PIXEL]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_CLK_LCDIF_PIXEL]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_CLK_DSI_PHY_REF]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_CLK_DSI_AHB]);
++		idt_ignore_preenable_unused_clk(clks[IMX8MQ_CLK_DSI_IPG_DIV]);
++	}
++
+ 	imx_register_uart_clocks();
+ 
+ 	return 0;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 27ecad959aa4..0d728902a728 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -35,6 +35,9 @@
+ #define CLK_SET_PARENT_NOCACHE	BIT(14) /* do not use the cached clk parent */
+ #define CLK_DONT_HOLD_STATE	BIT(15) /* Don't hold state */
+ 
++/* IDT Continuous splash feature, ignore pre-enable but status is unused clock */
++#define IDT_IGNORE_PREENABLE_UNUSED_CLK	BIT(16)
++
+ struct clk;
+ struct clk_hw;
+ struct clk_core;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index 18b7b95a8253..b78704ea48b6 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -982,4 +982,6 @@ static inline struct clk *of_clk_get_from_provider(struct of_phandle_args *clksp
+ }
+ #endif
+ 
++void idt_ignore_preenable_unused_clk(struct clk *tarClk);
++
+ #endif

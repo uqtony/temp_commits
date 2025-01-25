@@ -1,0 +1,64 @@
+8047b69357 George.Huang 2021-08-09
+
+AOS-678: extend meminfo to hold at most 61 memory timings
+
+- Preconditions:
+  mem_info.img size is limited to 1024K
+  1 timing data body costs 16.5K
+  1 timing data header costs 88 bytes
+
+- Summary:
+  mem_info.img at most contains 61 timing data and 1 header structure
+  max No. of timing data: 1024K/16.5K=62
+  size of header struct : (62-1)*88/1024=5.2K -> 6K (=12 blocks)
+
+- Layout of mem_info.img:
+  |<header>|<timing-01>|<timing-02>|...|<timing-61>|<zeros>|
+  |<  6K  >|<  16.5K  >|<  16.5K  >|...|<  16.5K  >|<zeros>|
+  |<                       1024K                          >|
+
+Change-Id: I8ed0999fa032e6b79b98055df8960061feefc50d
+
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index 4a04ed5308..40aa529ac3 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -92,7 +92,7 @@ unsigned int get_misc_ab_info(struct blk_desc *dev_desc)
+ 		return MEM_INFO_B_BASE;
+ 	} else {
+ #if _DEBUG_IDT_DDR
+-		printf("IDT: slot A priority: %d, slot B priority: %d
+", p_abdata->slots[0].priority, p_abdata->slots[1].priority);
++		printf("IDT: slot A priority: %d, slot B priority: %d
+", p_abdata->slot_info[0].priority, p_abdata->slot_info[1].priority);
+ #endif
+ 		printf("using slot a
+");
+ 		return MEM_INFO_A_BASE;
+@@ -105,10 +105,11 @@ unsigned int read_mem_root_block(struct blk_desc *dev_desc, unsigned int root_hd
+ 	struct idt_mem_root* p_root = NULL;
+ 	struct BoardInfoData* p_bdinfo = NULL;
+ 	char bdinfo[IDT_BLOCK_SIZE] = "";
+-	char root_buf[IDT_BLOCK_SIZE*2] = "";
++	char root_buf[IDT_BLOCK_SIZE*HEADER_BLOCK_NUM] = "";
+ 	blk_dread(dev_desc, BDINFO_BLOCK_BASE, 1, (void *) bdinfo);
+-	blk_dread(dev_desc, root_hdr_off, 1, (void *) root_buf);
+-	blk_dread(dev_desc, root_hdr_off + 1, 1, (void *) root_buf + IDT_BLOCK_SIZE);
++	for (int i = 0; i < HEADER_BLOCK_NUM; i++) {
++		blk_dread(dev_desc, root_hdr_off + i, 1, (void *) root_buf + IDT_BLOCK_SIZE * i);
++	}
+ 	p_root = (struct idt_mem_root*)root_buf;
+ 	p_bdinfo = (struct BoardInfoData*)bdinfo;
+ 
+diff --git a/include/idt_ddr_select.h b/include/idt_ddr_select.h
+index 9f126b33dc..3c98c8013c 100644
+--- a/include/idt_ddr_select.h
++++ b/include/idt_ddr_select.h
+@@ -25,6 +25,7 @@
+ #define MMC_BOOTDEV 0
+ #endif
+ 
++#define HEADER_BLOCK_NUM 12
+ #define IDT_BLOCK_SIZE  512
+ #define BDINFO_BLOCK_BASE 16384   // board_info start from emmc: 8M
+ #define MEM_INFO_A_BASE 20480 // mem_info start from emmc: 10M

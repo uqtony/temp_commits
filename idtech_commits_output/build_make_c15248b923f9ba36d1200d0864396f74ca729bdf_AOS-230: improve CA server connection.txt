@@ -1,0 +1,114 @@
+c15248b92 owen.wen 2020-06-18
+
+AOS-230: improve CA server connection
+
+using python ssl connection module to save 2 seconds delay of bash script
+
+Change-Id: Id0d8b2bd61920198f47218a5d2b261837906d569
+
+diff --git a/tools/releasetools/CA_sign_data.py b/tools/releasetools/CA_sign_data.py
+new file mode 100755
+index 000000000..783722a09
+--- /dev/null
++++ b/tools/releasetools/CA_sign_data.py
+@@ -0,0 +1,63 @@
++#! /usr/bin/env python
++import socket
++import ssl
++import sys, getopt
++
++HOST, PORT = '99.93.153.229', 7001
++CAID1 = 'Admin1'
++CAID2 = 'Admin2'
++CAPS1 = 'idtech'
++CAPS2 = 'idtech'
++CACA = 'ID TECH PKI TEST'
++CIPHER = 'DHE-RSA-AES256-GCM-SHA384'
++BUF_SIZE = 1280 # just a buffer, 1280 is big enough
++
++def sign_data(RT, RF, PEM):
++  # CREATE SOCKET
++  sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++  sock.settimeout(3)
++
++  # WRAP SOCKET
++  wrappedSocket = ssl.wrap_socket(sock, certfile=PEM, ssl_version=ssl.PROTOCOL_TLSv1_2, ciphers=CIPHER)
++
++  # CONNECT AND PRINT REPLY
++  wrappedSocket.connect((HOST, PORT))
++  wrappedSocket.send('[AORKLO;DA'+CAID1+';CH'+CAPS1+']')
++  wrappedSocket.recv(BUF_SIZE)
++  wrappedSocket.send('[AORKLO;DA'+CAID2+';CH'+CAPS2+']')
++  wrappedSocket.recv(BUF_SIZE)
++  wrappedSocket.send('[AORKGS;CA'+CACA+';RT'+RT+';RF'+RF+';HS1;RG4;ZA1]')
++  ret = wrappedSocket.recv(BUF_SIZE)
++
++  # CLOSE SOCKET CONNECTION
++  wrappedSocket.close()
++
++  return ret[10:-2]
++
++def print_help():
++  print sys.argv[0] + ' -k <key name> -d <data to sign hex format> -p <PEM of CA server>'
++
++def main(argv):
++  RT = ''
++  RF = ''
++  PEM = ''
++  try:
++     opts, args = getopt.getopt(argv,"hk:d:p:",["key=","data=", "pem="])
++  except getopt.GetoptError:
++     print_help()
++     sys.exit(2)
++  for opt, arg in opts:
++     if opt == '-h':
++        print_help()
++        sys.exit()
++     elif opt in ("-k", "--key"):
++        RT = arg
++     elif opt in ("-d", "--data"):
++        RF = arg
++     elif opt in ("-p", "--pem"):
++        PEM = arg
++  signed_data = sign_data(RT, RF, PEM)
++  print signed_data
++
++if __name__ == "__main__":
++   main(sys.argv[1:])
+diff --git a/tools/releasetools/dump_apks_to_sign.sh b/tools/releasetools/dump_apks_to_sign.sh
+index 19367412a..f0a1f789e 100755
+--- a/tools/releasetools/dump_apks_to_sign.sh
++++ b/tools/releasetools/dump_apks_to_sign.sh
+@@ -5,18 +5,13 @@ argv=$1
+ apkcerts=$2
+ apkzippath=$3
+ CAcert=$4
++CA_sign_data=$(dirname $(readlink -e $0))/CA_sign_data.py
+ 
+ APKSIGNER="out/host/linux-x86/bin/apksigner"
+ DER_PATH="device/idtech/common/security/IDT_CA_TESTING"
+ FAKEKS="$DER_PATH/fake.keystore"
+ KSPASS="testtest"
+ SIG_SIZE=512
+-CA_SERVER="99.93.153.229:7001"
+-CAID1="Admin1"
+-CAID2="Admin2"
+-CAPS1="idtech"
+-CAPS2="idtech"
+-CACA="ID TECH PKI TEST"
+ 
+ dump_apks_to_sign() {
+     # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.$USER_NAME/META/apkcerts.txt
+@@ -167,7 +162,7 @@ send_to_server() {
+                 while [ "$size" != "$SIG_SIZE" ]
+                 do
+                     set +e
+-                    value=$(timeout 2s openssl s_client -connect $CA_SERVER -cert $CACERT -ign_eof <<< $"[AORKLO;DA$CAID1;CH$CAPS1]
+[AORKLO;DA$CAID2;CH$CAPS2]
+[AORKGS;CA$CACA;RT$RT;RF$hex;HS1;RG4;ZA1]
+
+")
++                    value=$($CA_sign_data -k "$RT" -d "$hex" -p "$CACERT")
+                     set -e
+                     searchstring="RH"
+                     signature=${value#*$searchstring}

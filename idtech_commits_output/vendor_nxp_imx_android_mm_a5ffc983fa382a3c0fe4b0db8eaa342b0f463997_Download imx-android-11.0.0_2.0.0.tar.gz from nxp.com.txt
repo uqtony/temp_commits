@@ -1,0 +1,2109 @@
+a5ffc98 jenkins 2021-04-23
+
+Download imx-android-11.0.0_2.0.0.tar.gz from nxp.com
+
+Change-Id: Idbb33561fe5e792f35e07fb2c489077467f9243c
+
+diff --git a/codec2/Android.bp b/codec2/Android.bp
+index 628966b..56b7a46 100644
+--- a/codec2/Android.bp
++++ b/codec2/Android.bp
+@@ -31,6 +31,10 @@ imx_codec2_defaults {
+     name: "imx_codec2_default",
+ }
+ 
++imx_mm_common_defaults {
++    name: "imx_mm_common_default",
++}
++
+ bootstrap_go_package {
+     name: "soong-codec2",
+     pkgPath: "android/soong/vendor/nxp/imx_android_mm/codec2",
+diff --git a/codec2/audio_dec/common/AudioDecodeUtil.h b/codec2/audio_dec/common/AudioDecodeUtil.h
+index 3d9c243..3b3c43b 100755
+--- a/codec2/audio_dec/common/AudioDecodeUtil.h
++++ b/codec2/audio_dec/common/AudioDecodeUtil.h
+@@ -20,8 +20,12 @@ struct UniaDecFrameInfo;
+ 
+ class AudioDecodeUtil {
+     public:
+-        AudioDecodeUtil():mFrameInput(false){
+-            logLevel = property_get_int32("media.log.level", 0);
++        AudioDecodeUtil():
++            wrapperLibName(nullptr),
++            optionalWrapperLibName(nullptr),
++            mFrameInput(false)
++        {
++            logLevel = property_get_int32("vendor.media.log.level", 0);
+         };
+         virtual c2_status_t getLibName(const char ** lib, const char ** optionalLib) = 0;
+         virtual uint32_t getFrameHdrBufLen(){ return 0;};
+diff --git a/codec2/audio_dec/common/AudioTSManager.cpp b/codec2/audio_dec/common/AudioTSManager.cpp
+index 3065d71..37e452d 100644
+--- a/codec2/audio_dec/common/AudioTSManager.cpp
++++ b/codec2/audio_dec/common/AudioTSManager.cpp
+@@ -28,7 +28,7 @@ AudioTSManager::AudioTSManager()
+     TotalConsumeLen = 0;
+     TotalReceivedLen = 0;
+     nOneByteTime = 0;
+-    logLevel = property_get_int32("media.log.level", 0);
++    logLevel = property_get_int32("vendor.media.log.level", 0);
+ }
+ 
+ AUDIO_TS_MANAGER_ERRORTYPE AudioTSManager::Create()
+diff --git a/codec2/audio_dec/common/IMXAudioDecComponent.cpp b/codec2/audio_dec/common/IMXAudioDecComponent.cpp
+index 62713e0..641b41d 100644
+--- a/codec2/audio_dec/common/IMXAudioDecComponent.cpp
++++ b/codec2/audio_dec/common/IMXAudioDecComponent.cpp
+@@ -19,18 +19,40 @@
+ 
+ namespace android {
+ 
++static void fillEmptyWork(const std::unique_ptr<C2Work> &work) {
++    work->worklets.front()->output.buffers.clear();
++    work->worklets.front()->output.ordinal = work->input.ordinal;
++    work->workletsProcessed = 1u;
++}
++
++
+ IMXAudioDecComponent::IMXAudioDecComponent(const std::shared_ptr<C2ComponentInterface> &intf)
+ : IMXC2ComponentBase(intf),
++    bDecoderEOS(false),
++    nPushModeInputLen(0),
++    nRingBufferScale(0),
++    TS_PerFrame(0),
++    nRequiredSize(0),
++    nOutputBitPerSample(16),
+     bConvertEnable(true),
+     ePlayMode(DEC_FILE_MODE),
++    bReceivedEOS(false),
++    mTimestampDelta(0),
++    mDecodeEachInput(false),
++    bCheckFrameHeader(false),
++    bCodecInit(false),
++    bDecoderInitFail(false),
++    bFirstInBuffer(true),
+     pConvertBuffer(nullptr),
++    nConvertBufferSize(200000),
+     bFirstOutput(true),
+     fpOutput(nullptr),
+     frameIndex(0),
+     bInitFlag(false)
+ {
++    memset(&PcmMode, 0, sizeof(PcmMode));
++    logLevel = property_get_int32("vendor.media.log.level", 0);
+     LOGV("entry %p", this);
+-    logLevel = property_get_int32("media.log.level", 0);
+ }
+ 
+ IMXAudioDecComponent::~IMXAudioDecComponent()
+@@ -75,7 +97,7 @@ c2_status_t IMXAudioDecComponent::onInit()
+     nConvertBufferSize = 200000;
+     bCheckFrameHeader = false;
+     mTimestampDelta = 0;
+-    mDecodeEachInput = 0;
++    mDecodeEachInput = false;
+     if(bConvertEnable){
+         pConvertBuffer = (uint8_t *)malloc(nConvertBufferSize);
+     }
+@@ -136,6 +158,7 @@ c2_status_t IMXAudioDecComponent::onFlush_sm()
+     bDecoderEOS = false;
+     bFirstOutput = true;
+     bCheckFrameHeader = false;
++    mDecodeEachInput = false;
+     mTimestampDelta = 0;
+     AudioRingBuffer.BufferReset();
+     TS_Manager.Reset();
+@@ -163,6 +186,11 @@ void IMXAudioDecComponent::processWork(const std::unique_ptr<C2Work> &work)
+     //    return;
+     //}
+ 
++    if (bDecoderEOS)
++    {
++        return fillEmptyWork(work);
++    }
++
+     _processInputFlag(work);
+     if(work->workletsProcessed == 1u){
+         LOGV("processWork done after _processInputFlag");
+@@ -197,15 +225,11 @@ void IMXAudioDecComponent::processWork(const std::unique_ptr<C2Work> &work)
+     LOGV("playMode %s, nRequiredSize %d, nPushModeInputLen %d, result threshold %d",
+         (ePlayMode == DEC_FILE_MODE)?"file":"stream", nRequiredSize, nPushModeInputLen, threshold);
+ 
+-    if ((AudioRingBuffer.AudioDataLen() < threshold && bReceivedEOS == false)
+-        || bDecoderEOS == true)
++    if (AudioRingBuffer.AudioDataLen() < threshold && bReceivedEOS == false)
+     {
+-        LOGV("RingBuffer data is not enough or DecoderEOS true, skip decoding.
+");
++        LOGV("RingBuffer data is not enough, skip decoding.
+");
+         work->worklets.front()->output.flags = work->input.flags;
+-        work->worklets.front()->output.ordinal = work->input.ordinal;
+-        work->worklets.front()->output.buffers.clear();
+-        work->workletsProcessed = 1u;
+-        return;
++        return fillEmptyWork(work);
+     }
+ 
+     // this seems just for aac, need to move into UniaDecoder or AacDecodeUtil
+@@ -226,7 +250,11 @@ void IMXAudioDecComponent::processWork(const std::unique_ptr<C2Work> &work)
+         LOGE("_processOutput fail ret %d", ret);
+     }
+ 
+-    work->worklets.front()->output.flags = work->input.flags;
++    uint32_t flags = work->input.flags;
++    if (bDecoderEOS)
++        flags |= C2FrameData::FLAG_END_OF_STREAM;
++
++    work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
+     work->workletsProcessed = 1u;
+ 
+     LOGV("return input work: flags 0x%x, Processed %d", work->worklets.front()->output.flags, work->workletsProcessed);
+@@ -320,9 +348,9 @@ c2_status_t IMXAudioDecComponent::_processInputData(const std::unique_ptr<C2Work
+     size_t size = 0;
+ 
+     if(ePlayMode == DEC_STREAM_MODE && nRequiredSize > 0 && AudioRingBuffer.AudioDataLen() > nRequiredSize){
+-        LOGV("don't handle this input becauseof stream mode");
+-        // need modify for codec2
+-        return ret;
++        //LOGV("don't handle this input becauseof stream mode");
++        //need modify for codec2
++        //return ret;
+     }
+ 
+     if (!work->input.buffers.empty()) {
+@@ -333,6 +361,7 @@ c2_status_t IMXAudioDecComponent::_processInputData(const std::unique_ptr<C2Work
+ 
+     /** Process audio data */
+     if(size > 0 && pBuffer != nullptr){
++        (void)parseInputFrame(pBuffer, size);
+         AudioRingBuffer.BufferAdd(pBuffer, size,  &nActualLen);
+         LOGV("add input %zu to ringBuffer, %d added, total %d",  size, nActualLen, AudioRingBuffer.AudioDataLen());
+         /*
+@@ -349,7 +378,7 @@ c2_status_t IMXAudioDecComponent::_processInputData(const std::unique_ptr<C2Work
+     //if(nActualLen > 0)
+     //    _fileDump(&fpOutput, pBuffer, nActualLen);
+ 
+-    if (nActualLen < size)
++    if (pBuffer != nullptr && nActualLen < size)
+     {
+         LOGW("ringbuffer full! added %d, expect %zu, total %d", nActualLen, size, AudioRingBuffer.AudioDataLen());
+         uint32_t left = size - nActualLen;
+@@ -592,19 +621,12 @@ c2_status_t IMXAudioDecComponent::_processOutput(const std::unique_ptr<C2Work> &
+ 
+ void IMXAudioDecComponent::_fileDump(FILE** ppFp, uint8_t * pBits, uint32_t nSize)
+ {
+-    static const char * fileName = "/data/audioComp.bit";
++    static const char * const fileName = "/data/audioComp.bit";
+     if(nSize==0)
+         return;
+ 
+     if(*ppFp==nullptr)
+     {
+-        // dump to file only when this file doesn't exist
+-        // avoid dumping file everytime playing
+-        // remove this file before you want to dump data
+-        struct stat sb;
+-        if (stat(fileName, &sb) != -1)
+-            return;
+-
+         *ppFp=fopen(fileName,"wb");
+         if(*ppFp==nullptr)
+         {
+@@ -621,17 +643,10 @@ void IMXAudioDecComponent::_fileDump(FILE** ppFp, uint8_t * pBits, uint32_t nSiz
+ 
+ void IMXAudioDecComponent::_fileDump(FILE** ppFp, const std::unique_ptr<C2Work> &work)
+ {
+-    static const char * fileName = "/data/audioComp.bit";
++    static const char * const fileName = "/data/audioComp.bit";
+ 
+     if(*ppFp==nullptr)
+     {
+-        // dump to file only when this file doesn't exist
+-        // avoid dumping file everytime playing
+-        // remove this file before you want to dump data
+-        struct stat sb;
+-        if (stat(fileName, &sb) != -1)
+-            return;
+-
+         *ppFp=fopen(fileName,"wb");
+         if(*ppFp==nullptr)
+         {
+diff --git a/codec2/audio_dec/common/IMXAudioDecComponent.h b/codec2/audio_dec/common/IMXAudioDecComponent.h
+index 8ef1fd5..777d366 100644
+--- a/codec2/audio_dec/common/IMXAudioDecComponent.h
++++ b/codec2/audio_dec/common/IMXAudioDecComponent.h
+@@ -79,6 +79,7 @@ protected:
+     virtual c2_status_t handleEOS(uint8_t **ppBuffer, uint32_t* length) { return C2_OK; };
+     virtual c2_status_t handleBOS(uint32_t* offset, uint32_t length) { return C2_OK; };
+     virtual c2_status_t getParamDirectly() { return C2_OK; };
++    virtual c2_status_t parseInputFrame(uint8_t * pBuf, size_t size) = 0;
+ 
+     RingBuffer AudioRingBuffer;
+     bool       bDecoderEOS;
+@@ -95,7 +96,7 @@ protected:
+     AudioTSManager TS_Manager;
+     bool bReceivedEOS;
+     int64_t mTimestampDelta;
+-    uint32_t mDecodeEachInput;
++    bool mDecodeEachInput;
+     int32_t logLevel;
+ 
+     std::queue<int> mFrameLenQueue;
+diff --git a/codec2/audio_dec/common/RingBuffer.cpp b/codec2/audio_dec/common/RingBuffer.cpp
+index 72df359..3d6a1b8 100644
+--- a/codec2/audio_dec/common/RingBuffer.cpp
++++ b/codec2/audio_dec/common/RingBuffer.cpp
+@@ -31,7 +31,7 @@ RingBuffer::RingBuffer()
+ 	Begin = NULL;
+ 	End = NULL;
+ 	Consumered = NULL;
+-	logLevel = property_get_int32("media.log.level", 0);
++	logLevel = property_get_int32("vendor.media.log.level", 0);
+ }
+ 
+ RINGBUFFER_ERRORTYPE RingBuffer::BufferCreate(uint32_t nPushModeLen, uint32_t nRingBufferScale)
+diff --git a/codec2/audio_dec/common/UniaDecoder.cpp b/codec2/audio_dec/common/UniaDecoder.cpp
+index df40f4e..084bdef 100755
+--- a/codec2/audio_dec/common/UniaDecoder.cpp
++++ b/codec2/audio_dec/common/UniaDecoder.cpp
+@@ -130,21 +130,26 @@ static void * appLocalReAlloc (void *MemoryBlock, uint32 TotalSize)
+ }
+ UniaDecoder::UniaDecoder(const std::shared_ptr<C2ComponentInterface> &intf, AudioDecodeUtil *pDecodeUtil)
+     : IMXAudioDecComponent(intf),
+-      mUtil(pDecodeUtil)
++        mLibHandle(nullptr),
++        mWrapper(nullptr),
++        mWrapperHandle(nullptr),
++        mUtil(pDecodeUtil),
++        errorCount(0),
++        profileErrorCount(0),
++        consumeFrameCount(0),
++        inputFrameCount(0),
++        accumulatedOutputLen(0),
++        inputBufferCount(0),
++        framedInputBufferCount(0)
+ {
+     LOGV("entry %p", this);
+     nPushModeInputLen = mUtil->getPushModeInputLen();
+     nRingBufferScale = RING_BUFFER_SCALE;
+ 
+-    //these values must be reset by subclass
+-    errorCount = 0;
+-    profileErrorCount = 0;
+-
+-    accumulatedOutputLen = 0;
+-    mWrapper = nullptr;
+-    mWrapperHandle = nullptr;
+-    mLibHandle = nullptr;
++    memset(&memOps, 0, sizeof(memOps));
+     codecConfig.buf = nullptr;
++    codecConfig.size = 0;
++    memset(&channelTable, 0, sizeof(channelTable));
+ 
+     mDecodeEachInput = 0;
+ }
+@@ -196,6 +201,8 @@ c2_status_t UniaDecoder::doInit()
+     errorCount = 0;
+     profileErrorCount = 0;
+     mWrapperHandle = nullptr;
++    inputBufferCount = 0;
++    framedInputBufferCount = 0;
+ 
+     do{
+         LOGI("SetupWrapper %s
+", mWrapper->GetVersionInfo());
+@@ -240,7 +247,7 @@ c2_status_t UniaDecoder::handleBOS(uint32_t* offset, uint32_t length)
+ 
+     if (off2 > off1) {
+         // need adjust timestamp because handleBOS cut samples from this buffer
+-        uint64_t bitrate = PcmMode.nChannels*PcmMode.nSamplingRate*nOutputBitPerSample;
++        uint64_t bitrate = (uint64_t)PcmMode.nChannels*PcmMode.nSamplingRate*nOutputBitPerSample;
+         LOGV("bitrate %lld handled length %lld", (long long)bitrate, (long long)(off2-off1));
+         mTimestampDelta += (int64_t)((off2-off1)*8*TICKS_PER_SECOND + bitrate - 1)/bitrate;
+     }
+@@ -487,6 +494,32 @@ AUDIO_DECODE_RETURN_TYPE UniaDecoder::_doDecodeInternal(
+     return ret;
+ }
+ 
++// check whether each input buffer contains one frame or not
++c2_status_t UniaDecoder::parseInputFrame(uint8_t * pBuf, size_t size)
++{
++    c2_status_t ret = C2_OK;
++    uint32_t nOffset = 0;
++    LOGV("entry");
++
++    if(pBuf == NULL || 0 == size)
++        return ret;
++
++    if(++inputBufferCount > 5)
++        return ret;
++
++    ret = mUtil->checkFrameHeader(pBuf, size, &nOffset);
++
++    if(ret == C2_OK && mUtil->isFrameInput())
++        framedInputBufferCount ++;
++    LOGV("checkFrameHeader ret=%d,size=%zu,offset=%u,input=%d,framed=%d",ret , size, nOffset, inputBufferCount, framedInputBufferCount);
++
++    if(inputBufferCount == 5 && framedInputBufferCount == inputBufferCount){
++        mDecodeEachInput = true;
++        LOGI("set mDecodeEachInput");
++    }
++
++    return C2_OK;
++}
+ 
+ c2_status_t UniaDecoder::checkFrameHeader()
+ {
+@@ -539,6 +572,9 @@ c2_status_t UniaDecoder::codecInit()
+ void UniaDecoder::doReset()
+ {
+     LOGV("entry");
++    inputBufferCount = 0;
++    framedInputBufferCount = 0;
++
+     if(mWrapper == nullptr || mWrapperHandle == nullptr){
+         LOGE("performReset invalid argument");
+         return;
+@@ -620,6 +656,9 @@ c2_status_t UniaDecoder::unInit()
+         mWrapper = nullptr;
+     }
+     LOGV("UniaDec::DeInitComponent inputFrameCount=%d,consumeFrameCount=%d",inputFrameCount,consumeFrameCount);
++
++    inputBufferCount = 0;
++    framedInputBufferCount = 0;
+     return C2_OK;
+ }
+ 
+diff --git a/codec2/audio_dec/common/UniaDecoder.h b/codec2/audio_dec/common/UniaDecoder.h
+index 7908c9d..8f566c3 100755
+--- a/codec2/audio_dec/common/UniaDecoder.h
++++ b/codec2/audio_dec/common/UniaDecoder.h
+@@ -55,6 +55,7 @@ class UniaDecoder : public IMXAudioDecComponent {
+         c2_status_t handleEOS(uint8_t **ppBuffer, uint32_t* length) override;
+         c2_status_t handleBOS(uint32_t* offset, uint32_t length) override;
+         c2_status_t getParamDirectly() override;
++        c2_status_t parseInputFrame(uint8_t * pBuf, size_t size) override;
+ 
+     private:
+ 
+@@ -71,7 +72,8 @@ class UniaDecoder : public IMXAudioDecComponent {
+         uint32_t consumeFrameCount;
+         uint32_t inputFrameCount;
+         uint32_t accumulatedOutputLen;
+-
++        uint32_t inputBufferCount;
++        uint32_t framedInputBufferCount;
+         AUDIO_DECODE_RETURN_TYPE _doDecodeInternal(const std::unique_ptr<C2Work> &work,
+                                                         uint8_t **ppOutputBuffer, uint32_t *pOutputSize);
+ 
+diff --git a/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c b/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
+index 1c9f79b..045c48d 100755
+--- a/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
++++ b/codec2/audio_dec/common/audio_frame_parser/AudioFrameParser.c
+@@ -67,7 +67,6 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+             printf("CheckFrame frame size=%d,buffer len=%d",Info.frm_size,nBufferLen);
+             pFrameInfo->bGotOneFrame = true;
+             pFrameInfo->nNextFrameSize = 0;
+-            nHeaderCount ++;
+             break;
+         }else if(Info.frm_size + nOffset + nHeadSize < nBufferLen){
+             nOffset += Info.frm_size;
+@@ -84,7 +83,6 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+             nHeaderCount ++;
+             break;
+         }else{
+-            nHeaderCount --;
+             nOffset = nFrameOffset+1;
+             continue;
+         }
+@@ -109,7 +107,7 @@ AFP_RETURN CheckFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8_t *pBuffer, uint32_t n
+     pFrameInfo->nSamplingRate = Info.sampling_rate;
+     pFrameInfo->nChannels = Info.channels;
+     pFrameInfo->nHeaderCount = nHeaderCount;
+-    ALOGI("CheckFrame bGotOneFrame=%d,nFrameCount=%d,Consumed=%d,nFrameSize=%d,\
++    ALOGV("CheckFrame bGotOneFrame=%d,nFrameCount=%d,Consumed=%d,nFrameSize=%d,\
+ samplerate=%d,bitrate=%d,channel=%d,samplePerFrame=%d",
+         pFrameInfo->bGotOneFrame,
+         pFrameInfo->nHeaderCount,
+diff --git a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
+index 5811e89..af3b4a0 100755
+--- a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
++++ b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.cpp
+@@ -297,6 +297,33 @@ size_t Mp3DecodeUtil::getPushModeInputLen()
+     return MP3_PUSH_MODE_LEN;
+ }
+ 
++c2_status_t Mp3DecodeUtil::checkFrameHeader(unsigned char * pBuffer, size_t length, uint32_t *pOffset){
++
++    LOGV("entry");
++    uint32_t nVal = 0;
++    AUDIO_FRAME_INFO FrameInfo;
++    memset(&FrameInfo, 0, sizeof(AUDIO_FRAME_INFO));
++
++    do{
++
++        if(AFP_SUCCESS != Mp3CheckFrame(&FrameInfo, pBuffer, length)){
++            LOGD("CHECK FAILED");
++            break;
++        }
++
++        if(FrameInfo.bGotOneFrame && FrameInfo.nHeaderCount == 1 &&
++            (FrameInfo.nNextFrameSize == 0 || FrameInfo.nFrameSize == length)){
++            mFrameInput = true;
++            LOGD("get one single frame");
++        }
++
++        uint32_t nOffset = FrameInfo.nConsumedOffset;
++        *pOffset = nOffset;
++        return C2_OK;
++    }while(0);
++
++    return C2_NOT_FOUND;
++}
+ 
+ class IMXC2Mp3DecFactory : public C2ComponentFactory {
+ public:
+diff --git a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
+index 162503f..6694904 100755
+--- a/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
++++ b/codec2/audio_dec/mp3_dec/Mp3DecodeUtil.h
+@@ -28,6 +28,7 @@ class Mp3DecodeUtil  : public AudioDecodeUtil {
+         virtual c2_status_t setParameter(UA_ParaType index,int32_t value) override;
+         virtual c2_status_t getParameter(UA_ParaType index,int32_t * value) override;
+         virtual size_t getPushModeInputLen() override;
++        virtual c2_status_t checkFrameHeader(unsigned char * pBuffer, size_t length, uint32_t *pOffset) override;
+ 
+     private:
+         bool bFrameChecked;
+diff --git a/codec2/base/IMXC2ComponentBase.cpp b/codec2/base/IMXC2ComponentBase.cpp
+old mode 100755
+new mode 100644
+index 303e254..9563796
+--- a/codec2/base/IMXC2ComponentBase.cpp
++++ b/codec2/base/IMXC2ComponentBase.cpp
+@@ -386,6 +386,7 @@ c2_status_t IMXC2ComponentBase::finish(
+         uint64_t timestamp, std::function<void(const std::unique_ptr<C2Work> &)> fillWork) {
+ 
+     std::unique_ptr<C2Work> work;
++    uint64_t frameIndex;
+     {
+         // find one work : 1. input is used; 2. input ts match output ts
+         Mutexed<PendingWork>::Locked pending(mPendingWork);
+@@ -394,6 +395,7 @@ c2_status_t IMXC2ComponentBase::finish(
+                                  [timestamp](const std::unique_ptr<C2Work>& w) {
+                                      return (w->input.ordinal.timestamp == timestamp);
+                                  });
++
+         if (workIter != pending->end()) {
+             work = std::move(*workIter);
+             workIter = pending->erase(workIter);
+@@ -417,7 +419,8 @@ c2_status_t IMXC2ComponentBase::finish(
+     }
+ 
+     if (work) {
+-        ALOGV("returning pending work #%lld", (long long)work->input.ordinal.frameIndex.peeku());
++        frameIndex = work->input.ordinal.frameIndex.peeku();
++        ALOGV("returning pending work #%lld", (long long)frameIndex);
+ 
+         fillWork(work);
+ 
+@@ -429,30 +432,38 @@ c2_status_t IMXC2ComponentBase::finish(
+         state.unlock();
+         listener->onWorkDone_nb(shared_from_this(), vec(work));
+ 
+-        if(0){
++        {
++            //add expired time to avoid input buffer return immediately. the value should be less than 3 seconds
++            #define EXPIRED_TIME (2000000L)
+             std::unique_ptr<C2Work> unexpected;
+             Mutexed<PendingWork>::Locked pending(mPendingWork);
+ 
+-            auto iter = std::find_if(pending->begin(), pending->end(),
+-                                 [timestamp](const std::unique_ptr<C2Work>& w) {
+-                                     return (w->input.ordinal.timestamp.peeku() < timestamp &&
+-                                             (w->input.flags & C2FrameData::FLAG_END_OF_STREAM) == 0);
+-                                 });
+-
+-            if (iter != pending->end()) {
+-                unexpected = std::move(*iter);
+-                pending->erase(iter);
+-            }
++            for (;;) {
++                auto iter = std::find_if(pending->begin(), pending->end(),
++                                     [timestamp, frameIndex](const std::unique_ptr<C2Work>& w) {
++                                         return (w->input.ordinal.timestamp != (-1)
++                                                    && w->input.ordinal.timestamp + EXPIRED_TIME < timestamp
++                                                    && w->input.ordinal.frameIndex < frameIndex
++                                                    && (w->input.flags & C2FrameData::FLAG_END_OF_STREAM) == 0);
++                                     });
++
++                if (iter != pending->end()) {
++                    unexpected = std::move(*iter);
++                    pending->erase(iter);
++                }
+ 
+-            if (unexpected) {
+-                ALOGD("unexpected pending work ts=%lld, frameIndex=%lld",
+-                    (long long)unexpected->input.ordinal.timestamp.peeku(),
+-                    (long long)unexpected->input.ordinal.frameIndex.peeku());
+-                unexpected->result = C2_OK;
+-                Mutexed<ExecState>::Locked state(mExecState);
+-                std::shared_ptr<C2Component::Listener> listener = state->mListener;
+-                state.unlock();
+-                listener->onWorkDone_nb(shared_from_this(), vec(unexpected));
++                if (unexpected) {
++                    ALOGD("unexpected pending work ts=%lld, frameIndex=%lld",
++                        (long long)unexpected->input.ordinal.timestamp.peeku(),
++                        (long long)unexpected->input.ordinal.frameIndex.peeku());
++                    unexpected->result = C2_OK;
++                    Mutexed<ExecState>::Locked state(mExecState);
++                    std::shared_ptr<C2Component::Listener> listener = state->mListener;
++                    state.unlock();
++                    listener->onWorkDone_nb(shared_from_this(), vec(unexpected));
++                    continue;
++                } else
++                    break;
+             }
+         }
+ 
+diff --git a/codec2/imx_codec2.go b/codec2/imx_codec2.go
+index e7cfe87..657823d 100644
+--- a/codec2/imx_codec2.go
++++ b/codec2/imx_codec2.go
+@@ -23,6 +23,7 @@ import (
+ 
+ func init() {
+     android.RegisterModuleType("imx_codec2_defaults", imx_codec2DefaultsFactory)
++    android.RegisterModuleType("imx_mm_common_defaults", imx_mmDefaultsFactory)
+ }
+ 
+ func imx_codec2DefaultsFactory() (android.Module) {
+@@ -31,6 +32,12 @@ func imx_codec2DefaultsFactory() (android.Module) {
+     return module
+ }
+ 
++func imx_mmDefaultsFactory() (android.Module) {
++    module := cc.DefaultsFactory()
++    android.AddLoadHook(module, imx_mmDefaults)
++    return module
++}
++
+ func imx_codec2Defaults(ctx android.LoadHookContext) {
+     type props struct {
+         Target struct {
+@@ -47,3 +54,18 @@ func imx_codec2Defaults(ctx android.LoadHookContext) {
+     }
+     ctx.AppendProperties(p)
+ }
++
++func imx_mmDefaults(ctx android.LoadHookContext) {
++    type props struct {
++        Target struct {
++                Android struct {
++                        Cppflags []string
++                }
++        }
++    }
++    p := &props{}
++    if ctx.Config().VendorConfig("IMXPLUGIN").String("TARGET_GRALLOC_VERSION") == "v4" {
++        p.Target.Android.Cppflags = append(p.Target.Android.Cppflags, "-DGRALLOC_VERSION=4")
++    }
++    ctx.AppendProperties(p)
++}
+diff --git a/codec2/process/common/Android.bp b/codec2/process/common/Android.bp
+index c804545..2c08da8 100644
+--- a/codec2/process/common/Android.bp
++++ b/codec2/process/common/Android.bp
+@@ -38,6 +38,7 @@ cc_library_shared {
+     ],
+ 
+      defaults: [
++        "imx_mm_common_default",
+         "imx_codec2_default",
+      ],
+ 
+diff --git a/codec2/process/common/ProcessBase.cpp b/codec2/process/common/ProcessBase.cpp
+index 7c2914e..e579ee4 100644
+--- a/codec2/process/common/ProcessBase.cpp
++++ b/codec2/process/common/ProcessBase.cpp
+@@ -86,8 +86,10 @@ ProcessBase::ProcessBase()
+     mState = UNINITIALIZED;
+     mAsync = false;
+     bResChanged = false;
++    bAllocateBuffers = false;
+     nInputCnt = 0;
+     nOutputCnt = 0;
++    nDebugFlag = 0;
+ }
+ 
+ ProcessBase::~ProcessBase() {
+@@ -182,10 +184,14 @@ status_t ProcessBase::getConfig(ProcessConfig index, void* pConfig) {
+ }
+ 
+ status_t ProcessBase::destroy() {
++
+     sp<AMessage> reply;
+-    (new AMessage(kWhatDestroy, this))->postAndAwaitResponse(&reply);
+-    int32_t err;
+-    CHECK(reply->findInt32("err", &err));
++    sp<AMessage> msg = new AMessage(kWhatDestroy, this);
++    status_t err = msg->postAndAwaitResponse(&reply);
++    if (err == OK && reply != NULL) {
++        CHECK(reply->findInt32("err", &err));
++    }
++
+     return err;
+ }
+ 
+@@ -310,6 +316,9 @@ status_t ProcessBase::AllocateProcessBuffers(uint32_t num) {
+         ProcessFrameSet(&sOutMemInfo, pPhys, i, fd, 0, &index);
+         mOutputQueue.push(index);
+         mProcessBlocks.push_back(std::move(info));
++
++        if(!bAllocateBuffers)
++            bAllocateBuffers = true;
+     }
+ 
+     return OK;
+@@ -352,10 +361,14 @@ status_t ProcessBase::AllocateProcessBuffers(uint32_t num, uint32_t num_plane, u
+         mOutputQueue.push(index);
+         mProcessBlocks.push_back(std::move(info));
+         ALOGV("AllocateProcessBuffers fd0=%d,fd1=%d",(int)pPhys, fd);
++
++        if(!bAllocateBuffers)
++            bAllocateBuffers = true;
+     }
+     return OK;
+ }
+ status_t ProcessBase::FreeProcessBuffers() {
++    ALOGV("FreeProcessBuffers");
+     for (auto& info : mProcessBlocks) {
+         //no need to close fd
+         #if 0
+@@ -660,6 +673,11 @@ void ProcessBase::onMessageReceived(const sp<AMessage> &msg) {
+             clearOutputBuffers();
+ 
+             int32_t err = onStop();
++
++            //AllocateProcessBuffers maybe called during init, if so do not call FreeProcessBuffers()
++            if(!bAllocateBuffers)
++                FreeProcessBuffers();
++
+             mState = STOPPED;
+             Reply(msg, &err);
+             break;
+@@ -680,6 +698,7 @@ void ProcessBase::onMessageReceived(const sp<AMessage> &msg) {
+             clearOutputBuffers();
+ 
+             int32_t err = onDestroy();
++
+             FreeProcessBuffers();
+             Reply(msg, &err);
+             break;
+@@ -768,6 +787,7 @@ status_t ProcessBase::FetchProcessBuffer(int *bufferId, unsigned long *phys) {
+                                   });
+ 
+     if (blockIter == mProcessBlocks.end()) {
++
+         // fetch a new graphic buffer
+         ProcessBlockInfo info;
+         memset(&info, 0, sizeof(ProcessBlockInfo));
+@@ -779,7 +799,7 @@ status_t ProcessBase::FetchProcessBuffer(int *bufferId, unsigned long *phys) {
+         *bufferId = info.mBlockId;
+         *phys = prvHandle->phys;
+         mProcessBlocks.push_back(std::move(info));
+-        ALOGV("fetch a new graphic buffer: id %d, phys %p,fd=%d", *bufferId, (void*)*phys, info.mFd);
++        ALOGD("fetch a new graphic buffer: id %d, phys %p,fd=%d", *bufferId, (void*)*phys, info.mFd);
+     } else {
+         // previous buffer fetch back
+         ALOGV("previous buffer fetch back, id %d", blockIter->mBlockId);
+diff --git a/codec2/process/common/ProcessBase.h b/codec2/process/common/ProcessBase.h
+index a2f9b8b..a847b73 100644
+--- a/codec2/process/common/ProcessBase.h
++++ b/codec2/process/common/ProcessBase.h
+@@ -131,7 +131,6 @@ protected:
+     int mState;
+ 
+     bool mAsync;
+-    bool bOutputEos;
+     uint64_t nInputCnt;
+     uint64_t nOutputCnt;
+ 
+@@ -187,9 +186,9 @@ private:
+     sp<ALooper> mLooper;
+     Client* mClient;
+ 
+-    bool bRunning;
+     bool bInputEos;
+     bool bResChanged;
++    bool bAllocateBuffers;
+ 
+     typedef std::list<std::unique_ptr<PPInputBuffer>> InputBufferQueue;
+     Mutexed<InputBufferQueue> mInputBufferQueue;
+diff --git a/codec2/process/g2d_post/G2dPostProcess.cpp b/codec2/process/g2d_post/G2dPostProcess.cpp
+index cb8245f..3d9d4d0 100644
+--- a/codec2/process/g2d_post/G2dPostProcess.cpp
++++ b/codec2/process/g2d_post/G2dPostProcess.cpp
+@@ -55,6 +55,7 @@ G2dPostProcess::G2dPostProcess() {
+     memset(&sDstSurface, 0, sizeof(G2DSurfaceEx));
+     bFetchStarted = false;
+     bFetchStopped = true;
++    nDebugFlag = 0;
+ }
+ 
+ G2dPostProcess::~G2dPostProcess() {
+@@ -109,7 +110,7 @@ status_t G2dPostProcess::HandleFetchThread() {
+         unsigned long phys;
+ 
+         if (OK != FetchProcessBuffer(&bufferId, &phys)) {
+-            usleep(1000);
++            usleep(5000);
+             continue;
+         }
+ 
+diff --git a/codec2/process/g2d_post/G2dPostProcess.h b/codec2/process/g2d_post/G2dPostProcess.h
+index f7084af..277cf8f 100644
+--- a/codec2/process/g2d_post/G2dPostProcess.h
++++ b/codec2/process/g2d_post/G2dPostProcess.h
+@@ -46,6 +46,7 @@ public:
+     status_t onStart() override;
+     status_t onStop() override;
+ protected:
++
+     status_t onProcess() override;
+     status_t onVideoResChanged() override;
+     status_t DoSetConfig(ProcessConfig index, void* pConfig) override;
+@@ -75,4 +76,4 @@ private:
+ 
+ } // namespcae android
+ 
+-#endif // G2D_POST_PROCESS_H
+\ No newline at end of file
++#endif // G2D_POST_PROCESS_H
+diff --git a/codec2/process/isi_pre/Android.bp b/codec2/process/isi_pre/Android.bp
+index ae72cd8..32b5afa 100755
+--- a/codec2/process/isi_pre/Android.bp
++++ b/codec2/process/isi_pre/Android.bp
+@@ -35,6 +35,7 @@ cc_library_shared {
+     ],
+ 
+     include_dirs: [
++        "device/nxp/common/kernel-headers",
+         "hardware/libhardware/include",
+         "frameworks/av",
+         "frameworks/av/media/codec2/core/include",
+diff --git a/codec2/process/isi_pre/IsiPreProcess.cpp b/codec2/process/isi_pre/IsiPreProcess.cpp
+index d4f7224..ae58ba3 100644
+--- a/codec2/process/isi_pre/IsiPreProcess.cpp
++++ b/codec2/process/isi_pre/IsiPreProcess.cpp
+@@ -1,5 +1,5 @@
+ /**
+- *  Copyright 2019 NXP
++ *  Copyright 2019-2020 NXP
+  *  All Rights Reserved.
+  *
+  *  The following programs are the sole property of Freescale Semiconductor Inc.,
+@@ -28,8 +28,10 @@ status_t IsiPreProcess::onInit(){
+     mFd = pDev->Open(V4L2_DEV_ISI);
+     ALOGV("onInit pV4l2Dev->Open fd=%d",mFd);
+ 
+-    if(mFd < 0)
++    if(mFd < 0){
++        ALOGE("onInit open isi device failed");
+         return ret;
++    }
+ 
+     mInMemType = V4L2_MEMORY_DMABUF;
+     mOutMemType = V4L2_MEMORY_DMABUF;
+@@ -103,8 +105,8 @@ typedef struct{
+ }V4L2_FORMAT_TABLE;
+ 
+ static V4L2_FORMAT_TABLE color_format_table[]={
+-{v4l2_fourcc('R', 'G', 'B', 'A'), HAL_PIXEL_FORMAT_RGBA_8888},
+-{v4l2_fourcc('R', 'G', 'B', 'A'), HAL_PIXEL_FORMAT_RGBX_8888},
++{V4L2_PIX_FMT_RGBA32, HAL_PIXEL_FORMAT_RGBA_8888},
++{V4L2_PIX_FMT_RGBA32, HAL_PIXEL_FORMAT_RGBX_8888},
+ {V4L2_PIX_FMT_RGB565, HAL_PIXEL_FORMAT_RGB_565},
+ {V4L2_PIX_FMT_NV12, HAL_PIXEL_FORMAT_YCbCr_420_SP},
+ };
+@@ -127,14 +129,14 @@ status_t IsiPreProcess::prepareInputParams()
+     Mutex::Autolock autoLock(mLock);
+ 
+     sInFormat.width = Align(sInFormat.width, mWidthAlign);
+-    sInFormat.height = sInFormat.height;
++    //sInFormat.height = sInFormat.height;
+     sInFormat.stride = Align(sInFormat.stride, mWidthAlign);
+ 
+     mInFormat = getV4l2Format(sInFormat.format);
+ 
+     ALOGV("prepareInputParams width=%d,height=%d,format=%x",sInFormat.width,sInFormat.height, mInFormat);
+ 
+-    if(mInFormat == v4l2_fourcc('R', 'G', 'B', 'A')){
++    if(mInFormat == V4L2_PIX_FMT_RGBA32){
+         sInFormat.bufferSize = sInFormat.width * sInFormat.height * 4;
+     }else{
+         ALOGE("mInFormat is not RGBA");
+diff --git a/codec2/process/isi_pre/imx_process_isi_pre.go b/codec2/process/isi_pre/imx_process_isi_pre.go
+index b4c211a..035042a 100644
+--- a/codec2/process/isi_pre/imx_process_isi_pre.go
++++ b/codec2/process/isi_pre/imx_process_isi_pre.go
+@@ -1,4 +1,4 @@
+-// Copyright 2019 NXP
++// Copyright 2019-2020 NXP
+ //
+ // Licensed under the Apache License, Version 2.0 (the "License");
+ // you may not use this file except in compliance with the License.
+diff --git a/codec2/v4l2_dev/Android.bp b/codec2/v4l2_dev/Android.bp
+index bafa332..2d5233b 100644
+--- a/codec2/v4l2_dev/Android.bp
++++ b/codec2/v4l2_dev/Android.bp
+@@ -34,6 +34,7 @@ cc_library_shared {
+     ],
+ 
+     include_dirs: [
++        "device/nxp/common/kernel-headers",
+         "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
+         "frameworks/av/media/codec2/core/include",
+diff --git a/codec2/v4l2_dev/V4l2Dev.cpp b/codec2/v4l2_dev/V4l2Dev.cpp
+index 6391e41..de38183 100644
+--- a/codec2/v4l2_dev/V4l2Dev.cpp
++++ b/codec2/v4l2_dev/V4l2Dev.cpp
+@@ -24,23 +24,16 @@
+ #include "graphics_ext.h"
+ #include "Imx_ext.h"
+ #include "C2Config.h"
++#include <linux/imx_vpu.h>
+ 
+ namespace android {
+ 
+ #define VPU_DEC_NODE "/dev/video12"
+ #define VPU_ENC_NODE "/dev/video13"
+ 
+-#define V4L2_CID_USER_FRAME_DEPTH (V4L2_CID_USER_BASE + 0x1200)
+-#define V4L2_CID_USER_TS_THRESHOLD     (V4L2_CID_USER_BASE + 0x1101)
+-#define V4L2_CID_USER_BS_L_THRESHOLD	(V4L2_CID_USER_BASE + 0x1102)
+-#define V4L2_CID_USER_BS_H_THRESHOLD	(V4L2_CID_USER_BASE + 0x1103)
+-#define V4L2_CID_USER_FRAME_COLORDESC   (V4L2_CID_USER_BASE + 0x1104)
+-#define V4L2_CID_USER_FRAME_TRANSFERCHARS   (V4L2_CID_USER_BASE + 0x1105)
+-#define V4L2_CID_USER_FRAME_MATRIXCOEFFS    (V4L2_CID_USER_BASE + 0x1106)
+-#define V4L2_CID_USER_FRAME_FULLRANGE       (V4L2_CID_USER_BASE + 0x1107)
+-#define V4L2_CID_USER_FRAME_VUIPRESENT      (V4L2_CID_USER_BASE + 0x1108)
+-
+ #define MAX_VIDEO_SEARCH_NODE (20)
++static std::atomic<std::int32_t> gIsiIndex = -1;
++
+ 
+ V4l2Dev::V4l2Dev()
+ {
+@@ -69,7 +62,7 @@ int32_t V4l2Dev::Open(V4l2DEV_TYPE type){
+             sub.type = V4L2_EVENT_SKIP;
+             ioctl(nFd, VIDIOC_SUBSCRIBE_EVENT, &sub);
+ 
+-            sub.type = V4L2_EVENT_DECODE_ERROR;
++            sub.type = V4L2_EVENT_CODEC_ERROR;
+             ioctl(nFd, VIDIOC_SUBSCRIBE_EVENT, &sub);
+         }
+ 
+@@ -101,6 +94,11 @@ status_t V4l2Dev::SearchName(V4l2DEV_TYPE type)
+     }else if(type == V4L2_DEV_ENCODER){
+          strcpy((char *)sDevName, VPU_ENC_NODE );
+          return OK;
++    }else if(type == V4L2_DEV_ISI && gIsiIndex > 0 && gIsiIndex < MAX_VIDEO_SEARCH_NODE){
++        int32_t isiIndex= gIsiIndex;
++        sprintf((char*)sDevName, "/dev/video%d", isiIndex);
++        ALOGV("SearchName get %s for isi device", (char *)sDevName);
++        return OK;
+     }
+ 
+     int32_t index = 0;
+@@ -128,13 +126,6 @@ status_t V4l2Dev::SearchName(V4l2DEV_TYPE type)
+         }
+         ALOGV("index %d name=%s
+",index,(char*)cap.driver);
+ 
+-        if(type == V4L2_DEV_DECODER || type == V4L2_DEV_ENCODER){
+-            if(NULL == strstr((char*)cap.driver, "vpu")){
+-                close(fd);
+-                index ++;
+-                continue;
+-            }
+-        }
+         if(type == V4L2_DEV_ISI){
+             if(NULL == strstr((char*)cap.driver, "mxc-isi-m2m")){
+                 close(fd);
+@@ -168,6 +159,11 @@ status_t V4l2Dev::SearchName(V4l2DEV_TYPE type)
+         index ++;
+     }
+ 
++    if(bGet && type == V4L2_DEV_ISI && gIsiIndex < 0){
++        gIsiIndex = index;
++        ALOGV("SearchName set %d for isi device", index);
++    }
++
+     if(bGet)
+         return OK;
+     else
+@@ -299,7 +295,7 @@ static const V4L2_FORMAT_TABLE v4l2_format_table[]={
+     { MEDIA_MIMETYPE_VIDEO_MPEG4, V4L2_PIX_FMT_MPEG4 },
+     { MEDIA_MIMETYPE_VIDEO_MPEG2, V4L2_PIX_FMT_MPEG2 },
+     { MEDIA_MIMETYPE_VIDEO_VP8, V4L2_PIX_FMT_VP8 },
+-    { MEDIA_MIMETYPE_VIDEO_VC1, V4L2_PIX_FMT_VC1_ANNEX_G },
++    { MEDIA_MIMETYPE_VIDEO_VC1, V4L2_PIX_FMT_VC1_ANNEX_L },
+     { MEDIA_MIMETYPE_VIDEO_XVID, V4L2_PIX_FMT_XVID },
+     { MEDIA_MIMETYPE_VIDEO_REAL, v4l2_fourcc('R', 'V', '0', '0')},
+     { MEDIA_MIMETYPE_VIDEO_MJPEG, V4L2_PIX_FMT_JPEG },
+@@ -465,7 +461,7 @@ status_t V4l2Dev::ResetDecoder()
+     struct v4l2_decoder_cmd cmd;
+     memset(&cmd, 0, sizeof(struct v4l2_decoder_cmd));
+ 
+-    cmd.cmd = IMX_V4L2_DEC_CMD_RESET;
++    cmd.cmd = V4L2_DEC_CMD_RESET;
+     cmd.flags = V4L2_DEC_CMD_STOP_IMMEDIATELY;
+ 
+     ret = ioctl(nFd, VIDIOC_DECODER_CMD, &cmd);
+@@ -497,6 +493,22 @@ status_t V4l2Dev::StopDecoder()
+     ALOGV("V4l2Dev::StopDecoder SUCCESS
+");
+     return OK;
+ }
++status_t V4l2Dev::EnableLowLatencyDecoder(bool enabled)
++{
++
++    int ret = 0;
++    struct v4l2_control ctl = { 0,0 };
++    ctl.id = V4L2_CID_DIS_REORDER;
++    ctl.value = enabled;
++    ret = ioctl(nFd, VIDIOC_S_CTRL, &ctl);
++
++    if(ret < 0){
++        ALOGV("V4l2Dev::EnableLowLatencyDecoder ret=%x
+",ret);
++        return UNKNOWN_ERROR;
++    }
++
++    return OK;
++}
+ 
+ status_t V4l2Dev::StopEncoder()
+ {
+diff --git a/codec2/v4l2_dev/V4l2Dev.h b/codec2/v4l2_dev/V4l2Dev.h
+index 84b03da..faf85fa 100644
+--- a/codec2/v4l2_dev/V4l2Dev.h
++++ b/codec2/v4l2_dev/V4l2Dev.h
+@@ -27,11 +27,6 @@ V4L2_DEV_ISI,
+ #define V4L2_DEV_POLL_OUTPUT 2
+ #define V4L2_DEV_POLL_CAPTURE 4
+ 
+-#define IMX_V4L2_DEC_CMD_START         (0x09000000)
+-#define IMX_V4L2_DEC_CMD_RESET         (IMX_V4L2_DEC_CMD_START + 1)
+-
+-#define V4L2_EVENT_DECODE_ERROR                (V4L2_EVENT_PRIVATE_START + 1)
+-#define V4L2_EVENT_SKIP                        (V4L2_EVENT_PRIVATE_START + 2)
+ 
+ #define MAX_DEV_NAME_LEN (16)
+ 
+@@ -80,6 +75,7 @@ public:
+     status_t StopDecoder();
+ 
+     status_t GetColorAspectsInfo(struct v4l2_pix_format_mplane * pixel_fmt, VideoColorAspect * desc);
++    status_t EnableLowLatencyDecoder(bool enabled);
+ 
+     //encoder functions
+     status_t StopEncoder();
+diff --git a/codec2/v4l2_dev/v4l2_dev.go b/codec2/v4l2_dev/v4l2_dev.go
+index 1938053..ab14dca 100644
+--- a/codec2/v4l2_dev/v4l2_dev.go
++++ b/codec2/v4l2_dev/v4l2_dev.go
+@@ -34,13 +34,11 @@ func v4l2DefaultsFactory() (android.Module) {
+ 
+ func v4l2Defaults(ctx android.LoadHookContext) {
+     var Cflags []string
+-    var Include_dirs []string
+     type props struct {
+         Target struct {
+                 Android struct {
+                         Enabled *bool
+                         Cflags []string
+-                        Include_dirs []string
+                 }
+         }
+     }
+@@ -48,16 +46,9 @@ func v4l2Defaults(ctx android.LoadHookContext) {
+     var board string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_SOC_TYPE")
+     if strings.Contains(board, "IMX8Q") {
+         p.Target.Android.Enabled = proptools.BoolPtr(true)
+-        if ctx.AConfig().PlatformVersionName() == "10" {
+-            Include_dirs = append(Include_dirs, "device/fsl/common/kernel-headers")
+-        }else{
+-            //for android 11
+-            Include_dirs = append(Include_dirs, "device/nxp/common/kernel-headers")
+-        }
+     } else {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+     }
+     p.Target.Android.Cflags = Cflags
+-    p.Target.Android.Include_dirs = Include_dirs
+     ctx.AppendProperties(p)
+ }
+diff --git a/codec2/video_dec/common/Android.bp b/codec2/video_dec/common/Android.bp
+index 6a16e99..e6bd41d 100644
+--- a/codec2/video_dec/common/Android.bp
++++ b/codec2/video_dec/common/Android.bp
+@@ -36,6 +36,7 @@ cc_library_shared {
+ 
+     defaults: [
+         "imx_defaults",
++        "imx_mm_common_default",
+         "imx_codec2_default",
+     ],
+ }
+@@ -88,6 +89,7 @@ cc_library_shared {
+ 
+     defaults: [
+         "imx_defaults",
++        "imx_mm_common_default",
+         "imx_c2_video_dec_default",
+     ],
+ }
+diff --git a/codec2/video_dec/common/IMXC2VideoDecoder.cpp b/codec2/video_dec/common/IMXC2VideoDecoder.cpp
+index 7334d48..c500024 100644
+--- a/codec2/video_dec/common/IMXC2VideoDecoder.cpp
++++ b/codec2/video_dec/common/IMXC2VideoDecoder.cpp
+@@ -26,7 +26,7 @@ namespace android {
+ #define C2ERR(err) ((err) == OK ? C2_OK : C2_CORRUPTED)
+ 
+ #define DEFAULT_ACTUAL_OUTPUT_DELAY_VALUE 16
+-#define DEFAULT_OUTPUT_BUFFER_CNT_IN_POST_PROCESS 3
++#define DEFAULT_OUTPUT_BUFFER_CNT_IN_POST_PROCESS 6
+ 
+ #ifdef IMX_VIDEO_DEC_API_TRACE
+ #define IMX_VIDEO_DEC_API_TRACE ALOGD
+@@ -380,6 +380,12 @@ public:
+                 .withFields({C2F(mVendorHalPixelFormat, value).inRange(0, 0xffffffff)})
+                 .withSetter(Setter<decltype(*mVendorHalPixelFormat)>::StrictValueWithNoDeps)
+                 .build());
++        addParameter(
++                DefineParam(mLowLatency, C2_PARAMKEY_LOW_LATENCY_MODE)
++                .withDefault(new C2GlobalLowLatencyModeTuning(0))
++                .withFields({C2F(mLowLatency, value).inRange(0, 1)})
++                .withSetter(Setter<decltype(*mLowLatency)>::StrictValueWithNoDeps)
++                .build());
+     }
+ 
+     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::output> &oldMe,
+@@ -527,6 +533,7 @@ private:
+     std::shared_ptr<C2StreamHdr10PlusInfo::output> mHdr10PlusInfoOutput;
+     std::shared_ptr<C2StreamVendorSubFormat::output> mVideoSubFormat;
+     std::shared_ptr<C2StreamVendorHalPixelFormat::output> mVendorHalPixelFormat;
++    std::shared_ptr<C2GlobalLowLatencyModeTuning> mLowLatency;
+ };
+ 
+ 
+@@ -669,6 +676,7 @@ void IMXC2VideoDecoder::processWork(const std::unique_ptr<C2Work> &work) {
+     int32_t fd, inputId;
+     uint8_t* inputBuffer;
+     uint64_t timestamp;
++    status_t ret = OK;
+ 
+     if (!bGetGraphicBlockPool) {
+         status_t err = mDecoder->setGraphicBlockPool(mOutputBlockPool);
+@@ -724,7 +732,7 @@ void IMXC2VideoDecoder::processWork(const std::unique_ptr<C2Work> &work) {
+           fd, inputBuffer, (int)view.capacity(), (int)timestamp,
+           (int)work->input.ordinal.frameIndex.peeku(), flags);
+ 
+-    mDecoder->queueInput(inputBuffer, size, timestamp, flags, fd, inputId);
++    ret = mDecoder->queueInput(inputBuffer, size, timestamp, flags, fd, inputId);
+ 
+     if (nUsedFrameIndex == nCurFrameIndex) {
+         work->input.buffers.front().reset();
+@@ -732,7 +740,7 @@ void IMXC2VideoDecoder::processWork(const std::unique_ptr<C2Work> &work) {
+     }
+ 
+     // codec data won't have a picture out, mark c2work as processed directly
+-    if (flags & C2FrameData::FLAG_CODEC_CONFIG) {
++    if ((flags & C2FrameData::FLAG_CODEC_CONFIG) || ret != OK) {
+         work->workletsProcessed = 1u;
+         work->result = C2_OK;
+     }
+@@ -767,7 +775,7 @@ status_t IMXC2VideoDecoder::initInternalParam() {
+     ALOGV("initInternalParam BEGIN");
+ 
+     C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+-    intf()->query_vb({&size,}, {}, C2_DONT_BLOCK, nullptr);
++    err = intf()->query_vb({&size,}, {}, C2_DONT_BLOCK, nullptr);
+     if (err == C2_OK) {
+         mWidth = size.width;
+         mHeight = size.height;
+@@ -801,13 +809,21 @@ status_t IMXC2VideoDecoder::initInternalParam() {
+     }
+ 
+     C2StreamVendorHalPixelFormat::output output_fmt(0);
+-    intf()->query_vb({&output_fmt,}, {}, C2_DONT_BLOCK, nullptr);
++    err = intf()->query_vb({&output_fmt,}, {}, C2_DONT_BLOCK, nullptr);
+     if (err == C2_OK && output_fmt.value != 0) {
+         uint32_t fmt = output_fmt.value;
+         ALOGV("SET DEC_CONFIG_HAL_PIXEL_FORMAT fmt=%x",fmt);
+         (void)mDecoder->setConfig(DEC_CONFIG_HAL_PIXEL_FORMAT, &fmt);
+     }
+ 
++    C2GlobalLowLatencyModeTuning low_latency(0);
++    err = intf()->query_vb({&low_latency,}, {}, C2_DONT_BLOCK, nullptr);
++    if (err == C2_OK) {
++        int32_t enable = (int32_t)low_latency.value;
++        ALOGV("SET C2StreamVendorLowLatency enable=%d",enable);
++        (void)mDecoder->setConfig(DEC_CONFIG_LOW_LATENCY, &enable);
++    }
++
+     return OK;
+ }
+ 
+@@ -841,6 +857,7 @@ void IMXC2VideoDecoder::handleOutputPicture(GraphicBlockInfo* info, uint64_t tim
+     C2PortActualDelayTuning::output outputDelay(0);
+     C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+     C2StreamPixelFormatInfo::output fmt(0u, HAL_PIXEL_FORMAT_YCBCR_420_888);
++    C2StreamCropRectInfo::output crop(0u, C2Rect(mCropWidth, mCropHeight));
+ 
+     if (bSupportColorAspects) {
+         IntfImpl::Lock lock = mIntf->lock();
+@@ -883,12 +900,9 @@ void IMXC2VideoDecoder::handleOutputPicture(GraphicBlockInfo* info, uint64_t tim
+             {},
+             C2_DONT_BLOCK,
+             nullptr);
+-        if (err == C2_OK) {
+-            outputDelayValue = outputDelay.value;
+-        }
+ 
+         if (bPendingFmtChanged) {
+-            // align with c2, add 4 (kSmoothnessFactor) buffers.
++            //TODO: remove 4 buffers after resolve pause timeout issue
+             outputDelayValue = nOutBufferNum + 4;
+ 
+             if (outputDelay.value < outputDelayValue) {
+@@ -905,7 +919,7 @@ void IMXC2VideoDecoder::handleOutputPicture(GraphicBlockInfo* info, uint64_t tim
+         }
+     }
+ 
+-    auto fillWork = [buffer, timestamp, configUpdate, size, outputDelay, fmt]
++    auto fillWork = [buffer, timestamp, configUpdate, crop, size, outputDelay, fmt]
+                     (const std::unique_ptr<C2Work> &work) mutable {
+ 
+         uint32_t flags = 0;
+@@ -915,6 +929,7 @@ void IMXC2VideoDecoder::handleOutputPicture(GraphicBlockInfo* info, uint64_t tim
+             ALOGV("signalling eos");
+         }
+         if (configUpdate) {
++            work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(crop));
+             work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(size));
+             work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(outputDelay));
+             work->worklets.front()->output.configUpdate.push_back(C2Param::Copy(fmt));
+@@ -1024,14 +1039,6 @@ void IMXC2VideoDecoder::notifyVideoInfo(VideoFormat *pFormat) {
+ 
+     std::vector<std::unique_ptr<C2SettingResult>> failures;
+ 
+-    C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
+-
+-    C2StreamCropRectInfo::output crop(0u, C2Rect(mCropWidth, mCropHeight));
+-
+-    (void)mIntf->config({&size}, C2_MAY_BLOCK, &failures);
+-
+-    (void)mIntf->config({&crop}, C2_MAY_BLOCK, &failures);
+-
+     //update C2StreamVendorHalPixelFormat when enable post process for malone decoder
+     if(bPPEnabled){
+         C2StreamVendorHalPixelFormat::output fmt(0u, HAL_PIXEL_FORMAT_YCBCR_422_I);//FORMAT_YUYV 0x14
+diff --git a/codec2/video_dec/common/IMXC2VideoDecoder.h b/codec2/video_dec/common/IMXC2VideoDecoder.h
+index 6a12f38..dd5beb0 100755
+--- a/codec2/video_dec/common/IMXC2VideoDecoder.h
++++ b/codec2/video_dec/common/IMXC2VideoDecoder.h
+@@ -87,7 +87,6 @@ private:
+     bool bSignalledError;
+     bool bFlushDone;
+     bool bPPEnabled;
+-    bool bReleasingDecoder;
+     bool bSupportColorAspects;
+ 
+     status_t initInternalParam();    // init internel paramters
+diff --git a/codec2/video_dec/common/VideoDecoderBase.cpp b/codec2/video_dec/common/VideoDecoderBase.cpp
+index d2c9a0a..20b91e5 100644
+--- a/codec2/video_dec/common/VideoDecoderBase.cpp
++++ b/codec2/video_dec/common/VideoDecoderBase.cpp
+@@ -65,19 +65,16 @@ VideoRect::VideoRect(uint32_t left, uint32_t right, uint32_t top, uint32_t botto
+       bottom(bottom) {
+ }
+ 
+-VideoFormat::VideoFormat(
+-                    int format,
+-                    uint32_t minNumBuffers,
+-                    uint32_t width,
+-                    uint32_t height,
+-                    VideoRect &rect,
+-                    bool interlaced)
+-    : pixelFormat(format),
+-      minBufferNum(minNumBuffers),
+-      width(width),
+-      height(height),
+-      rect(rect),
+-      interlaced(interlaced) {
++VideoFormat::VideoFormat() {
++    pixelFormat = 0;
++    minBufferNum = 0;
++    width = DEFAULT_FRM_WIDTH;
++    height = DEFAULT_FRM_HEIGHT;
++    stride = DEFAULT_FRM_WIDTH;
++    bufferNum = 0;
++    bufferSize = 0;
++    rect = {0,0,0,0};
++    interlaced = false;
+ }
+ 
+ VideoDecoderBase::IMXInputBuffer::IMXInputBuffer(
+@@ -105,7 +102,8 @@ VideoDecoderBase::VideoDecoderBase()
+       bReceiveError(false),
+       bCodecDataReceived(false),
+       bCodecDataQueued(false),
+-      mLooper(new ALooper) {
++      mLooper(new ALooper),
++      mClient(nullptr) {
+ 
+     bOutputFmtChangedPending = false;
+     bReleasingDecoder = false;
+@@ -120,6 +118,10 @@ VideoDecoderBase::VideoDecoderBase()
+ }
+ 
+ VideoDecoderBase::~VideoDecoderBase() {
++    if (mLooper != NULL) {
++        mLooper->unregisterHandler(id());
++        mLooper->stop();
++    }
+ }
+ 
+ status_t VideoDecoderBase::init(Client* client/*const std::shared_ptr<C2BlockPool> &pool*/) {
+@@ -165,9 +167,11 @@ status_t VideoDecoderBase::flush() {
+ status_t VideoDecoderBase::destroy() {
+     VDB_API_TRACE("%s, line %d", __FUNCTION__, __LINE__);
+     sp<AMessage> reply;
+-    (new AMessage(kWhatDestroy, this))->postAndAwaitResponse(&reply);
+-    int32_t err;
+-    CHECK(reply->findInt32("err", &err));
++    sp<AMessage> msg = new AMessage(kWhatDestroy, this);
++    status_t err = msg->postAndAwaitResponse(&reply);
++    if (err == OK && reply != NULL) {
++        CHECK(reply->findInt32("err", &err));
++    }
+     return err;
+ }
+ 
+@@ -523,7 +527,7 @@ status_t VideoDecoderBase::appendOutputBuffer(std::shared_ptr<C2GraphicBlock> bl
+         fsl::IonAllocator * pIonAllocator = fsl::IonAllocator::getInstance();
+         int ret = pIonAllocator->getVaddrs(prvHandle->fd, prvHandle->size, (uint64_t&)info.mVirtAddr);
+         if (ret != 0) {
+-            ALOGE("Ion get virtual address failed, fd %d", info.mDMABufFd);
++            ALOGE("Ion get virtual address failed, fd %d", prvHandle->fd);
+             return BAD_VALUE;
+         }
+ 
+diff --git a/codec2/video_dec/common/VideoDecoderBase.h b/codec2/video_dec/common/VideoDecoderBase.h
+index 7434368..2f0ceeb 100644
+--- a/codec2/video_dec/common/VideoDecoderBase.h
++++ b/codec2/video_dec/common/VideoDecoderBase.h
+@@ -29,6 +29,7 @@ typedef enum {
+     DEC_CONFIG_HAL_PIXEL_FORMAT,
+     DEC_CONFIG_HDR10_STATIC_INFO,
+     DEC_CONFIG_COLOR_ASPECTS,
++    DEC_CONFIG_LOW_LATENCY,
+ } DecConfig;
+ 
+ typedef struct {
+@@ -80,14 +81,14 @@ struct VideoRect {
+ 	uint32_t top;
+ 	uint32_t right;
+ 	uint32_t bottom;
+-    VideoRect() {}
++    VideoRect() {left = 0; top = 0; right = 0; bottom = 0;}
+     VideoRect(VideoRect &rect);
+     VideoRect(uint32_t left, uint32_t right, uint32_t top, uint32_t bottom);
+ };
+ 
+ struct VideoFormat {
+-    int pixelFormat = 0;//HalPixelFormat::UNKNOWN;
+-    uint32_t minBufferNum = 0;
++    int pixelFormat;//HalPixelFormat::UNKNOWN;
++    uint32_t minBufferNum;
+     uint32_t width;
+     uint32_t height;
+     uint32_t stride;
+@@ -96,9 +97,7 @@ struct VideoFormat {
+     VideoRect rect;
+     bool interlaced;
+ 
+-    VideoFormat() {}
+-    VideoFormat(int format, uint32_t minNumBuffers, uint32_t width, uint32_t height,
+-                VideoRect &rect, bool interlaced);
++    VideoFormat();
+ };
+ 
+ 
+diff --git a/codec2/video_dec/v4l2_dec/Android.bp b/codec2/video_dec/v4l2_dec/Android.bp
+index f10f27b..3086ebe 100644
+--- a/codec2/video_dec/v4l2_dec/Android.bp
++++ b/codec2/video_dec/v4l2_dec/Android.bp
+@@ -22,7 +22,10 @@ bootstrap_go_package {
+ cc_library_shared {
+     name: "lib_imx_c2_v4l2_dec",
+ 
+-    defaults: ["imx_c2_v4l2_dec_default"],
++    defaults: [
++        "imx_mm_common_default",
++        "imx_c2_v4l2_dec_default",
++    ],
+ 
+     soc_specific: true,
+     srcs: [
+@@ -35,7 +38,8 @@ cc_library_shared {
+     ],
+ 
+     include_dirs: [
+-	"hardware/libhardware/include",
++        "device/nxp/common/kernel-headers",
++        "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
+         "frameworks/av/media/codec2/core/include",
+         "frameworks/av/media/codec2/vndk/include",
+diff --git a/codec2/video_dec/v4l2_dec/V4l2Dec.cpp b/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
+index a068fd0..8559e60 100644
+--- a/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
++++ b/codec2/video_dec/v4l2_dec/V4l2Dec.cpp
+@@ -16,6 +16,9 @@
+ #include "Memory.h"
+ #include "IonAllocator.h"
+ #include <sys/mman.h>
++#include <media/stagefright/foundation/avc_utils.h>
++#include <linux/imx_vpu.h>
++
+ 
+ namespace android {
+ 
+@@ -53,6 +56,7 @@ V4l2Dec::V4l2Dec(const char* mime):
+ 
+     bNeedPostProcess = true;
+     bMpeg2 = false;
++    bH264 = false;
+ 
+     mState = UNINITIALIZED;
+ 
+@@ -79,6 +83,17 @@ V4l2Dec::V4l2Dec(const char* mime):
+     mVc1Format = V4L2_PIX_FMT_VC1_ANNEX_G;
+     mLastInputTs = -1;
+     mLastInputId = 0;
++
++    mInMemType = V4L2_MEMORY_MMAP;
++    mOutMemType = V4L2_MEMORY_DMABUF;//V4L2_MEMORY_USERPTR
++    bLowLatency = false;
++    mInCnt = 0;
++    mOutCnt = 0;
++    nDebugFlag = 0;
++    mInFormat = V4L2_PIX_FMT_H264;
++    mOutFormat = V4L2_PIX_FMT_NV12;
++
++    memset(&mIsoColorAspect,0,sizeof(VideoColorAspect));
+ }
+ V4l2Dec::~V4l2Dec()
+ {
+@@ -98,13 +113,11 @@ status_t V4l2Dec::onInit(){
+     if(mFd < 0)
+         return ret;
+ 
+-    mInMemType = V4L2_MEMORY_MMAP;
+-    mOutMemType = V4L2_MEMORY_DMABUF;//V4L2_MEMORY_USERPTR
+     mState = UNINITIALIZED;
+-    mInCnt = 0;
+-    mOutCnt = 0;
++
+     mLastInputTs = -1;
+     mLastInputId = 0;
++
+     ParseVpuLogLevel();
+     return OK;
+ }
+@@ -125,6 +138,13 @@ status_t V4l2Dec::onStart()
+         return ret;
+     }
+ 
++    if(bH264 && bLowLatency){
++        ALOGI("enable low latency decoder");
++        ret = pDev->EnableLowLatencyDecoder(bLowLatency);
++        if(ret != OK)
++            ALOGE("EnableLowLatencyDecoder failed");
++    }
++
+     if(mInputBufferMap.empty() || (mInputFormat.bufferSize != mInputBufferMap[0].plane.size)){
+ 
+         ret = prepareInputBuffers();
+@@ -196,6 +216,8 @@ status_t V4l2Dec::prepareInputParams()
+ 
+     if (strcmp(mMime, MEDIA_MIMETYPE_VIDEO_MPEG2) == 0) {
+         bMpeg2 = true;
++    }else if(strcmp(mMime, MEDIA_MIMETYPE_VIDEO_AVC) == 0) {
++        bH264 = true;
+     }
+ 
+     if(mInputFormat.bufferNum == 0){
+@@ -637,7 +659,7 @@ status_t V4l2Dec::HandleFetchThread()
+         GraphicBlockInfo *gbInfo = getFreeGraphicBlock();
+         if (bNeedPostProcess) {
+             if(!gbInfo || gbInfo->mBlockId >= mOutputFormat.bufferNum) {
+-                usleep(1000);
++                usleep(3000);
+                 continue;
+             }
+             ALOGV("HandleFetchThread queueOutput BEGIN, blockid=%d",gbInfo->mBlockId);
+@@ -774,7 +796,7 @@ status_t V4l2Dec::decodeInternal(std::unique_ptr<IMXInputBuffer> input)
+     }
+ 
+     int32_t fd = input->fd;
+-    uint64_t ts = input->timestamp;
++    int64_t ts = (int64_t)input->timestamp;
+     uint32_t buf_length = 0;
+     bool eos = input->eos;
+ 
+@@ -786,9 +808,6 @@ status_t V4l2Dec::decodeInternal(std::unique_ptr<IMXInputBuffer> input)
+         return OK;
+     }
+ 
+-    if((int64_t)ts > 0)
+-        v4l2_flags |= (V4L2_BUF_FLAG_TIMESTAMP_MASK | V4L2_BUF_FLAG_TIMESTAMP_COPY);
+-
+     if (input->csd)
+         v4l2_flags |= (IMX_V4L2_BUF_FLAG_CODECCONFIG | IMX_V4L2_BUF_FLAG_TIMESTAMP_INVALID);
+ 
+@@ -797,6 +816,35 @@ status_t V4l2Dec::decodeInternal(std::unique_ptr<IMXInputBuffer> input)
+         return UNKNOWN_ERROR;
+     }
+ 
++    //check nal type for h264 frame, do not queue single sps or pps frame as one normal frame.
++    if(bH264 && fd > 0 && input->id && input->size > 0 && !(v4l2_flags & IMX_V4L2_BUF_FLAG_CODECCONFIG)){
++
++        const uint8_t * data = (uint8_t *)input->pInBuffer;
++        size_t data_size = input->size;
++        const uint8_t * nal_start = NULL;
++        size_t nal_size = 0;
++        bool codec_data_nal = false;
++        bool has_other_nal = false;
++
++        while (getNextNALUnit(&data, &data_size, &nal_start, &nal_size, true) == OK) {
++            if (nal_size == 0) continue;
++
++            unsigned nalType = nal_start[0] & 0x1f;
++            if(nalType <= 5 || nalType == 20){
++                has_other_nal = true;
++            }else if(nalType >= 6 && nalType <= 8){
++                codec_data_nal = true;
++            }
++        }
++
++        if(codec_data_nal && !has_other_nal){
++            ALOGV("SKIP SPS or PPS");
++            NotifyInputBufferUsed(input->id);
++            //return bad value then client IMXC2VideoDecoder will handle it
++            return BAD_VALUE;
++        }
++    }
++
+ QueueOneBuffer:
+     mLock.lock();
+ 
+@@ -847,10 +895,17 @@ QueueOneBuffer:
+ 
+     stV4lBuf.index = index;
+     stV4lBuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+-    if((int64_t)ts > 0){
++
++    if(ts >= 0){
+         stV4lBuf.timestamp.tv_sec = ts / 1000000;
+         stV4lBuf.timestamp.tv_usec = ts % 1000000;
++        v4l2_flags |= (V4L2_BUF_FLAG_TIMESTAMP_MASK | V4L2_BUF_FLAG_TIMESTAMP_COPY);
++    }else{
++        stV4lBuf.timestamp.tv_sec = -1;
++        stV4lBuf.timestamp.tv_usec = 0;
++        v4l2_flags |= IMX_V4L2_BUF_FLAG_TIMESTAMP_INVALID;
+     }
++
+     stV4lBuf.memory = mInMemType;
+     stV4lBuf.m.planes = &plane;
+     stV4lBuf.length = kInputBufferPlaneNum;
+@@ -871,7 +926,7 @@ QueueOneBuffer:
+         stV4lBuf.index, plane.bytesused, (long long)ts);
+ 
+     if(bMpeg2 && !input->csd){
+-        if(mLastInputTs == ts){
++        if(ts >= 0 && mLastInputTs == ts){
+             returnEmptyWork = true;
+         }else{
+             mLastInputTs = ts;
+@@ -1108,7 +1163,7 @@ status_t V4l2Dec::stopOutputStream()
+     Mutex::Autolock autoLock(mLock);
+     //call VIDIOC_STREAMOFF and ignore the result
+     enum v4l2_buf_type buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+-    ioctl(mFd, VIDIOC_STREAMOFF, &buf_type);
++    (void)ioctl(mFd, VIDIOC_STREAMOFF, &buf_type);
+     bOutputStreamOn = false;
+ 
+     // return capture buffer to component
+@@ -1197,7 +1252,7 @@ status_t V4l2Dec::onDequeueEvent()
+                 mState = STOPPED;
+                 break;
+             }
+-            case V4L2_EVENT_DECODE_ERROR:
++            case V4L2_EVENT_CODEC_ERROR:
+                 ALOGE("get V4L2_EVENT_DECODE_ERROR");
+                 NotifyError(UNKNOWN_ERROR);//send error event
+                 break;
+@@ -1228,9 +1283,9 @@ status_t V4l2Dec::DoSetConfig(DecConfig index, void* pConfig) {
+             int* format = (int*)pConfig;
+             // TODO: remove this OMX_VIDEO_WMVFormat9=0x08, OMX_VIDEO_WMVFormatWVC1=0x7f000002
+             if (*format == 0x08)
+-                mVc1Format = V4L2_PIX_FMT_VC1_ANNEX_G;
+-            else if (*format == 0x7f000002)
+                 mVc1Format = V4L2_PIX_FMT_VC1_ANNEX_L;
++            else if (*format == 0x7f000002)
++                mVc1Format = V4L2_PIX_FMT_VC1_ANNEX_G;
+ 
+             ALOGV("vc1 sub-format 0x%x mVc1Format %d", *format, mVc1Format);
+             break;
+@@ -1244,6 +1299,15 @@ status_t V4l2Dec::DoSetConfig(DecConfig index, void* pConfig) {
+             ALOGV("set DEC_CONFIG_HAL_PIXEL_FORMAT fmt=0x%x,bNeedPostProcess=%d",*format, bNeedPostProcess);
+             break;
+         }
++        case DEC_CONFIG_LOW_LATENCY: {
++            int32_t* enable = (int32_t*)pConfig;
++            ALOGV("set DEC_CONFIG_LOW_LATENCY enable=%d",*enable);
++            if(1 == *enable)
++                bLowLatency = true;
++            else
++                bLowLatency = false;
++            break;
++        }
+         default:
+             ret = BAD_VALUE;
+             break;
+@@ -1439,10 +1503,7 @@ status_t V4l2Dec::handleFormatChanged() {
+         if(result < 0)
+             return UNKNOWN_ERROR;
+ 
+-        if (bNeedPostProcess){
+-            mOutputFormat.minBufferNum = ctl.value+3;
+-        }else
+-            mOutputFormat.minBufferNum = ctl.value;
++        mOutputFormat.minBufferNum = ctl.value+1;
+ 
+         if(mOutputFormat.minBufferNum > mOutputFormat.bufferNum)
+             mOutputFormat.bufferNum = mOutputFormat.minBufferNum;
+@@ -1652,7 +1713,7 @@ void V4l2Dec::ParseVpuLogLevel()
+     int level=0;
+     FILE* fpVpuLog;
+     nDebugFlag = 0;
+-    
++
+     fpVpuLog=fopen(VPU_DECODER_LOG_LEVELFILE, "r");
+     if (NULL==fpVpuLog){
+         return;
+@@ -1723,6 +1784,11 @@ void V4l2Dec::dumpOutputBuffer(void* inBuf, uint32_t size)
+         ALOGV("dumpOutputBuffer failed to open %s",DUMP_DEC_OUTPUT_FILE);
+     return;
+ }
++bool V4l2Dec::OutputBufferFull() {
++    if(mOutputBufferMap.size() > mOutputFormat.bufferNum)
++        return true;
++    return false;
++}
+ 
+ VideoDecoderBase * CreateVideoDecoderInstance(const char* mime) {
+     return static_cast<VideoDecoderBase *>(new V4l2Dec(mime));
+diff --git a/codec2/video_dec/v4l2_dec/V4l2Dec.h b/codec2/video_dec/v4l2_dec/V4l2Dec.h
+index 2beb9ec..569b4cb 100644
+--- a/codec2/video_dec/v4l2_dec/V4l2Dec.h
++++ b/codec2/video_dec/v4l2_dec/V4l2Dec.h
+@@ -43,7 +43,7 @@ protected:
+ 
+     status_t allocateOutputBuffers() override;
+     status_t freeOutputBuffers() override;
+-
++    bool OutputBufferFull() override;
+ private:
+     enum {
+         kInputBufferPlaneNum = 1,
+@@ -119,6 +119,8 @@ private:
+ 
+     bool bNeedPostProcess;
+     bool bMpeg2;
++    bool bH264;
++    bool bLowLatency;
+ 
+     int mState;
+ 
+diff --git a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
+old mode 100644
+new mode 100755
+index a11cf12..28be856
+--- a/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
++++ b/codec2/video_dec/vpuwrapper_dec/VpuWrapperDec.cpp
+@@ -957,7 +957,9 @@ decode_one_frame:
+ 			NotifyError(TIMED_OUT);
+ 		}
+         NotifyError(UNKNOWN_ERROR);
+-		return UNKNOWN_ERROR;
++        //TODO: need remove below line
++        return OK;
++		//return UNKNOWN_ERROR;
+ 	}
+ 
+     VPU_COMP_LOG("%s: bufRetCode: 0x%X  
+", __FUNCTION__, bufRetCode);
+@@ -982,6 +984,9 @@ decode_one_frame:
+         NotifyError(err);
+     }
+ 
++    //TODO: need remove below line
++    err = OK;
++
+     return err;
+ }
+ 
+@@ -1022,6 +1027,10 @@ status_t VpuWrapperDec::setOutputBuffer(int32_t bufferId) {
+             }
+             VPU_COMP_LOG("return register frame, free buffers: %d", nFreeOutBufferCnt);
+         }
++        else{
++            VPU_COMP_LOG("setOutputBuffer incorrect state %d, don't register", eVpuDecoderState);
++            return BAD_VALUE;
++        }
+     } else {
+ 		VpuDecoderFrmState eState;
+ 		FramePoolGetBufProperty(&sFramePoolInfo, index, &eState, &pFrameInfo);
+diff --git a/codec2/video_enc/common/Android.bp b/codec2/video_enc/common/Android.bp
+index 7ca265b..87f8809 100644
+--- a/codec2/video_enc/common/Android.bp
++++ b/codec2/video_enc/common/Android.bp
+@@ -86,6 +86,7 @@ cc_library_shared {
+ 
+     defaults: [
+         "imx_defaults",
++        "imx_mm_common_default",
+         "imx_c2_video_enc_default",
+     ],
+ }
+diff --git a/codec2/video_enc/common/IMXC2VideoEncoder.cpp b/codec2/video_enc/common/IMXC2VideoEncoder.cpp
+old mode 100644
+new mode 100755
+index 899e0d3..eb9cdf9
+--- a/codec2/video_enc/common/IMXC2VideoEncoder.cpp
++++ b/codec2/video_enc/common/IMXC2VideoEncoder.cpp
+@@ -397,7 +397,7 @@ public:
+             { LEVEL_HEVC_MAIN_6_2, 4278190080, 35651584, 240000000 },
+         };
+ 
+-        uint64_t samples = size.v.width * size.v.height;
++        uint64_t samples = (uint64_t)size.v.width * size.v.height;
+         uint64_t samplesPerSec = samples * frameRate.v.value;
+ 
+         // Check if the supplied level meets the MB / bitrate requirements. If
+@@ -772,8 +772,11 @@ void IMXC2VideoEncoder::processWork(const std::unique_ptr<C2Work> &work) {
+ 
+     if (!bStarted) {
+         status_t err = initComponent();
+-        if (err != OK)
++        if (err != OK){
++            work->result = C2_CORRUPTED;
++            work->workletsProcessed = 1u;
+             return;
++        }
+ 
+         bStarted = true;
+     }
+@@ -914,6 +917,7 @@ status_t IMXC2VideoEncoder::initComponent() {
+     if (bPPEnabled) {
+         // init preprocess component
+         mPreProcess = CreatePreProcessInstance();
++
+         if (!mPreProcess) {
+             goto RELEASE_ENCODER;
+         }
+diff --git a/codec2/video_enc/common/VideoEncoderBase.cpp b/codec2/video_enc/common/VideoEncoderBase.cpp
+index c975022..6b74284 100755
+--- a/codec2/video_enc/common/VideoEncoderBase.cpp
++++ b/codec2/video_enc/common/VideoEncoderBase.cpp
+@@ -53,17 +53,25 @@ static void Reply(const sp<AMessage> &msg, int32_t *err = nullptr) {
+     reply->postReply(replyId);
+ }
+ 
+-VideoFormat::VideoFormat(
+-                    int format,
+-                    uint32_t minNumBuffers,
+-                    uint32_t width,
+-                    uint32_t height,
+-                    bool interlaced)
+-    : pixelFormat(format),
+-      minBufferNum(minNumBuffers),
+-      width(width),
+-      height(height),
+-      interlaced(interlaced) {
++VideoFormat::VideoFormat() {
++    pixelFormat = 0;//HalPixelFormat::UNKNOWN;
++    minBufferNum = 0;
++    width = DEFAULT_FRM_WIDTH;
++    height = DEFAULT_FRM_HEIGHT;
++    bufferNum = 0;
++    bufferSize = 0;
++    interlaced = false;
++}
++
++IMXInputBuffer::IMXInputBuffer() {
++    pInputVirt = nullptr;
++    pInputPhys = nullptr;
++    fd = -1;
++    id = -1;
++    size = 0;
++    timestamp = 0;
++    flag = 0;
++    eos = false;
+ }
+ 
+ IMXInputBuffer::IMXInputBuffer(IMXInputBuffer* pInput)
+@@ -100,7 +108,11 @@ IMXInputBuffer::IMXInputBuffer(
+ VideoEncoderBase::VideoEncoderBase()
+     : bInputEos(false),
+       bOutputEos(false),
+-      mLooper(new ALooper) {
++      mLooper(new ALooper),
++      mClient(nullptr) {
++    mWidth = DEFAULT_FRM_WIDTH;
++    mHeight = DEFAULT_FRM_HEIGHT;
++
+     mInputFormat.bufferNum = kInputBufferCount;
+     mInputFormat.bufferSize = kInputBufferSizeFor1080p;
+     mInputFormat.width = DEFAULT_FRM_WIDTH;
+@@ -118,6 +130,10 @@ VideoEncoderBase::VideoEncoderBase()
+ }
+ 
+ VideoEncoderBase::~VideoEncoderBase() {
++    if (mLooper != NULL) {
++        mLooper->unregisterHandler(id());
++        mLooper->stop();
++    }
+ }
+ 
+ status_t VideoEncoderBase::RegisterLooper() {
+@@ -164,9 +180,12 @@ status_t VideoEncoderBase::destroy() {
+     VEB_API_TRACE("%s, line %d", __FUNCTION__, __LINE__);
+ 
+     sp<AMessage> reply;
+-    (new AMessage(kWhatDestroy, this))->postAndAwaitResponse(&reply);
+-    int32_t err;
+-    CHECK(reply->findInt32("err", &err));
++    sp<AMessage> msg = new AMessage(kWhatDestroy, this);
++    status_t err = msg->postAndAwaitResponse(&reply);
++    if (err == OK && reply != NULL) {
++        CHECK(reply->findInt32("err", &err));
++    }
++
+     return err;
+ }
+ 
+diff --git a/codec2/video_enc/common/VideoEncoderBase.h b/codec2/video_enc/common/VideoEncoderBase.h
+index 2dba8c1..96cf4de 100755
+--- a/codec2/video_enc/common/VideoEncoderBase.h
++++ b/codec2/video_enc/common/VideoEncoderBase.h
+@@ -87,17 +87,15 @@ typedef struct {
+ 
+ 
+ struct VideoFormat {
+-    int pixelFormat = 0;//HalPixelFormat::UNKNOWN;
+-    uint32_t minBufferNum = 0;
++    int pixelFormat;//HalPixelFormat::UNKNOWN;
++    uint32_t minBufferNum;
+     uint32_t width;
+     uint32_t height;
+     uint32_t bufferNum;
+     uint32_t bufferSize;
+     bool interlaced;
+ 
+-    VideoFormat() {}
+-    VideoFormat(int format, uint32_t minNumBuffers, uint32_t width, uint32_t height,
+-                bool interlaced);
++    VideoFormat();
+ };
+ 
+ struct IMXInputBuffer{
+@@ -110,7 +108,7 @@ struct IMXInputBuffer{
+     uint32_t flag;
+     bool eos;
+ 
+-    IMXInputBuffer() {}
++    IMXInputBuffer();
+     IMXInputBuffer(IMXInputBuffer* pInput);
+     IMXInputBuffer(void* pVirt, void* pPhys, int fd, int id, uint32_t size, uint64_t timestamp, uint32_t flag, bool eos);
+ };
+diff --git a/codec2/video_enc/v4l2_enc/Android.bp b/codec2/video_enc/v4l2_enc/Android.bp
+index 47cd9a8..e149895 100644
+--- a/codec2/video_enc/v4l2_enc/Android.bp
++++ b/codec2/video_enc/v4l2_enc/Android.bp
+@@ -36,7 +36,8 @@ cc_library_shared {
+     ],
+ 
+     include_dirs: [
+-		"hardware/libhardware/include",
++        "device/nxp/common/kernel-headers",
++        "hardware/libhardware/include",
+         "frameworks/av/media/libstagefright/include",
+         "frameworks/av/media/codec2/core/include",
+         "frameworks/av/media/codec2/vndk/include",
+diff --git a/codec2/video_enc/v4l2_enc/V4l2Enc.cpp b/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
+index 7d1fdc7..9f2722a 100644
+--- a/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
++++ b/codec2/video_enc/v4l2_enc/V4l2Enc.cpp
+@@ -13,6 +13,7 @@
+ #include "graphics_ext.h"
+ #include <sys/mman.h>
+ #include "C2_imx.h"
++#include <linux/imx_vpu.h>
+ 
+ namespace android {
+ 
+@@ -33,7 +34,21 @@ V4l2Enc::V4l2Enc(const char* mime):
+     mPollThread(0),
+     mFetchThread(0),
+     pDev(NULL),
+-    mFd(-1){
++    mFd(-1),
++    mTargetFps(0),
++    mInFormat(V4L2_PIX_FMT_NV12),
++    mOutFormat(V4L2_PIX_FMT_H264),
++    mWidthAlign(0),
++    mHeightAlign(0),
++    bPollStarted(false),
++    bFetchStarted(false),
++    bInputStreamOn(false),
++    bOutputStreamOn(false),
++    bSyncFrame(false),
++    bHasCodecData(false),
++    bStarted(false),
++    mFrameOutNum(0),
++    nDebugFlag(0){
+ 
+     mInputFormat.bufferNum = DEFAULT_INPUT_BUFFER_COUNT;
+     mInputFormat.bufferSize = DEFAULT_FRM_WIDTH * DEFAULT_FRM_HEIGHT * 3/2;
+@@ -48,6 +63,14 @@ V4l2Enc::V4l2Enc(const char* mime):
+     mOutputFormat.bufferNum = kDefaultOutputBufferCount;
+     mOutputFormat.interlaced = false;
+ 
++    memset(&mEncParam, 0, sizeof(V4l2EncInputParam));
++    memset(&mIsoColorAspect, 0, sizeof(VideoColorAspect));
++    memset(&mInputPlaneSize[0], 0, kInputBufferPlaneNum * sizeof(uint32_t));
++
++    //V4L2_MEMORY_USERPTR; V4L2_MEMORY_DMABUF; V4L2_MEMORY_MMAP
++    mInMemType = V4L2_MEMORY_DMABUF;
++    mOutMemType = V4L2_MEMORY_MMAP;
++
+     mConverter = NULL;
+ 
+     bPreProcess = false;
+@@ -57,9 +80,9 @@ V4l2Enc::V4l2Enc(const char* mime):
+ }
+ V4l2Enc::~V4l2Enc()
+ {
+-    if(bFetchStarted || bPollStarted)
++    if(pDev != NULL && (bFetchStarted || bPollStarted))
+         onStop();
+-
++    ALOGV("V4l2Enc::~V4l2Enc");
+     onDestroy();
+ }
+ status_t V4l2Enc::onInit(){
+@@ -77,9 +100,6 @@ status_t V4l2Enc::onInit(){
+     if(mFd < 0)
+         return ret;
+ 
+-    //V4L2_MEMORY_USERPTR; V4L2_MEMORY_DMABUF; V4L2_MEMORY_MMAP
+-    mInMemType = V4L2_MEMORY_DMABUF;
+-    mOutMemType = V4L2_MEMORY_MMAP;
+     mFrameOutNum = 0;
+ 
+     ret = prepareOutputParams();
+@@ -361,6 +381,7 @@ V4l2Enc::InputRecord::~InputRecord() {}
+ 
+ V4l2Enc::OutputRecord::OutputRecord()
+     : at_device(false), picture_id(0), flag(0) {
++    memset(&plane, 0, sizeof(VideoFramePlane));
+ }
+ 
+ V4l2Enc::OutputRecord::~OutputRecord() {
+@@ -844,7 +865,7 @@ status_t V4l2Enc::queueOutput(int buffer_id, int fd, unsigned long nVaddr)
+         //index not found
+         if(index < 0){
+             for(int32_t i = 0; i < mOutputBufferMap.size(); i++){
+-                if(-1 == mOutputBufferMap[i].plane.fd && !mOutputBufferMap[index].at_device){
++                if(-1 == mOutputBufferMap[i].plane.fd){
+                     mOutputBufferMap[i].plane.fd = fd;
+                     mOutputBufferMap[i].plane.addr = nVaddr;
+                     mOutputBufferMap[i].plane.offset = 0;
+@@ -964,12 +985,13 @@ status_t V4l2Enc::startOutputStream()
+ status_t V4l2Enc::stopOutputStream()
+ {
+     Mutex::Autolock autoLock(mLock);
++    int result = 0;
+ 
+     //call VIDIOC_STREAMOFF and ignore the result
+     enum v4l2_buf_type buf_type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+-    ioctl(mFd, VIDIOC_STREAMOFF, &buf_type);
++    result = ioctl(mFd, VIDIOC_STREAMOFF, &buf_type);
+     bOutputStreamOn = false;
+-    ALOGV("VIDIOC_STREAMOFF CAPTURE_MPLANE success");
++    ALOGV("VIDIOC_STREAMOFF CAPTURE_MPLANE ret %d", result);
+ 
+     for (size_t i = 0; i < mOutputBufferMap.size(); i++) {
+         mOutputBufferMap[i].at_device = false;
+@@ -1067,7 +1089,7 @@ status_t V4l2Enc::onDequeueEvent()
+             case V4L2_EVENT_EOS:
+                 ALOGV("get V4L2_EVENT_EOS event, wait for last frame");
+                 break;
+-            case V4L2_EVENT_DECODE_ERROR:
++            case V4L2_EVENT_CODEC_ERROR:
+                 NotifyError(UNKNOWN_ERROR);//send error event
+                 break;
+             default:
+diff --git a/codec2/video_enc/v4l2_enc/v4l2_enc.go b/codec2/video_enc/v4l2_enc/v4l2_enc.go
+old mode 100755
+new mode 100644
+diff --git a/extractor/ImxExtractor.cpp b/extractor/ImxExtractor.cpp
+index 91f5f34..2b27f31 100755
+--- a/extractor/ImxExtractor.cpp
++++ b/extractor/ImxExtractor.cpp
+@@ -3133,7 +3133,7 @@ media_status_t ImxExtractor::GetNextSample(uint32_t index,bool is_sync)
+                 // return aac adts by frame
+                 MediaBufferHelper *newBuf;
+                 size_t size = mAdtsBuffer->size() + pInfo->buffer->range_length();
+-                mReader->AcquireBuffer(0, size, &newBuf);
++                mReader->AcquireBuffer(pInfo->mTrackNum, size, &newBuf);
+ 
+                 if (newBuf && (OK == GetAacAdtsFrames(pInfo->buffer, newBuf))) {
+                     pInfo->buffer->release();
+diff --git a/extractor/ImxInspector.cpp b/extractor/ImxInspector.cpp
+index cc6743a..d97e289 100755
+--- a/extractor/ImxInspector.cpp
++++ b/extractor/ImxInspector.cpp
+@@ -34,12 +34,6 @@ static std::unordered_map<uint64_t, int32_t> gMp4FilteredFiles = {
+     //binary_counter_320x240_30fps_600frames_editlist.mp4
+     //android.media.cts.MediaMetadataRetrieverTest#testGetFrameAtTimeClosestSyncEditList
+     {94827,  1},
+-    //monotestoggmp4.mp4
+-    //android.media.cts.DecoderTest#testDecodeMonoOggMp4
+-    {20112,  2},
+-    //sinesweepoggmp4.mp4
+-    //android.media.cts.DecoderTest#testDecodeOggMp4
+-    {17342,  3},
+     //android.media.cts.MediaMetadataRetrieverTest#test3gppMetadata
+     //testvideo.3gp
+     {504045, 5},
+diff --git a/mediacodec-profile/imx8q/media_codecs_performance_c2.xml b/mediacodec-profile/imx8q/media_codecs_performance_c2.xml
+index 7d4d454..d4fb11c 100644
+--- a/mediacodec-profile/imx8q/media_codecs_performance_c2.xml
++++ b/mediacodec-profile/imx8q/media_codecs_performance_c2.xml
+@@ -18,31 +18,30 @@
+ <MediaCodecs>
+     <Encoders>
+         <MediaCodec name="c2.android.h263.encoder" type="video/3gpp" update="true">
+-            <Limit name="measured-frame-rate-176x144" range="192-200" />
++            <Limit name="measured-frame-rate-176x144" range="262-269" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.avc.encoder" type="video/avc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="137-151" />
+-            <Limit name="measured-frame-rate-720x480" range="53-53" />
+-            <Limit name="measured-frame-rate-1280x720" range="25-26" />
+-            <Limit name="measured-frame-rate-1920x1080" range="12-12" />
++            <Limit name="measured-frame-rate-320x240" range="100-110" />
++            <Limit name="measured-frame-rate-720x480" range="30-31" />
++            <Limit name="measured-frame-rate-1280x720" range="11-12" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.hevc.encoder" type="video/hevc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="37-45" />
++            <Limit name="measured-frame-rate-320x240" range="19-19" />
++            <Limit name="measured-frame-rate-720x480" range="6-6" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.mpeg4.encoder" type="video/mp4v-es" update="true">
+-            <Limit name="measured-frame-rate-176x144" range="232-235" />
++            <Limit name="measured-frame-rate-176x144" range="260-265" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" update="true">
+-            <Limit name="measured-frame-rate-320x180" range="69-69" />
+-            <Limit name="measured-frame-rate-640x360" range="35-35" />
+-            <Limit name="measured-frame-rate-1280x720" range="17-17" />
+-            <Limit name="measured-frame-rate-1920x1080" range="8-8" />
++            <Limit name="measured-frame-rate-320x180" range="60-61" />
++            <Limit name="measured-frame-rate-640x360" range="33-33" />
++            <Limit name="measured-frame-rate-1280x720" range="9-9" />
+         </MediaCodec>
+         <MediaCodec name="c2.imx.avc.encoder" type="video/avc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="388-390" />
+-            <Limit name="measured-frame-rate-720x480" range="125-127" />
+-            <Limit name="measured-frame-rate-1280x720" range="60-62" />
+-            <Limit name="measured-frame-rate-1920x1080" range="29-29" />
++            <Limit name="measured-frame-rate-320x240" range="173-286" />
++            <Limit name="measured-frame-rate-720x480" range="115-119" />
++            <Limit name="measured-frame-rate-1280x720" range="54-55" />
++            <Limit name="measured-frame-rate-1920x1080" range="26-27" />
+         </MediaCodec>
+     </Encoders>
+     <Decoders>
+diff --git a/mediacodec-profile/imx8q/media_codecs_performance_c2_8qxp.xml b/mediacodec-profile/imx8q/media_codecs_performance_c2_8qxp.xml
+index 7d4d454..d4fb11c 100644
+--- a/mediacodec-profile/imx8q/media_codecs_performance_c2_8qxp.xml
++++ b/mediacodec-profile/imx8q/media_codecs_performance_c2_8qxp.xml
+@@ -18,31 +18,30 @@
+ <MediaCodecs>
+     <Encoders>
+         <MediaCodec name="c2.android.h263.encoder" type="video/3gpp" update="true">
+-            <Limit name="measured-frame-rate-176x144" range="192-200" />
++            <Limit name="measured-frame-rate-176x144" range="262-269" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.avc.encoder" type="video/avc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="137-151" />
+-            <Limit name="measured-frame-rate-720x480" range="53-53" />
+-            <Limit name="measured-frame-rate-1280x720" range="25-26" />
+-            <Limit name="measured-frame-rate-1920x1080" range="12-12" />
++            <Limit name="measured-frame-rate-320x240" range="100-110" />
++            <Limit name="measured-frame-rate-720x480" range="30-31" />
++            <Limit name="measured-frame-rate-1280x720" range="11-12" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.hevc.encoder" type="video/hevc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="37-45" />
++            <Limit name="measured-frame-rate-320x240" range="19-19" />
++            <Limit name="measured-frame-rate-720x480" range="6-6" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.mpeg4.encoder" type="video/mp4v-es" update="true">
+-            <Limit name="measured-frame-rate-176x144" range="232-235" />
++            <Limit name="measured-frame-rate-176x144" range="260-265" />
+         </MediaCodec>
+         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" update="true">
+-            <Limit name="measured-frame-rate-320x180" range="69-69" />
+-            <Limit name="measured-frame-rate-640x360" range="35-35" />
+-            <Limit name="measured-frame-rate-1280x720" range="17-17" />
+-            <Limit name="measured-frame-rate-1920x1080" range="8-8" />
++            <Limit name="measured-frame-rate-320x180" range="60-61" />
++            <Limit name="measured-frame-rate-640x360" range="33-33" />
++            <Limit name="measured-frame-rate-1280x720" range="9-9" />
+         </MediaCodec>
+         <MediaCodec name="c2.imx.avc.encoder" type="video/avc" update="true">
+-            <Limit name="measured-frame-rate-320x240" range="388-390" />
+-            <Limit name="measured-frame-rate-720x480" range="125-127" />
+-            <Limit name="measured-frame-rate-1280x720" range="60-62" />
+-            <Limit name="measured-frame-rate-1920x1080" range="29-29" />
++            <Limit name="measured-frame-rate-320x240" range="173-286" />
++            <Limit name="measured-frame-rate-720x480" range="115-119" />
++            <Limit name="measured-frame-rate-1280x720" range="54-55" />
++            <Limit name="measured-frame-rate-1920x1080" range="26-27" />
+         </MediaCodec>
+     </Encoders>
+     <Decoders>

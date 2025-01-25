@@ -1,0 +1,75 @@
+4f088a9d George.Huang 2020-05-15
+
+AOS-193: Disable kernel uart log only for secure-user build
+
+1. CONFIG_SERIAL_IMX_CONSOLE can be overridden in android_secure_defconfig
+
+2  Test result on devboard:
+   bootloader time (sec) | Save time (sec) |
+             25.5 > 20.7 |             4.8 |
+
+             3. Test result on evkboard:
+   bootloader time (sec) | Save time (sec) |
+            18.79 > 15.6 |             3.1 |
+
+Change-Id: Iada438ee9d3473289ca74ca75d4a655b86eb3c40
+
+diff --git a/common/build/kernel.mk b/common/build/kernel.mk
+index 18725ca2..29e8d3f3 100644
+--- a/common/build/kernel.mk
++++ b/common/build/kernel.mk
+@@ -116,8 +116,15 @@ KERNEL_CONFIG_ADDITION := $(TARGET_DEVICE_DIR)/$(TARGET_KERNEL_ADDITION_DEFCONF)
+ else
+ KERNEL_CONFIG_ADDITION :=
+ endif
++KERNEL_CONFIG_SECURE :=
++ifneq ($(TARGET_KERNEL_SECURE_DEFCONF),)
++ifeq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++KERNEL_CONFIG_SECURE := $(TARGET_DEVICE_DIR)/$(TARGET_KERNEL_SECURE_DEFCONF)
++endif
++endif
+ KERNEL_CONFIG_SRC := $(KERNEL_CONFIG_DEFAULT) \
+-  $(KERNEL_CONFIG_ADDITION)
++  $(KERNEL_CONFIG_ADDITION) \
++  $(KERNEL_CONFIG_SECURE)
+ KERNEL_CONFIG := $(KERNEL_OUT)/.config
+ KERNEL_MERGE_CONFIG := device/idtech/common/tools/mergeconfig.sh
+ 
+diff --git a/imx8m/evk_a300/UbootKernelBoardConfig.mk b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+index 0e21e87e..5e734ba9 100644
+--- a/imx8m/evk_a300/UbootKernelBoardConfig.mk
++++ b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+@@ -15,6 +15,7 @@ TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android
+ 
+ TARGET_KERNEL_DEFCONFIG := android_defconfig
+ # TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+diff --git a/imx8m/evk_a300/android_secure_defconfig b/imx8m/evk_a300/android_secure_defconfig
+new file mode 100644
+index 00000000..07c19dbb
+--- /dev/null
++++ b/imx8m/evk_a300/android_secure_defconfig
+@@ -0,0 +1 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
+diff --git a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+index 169b8566..ff7ba954 100644
+--- a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+@@ -29,6 +29,7 @@ TARGET_BOOTLOADER_CONFIG += imx8mq-evk-evk-uuu:vp6820_8mq_evk_android_uuu_defcon
+ 
+ TARGET_KERNEL_DEFCONFIG := android_defconfig
+ # TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+diff --git a/imx8m/vp6820_8mq/android_secure_defconfig b/imx8m/vp6820_8mq/android_secure_defconfig
+new file mode 100644
+index 00000000..07c19dbb
+--- /dev/null
++++ b/imx8m/vp6820_8mq/android_secure_defconfig
+@@ -0,0 +1 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set

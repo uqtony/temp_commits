@@ -1,0 +1,252 @@
+92e7e6456d8e owen.wen 2022-03-08
+
+AOS-891: android12: fix conflict camera driver
+
+refer to below to fix camera driver
+commit 569f420bba36 ("MA-19289-1 [Android] use s/g_frame_interval to set fps")
+
+Change-Id: I7e6c6f55af63fe03f88e66f4700d43f92b5aed46
+
+diff --git a/drivers/media/i2c/s5k5e9.c b/drivers/media/i2c/s5k5e9.c
+index 87bce90a101f..c70ef021e2e2 100644
+--- a/drivers/media/i2c/s5k5e9.c
++++ b/drivers/media/i2c/s5k5e9.c
+@@ -580,93 +580,25 @@ static int s5k5e9_s_stream(struct v4l2_subdev *sd, int on)
+ 	return ret;
+ }
+ 
+-static int s5k5e9_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int s5k5e9_g_frame_interval(struct v4l2_subdev *sd,
++			struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct s5k5e9 *sensor = sd_to_s5k5e9(sd);
+-	struct v4l2_captureparm *cparm = &a->parm.capture;
+-	int ret = 0;
+ 
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		memset(a, 0, sizeof(*a));
+-		a->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+-		cparm->capability = sensor->streamcap.capability;
+-		cparm->timeperframe = sensor->streamcap.timeperframe;
+-		cparm->capturemode = sensor->streamcap.capturemode;
+-		ret = 0;
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(sensor->dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
++	ival->interval = sensor->streamcap.timeperframe;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+-static int s5k5e9_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int s5k5e9_s_frame_interval(struct v4l2_subdev *sd,
++			struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct s5k5e9 *sensor = sd_to_s5k5e9(sd);
+-	int ret = 0;
++	struct v4l2_fract *timeperframe = &ival->interval;
+ 
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		/* currently only support default 30 fps */
+-		sensor->streamcap.capturemode = 0;
+-		sensor->streamcap.timeperframe.denominator = S5K5E9_DEFAULT_FPS;
+-		sensor->streamcap.timeperframe.numerator = 1;
+-		switch (a->parm.capture.capturemode) {
+-		case s5k5e9_mode_1600_1600:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_1600_1600_setting,
+-				sizeof(s5k5e9_cap_res_1600_1600_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		case s5k5e9_mode_1200_1200:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_1200_1200_setting,
+-				sizeof(s5k5e9_cap_res_1200_1200_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		case s5k5e9_mode_800_800:
+-			ret = s5k5e9_i2c_array_write(sensor, s5k5e9_cap_res_800_800_setting,
+-				sizeof(s5k5e9_cap_res_800_800_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		}
++	sensor->streamcap.timeperframe = *timeperframe;
+ 
+-		if (ret)
+-			dev_err(sensor->dev, "%s: array write capture resolution %d
+",
+-				__func__, ret);
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		dev_warn(sensor->dev, "Type is not V4L2_BUF_TYPE_VIDEO_CAPTURE but %d
+",
+-			a->type);
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(sensor->dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
+-
+-	return ret;
++	return 0;
+ }
+ 
+ static int s5k5e9_check_chip_id(struct s5k5e9 *sensor)
+@@ -694,8 +626,8 @@ static const struct v4l2_subdev_core_ops s5k5e9_core_ops = {
+ };
+ 
+ static const struct v4l2_subdev_video_ops s5k5e9_video_ops = {
+-	.g_parm = s5k5e9_g_parm,
+-	.s_parm = s5k5e9_s_parm,
++	.g_frame_interval = s5k5e9_g_frame_interval,
++	.s_frame_interval = s5k5e9_s_frame_interval,
+ 	.s_stream = s5k5e9_s_stream,
+ };
+ 
+diff --git a/drivers/media/platform/mxc/capture/gc02m2_mipi.c b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+index 2e2b4a4f03e3..00282b29b24f 100644
+--- a/drivers/media/platform/mxc/capture/gc02m2_mipi.c
++++ b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+@@ -473,93 +473,27 @@ static int gc02m2_s_power(struct v4l2_subdev *subdev, int on)
+ 	return ret;
+ }
+ 
+-static int gc02m2_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int gc02m2_g_frame_interval(struct v4l2_subdev *sd,
++			struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct gc02m2 *sensor = to_gc02m2(client);
+-	struct device *dev = &sensor->i2c_client->dev;
+-	struct v4l2_captureparm *cparm = &a->parm.capture;
+-	int ret = 0;
+ 
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		memset(a, 0, sizeof(*a));
+-		a->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+-		cparm->capability = sensor->streamcap.capability;
+-		cparm->timeperframe = sensor->streamcap.timeperframe;
+-		cparm->capturemode = sensor->streamcap.capturemode;
+-		ret = 0;
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
++	ival->interval = sensor->streamcap.timeperframe;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+-static int gc02m2_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *a)
++static int gc02m2_s_frame_interval(struct v4l2_subdev *sd,
++			struct v4l2_subdev_frame_interval *ival)
+ {
+ 	struct i2c_client *client = v4l2_get_subdevdata(sd);
+ 	struct gc02m2 *sensor = to_gc02m2(client);
+-	struct device *dev = &sensor->i2c_client->dev;
+-	int ret = 0;
++	struct v4l2_fract *timeperframe = &ival->interval;
+ 
+-	switch (a->type) {
+-	/* This is the only case currently handled. */
+-	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+-		/* currently only support default 30 fps */
+-	        sensor->streamcap.capturemode = 0;
+-		sensor->streamcap.timeperframe.denominator = DEFAULT_FPS;
+-	        sensor->streamcap.timeperframe.numerator = 1;
+-		switch (a->parm.capture.capturemode) {
+-		case gc02m2_mode_1600_1200:
+-			ret = gc02m2_write_reg_array(sensor->i2c_client, gc02m2_1600_1200_setting,
+-				sizeof(gc02m2_1600_1200_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		case gc02m2_mode_1280_720:
+-			ret = gc02m2_write_reg_array(sensor->i2c_client, gc02m2_1280_720_setting,
+-				sizeof(gc02m2_1280_720_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		case gc02m2_mode_800_480:
+-			ret = gc02m2_write_reg_array(sensor->i2c_client, gc02m2_800_480_setting,
+-				sizeof(gc02m2_800_480_setting)/sizeof(struct sensor_reg_value));
+-			break;
+-		}
+-		break;
+-
+-	/* These are all the possible cases. */
+-	case V4L2_BUF_TYPE_VIDEO_OUTPUT:
+-	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
+-	case V4L2_BUF_TYPE_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_VBI_OUTPUT:
+-	case V4L2_BUF_TYPE_SLICED_VBI_CAPTURE:
+-	case V4L2_BUF_TYPE_SLICED_VBI_OUTPUT:
+-		dev_warn(dev, "Type is not V4L2_BUF_TYPE_VIDEO_CAPTURE but %d
+",
+-			a->type);
+-		ret = -EINVAL;
+-		break;
+-
+-	default:
+-		dev_warn(dev, "Type is unknown - %d
+", a->type);
+-		ret = -EINVAL;
+-		break;
+-	}
++	sensor->streamcap.timeperframe = *timeperframe;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ static const struct v4l2_mbus_framefmt *find_sensor_format(
+@@ -741,8 +675,8 @@ static int init_device(struct gc02m2 *sensor)
+ }
+ 
+ static const struct v4l2_subdev_video_ops gc02m2_video_ops = {
+-	.g_parm = gc02m2_g_parm,
+-	.s_parm = gc02m2_s_parm,
++	.g_frame_interval = gc02m2_g_frame_interval,
++	.s_frame_interval = gc02m2_s_frame_interval,
+ 	.s_stream = gc02m2_s_stream,
+ };
+ 

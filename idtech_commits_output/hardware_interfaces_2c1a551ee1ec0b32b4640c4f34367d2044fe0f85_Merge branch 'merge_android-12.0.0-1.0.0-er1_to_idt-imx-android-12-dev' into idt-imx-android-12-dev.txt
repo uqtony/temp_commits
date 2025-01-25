@@ -1,0 +1,84 @@
+2c1a551ee jenkins 2022-02-21
+
+Merge branch 'merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev' into idt-imx-android-12-dev
+
+Change-Id: I09beeb53d5831c7dfb09f1629ec2ca5287df58cf
+
+diff --cc automotive/vehicle/2.0/default/Android.bp
+index ee179f392,ffa0c1395..f7f3f1ebd
+--- a/automotive/vehicle/2.0/default/Android.bp
++++ b/automotive/vehicle/2.0/default/Android.bp
+@@@ -208,8 -219,33 +219,33 @@@ cc_binary 
+      ],
+      static_libs: [
+          "android.hardware.automotive.vehicle@2.0-manager-lib",
+ -        "android.hardware.automotive.vehicle@2.0-default-impl-lib",
+ +        "android.hardware.automotive.vehicle@2.0-imx-impl-lib",
+          "android.hardware.automotive.vehicle@2.0-libproto-native",
+-         "libqemu_pipe",
+      ],
+  }
++ 
++ cc_fuzz {
++     name: "vehicleManager_fuzzer",
++     vendor: true,
++     defaults: ["vhal_v2_0_target_defaults"],
++     whole_static_libs: ["android.hardware.automotive.vehicle@2.0-manager-lib"],
++     srcs: [
++         "tests/fuzzer/VehicleManager_fuzzer.cpp",
++     ],
++     shared_libs: [
++         "libbase",
++         "libcutils",
++         "libbinder_ndk",
++     ],
++     header_libs: ["libbase_headers"],
++     local_include_dirs: [
++         "common/include",
++         "tests",
++     ],
++     fuzz_config: {
++         cc: [
++             "android-media-fuzzing-reports@google.com",
++         ],
++         componentid: 533764,
++     },
++ }
+diff --cc compatibility_matrices/Android.bp
+index ba9d7d02d,31fa1ae40..c56528b55
+--- a/compatibility_matrices/Android.bp
++++ b/compatibility_matrices/Android.bp
+@@@ -88,6 -57,32 +57,33 @@@ vintf_compatibility_matrix 
+          "kernel_config_r_4.14",
+          "kernel_config_r_4.19",
+          "kernel_config_r_5.4",
+ +        "kernel_config_r_5.10",
+      ],
+  }
++ 
++ vintf_compatibility_matrix {
++     name: "framework_compatibility_matrix.6.xml",
++     stem: "compatibility_matrix.6.xml",
++     srcs: [
++         "compatibility_matrix.6.xml",
++     ],
++     kernel_configs: [
++         "kernel_config_s_4.19",
++         "kernel_config_s_5.4",
++         "kernel_config_s_5.10",
++     ],
++ }
++ 
++ vintf_compatibility_matrix {
++     name: "framework_compatibility_matrix.current.xml",
++     enabled: false,
++     stem: "compatibility_matrix.current.xml",
++     srcs: [
++         "compatibility_matrix.current.xml",
++     ],
++     kernel_configs: [
++         "kernel_config_current_4.19",
++         "kernel_config_current_5.4",
++         "kernel_config_current_5.10",
++     ],
++ }

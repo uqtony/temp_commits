@@ -1,0 +1,513 @@
+aeafa2ec George.Huang 2022-03-17
+
+Merge tag 'android-12.0.0_1.0.0' into HEAD
+
+android-12.0.0_1.0.0
+
+Change-Id: I12412fe2b4b4dd2d35c6ef92bd5d397edcf1e7c7
+
+diff --cc common/tools/uuu_imx_android_flash.bat
+index 2afa6b8d,09f6d948..7e5a40aa
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@@ -1,8 -1,7 +1,8 @@@
+  :: Do not output the command
+  @echo off
+  
+- set uuu_version=1.4.139
+ -echo This script is validated with uuu 1.4.182 version, it is recommended to align with this version.
+++set uuu_version=1.4.182
+ +echo This script is validated with uuu %uuu_version% version, it is recommended to align with this version.
+  
+  ::---------------------------------------------------------------------------------
+  ::Variables
+@@@ -610,10 -524,9 +610,10 @@@ goto :eo
+  :help
+  echo.
+  echo Version: 1.8
+- echo Last change: support -usb option to specify the usb path to monitor
++ echo Last change: change the recommended uuu version as VID/PID values used in uboot are changed
+  echo currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+  echo.
+ +echo eg: uuu_imx_android_flash.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+  echo eg: uuu_imx_android_flash.bat -f imx8mm -a -e -D C:\Users\user_01\imagesvk_8mm\ -t emmc -u trusty -d mipi-panel
+  echo.
+  echo Usage: %script_name% ^<option^>
+diff --cc common/tools/uuu_imx_android_flash.sh
+index 74b27ad1,4946cfc3..7d504e88
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@@ -6,10 -6,9 +6,10 @@@ bn=`basename $0
+  cat << EOF
+  
+  Version: 1.8
+- Last change: support -usb option to specify the usb path to monitor
++ Last change: change the recommended uuu version as VID/PID values used in uboot are changed
+  currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+  
+ +eg: ./uuu_imx_android_flash.sh -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+  eg: ./uuu_imx_android_flash.sh -f imx8mm -a -e -D ~/evk_8mm/ -t emmc -u trusty -d mipi-panel
+  
+  Usage: $bn <option>
+@@@ -551,8 -393,7 +551,8 @@@ imx8ulp_dtb_feature=(hdmi epdc
+  imx7ulp_dtb_feature=(evk-mipi evk mipi)
+  
+  
+- uuu_version="1.4.139"
+ -echo -e This script is validated with ${RED}uuu 1.4.182${STD} version, it is recommended to align with this version.
+++uuu_version="1.4.182"
+ +echo -e This script is validated with ${RED}uuu ${uuu_version}${STD} version, it is recommended to align with this version.
+  
+  if [ $# -eq 0 ]; then
+      echo -e >&2 ${RED}please provide more information with command script options${STD}
+diff --cc imx8m/ProductConfigCommon.mk
+index 69cd2f0e,280a187f..0d7a0a6e
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@@ -409,21 -352,10 +409,26 @@@ ifneq (,$(filter userdebug, $(TARGET_BU
+      $(call add-product-dex-preopt-module-config,services,--generate-mini-debug-info)
+      $(call add-product-dex-preopt-module-config,wifi-service,--generate-mini-debug-info)
+  
++     PRODUCT_PROPERTY_OVERRIDES += \
++       logd.logpersistd.rotate_kbytes=51200 \
++       logd.logpersistd=logcatd \
++       logd.logpersistd.size=3
+++
+ +    # idtech idg spi console tool for test & debug
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_tool
+ +
+ +    # idtech idg spi service daemon
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_service
+ +
+ +    # idtech idg spi client
+ +    PRODUCT_PACKAGES += \
+ +        idg_spi_client
+ +
+ +    # idtech idg console tool
+ +    PRODUCT_PACKAGES += \
+ +        idg_console_tool
+  endif
+  
+  #Dumpstate HAL 1.1 support
+diff --cc imx8m/bigcypress_8mp/thermal_info_config_imx8mp.json
+index 68aa4ee0,69803f5d..408b6638
+--- a/imx8m/bigcypress_8mp/thermal_info_config_imx8mp.json
++++ b/imx8m/bigcypress_8mp/thermal_info_config_imx8mp.json
+@@@ -73,16 -73,12 +73,12 @@@
+      ],
+      "CoolingDevices":[
+          {
+-             "Name":"thermal-devfreq-0",
+-             "Type": "CPU"
+-         },
+-         {
+-             "Name":"thermal-devfreq-1",
+ -            "Name":"thermal-cpufreq-0",
+--            "Type":"CPU"
+++            "Name":"thermal-gpufreq-0",
+++            "Type": "GPU"
+          },
+          {
+ -            "Name":"thermal-gpufreq-0",
+ -            "Type":"GPU"
+ +            "Name":"thermal-cpufreq-0",
+ +            "Type":"CPU"
+          }
+      ]
+  }
+diff --cc imx8m/bigcypress_8mq/init.imx8mq.rc
+index 86286707,ef7d1294..6b2b0a78
+mode 100755,100644..100755
+--- a/imx8m/bigcypress_8mq/init.imx8mq.rc
++++ b/imx8m/bigcypress_8mq/init.imx8mq.rc
+@@@ -30,9 -30,12 +30,8 @@@ on property:sys.boot_completed=
+      write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+      # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+      # Set up and down limit to 200us/200us
+-     write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-     write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++     write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+      write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+ -    chown mediacodec mediacodec /sys/class/remoteproc/remoteproc0/state
+ -    chmod 0660 /sys/class/remoteproc/remoteproc0/state
+ -    chown mediacodec mediacodec /sys/class/remoteproc/remoteproc0/name
+ -    chmod 0660 /sys/class/remoteproc/remoteproc0/name
+  
+  on property:sys.boot_completed=1
+      # update cpuset now that processors are up
+diff --cc imx8m/kingscanyon_8mq/init.rc
+index 8fc775ce,af190411..b1f00afc
+--- a/imx8m/kingscanyon_8mq/init.rc
++++ b/imx8m/kingscanyon_8mq/init.rc
+@@@ -81,16 -87,8 +85,13 @@@ on late-fs && property:vendor.skip.char
+  
+      mount_all /vendor/etc/fstab.nxp --late
+  
+- on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-     start vendor.oemlock-1-0
+- 
+  on early-boot && property:vendor.skip.charger_not_need=0
+ -    setprop vendor.sys.hwc.disable     0
+ +    # For kingscanyon_8mq, when swap used about 400M, upgrade the level.
+ +    setprop ro.lmk.upgrade_pressure 87
+ +    setprop ro.lmk.downgrade_pressure 95
+ +    setprop ro.lmk.critical_upgrade true
+ +
+ +    setprop vendor.sys.hwc.disable     1
+      setprop vendor.2d.composition 0
+      setprop vendor.hwc.stretch.filter  1
+  
+@@@ -258,11 -215,14 +259,11 @@@ service early_init_sh /vendor/bin/init.
+  on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+      # create temp node for secure storage proxy
+      mkdir /data/vendor/ss 0700 system system
+-     start storageproxyd
++     restart storageproxyd
+  
+ -# set freq coefficient to 3 for get better performance in i.MX8Q series SoC
+ -on property:sys.boot_completed=1
+ -    write /sys/devices/system/cpu/cpufreq/schedutil/freq_coefficient 3
+ -
+  service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk0rpmb -d /dev/trusty-ipc-dev0
+ -    group system
+ +   group system
+ +
+  
+  on property:ro.boot.vendor.sysrq=1 && property:vendor.skip.charger_not_need=0
+      write /proc/sys/kernel/sysrq 1
+diff --cc imx8m/redwood_8mq/init.rc
+index 88f08026,00000000..fe815f8c
+mode 100644,000000..100644
+--- a/imx8m/redwood_8mq/init.rc
++++ b/imx8m/redwood_8mq/init.rc
+@@@ -1,262 -1,0 +1,263 @@@
+ +import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ +import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
+ +import /product/etc/init/hw/init.idt.common.rc
+ +
+ +service vendor.charger /system/bin/charger
+ +    class charger
+ +    user system
+ +    group system wakelock input
+ +    capabilities SYS_BOOT
+ +    file /dev/kmsg w
+ +    file /sys/fs/pstore/console-ramoops-0 r
+ +    file /sys/fs/pstore/console-ramoops r
+ +    file /proc/last_kmsg r
+ +
+ +on charger
+ +    start vendor.charger
+ +
+ +on early-init
+ +    # mount the debugfs
+ +    mount debugfs none /sys/kernel/debug/ mode=0755
+ +
+ +on early-init
+ +    start early_init_sh
+ +    # Set the host name which used in console
+ +    export HOSTNAME redwood_8mq
+ +
+ +    # Due keymaster start very early so set prop here
+ +    # Also gatekeeper share same role for keymaster
+ +    setprop ro.hardware.keystore ${ro.boot.keystore}
+ +    setprop ro.hardware.gatekeeper ${ro.boot.keystore}
+ +    setprop vendor.storageproxyd ${ro.boot.keystore}
+ +
+ +    # Use ro.boot.lcd_density to override ro.sf.lcd_density
+ +    setprop ro.sf.lcd_density ${ro.boot.lcd_density}
+ +
+ +# Skip charger_not_need trigger for charger mode
+ +on early-init && property:ro.boot.mode=charger
+ +    setprop vendor.skip.charger_not_need 1
+ +
+ +on init && property:vendor.skip.charger_not_need=0
+ +    start watchdogd
+ +
+ +    # disable cursor blink for fbcon, if no splash screen support
+ +    write /sys/class/graphics/fbcon/cursor_blink 0
+ +
+ +    # deattch the fbcon as hdmi hotplug conflict with fbcon
+ +    write /sys/class/vtconsole/vtcon1/bind 0
+ +
+ +    chown system system /dev/cpuctl/top-app/cpu.uclamp.min
+ +    chmod 664 /dev/cpuctl/top-app/cpu.uclamp.min
+ +    chown system system /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive
+ +    chmod 664 /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive
+ +    chown system system /dev/cpuctl/foreground/cpu.uclamp.min
+ +    chmod 664 /dev/cpuctl/foreground/cpu.uclamp.min
+ +    chown system system /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive
+ +    chmod 664 /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive
+ +    chown system system /dev/cpuctl/rt/cpu.uclamp.min
+ +    chmod 664 /dev/cpuctl/rt/cpu.uclamp.min
+ +    chown system system /dev/cpuctl/rt/cpu.uclamp.latency_sensitive
+ +    chmod 664 /dev/cpuctl/rt/cpu.uclamp.latency_sensitive
+ +    chown system system /dev/cpuctl/background/cpu.uclamp.max
+ +    chmod 664 /dev/cpuctl/background/cpu.uclamp.max
+ +
+ +    # set default uclamp value for foreground/top-app/rt/background (only affects EAS)
+ +    write /dev/cpuctl/foreground/cpu.uclamp.min 20
+ +    write /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive 1
+ +    write /dev/cpuctl/top-app/cpu.uclamp.min 50
+ +    write /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive 1
+ +    write /dev/cpuctl/rt/cpu.uclamp.min 60
+ +    write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 1
+ +    write /dev/cpuctl/background/cpu.uclamp.max 50
+ +
+++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+++    start storageproxyd
+++    start vendor.oemlock-1-0
+++
+ +on late-fs && property:vendor.skip.charger_not_need=0
+ +    # Start keymaster/gatekeeper service
+ +    start vendor.gatekeeper-1-0-${ro.boot.keystore}
+ +    start vendor.keymint-${ro.boot.keystore}
+ +    setprop vendor.powerhal.init 1
+ +
+ +    # Wait for keymaster
+ +    exec_start wait_for_keymaster
+ +
+ +    mount_all /vendor/etc/fstab.nxp --late
+ +
+- on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-     start vendor.oemlock-1-0
+- 
+ +on early-boot && property:vendor.skip.charger_not_need=0
+ +    # For redwood_8mq, when swap used about 400M, upgrade the level.
+ +    setprop ro.lmk.upgrade_pressure 87
+ +    setprop ro.lmk.downgrade_pressure 95
+ +    setprop ro.lmk.critical_upgrade true
+ +
+ +    setprop vendor.sys.hwc.disable     1
+ +    setprop vendor.2d.composition 0
+ +    setprop vendor.hwc.stretch.filter  1
+ +
+ +    #viv sdk dir
+ +    setprop vendor.VIVANTE_SDK_DIR /vendor/etc/viv_sdk
+ +
+ +    # fsl omx graphic manager media framework property
+ +    setprop vendor.rw.VIDEO_RENDER_NAME video_render.surface
+ +    setprop vendor.media.fsl_codec.flag 7
+ +
+ +    setprop camera.disable_zsl_mode 1
+ +    setprop back_camera_name mx6s-csi0
+ +    setprop back_camera_orient 0
+ +    setprop front_camera_name mx6s-csi1
+ +    setprop front_camera_orient 0
+ +
+ +   # Tweak the mmc device read ahead buffer size
+ +    write /sys/block/mmcblk0/queue/read_ahead_kb 2048
+ +    write /sys/block/mmcblk1/queue/read_ahead_kb 2048
+ +
+ +    # Prepare for wifi
+ +    setprop wifi.interface wlan0
+ +    setprop wifi.direct.interface p2p0
+ +    setprop wifi.concurrent.interface wlan1
+ +
+ +    # Disable surfaceflinger back pressure propagate
+ +    setprop debug.sf.disable_backpressure 1
+ +
+ +    # Set tracefs permission to 755
+ +    chmod 0755 /sys/kernel/debug/tracing
+ +
+ +    # Set sw_sync group to graphics and set permission to 664
+ +    chown root graphics /sys/kernel/debug/sync/sw_sync
+ +    chmod 0664 /sys/kernel/debug/sync/sw_sync
+ +
+ +    # Default backlight device
+ +    #setprop vendor.hw.backlight.dev "30a00000.mipi-dsi.0"
+ +    # Chmod/chown FSL specific sys entry
+ +    #chown system system /sys/class/backlight/30a00000.mipi-dsi.0/brightness
+ +    #chmod 0660 /sys/class/backlight/30a00000.mipi-dsi.0/brightness
+ +    setprop vendor.hw.backlight.dev "backlight"
+ +    chown system system /sys/class/backlight/backlight/brightness
+ +    chmod 0660 /sys/class/backlight/backlight/brightness
+ +
+ +    # For PWM2-4
+ +    chown system system /sys/class/backlight/pwm_2/brightness
+ +    chown system system /sys/class/backlight/pwm_3/brightness
+ +    chown system system /sys/class/backlight/pwm_4/brightness
+ +    chmod 0660 /sys/class/backlight/pwm_2/brightness
+ +    chmod 0660 /sys/class/backlight/pwm_3/brightness
+ +    chmod 0660 /sys/class/backlight/pwm_4/brightness
+ +
+ +    # Set light sensor sysfs path and light sensor threshold lux value
+ +    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
+ +    setprop vendor.ro.lightsensor.threshold  20
+ +
+ +    # Allow DSD file(duration larger than 10s) can play
+ +    setprop audio.offload.min.duration.secs 10
+ +
+ +    # Enlarge limition of audio buffer allocation
+ +    setprop ro.af.client_heap_size_kbyte 32768
+ +
+ +service vsidaemon /vendor/bin/vsidaemon
+ +    class main
+ +    user root
+ +
+ +on boot && property:vendor.skip.charger_not_need=0
+ +    start audioserver
+ +    start mediadrm
+ +    start media
+ +    start drm
+ +
+ +service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+ +    -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
+ +    -g@android:wpa_wlan0
+ +    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
+ +    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
+ +    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
+ +    interface android.hardware.wifi.supplicant@1.3::ISupplicant default
+ +    class main
+ +    socket wpa_wlan0 dgram 660 wifi wifi
+ +    disabled
+ +    oneshot
+ +
+ +service sensor_fusion /vendor/bin/fsl_sensor_fusion
+ +    class late_start
+ +    seclabel u:r:sensors:s0
+ +    user system
+ +    group system uhid
+ +    oneshot
+ +
+ +service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+ +    class hal
+ +    user system
+ +    group system wakelock input root
+ +    capabilities BLOCK_SUSPEND SYS_NICE
+ +
+ +# Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ +service watchdogd /system/bin/watchdogd 10 20
+ +    class core
+ +    seclabel u:r:watchdogd:s0
+ +
+ +# bugreport is triggered by holding down volume down, volume up and power
+ +service bugreport /system/bin/dumpstate -d -p -z
+ +    class main
+ +    disabled
+ +    oneshot
+ +    keycodes 114 115 116
+ +
+ +on fs && property:vendor.skip.charger_not_need=0
+ +# mount ext4 partitions
+ +    mount_all /vendor/etc/fstab.nxp --early
+ +
+ +    # Adjust parameters for dm-verity device
+ +    write /sys/block/dm-0/queue/read_ahead_kb 4096
+ +
+ +    # Update dm-verity state and set partition.*.verified properties
+ +    verity_update_state
+ +
+ +on post-fs && property:vendor.skip.charger_not_need=0
+ +    # Set netd memlock rlimit to 8MB
+ +    setrlimit 8 8388608 8388608
+ +
+ +    # Turn on swap
+ +    swapon_all /vendor/etc/fstab.nxp
+ +
+ +    # Swap in only 1 page at a time
+ +    write /proc/sys/vm/page-cluster 0
+ +
+ +    # Grant permission for fetching available_pages info of statsd
+ +    chown system system /proc/pagetypeinfo
+ +    chmod 0440 /proc/pagetypeinfo
+ +
+ +on post-fs-data && property:vendor.skip.charger_not_need=0
+ +    setprop vold.post_fs_data_done 1
+ +
+ +    # tmp dir for opencl Compiler
+ +    setprop vendor.TMPDIR /data/vendor/.opencl-cache
+ +    mkdir /data/vendor/.opencl-cache 0771 system camera
+ +
+ +on zygote-start && property:vendor.skip.charger_not_need=0
+ +    # Create the directories used by the Wireless subsystem
+ +    mkdir /data/vendor/wifi 0771 wifi wifi
+ +    mkdir /data/vendor/wifi/wifi_dumps 0770 wifi wifi
+ +    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+ +    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+ +
+ +service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vendor.all.early_init.ready
+ +    class main
+ +    user root
+ +    group root system
+ +    disabled
+ +    oneshot
+ +
+ +on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+ +    # create temp node for secure storage proxy
+ +    mkdir /data/vendor/ss 0700 system system
+-     start storageproxyd
+++    restart storageproxyd
+ +
+ +service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk0rpmb -d /dev/trusty-ipc-dev0
+ +   group system
+ +
+ +
+ +on property:ro.boot.vendor.sysrq=1 && property:vendor.skip.charger_not_need=0
+ +    write /proc/sys/kernel/sysrq 1
+ +
+ +# setenv append_bootargs androidboot.usb.debugging=1
+ +on property:ro.boot.usb.debugging=1
+ +    setprop persist.sys.usb.config adb
+diff --cc imx8m/sepolicy/hal_camera_default.te
+index 2a406c65,1b1acce2..cf395de6
+--- a/imx8m/sepolicy/hal_camera_default.te
++++ b/imx8m/sepolicy/hal_camera_default.te
+@@@ -8,4 -8,6 +8,7 @@@ allow hal_camera_default hal_graphics_m
+  allow hal_camera_default opencl_cache_file:dir create_dir_perms;
+  allow hal_camera_default opencl_cache_file:file create_file_perms;
+  allow hal_camera_default dmabuf_heap_device:chr_file {ioctl read open };
++ 
++ set_prop(hal_camera_default, vendor_camera_prop)
++ get_prop(hal_camera_default, vendor_camera_prop)
+ +get_prop(hal_camera_default, vendor_idtech_prop)
+diff --cc imx8m/sepolicy/property.te
+index 539b3338,8e77095b..6c27eb5e
+--- a/imx8m/sepolicy/property.te
++++ b/imx8m/sepolicy/property.te
+@@@ -5,4 -5,6 +5,7 @@@ vendor_internal_prop(vendor_bluetooth_p
+  vendor_restricted_prop(vendor_public_default_prop)
+  vendor_internal_prop(vendor_wifi_version)
+  vendor_internal_prop(vendor_logging_prop)
++ vendor_internal_prop(vendor_camera_prop)
+ +vendor_public_prop(vendor_idtech_prop)
++ 
++ system_public_prop(usb_notify_prop)
+diff --cc imx8m/sepolicy/vendor_init.te
+index 4f6d7e91,c846f3ae..1ad03870
+--- a/imx8m/sepolicy/vendor_init.te
++++ b/imx8m/sepolicy/vendor_init.te
+@@@ -14,4 -14,8 +14,9 @@@ set_prop(vendor_init, vendor_public_def
+  set_prop(vendor_init, vendor_public_default_prop)
+  set_prop(vendor_init, system_prop)
+  set_prop(vendor_init, vendor_logging_prop)
++ set_prop(vendor_init, vendor_camera_prop)
+ +set_prop(vendor_init, vendor_idtech_prop)
++ 
++ userdebug_or_eng(`
++   set_prop(vendor_init, logpersistd_logging_prop)
++ ')
+diff --cc imx8m/vp6820_8mn/BoardConfig.mk
+index 8709487d,94fc8751..615cde40
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@@ -161,8 -160,15 +161,11 @@@ endi
+  ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+  
+  # -------@block_sepolicy-------
++ SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += \
+ -    $(CONFIG_REPO_PATH)/imx8ulp/system_ext_pri_sepolicy
+++    $(CONFIG_REPO_PATH)/imx8m/system_ext_pri_sepolicy
++ 
+  BOARD_SEPOLICY_DIRS := \
+ -       $(CONFIG_REPO_PATH)/imx8ulp/sepolicy \
+ +       $(CONFIG_REPO_PATH)/imx8m/sepolicy \
+         $(IMX_DEVICE_PATH)/sepolicy
+  
+ -ifeq ($(PRODUCT_IMX_DRM),true)
+ -BOARD_SEPOLICY_DIRS += \
+ -       $(IMX_DEVICE_PATH)/sepolicy_drm
+ -endif
+ -
+ +SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS := $(CONFIG_REPO_PATH)/imx8m/sepolicy_system/private

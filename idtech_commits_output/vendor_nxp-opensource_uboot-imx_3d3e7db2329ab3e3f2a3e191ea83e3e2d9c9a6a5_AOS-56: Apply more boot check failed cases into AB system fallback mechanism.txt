@@ -1,0 +1,231 @@
+3d3e7db232 George.Huang 2020-02-06
+
+AOS-56: Apply more boot check failed cases into AB system fallback mechanism
+
+Symptom:
+   17 check failed cases in do_boota() will not retry boot
+   and stay in fastboot mode only.
+
+Root-Cause:
+0. Currently only avb_ab_flow_fast() will update AB data in misc.
+   typedef struct AvbABSlotData (4 Bytes):
+   uint8_t priority;
+   uint8_t tries_remaining;
+   uint8_t successful_boot;
+   uint8_t bootloader_verified;
+1. But even if avb_ab_flow_fast() verified failed and wanted to retry,
+   it will still stock in fastboot mode.
+2. 16 check failed cases didn't update AB data in misc,
+   and never retry boot.
+
+Solution:
+1. 7 of 17 boot check failed cases in do_boota() will decrease tries_remaining
+   and reboot to retry.
+2. Once if avb_result == AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS,
+   then force to stay in fastboot mode.
+3. 10 of 17 boot check failed cases are not worth retrying,
+   so force to stay in fastboot mode.
+
+Change-Id: I6725a69d30ca37ef5b627791cc13f9560b1a53f0
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 8f971bfb6e..4a55d71138 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -774,6 +774,10 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	int entry_idx;
+ 	bool check_image_arm64 =  false;
+ 	bool is_recovery_mode = false;
++	bool retry_boot =  false;
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++	int retry_count_before_avb = -1, retry_count_after_avb = -1;
++#endif
+ 
+ 	AvbABFlowResult avb_result;
+ 	AvbSlotVerifyData *avb_out_data = NULL;
+@@ -796,6 +800,10 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 			printf("Will boot from recovery!
+");
+ 	}
+ 
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++	retry_count_before_avb = avb_ab_handle_retry_count(&fsl_avb_ab_ops, false);
++#endif
++
+ 	/* check lock state */
+ 	FbLockState lock_status = fastboot_get_lock_stat();
+ 	if (lock_status == FASTBOOT_LOCK_ERROR) {
+@@ -859,6 +867,9 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	/* get the duration of avb */
+ 	metrics.avb = get_timer(avb_metric);
+ 
++	if (avb_result == AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS)
++		goto fail;
++
+ 	if ((avb_result == AVB_AB_FLOW_RESULT_OK) ||
+ 			(avb_result == AVB_AB_FLOW_RESULT_OK_WITH_VERIFICATION_ERROR)) {
+ 		assert(avb_out_data != NULL);
+@@ -883,6 +894,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		hdr = (struct andr_img_hdr *)avb_loadpart->data;
+ 		if (android_image_check_header(hdr)) {
+ 			printf("boota: bad boot image magic
+");
++			retry_boot = true;
+ 			goto fail;
+ 		}
+ 		if (avb_result == AVB_AB_FLOW_RESULT_OK)
+@@ -931,6 +943,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 			if (ulz4fn((void *)((ulong)hdr + hdr->page_size),
+ 						hdr->kernel_size, (void *)(ulong)hdr->kernel_addr, &lz4_len) != 0) {
+ 				printf("Decompress kernel fail!
+");
++				retry_boot = true;
+ 				goto fail;
+ 			}
+ #else /* CONFIG_LZ4 */
+@@ -950,6 +963,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		if (lock_status == FASTBOOT_LOCK)
+ 			printf(" verify FAIL, state: LOCK
+");
+ 
++		retry_boot = true;
+ 		goto fail;
+ 	}
+ 
+@@ -986,6 +1000,7 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		if (is_recovery_mode) {
+ 			if (hdr->header_version != 1) {
+ 				printf("boota: boot image header version error!
+");
++				retry_boot = true;
+ 				goto fail;
+ 			}
+ 
+@@ -1004,9 +1019,11 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		if (fdt32_to_cpu(dt_img->magic) != DT_TABLE_MAGIC) {
+ 			printf("boota: bad dt table magic %08x
+",
+ 					fdt32_to_cpu(dt_img->magic));
++			retry_boot = true;
+ 			goto fail;
+ 		} else if (!fdt32_to_cpu(dt_img->dt_entry_count)) {
+ 			printf("boota: no dt entries
+");
++			retry_boot = true;
+ 			goto fail;
+ 		}
+ 
+@@ -1016,8 +1033,9 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 							    dt_entry_count));
+ 		entry_idx = find_dtb_in_dtbo(dt_img);
+ 		if (entry_idx < 1) {
+-			puts("Enter fastboot mode...
+");
+-			run_command("fastboot 0", 0);
++			puts("boota: no avaliable dtb
+");
++			retry_boot = true;
++			goto fail;
+ 		}
+ 		dt_entry = (struct dt_table_entry *)
+ 			   ((ulong)dt_img +
+@@ -1113,6 +1131,16 @@ fail:
+ 	if (avb_out_data != NULL)
+ 		avb_slot_verify_data_free(avb_out_data);
+ 
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++	retry_count_after_avb = avb_ab_handle_retry_count(&fsl_avb_ab_ops, false);
++	if (retry_boot &&
++			retry_count_before_avb >= 0 &&
++			retry_count_after_avb >= 0) {
++		if (retry_count_before_avb == retry_count_after_avb)
++			avb_ab_handle_retry_count(&fsl_avb_ab_ops, true);
++		do_reset(NULL, 0, 0, NULL);
++	}
++#endif
+ 	return run_command("fastboot 0", 0);
+ }
+ 
+diff --git a/include/fsl_avb.h b/include/fsl_avb.h
+index 3dad5b26ae..1facb6ef32 100644
+--- a/include/fsl_avb.h
++++ b/include/fsl_avb.h
+@@ -210,6 +210,11 @@ void fsl_set_key_version(AvbAtxOps* atx_ops,
+                          size_t rollback_index_location,
+                          uint64_t key_version);
+ 
++/* Get the tries_remaining value from the current slot. this function
++ * can also decrease tries_remaining if need_to_decrease is set true.
++ */
++int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease);
++
+ /* This is the fast version of avb_ab_flow(), this function will
+  * not check another slot if one slot can pass the verify (or verify
+  * fail is acceptable).
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index e828faf05b..52b3b22fc6 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -1274,3 +1274,59 @@ out:
+ #endif /* CONFIG_DUAL_BOOTLOADER */
+ 
+ #endif /* CONFIG_DUAL_BOOTLOADER && CONFIG_SPL_BUILD */
++
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++extern AvbIOResult fsl_save_metadata_if_changed(AvbABOps* ab_ops,
++						AvbABData* ab_data,
++						AvbABData* ab_data_orig);
++
++extern AvbIOResult fsl_load_metadata(AvbABOps* ab_ops,
++						AvbABData* ab_data,
++						AvbABData* ab_data_orig);
++
++extern void fsl_slot_set_unbootable(AvbABSlotData* slot);
++
++int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease) {
++	AvbABData ab_data, ab_data_orig;
++	AvbIOResult io_ret;
++	size_t slot_index_to_boot;
++
++	io_ret = fsl_load_metadata(ab_ops, &ab_data, &ab_data_orig);
++	if (io_ret == AVB_IO_RESULT_ERROR_OOM) {
++		return -1;
++	} else if (io_ret != AVB_IO_RESULT_OK) {
++		return -2;
++	}
++
++	printf("slot _a: priority: %d retry: %d
+",
++			ab_data.slots[0].priority, ab_data.slots[0].tries_remaining);
++	printf("slot _b: priority: %d retry: %d
+",
++			ab_data.slots[1].priority, ab_data.slots[1].tries_remaining);
++
++	slot_index_to_boot =
++	    (ab_data.slots[1].priority > ab_data.slots[0].priority) ? 1 : 0;
++
++	if (! need_to_decrease)
++		return ab_data.slots[slot_index_to_boot].tries_remaining;
++
++	if (ab_data.slots[slot_index_to_boot].tries_remaining == 0) {
++		printf("mark slot %s unbootable
+", (slot_index_to_boot == 0 ? "_a" : "_b"));
++		fsl_slot_set_unbootable(&ab_data.slots[slot_index_to_boot]);
++	}
++
++	if (!ab_data.slots[slot_index_to_boot].successful_boot &&
++			(ab_data.slots[slot_index_to_boot].tries_remaining > 0)) {
++		ab_data.slots[slot_index_to_boot].tries_remaining -= 1;
++	}
++
++	io_ret = fsl_save_metadata_if_changed(ab_ops, &ab_data, &ab_data_orig);
++	if (io_ret != AVB_IO_RESULT_OK) {
++		if (io_ret == AVB_IO_RESULT_ERROR_OOM) {
++			return -3;
++		} else {
++			return -4;
++		}
++	}
++	return ab_data.slots[slot_index_to_boot].tries_remaining;
++}
++#endif /* CONFIG_ANDROID_AB_SUPPORT */

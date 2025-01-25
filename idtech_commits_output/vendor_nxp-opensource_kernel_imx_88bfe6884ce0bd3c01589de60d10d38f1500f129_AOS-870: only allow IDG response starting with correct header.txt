@@ -1,0 +1,248 @@
+88bfe6884ce0 owen.wen 2022-02-15
+
+AOS-870: only allow IDG response starting with correct header
+
+IDG SPI was allowing IDG response header with some offset
+but didn't define how many offset is allowed
+And I have consult with Casper, who is owner of K81.
+Casper say that K81 and RT1050 didn't support offset,
+SPI message not start with "ViVO" will be dropped
+So I remove the offset related code in this commit
+
+Change-Id: I8e03a60a2bd31bf94be09b4d06a8d97c2f4b9b58
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index a02eae31728a..2cac6a7b149e 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -37,9 +37,6 @@
+ 
+ #include "idg_spi.h"
+ 
+-/* to fix v5 read issue */
+-#define IDG_V5_ISSUE_RECOVERY	1  /* enable: 1, disable: 0 */
+-
+ #define IDG_INPUT_HEX_NUMBER	0  /* enable: 1, disable: 0 */
+ 
+ #define IDG_RETURN_WITH_HEADER	1  /* enable: 1, disable: 0 */
+@@ -668,12 +665,10 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	char *idg_tx_s = NULL;
+ 	char *idg_rx_s = NULL;
+ 	char *data = NULL;
+-#if IDG_V5_ISSUE_RECOVERY
+ 	char *recover = NULL;
+ 	bool recovered = false;
+ 	int idg_start_pos = -1;
+ 	int idg_size_re;
+-#endif /* IDG_V5_ISSUE_RECOVERY */
+ 	int err	= 0;
+ 	int idg_size;
+ 	int status;
+@@ -729,11 +724,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		status = -ENOMEM;
+ 		goto spi_report_out;
+ 	}
+-	recover = kzalloc(BASE_READ_SIZE + MAX_BUFFER_SIZE, GFP_KERNEL);
+-	if (!recover) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -774,169 +764,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		dev_dbg(&spi->dev, "0x%.2X ", data[BASE_READ_SIZE - 1]);
+ 		dev_dbg(&spi->dev, "idg_start_pos: %d", idg_start_pos);
+ 		if (idg_start_pos > 0) {
+-#if IDG_V5_ISSUE_RECOVERY
+-			idg_size_re = data[IDG_SIZE_MSB + idg_start_pos] << 8;
+-			idg_size_re += data[IDG_SIZE_LSB + idg_start_pos];
+-			memcpy(recover, &data[idg_start_pos],
+-			       (BASE_READ_SIZE - idg_start_pos));
+-			if (strncmp(recover, NEOII_Header,
+-				    NEOII_HEADER_LEN) != 0) {
+-#endif /* IDG_V5_ISSUE_RECOVERY */
+ 				dev_info(&spi->dev, "K81 return not ready
+");
+-#if IDG_V5_ISSUE_RECOVERY
+-				dev_dbg(&spi->dev, "K81 re size: %d
+",
+-					 idg_size_re);
+-				for (i = 0; i < (BASE_READ_SIZE - idg_start_pos); i++)
+-					dev_dbg(&spi->dev, "0x%.2X ", recover[i]);
+-
+-				err = EBUSY;
+-			} else if (idg_size_re == 0) {
+-				/* Recovery logic for IDG V5 */
+-				dev_dbg(&spi->dev, "enter recovery
+");
+-				dev_dbg(&spi->dev, "recover base read
+");
+-				recovered = true;
+-				x_s->tx_buf = idg_tx_s;
+-				x_s->tx_nbits = SPI_NBITS_SINGLE;
+-				x_s->rx_buf = idg_rx_s;
+-				x_s->rx_nbits = SPI_NBITS_SINGLE;
+-				x_s->len = idg_start_pos;
+-				x_s->speed_hz = idg_dev->clock_freq;
+-				x_s->bits_per_word = idg_dev->bits_per_word;
+-				mutex_lock(&idg_dev->lock);
+-				spin_lock_irq(&idg_dev->spi_lock);
+-				m_s.spi = spi;
+-				spin_unlock_irq(&idg_dev->spi_lock);
+-				spi_message_add_tail(x_s, &m_s);
+-				status_s = spi_sync(spi, &m_s);
+-				gpiod_set_value_cansleep(idg_dev->spi_cs,
+-							 CS_CLEAR);
+-				mutex_unlock(&idg_dev->lock);
+-				dev_dbg(&spi->dev, "second re read "
+-						    "(%d bytes)
+",
+-					 idg_start_pos);
+-				if (!status_s) {
+-					memcpy(&recover[BASE_READ_SIZE -
+-							idg_start_pos],
+-					       idg_rx_s, idg_start_pos);
+-					for (i = 0; i < idg_start_pos; i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							recover[BASE_READ_SIZE -
+-								idg_start_pos +
+-								i]);
+-
+-					dev_dbg(&spi->dev, "total read %d:",
+-						 (idg_size_re +
+-						  BASE_READ_SIZE));
+-					for (i = 0; i < (idg_size_re +
+-							 BASE_READ_SIZE); i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							 recover[i]);
+-
+-#if IDG_K81_CRC_RULE
+-					if (!k81_crc(recover,
+-						     (idg_size_re +
+-						      BASE_READ_SIZE))) {
+-						dev_info(&spi->dev,
+-							 "read data CRC "
+-							 "error
+");
+-						err = EINVAL;
+-					}
+-#else
+-					if (CalculateCRC(recover,
+-							 (idg_size_re +
+-							  BASE_READ_SIZE))) {
+-						dev_info(&spi->dev,
+-							 "read data CRC "
+-							 "error
+");
+-						err = EINVAL;
+-					}
+-#endif /* IDG_K81_CRC_RULE */
+-				} else {
+-					pr_err("%s: idg spi re second read "
+-					       "failed(%d)", DRVNAME, status_s);
+-					err = EIO;
+-					for (i = 0; i < BASE_READ_SIZE ; i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							 idg_rx_s[i]);
+-
+-				}
+-			} else if (idg_size_re < MAX_BUFFER_SIZE) {
+-				dev_dbg(&spi->dev, "enter recovery
+");
+-				recovered = true;
+-				x_s->tx_buf = idg_tx_s;
+-				x_s->tx_nbits = SPI_NBITS_SINGLE;
+-				x_s->rx_buf = idg_rx_s;
+-				x_s->rx_nbits = SPI_NBITS_SINGLE;
+-				x_s->len = (idg_size_re + idg_start_pos);
+-				x_s->speed_hz = idg_dev->clock_freq;
+-				x_s->bits_per_word = idg_dev->bits_per_word;
+-				mutex_lock(&idg_dev->lock);
+-				spin_lock_irq(&idg_dev->spi_lock);
+-				m_s.spi = spi;
+-				spin_unlock_irq(&idg_dev->spi_lock);
+-				spi_message_add_tail(x_s, &m_s);
+-				status_s = spi_sync(spi, &m_s);
+-				gpiod_set_value_cansleep(idg_dev->spi_cs,
+-							 CS_CLEAR);
+-				mutex_unlock(&idg_dev->lock);
+-				dev_dbg(&spi->dev, "second re read "
+-						    "(%d bytes)
+",
+-					 (idg_size_re + idg_start_pos));
+-				if (!status_s) {
+-					memcpy(&recover[BASE_READ_SIZE -
+-							idg_start_pos],
+-					       idg_rx_s,
+-					       (idg_size_re + idg_start_pos));
+-					for (i = 0; i < (idg_size_re +
+-							 idg_start_pos); i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							recover[BASE_READ_SIZE -
+-								idg_start_pos +
+-								i]);
+-
+-					dev_dbg(&spi->dev, "total read %d:",
+-						 (idg_size_re +
+-						  BASE_READ_SIZE));
+-					for (i = 0; i < (idg_size_re +
+-							 BASE_READ_SIZE); i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							 recover[i]);
+-
+-#if IDG_K81_CRC_RULE
+-					if (!k81_crc(recover,
+-						     (idg_size_re +
+-						      BASE_READ_SIZE))) {
+-						dev_info(&spi->dev,
+-							 "read data CRC "
+-							 "error
+");
+-						err = EINVAL;
+-					}
+-#else
+-					if (CalculateCRC(recover,
+-							 (idg_size_re +
+-							  BASE_READ_SIZE))) {
+-						dev_info(&spi->dev,
+-							 "read data CRC "
+-							 "error
+");
+-						err = EINVAL;
+-					}
+-#endif /* IDG_K81_CRC_RULE */
+-				} else {
+-					pr_err("%s: idg spi re second read "
+-					       "failed(%d)",
+-						DRVNAME, status_s);
+-					err = EIO;
+-					for (i = 0; i < BASE_READ_SIZE ; i++)
+-						dev_dbg(&spi->dev, "0x%.2X ",
+-							 idg_rx_s[i]);
+-
+-				}
+-			} else {
+-				dev_info(&spi->dev,
+-					 "recovered: data from K81 error
+");
+-				err = EBUSY;
+-			}
+-#endif /* IDG_V5_ISSUE_RECOVERY */
+ 		} else if (idg_size == 0) {
+ 			dev_dbg(&spi->dev, "idg header: %s
+", data);
+ 			dev_dbg(&spi->dev, "idg data length: %d
+", idg_size);
+@@ -1003,11 +831,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				err = EBUSY;
+ 		}
+ 
+-#if IDG_V5_ISSUE_RECOVERY
+-		if (recovered)
+-			memcpy(data, recover, (BASE_READ_SIZE + idg_size_re));
+-
+-#endif /* IDG_V5_ISSUE_RECOVERY */
+ 		if ((!err) &&
+ 		    (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V2,
+ 			     NEOII_VERSION_LEN) == 0)) {

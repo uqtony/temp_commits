@@ -1,0 +1,85 @@
+6dd393bc owen.wen 2020-10-29
+
+AOS-362: fastbootd fix selinux of getvar all
+
+below rule is neverallow so I skip it:
+allow fastbootd block_device:blk_file { write open };
+
+with this patch, getvar all can get below information:
+(bootloader) partition-type:mmcblk0boot1p1:raw
+(bootloader) partition-type:mmcblk0boot1p2:raw
+(bootloader) partition-type:mmcblk0boot1:raw
+(bootloader) partition-type:metadata:raw
+(bootloader) partition-type:mmcblk0boot0p1:raw
+(bootloader) partition-type:mmcblk0boot0:raw
+(bootloader) has-slot:board_info:no
+(bootloader) has-slot:mmcblk0boot0p2:no
+(bootloader) has-slot:mmcblk0boot1p1:no
+(bootloader) has-slot:mmcblk0boot1p2:no
+(bootloader) has-slot:mmcblk0:no
+(bootloader) has-slot:mmcblk0boot1:no
+(bootloader) has-slot:metadata:no
+(bootloader) has-slot:fbmisc:no
+(bootloader) has-slot:mmcblk0boot0p1:no
+(bootloader) has-slot:mmcblk0boot0:no
+(bootloader) is-logical:mmcblk0boot0p2:no
+(bootloader) is-logical:mmcblk0boot1p1:no
+(bootloader) is-logical:mmcblk0boot1p2:no
+(bootloader) is-logical:mmcblk0boot1:no
+(bootloader) is-logical:metadata:no
+(bootloader) is-logical:mmcblk0boot0p1:no
+(bootloader) is-logical:mmcblk0boot0:no
+
+below information are still not available since selinux neverallow rule
+(bootloader) partition-size:bootloader_b:0x400000
+(bootloader) partition-size:board_info:0x100000
+(bootloader) partition-size:mmcblk0boot0p2:0x1F7000
+(bootloader) partition-size:mem_info_a:0x100000
+(bootloader) partition-size:mmcblk0boot1p2:0x1F7000
+(bootloader) partition-size:metadata:0x200000
+(bootloader) partition-size:mem_info_b:0x100000
+(bootloader) partition-size:mmcblk0boot1p1:0x1F7000
+(bootloader) partition-size:mmcblk0:0x3A6800000
+(bootloader) partition-size:fbmisc:0x100000
+(bootloader) partition-size:mmcblk0boot0p1:0x1F7000
+(bootloader) partition-size:mmcblk0boot0:0x400000
+(bootloader) partition-size:bootloader_a:0x400000
+(bootloader) partition-size:presistdata:0x100000
+(bootloader) partition-type:bootloader_b:raw
+(bootloader) partition-type:board_info:raw
+(bootloader) partition-type:mem_info_a:raw
+(bootloader) partition-type:mmcblk0boot1p2:raw
+(bootloader) partition-type:metadata:raw
+(bootloader) partition-type:mem_info_b:raw
+(bootloader) partition-type:bootloader_a:raw
+(bootloader) partition-type:presistdata:raw
+(bootloader) has-slot:bootloader:yes
+(bootloader) has-slot:mem_info:yes
+(bootloader) has-slot:mmcblk0boot1p2:no
+(bootloader) has-slot:metadata:no
+(bootloader) is-logical:bootloader_b:no
+(bootloader) is-logical:board_info:no
+(bootloader) is-logical:mem_info_a:no
+(bootloader) is-logical:mmcblk0boot1p2:no
+(bootloader) is-logical:metadata:no
+(bootloader) is-logical:mem_info_b:no
+(bootloader) is-logical:bootloader_a:no
+(bootloader) is-logical:presistdata:no
+
+
+Change-Id: If4461f24546be222e2aa0b91d72fabae5140c0a8
+
+diff --git a/imx8m/sepolicy/fastbootd.te b/imx8m/sepolicy/fastbootd.te
+index 8f8353c6..3adee031 100644
+--- a/imx8m/sepolicy/fastbootd.te
++++ b/imx8m/sepolicy/fastbootd.te
+@@ -4,5 +4,9 @@ recovery_only(`
+    allow fastbootd vbmeta_block_device:blk_file { getattr r_file_perms w_file_perms ioctl };
+    allow fastbootd system_block_device:blk_file { getattr r_file_perms w_file_perms ioctl };
+    allow fastbootd frp_block_device:blk_file { getattr };
++   allow fastbootd block_device:blk_file { getattr ioctl };
++   allow fastbootd bootloader_block_device:blk_file { ioctl open write };
++   allow fastbootd spl_block_device:blk_file { getattr write };
++   allow fastbootd sysfs:dir read;
+ ')
+ 

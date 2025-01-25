@@ -1,0 +1,45 @@
+3ec25a26a5c4 George.Huang 2021-05-06
+
+AOS-592: ASoC: codecs: rt5640: rename to snd_soc_component_read()
+
+snd_soc_component_read32() was removed since:
+5b554b0a29ce ("ASoC: remove snd_soc_component_read32()")
+
+Error Log:
+  error: implicit declaration of function 'snd_soc_component_read32'
+
+Change-Id: I291e5a6fe0225e486cccf9f5ddd431d759bc5043
+
+diff --git a/sound/soc/codecs/rt5640.c b/sound/soc/codecs/rt5640.c
+index 667db02c0bea..eec6d0f99543 100644
+--- a/sound/soc/codecs/rt5640.c
++++ b/sound/soc/codecs/rt5640.c
+@@ -2374,7 +2374,7 @@ static void rt5640_jack_work(struct work_struct *work)
+ 	if (!rt5640_jack_inserted(component)) {
+ 		/* Jack removed, or spurious IRQ? */
+ 		if (rt5640->jack->status & SND_JACK_HEADPHONE) {
+-			reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++			reg = snd_soc_component_read(component, RT5640_INT_IRQ_ST);
+ 			dev_info(component->dev, "jack unplugged, "
+ 				 "RT5640_INT_IRQ_ST: 0x%x, val: 0x%x
+",
+ 				 RT5640_INT_IRQ_ST, reg);
+@@ -2382,13 +2382,13 @@ static void rt5640_jack_work(struct work_struct *work)
+ 	} else if (!(rt5640->jack->status & SND_JACK_HEADPHONE)) {
+ 		/* Jack inserted */
+ 		status = rt5640_detect_headset(component);
+-		reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++		reg = snd_soc_component_read(component, RT5640_INT_IRQ_ST);
+ 		dev_info(component->dev, "jack unplugged, "
+ 			 "detect status %#02x
+"
+ 			 "RT5640_GPIO_CTRL1: 0x%x, val: 0x%x
+",
+ 			 status, RT5640_INT_IRQ_ST, reg);
+ 	} else {
+-		reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++		reg = snd_soc_component_read(component, RT5640_INT_IRQ_ST);
+ 		dev_info(component->dev, "jack interrupt triggered, "
+ 			 "RT5640_GPIO_CTRL1: 0x%x, val: 0x%x
+",
+ 			 RT5640_INT_IRQ_ST, reg);

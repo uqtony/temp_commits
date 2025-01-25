@@ -1,0 +1,46 @@
+00f8c73 max.yang 2020-08-12
+
+AOS-285: Support for imx8mq 4G and imx8mn 1G dram data into mem_info.img
+
+  Since each data occupied 88 Bytes in header block now, and header block
+  has only 512 Bytes. Here we enlarge header block to 1K so that we could
+  put max 11 dram timing data into mem_info.img
+
+  U-boot should be modified to read and skip 2 blocks:
+    https://gerrit.idtechproducts.com/c/android-imx/uboot-imx/+/4080
+
+Change-Id: I6e84c1fbbd2bce63fda74556af2dca5567a2d391
+
+diff --git a/generate_meminfo.py b/generate_meminfo.py
+index 7b53b8a..bc4508a 100644
+--- a/generate_meminfo.py
++++ b/generate_meminfo.py
+@@ -69,7 +69,9 @@ DRAM_TIMING_DATA = [['board_info-a300_evt-0_devboard_evt-1_ktc2g.img', '../../nx
+                     ['board_info-imx8mq_evt-0_evk_evk-0_mic3g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mq_evk/lpddr4_timing.c', './mq-evk-lpddr4_timing.o'],
+                     ['board_info-a100_evt-0_devboard_evt-0_ktc2g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mn_a100/lpddr4_timing.c', './a100-lpddr4_timing.o'],
+                     ['board_info-imx8mn_evt-0_evk_evk-0_mic2g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mn_evk/ddr4_timing.c', './mn-evk-ddr4_timing.o'],
+-                    ['board_info-imx8mp_evt-0_evk_evk-0_mic6g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mp_evk/lpddr4_timing.c', './mp-evk-lpddr4_timing.o']
++                    ['board_info-imx8mp_evt-0_evk_evk-0_mic6g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mp_evk/lpddr4_timing.c', './mp-evk-lpddr4_timing.o'],
++                    ['board_info-a100_evt-0_devboard_evt-0_ktc1g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mn_a100/lpddr4_timing_1g.c', './a100-lpddr4_timing_1g.o'],
++                    ['board_info-a300_evt-0_devboard_evt-1_ktc4g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mq_a300/ddr/lpddr4_timing_4g.c', './a300-lpddr4_timing_4g.o']
+                     ]
+ 
+ BLOCK_SIZE = 512.0
+@@ -258,7 +260,7 @@ def make_meminfo_obj(dram_code, dram_obj, mm_size_k):
+ def main(argv):
+   mem_root_hdr = struct.pack('I', len(DRAM_TIMING_DATA))
+   mem_root_body = bytearray()
+-  offset = 1 # first block for header
++  offset = 2 # first 2 blocks for root header
+ 
+   m_txt = open("./mem_info.txt", "w")
+ 
+@@ -285,7 +287,7 @@ def main(argv):
+     mem_root_body += local_blob
+ 
+   # padding header block to BLOCK_SIZE
+-  padding = int(BLOCK_SIZE - len(mem_root_hdr))
++  padding = int(BLOCK_SIZE*2 - len(mem_root_hdr))
+   mem_root_hdr += struct.pack(str(padding) + 'x')
+ 
+   m_txt.close()

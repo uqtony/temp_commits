@@ -1,0 +1,35 @@
+b425b644 owen.wen 2021-03-03
+
+AOS-455: define selinux policy for pppd and rild for Android 11
+
+avc: denied { read write } for path="/dev/ttyUSB2" dev="tmpfs" ino=21544 scontext=u:r:ppp:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { getattr } for path="/dev/ttyUSB3" dev="tmpfs" ino=21545 scontext=u:r:ppp:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { open } for path="/dev/ttyUSB3" dev="tmpfs" ino=21545 scontext=u:r:ppp:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { ioctl } for path="/dev/ttyUSB3" dev="tmpfs" ino=21545 ioctlcmd=0x5416 scontext=u:r:ppp:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { read write } for comm="rild" name="ttyUSB2" dev="tmpfs" ino=21544 scontext=u:r:rild:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { open } for comm="rild" path="/dev/ttyUSB2" dev="tmpfs" ino=21544 scontext=u:r:rild:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+avc: denied { ioctl } for comm="rild" path="/dev/ttyUSB2" dev="tmpfs" ino=21544 ioctlcmd=0x5401 scontext=u:r:rild:s0 tcontext=u:object_r:usb_serial_device:s0 tclass=chr_file permissive=1
+
+Change-Id: I993d597a9c51eea81bbb82c5f38b78e675738b3b
+
+diff --git a/imx8m/sepolicy/ppp.te b/imx8m/sepolicy/ppp.te
+index ee487e54..5678e0c0 100644
+--- a/imx8m/sepolicy/ppp.te
++++ b/imx8m/sepolicy/ppp.te
+@@ -14,3 +14,4 @@ allow ppp property_socket:sock_file write;
+ allow ppp radio_prop:property_service set;
+ allow ppp shell_data_file:dir { getattr read };
+ allow ppp system_data_file:dir read;
++allow ppp usb_serial_device:chr_file { rw_file_perms };
+diff --git a/imx8m/sepolicy/rild.te b/imx8m/sepolicy/rild.te
+index f8a46fb3..b9acf183 100644
+--- a/imx8m/sepolicy/rild.te
++++ b/imx8m/sepolicy/rild.te
+@@ -54,6 +54,7 @@ allow rild hal_bootctl_default:lnk_file read;
+ allow rild hal_keymaster_default:dir search;
+ allow rild vold:dir search;
+ allow rild toolbox_exec:file getattr;
++allow rild usb_serial_device:chr_file { rw_file_perms };
+ 
+ # support pppd dialing
+ domain_auto_trans(rild, ppp_exec, ppp);

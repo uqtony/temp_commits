@@ -1,0 +1,31 @@
+d5ab4a1f06 max.yang 2020-08-10
+
+AOS-285: [Multi DDR] Enlarge memory root header from 512 to 1K-bytes
+
+  We previously defined first sector (512 Bytes) as root header which indicates
+  all objects inside mem_info.img. Since we have more fields to compare,
+  each object takes 88 Bytes field size, so we could only put 5 mem objects
+  into header.
+  We are porting more memory objects into mem_info.img that we need to enlarge
+  header block in order to put 5 more memory objects into header.
+
+Change-Id: I7812202d70271998936560ff6c287e13e4b1205d
+
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index af1a55cfb3..50d377b2da 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -77,9 +77,10 @@ unsigned int read_mem_root_block(struct blk_desc * dev_desc) {
+ 	struct idt_mem_root* p_root = NULL;
+ 	struct BoardInfoData* p_bdinfo = NULL;
+ 	char bdinfo[IDT_BLOCK_SIZE] = "";
+-	char root_buf[IDT_BLOCK_SIZE] = "";
+-	blk_dread(dev_desc, BDINFO_BLOCK_BASE, 1, (void*) bdinfo);
+-	blk_dread(dev_desc, ROOT_HDR_BLOCK_BASE, 1, (void*) root_buf);
++	char root_buf[IDT_BLOCK_SIZE*2] = "";
++	blk_dread(dev_desc, BDINFO_BLOCK_BASE, 1, (void *) bdinfo);
++	blk_dread(dev_desc, ROOT_HDR_BLOCK_BASE, 1, (void *) root_buf);
++	blk_dread(dev_desc, ROOT_HDR_BLOCK_BASE + 1, 1, (void *) root_buf + IDT_BLOCK_SIZE);
+ 	p_root = (struct idt_mem_root*)root_buf;
+ 	p_bdinfo = (struct BoardInfoData*)bdinfo;
+ 

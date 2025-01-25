@@ -1,0 +1,26 @@
+4196a0ed George.Huang 2020-10-05
+
+AOS-361: Add dependency to build mke2fs before building userdata images
+
+Fix build breaks:
+  [ 11% 13173/109874] Target userdata image: out/target/product/vp6820_8mq/userdata-default.img
+  FAILED: out/target/product/vp6820_8mq/userdata-default.img
+  /bin/bash -c "..."
+  /bin/bash: out/host/linux-x86/bin/mke2fs: No such file or directory
+  /bin/bash: out/host/linux-x86/bin/mke2fs: No such file or directory
+
+Change-Id: I66d4713353e96d120824cbe1be22d7dd86b8e832
+
+diff --git a/common/build/userdata.mk b/common/build/userdata.mk
+index 8e70f6f9..6b170769 100644
+--- a/common/build/userdata.mk
++++ b/common/build/userdata.mk
+@@ -19,7 +19,7 @@ define build-userdataimage-target
+ endef
+ 
+ USERDATAIMAGE_TARGET := $(USERDATA_DEFAULT_TARGET)
+-$(USERDATAIMAGE_TARGET): $(BOARD_BPT_INPUT_FILES) $(IMX_INSTALLED_BPTIMAGE_TARGET)
++$(USERDATAIMAGE_TARGET): $(BOARD_BPT_INPUT_FILES) $(IMX_INSTALLED_BPTIMAGE_TARGET) $(HOST_OUT)/bin/mke2fs.conf $(HOST_OUT)/bin/mke2fs
+ 	$(build-userdataimage-target)
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(USERDATAIMAGE_TARGET)

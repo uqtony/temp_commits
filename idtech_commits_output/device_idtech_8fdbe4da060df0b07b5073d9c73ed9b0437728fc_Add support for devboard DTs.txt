@@ -1,0 +1,23 @@
+8fdbe4da Sergii Postulga 2020-01-30
+
+Add support for devboard DTs
+
+Change-Id: I835d9fdf55ae1631619418fb4b8bb74486c80607
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index a63f70cd..bc6d7620 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -36,8 +36,9 @@ TARGET_MTDTBOIMAGE_CONFIG_PATH=$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/arch/$(TAR
+ # Include all IDT DTS's
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+-idt_dts_list:=$(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(LOWER_BOARD_SOC_TYPE)*evk* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
+-idt_dts_list+=$(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*$(LOWER_BOARD_TYPE)* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list := $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(LOWER_BOARD_SOC_TYPE)*evk* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list := $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*devboard* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list += $(idt_dts_list) $(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*$(LOWER_BOARD_TYPE)* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
+ 
+ $(foreach idt_dts,$(idt_dts_list),$(eval TARGET_BOARD_DTS_CONFIG += $(idt_dts):$(idt_dts).dtb))
+ 

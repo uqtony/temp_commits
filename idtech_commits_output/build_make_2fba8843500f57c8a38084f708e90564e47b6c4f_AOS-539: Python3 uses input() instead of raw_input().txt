@@ -1,0 +1,61 @@
+2fba88435 max.yang 2021-05-20
+
+AOS-539: Python3 uses input() instead of raw_input()
+
+  1. python3 didn't support raw_input()
+  2. replace both "target_files" and "target-file" pattern, the
+     file downloaded from artifactory has no "s" postfix
+
+Change-Id: I820e2b36291d7c9d345f18676bde06152e4d269b
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index bb85a17d3..8dee9d4c2 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -1,3 +1,5 @@
++#!/usr/bin/env python3
++
+ import base64
+ import io
+ import os
+@@ -456,7 +458,7 @@ def create_released_bootloader(sign_env, output_zip, tmp_dir):
+   return output_zip
+ 
+ def create_fullota_package(sign_env, orig_filename, output_tgtfile, idt_cert_dir):
+-  ota_test = orig_filename.replace("target_files", "fullota")
++  ota_test = orig_filename.replace("target_files", "fullota").replace("target_file", "fullota")
+   # create package
+   cmd = ['python', 'releasetools/ota_from_target_files.py',
+          '--board_feature', 'lpddr4-dual-signed',
+diff --git a/tools/releasetools/idt_web_service.py b/tools/releasetools/idt_web_service.py
+index c2d8ff8f4..8bca6b486 100644
+--- a/tools/releasetools/idt_web_service.py
++++ b/tools/releasetools/idt_web_service.py
+@@ -1,3 +1,5 @@
++#!/usr/bin/env python3
++
+ import sys
+ import requests
+ import json
+@@ -83,16 +85,16 @@ class web_service(object):
+ 
+   def login(self, msg=None):
+     print("--------------------------------------
+Login {} account/password".format(msg))
+-    self.user1   = raw_input("Account:")
++    self.user1   = input("Account:")
+     self.passwd1 = getpass.getpass("Password:")
+     self.token1  = self.doAuth(self.user1, self.passwd1)
+ 
+   def dual_login(self):
+     print("--------------------------------------
+Starting Dual Login")
+-    self.user1   = raw_input("Account1 [First User]:")
++    self.user1   = input("Account1 [First User]:")
+     self.passwd1 = getpass.getpass("Password:")
+     self.token1  = self.doAuth(self.user1, self.passwd1)
+-    self.user2   = raw_input("Account2 [Second User]:")
++    self.user2   = input("Account2 [Second User]:")
+     self.passwd2 = getpass.getpass("Password:")
+     self.token2  = self.doAuth(self.user2, self.passwd2)
+ 

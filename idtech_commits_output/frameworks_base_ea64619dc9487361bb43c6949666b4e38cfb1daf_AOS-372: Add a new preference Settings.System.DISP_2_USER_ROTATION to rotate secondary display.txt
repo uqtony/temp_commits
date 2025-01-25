@@ -1,0 +1,74 @@
+ea64619dc948 AndrewS 2020-10-29
+
+AOS-372: Add a new preference Settings.System.DISP_2_USER_ROTATION to rotate secondary display
+
+because the changes in API, one might see build error and need to make API document to solve this:
+make api-stubs-docs-update-current-api
+
+This is actually adding a new system preference, please reference to android developer Settings.System section:
+https://developer.android.com/reference/android/provider/Settings.System
+And for the application manifest permission, please reference to Manifest.permission section:
+https://developer.android.com/reference/android/Manifest.permission
+user can add android.permission.WRITE_SETTINGS in application manifest file to allows an application to read or write the system settings, and using Settings.System.getInt and Settings.System.putInt to read/write Settings.System preferences
+
+Update this on Display settings page:
+https://atlassian.idtechproducts.com/confluence/display/EN/Display+settings
+
+Change-Id: I8f103cbf852d8f6c3527519adddd2c8d0fbf7e89
+
+diff --git a/config/hiddenapi-greylist-max-o.txt b/config/hiddenapi-greylist-max-o.txt
+index d9c1cd0313fc..ef401043ead0 100644
+--- a/config/hiddenapi-greylist-max-o.txt
++++ b/config/hiddenapi-greylist-max-o.txt
+@@ -61038,6 +61038,8 @@ Landroid/provider/Settings$System;->WIFI_STATIC_NETMASK_VALIDATOR:Landroid/provi
+ Landroid/provider/Settings$System;->WIFI_USE_STATIC_IP_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
+ Landroid/provider/Settings$System;->WINDOW_ORIENTATION_LISTENER_LOG:Ljava/lang/String;
+ Landroid/provider/Settings$System;->WINDOW_ORIENTATION_LISTENER_LOG_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
++Landroid/provider/Settings$System;->USER_ROTATION_DISP_2:Ljava/lang/String;
++Landroid/provider/Settings$System;->USER_ROTATION_DISP_2_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
+ Landroid/provider/Settings$UserSetupPersonalization;
+ Landroid/provider/Settings;->ACTION_ALL_APPS_NOTIFICATION_SETTINGS:Ljava/lang/String;
+ Landroid/provider/Settings;->ACTION_APPLICATION_DETAILS_SETTINGS_OPEN_BY_DEFAULT_PAGE:Ljava/lang/String;
+diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
+index eb6a5394bfef..905886fbd412 100644
+--- a/core/java/android/provider/Settings.java
++++ b/core/java/android/provider/Settings.java
+@@ -4106,6 +4106,22 @@ public final class Settings {
+         public static final Validator USER_ROTATION_VALIDATOR =
+                 new SettingsValidators.InclusiveIntegerRangeValidator(0, 3);
+ 
++        /**
++         * Default screen rotation for secondary display when no other policy applies.
++         * When {@link #ACCELEROMETER_ROTATION} is zero and no on-screen Activity expresses a
++         * preference, this rotation value will be used. Must be one of the
++         * {@link android.view.Surface#ROTATION_0 Surface rotation constants}.
++         *
++         * @see Display#getRotation
++         *
++         * @hide
++         */
++        public static final String USER_ROTATION_DISP_2 = "user_rotation_disp_2";
++
++        /** @hide */
++        public static final Validator USER_ROTATION_DISP_2_VALIDATOR =
++                new SettingsValidators.InclusiveIntegerRangeValidator(0, 3);
++
+         /**
+          * Control whether the rotation lock toggle in the System UI should be hidden.
+          * Typically this is done for accessibility purposes to make it harder for
+@@ -4621,6 +4637,7 @@ public final class Settings {
+             PUBLIC_SETTINGS.add(SETUP_WIZARD_HAS_RUN);
+             PUBLIC_SETTINGS.add(ACCELEROMETER_ROTATION);
+             PUBLIC_SETTINGS.add(USER_ROTATION);
++            PUBLIC_SETTINGS.add(USER_ROTATION_DISP_2);
+             PUBLIC_SETTINGS.add(DTMF_TONE_WHEN_DIALING);
+             PUBLIC_SETTINGS.add(SOUND_EFFECTS_ENABLED);
+             PUBLIC_SETTINGS.add(HAPTIC_FEEDBACK_ENABLED);
+@@ -4725,6 +4742,7 @@ public final class Settings {
+             VALIDATORS.put(SETUP_WIZARD_HAS_RUN, SETUP_WIZARD_HAS_RUN_VALIDATOR);
+             VALIDATORS.put(ACCELEROMETER_ROTATION, ACCELEROMETER_ROTATION_VALIDATOR);
+             VALIDATORS.put(USER_ROTATION, USER_ROTATION_VALIDATOR);
++            VALIDATORS.put(USER_ROTATION_DISP_2, USER_ROTATION_DISP_2_VALIDATOR);
+             VALIDATORS.put(DTMF_TONE_WHEN_DIALING, DTMF_TONE_WHEN_DIALING_VALIDATOR);
+             VALIDATORS.put(SOUND_EFFECTS_ENABLED, SOUND_EFFECTS_ENABLED_VALIDATOR);
+             VALIDATORS.put(HAPTIC_FEEDBACK_ENABLED, HAPTIC_FEEDBACK_ENABLED_VALIDATOR);

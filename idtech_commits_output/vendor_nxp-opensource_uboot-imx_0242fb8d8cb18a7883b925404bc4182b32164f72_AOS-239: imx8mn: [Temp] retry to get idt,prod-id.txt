@@ -1,0 +1,25 @@
+0242fb8d8c George.Huang 2020-07-07
+
+AOS-239: imx8mn: [Temp] retry to get idt,prod-id
+
+Since AOS-117 feature is not ready for imx8mn yet.
+  AOS-117: Add LCD display support in u-boot
+
+Change-Id: Ief1b4ed2680103a18fb3fd0f91971ce6ed9a3cad
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index af7bf1358f..b25e0ef31f 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -904,8 +904,10 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		env_value = env_get("idt,prod-id");
+ 		if (env_value == NULL) {
+ 			puts("boota: no IDTECH product ID in board_info
+");
++#ifdef CONFIG_SECURE_BOOT
+ 			retry_boot = true;
+ 			goto fail;
++#endif
+ 		}
+ 		env_value = env_get("entry_idx");
+ 		if (env_value != NULL) {

@@ -1,0 +1,257 @@
+fce3de42a852 AndrewS 2021-10-08
+
+AOS-750: bring up redwood barcode camera
+
+Change-Id: I4dc2aa1a614a03cd42a4162c011a11acc8bc0612
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 78b33a9da3a1..4d8ed8529c0a 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -649,22 +649,21 @@ &i2c2 {
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	gc02m2_mipi: gc02m2_mipi@6e {
++	gc02m2_mipi: gc02m2_mipi@37 {
+ 		compatible = "galaxycore,gc02m2_mipi";
+-		reg = <0x6e>;
++		reg = <0x37>;
+ 		status = "okay";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi1_power>, <&pinctrl_csi1_xshutdown>, <&pinctrl_csi1_clk>;
++		pinctrl-0 = <&pinctrl_csi1>;
+ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		clock-names = "csi_mclk";
+ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
+-		assigned-clock-rates = <20000000>;
++		assigned-clock-rates = <25000000>;
+ 		csi_id = <0>;
+ 		power-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+ 		xshutdown-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
+-		mclk = <24000000>;
+-		mclk_source = <0>;
++
+ 		port {
+ 			gc02m2_mipi_ep: endpoint {
+ 				remote-endpoint = <&mipi1_sensor_ep>;
+@@ -935,15 +934,11 @@ MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x16
+ 		>;
+ 	};
+ 
+-	pinctrl_csi1_power: csi1_power_grp {
++	pinctrl_csi1: csi1_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3			0x19
+-		>;
+-	};
+-
+-	pinctrl_csi1_xshutdown: csi1_xshutdown_grp {
+-		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6			0x19
++			MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2		0x59
+ 		>;
+ 	};
+ 
+@@ -953,12 +948,6 @@ MX8MQ_IOMUXC_SD1_RESET_B_GPIO2_IO10			0x19
+ 		>;
+ 	};
+ 
+-	pinctrl_csi1_clk: csi1_clk_grp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
+-		>;
+-	};
+-
+ 	pinctrl_fec1: fec1grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3		// ENET_MDC
+diff --git a/drivers/media/platform/mxc/capture/gc02m2_mipi.c b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+index 637c231ee2bf..e23548e390eb 100644
+--- a/drivers/media/platform/mxc/capture/gc02m2_mipi.c
++++ b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+@@ -12,6 +12,7 @@
+ #include <linux/i2c.h>
+ #include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/string.h>
+ #include <linux/errno.h>
+ #include <linux/kmod.h>
+@@ -34,6 +35,9 @@
+ #define MAX_FPS 30
+ #define DEFAULT_FPS 30
+ 
++#define GC02M2_MCLK_MIN		6000000
++#define GC02M2_MCLK_MAX		27000000
++
+ enum gc02m2_mode {
+         gc02m2_mode_MIN = 0,
+ 	/* currently only support 1600x1200 */
+@@ -55,13 +59,12 @@ struct gc02m2 {
+         bool on;
+ 
+         u32 mclk;
+-        u8 mclk_source;
+         struct clk *sensor_clk;
+         int csi;
+ 
+         void (*io_init)(struct gc02m2 *);
+-        int xshutdown_gpio;
+-	int power_gpio;
++	struct gpio_desc *xshutdown_gpio;
++	struct gpio_desc *power_gpio;
+ };
+ 
+ struct gc02m2_datafmt {
+@@ -252,14 +255,11 @@ static int gc02m2_write_reg_array(struct i2c_client *client,
+ 
+ static int gc02m2_power_on(struct gc02m2 *sensor)
+ {
+-        if (sensor->power_gpio < 0 || sensor->xshutdown_gpio < 0)
+-                return -EIO;
+-
+         /* power gpio controls IOVDD, DVDD and AVDD */
+-        gpio_set_value(sensor->power_gpio, 1);
++	gpiod_set_value_cansleep(sensor->power_gpio, 1);
+ 
+         /* set xshutdown high */
+-        gpio_set_value(sensor->xshutdown_gpio, 1);
++	gpiod_set_value_cansleep(sensor->xshutdown_gpio, 1);
+ 
+ 	/* delay for t4 and t5 before start i2c transaction */
+ 	/* 1200/24MHz */
+@@ -270,14 +270,28 @@ static int gc02m2_power_on(struct gc02m2 *sensor)
+ 
+ static int gc02m2_power_off(struct gc02m2 *sensor)
+ {
+-        if (sensor->power_gpio < 0 || sensor->xshutdown_gpio < 0)
+-                return -EIO;
+-
+         /* set xshutdown low */
+-        gpio_set_value(sensor->xshutdown_gpio, 0);
++	gpiod_set_value_cansleep(sensor->xshutdown_gpio, 0);
+ 
+ 	/* set power gpio low */
+-        gpio_set_value(sensor->power_gpio, 0);
++	gpiod_set_value_cansleep(sensor->power_gpio, 0);
++
++	return 0;
++}
++
++static int gc02m2_reset(struct gc02m2 *sensor)
++{
++	int ret = 0;
++
++	ret = gc02m2_power_off(sensor);
++	if (ret)
++		return ret;
++
++	msleep(5);
++
++	ret = gc02m2_power_on(sensor);
++	if (ret)
++		return ret;
+ 
+ 	return 0;
+ }
+@@ -584,44 +598,24 @@ static int gc02m2_remove(struct i2c_client *client)
+ 
+ static int gc02m2_probe(struct i2c_client *client)
+ {
+-	struct pinctrl *pinctrl;
+ 	struct device *dev = &client->dev;
+-	int ret;
++	int ret = 0;
+ 	struct gc02m2 *sensor;
+ 
+ 	sensor = devm_kzalloc(dev, sizeof(struct gc02m2), GFP_KERNEL);
+ 
+-	/* get default pinctrl */
+-	pinctrl = devm_pinctrl_get_select_default(dev);
+-	if (IS_ERR(pinctrl))
+-		dev_warn(dev, "No pin available
+");
+-
+-	/* get power pin */
+-	sensor->power_gpio = of_get_named_gpio(dev->of_node, "power-gpios", 0);
+-	if (!gpio_is_valid(sensor->power_gpio))
+-		dev_warn(dev, "No sensor power pin available");
+-	else {
+-		ret = devm_gpio_request_one(dev, sensor->power_gpio,
+-				GPIOF_OUT_INIT_LOW, "gc02m2_mipi_power");
+-		if (ret < 0) {
+-		        dev_warn(dev, "Failed to set power pin
+");
+-		        dev_warn(dev, "ret=%d
+", ret);
+-			goto err_free;
+-		}
+-        }
++	/* request power pin */
++	sensor->power_gpio = devm_gpiod_get(dev, "power", GPIOD_OUT_LOW);
++	if (IS_ERR(sensor->power_gpio)) {
++		dev_err(dev, "power gpio request error
+");
++		goto err_free;
++	}
+ 
+-	/* get xshutdown pin */
+-	sensor->xshutdown_gpio = of_get_named_gpio(dev->of_node, "xshutdown-gpios", 0);
+-	if (!gpio_is_valid(sensor->xshutdown_gpio))
+-		dev_warn(dev, "No sensor xshutdown pin available");
+-	else {
+-		ret = devm_gpio_request_one(dev, sensor->xshutdown_gpio,
+-				GPIOF_OUT_INIT_LOW, "gc02m2_mipi_xshutdown");
+-		if (ret < 0) {
+-			dev_warn(dev, "Failed to set xshutdown pin
+");
+-			dev_warn(dev, "ret=%d
+", ret);
+-			goto err_free;
+-		}
++	/* request xshutdown pin */
++	sensor->xshutdown_gpio = devm_gpiod_get(dev, "xshutdown", GPIOD_OUT_LOW);
++	if (IS_ERR(sensor->xshutdown_gpio)) {
++		dev_err(dev, "xshutdown gpio request error
+");
++		goto err_free;
+ 	}
+ 
+ 	sensor->sensor_clk = devm_clk_get(dev, "csi_mclk");
+@@ -632,17 +626,14 @@ static int gc02m2_probe(struct i2c_client *client)
+ 		goto err_free;
+ 	}
+ 
+-	ret = of_property_read_u32(dev->of_node, "mclk", &(sensor->mclk));
+-	if (ret) {
+-		dev_err(dev, "mclk missing or invalid
+");
++	sensor->mclk = clk_get_rate(sensor->sensor_clk);
++	if ((sensor->mclk < GC02M2_MCLK_MIN) ||
++	    (sensor->mclk > GC02M2_MCLK_MAX)) {
++		dev_err(dev, "clock-frequency out of range: %d Hz
+",
++			sensor->mclk);
+ 		goto err_free;
+ 	}
+ 
+-	ret = of_property_read_u32(dev->of_node, "mclk_source", (u32 *) &(sensor->mclk_source));
+-	if (ret) {
+-		dev_err(dev, "mclk_source missing or invalid
+");
+-		goto err_free;
+-        }
+ 
+         ret = of_property_read_u32(dev->of_node, "csi_id", &(sensor->csi));
+         if (ret) {
+@@ -652,7 +643,7 @@ static int gc02m2_probe(struct i2c_client *client)
+ 
+         clk_prepare_enable(sensor->sensor_clk);
+ 
+-        sensor->io_init = gc02m2_power_off;
++	sensor->io_init = gc02m2_reset;
+         sensor->i2c_client = client;
+         sensor->pix.pixelformat = V4L2_PIX_FMT_YUYV;
+         sensor->pix.width = 1600;

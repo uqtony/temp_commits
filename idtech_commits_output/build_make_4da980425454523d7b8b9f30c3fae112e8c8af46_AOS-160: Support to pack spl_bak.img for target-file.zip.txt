@@ -1,0 +1,53 @@
+4da980425 George.Huang 2020-04-17
+
+AOS-160: Support to pack spl_bak.img for target-file.zip
+
+Change-Id: Ia887107a7b86c2e3ae2e2178969d05b7554a37e0
+
+diff --git a/core/Makefile b/core/Makefile
+index 45ddec0ba..7811094ac 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4187,6 +4187,8 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	# Dual bootloader images for ota update
+ 	cp -f $(PRODUCT_OUT)/bootloader-$(LOWER_BOARD_SOC_TYPE)-$(LOWER_BOARD_TYPE)-dual.img $(zip_root)/IMAGES/bootloader.img
+ 	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-$(LOWER_BOARD_TYPE)-dual.bin $(zip_root)/IMAGES/spl.img
++	# backup spl images for ota update
++	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-$(LOWER_BOARD_TYPE)-dual.bin $(zip_root)/IMAGES/spl_bak.img
+ 
+ 	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+ 	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+diff --git a/tools/releasetools/ota_from_target_files.py b/tools/releasetools/ota_from_target_files.py
+index 011628f90..f7ae51802 100755
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@ -1943,22 +1943,24 @@ def GetTargetFilesZipWithBoardType(input_file, product, board_type, set_empty=Fa
+ 
+   src_spl = "IMAGES/spl-imx{}-{}.bin".format(product, board_type)
+   tgt_spl = "IMAGES/spl.img"
++  tgt_spl_bak = "IMAGES/spl_bak.img"
+   if src_spl in namelist:
+     src_bootloader = "IMAGES/bootloader-imx{}-{}.img".format(product, board_type)
+     tgt_bootloader = "IMAGES/bootloader.img"
+-    replace = {src_bootloader: tgt_bootloader, src_spl: tgt_spl}
++    replace = {tgt_bootloader: src_bootloader, tgt_spl: src_spl, tgt_spl_bak: src_spl}
+   else:
+     src_bootloader = "IMAGES/u-boot-imx{}-{}.imx".format(product, board_type)
+     tgt_bootloader = "IMAGES/bootloader.img"
+-    replace = {src_bootloader: tgt_bootloader}
++    replace = {tgt_bootloader: src_bootloader}
+ 
+   # unzip src images
+-  input_tmp = common.UnzipTemp(input_file, replace.keys())
++  unique_src = set( val for dic in replace for val in replace.values())
++  input_tmp = common.UnzipTemp(input_file, unique_src)
+   # delete tgt images
+-  common.ZipDelete(target_file, replace.values())
++  common.ZipDelete(target_file, replace.keys())
+   target_zip = zipfile.ZipFile(target_file, 'a', allowZip64=True)
+ 
+-  for src, dst in replace.items():
++  for dst, src in replace.items():
+     logger.info("Exchange %s with %s", dst, src)
+     assert src in namelist, \
+           'Missing {} in {}; {} cannot be written'.format(src, input_file, dst)

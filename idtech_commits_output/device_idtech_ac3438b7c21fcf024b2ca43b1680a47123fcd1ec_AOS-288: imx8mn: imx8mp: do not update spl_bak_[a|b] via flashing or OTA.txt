@@ -1,0 +1,83 @@
+ac3438b7 George.Huang 2020-09-16
+
+AOS-288: imx8mn: imx8mp: do not update spl_bak_[a|b] via flashing or OTA
+
+Change-Id: I862bb39e3f577cf91487882b5ba35d316c05ca3c
+
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index c2ef94a0..c3fe6e4b 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -172,12 +172,12 @@ if [%soc_name%] == [imx8mq] (
+ :: enable these 2 features only for imx8mn or imx8mp
+ if [%soc_name%] == [imx8mn] (
+     set /A support_idt_dual_spl=1
+-    set /A support_idt_backup_spl=1
++    set /A support_idt_backup_spl=0
+     set /A support_idt_spl_table=0
+ )
+ if [%soc_name%] == [imx8mp] (
+     set /A support_idt_dual_spl=1
+-    set /A support_idt_backup_spl=1
++    set /A support_idt_backup_spl=0
+     set /A support_idt_spl_table=0
+ )
+ 
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 98edfbfc..bc428499 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -607,7 +607,7 @@ fi
+ # enable these 2 features only for imx8mn or imx8mp
+ if [[ "${soc_name}" == "imx8mn" ]] || [[ "${soc_name}" == "imx8mp" ]]; then
+     support_idt_dual_spl=1;
+-    support_idt_backup_spl=1;
++    support_idt_backup_spl=0;
+     support_idt_spl_table=0;
+ fi
+ 
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 691bb7dd..53203269 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -104,9 +104,9 @@ BOARD_GPU_LIBDRM := libdrm_imx
+ 
+ AB_OTA_UPDATER := true
+ ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl spl_bak
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl
+ else
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl spl_bak
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl
+ endif
+ TARGET_NO_RECOVERY := true
+ BOARD_USES_RECOVERY_AS_BOOT := true
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index 7d52eb2d..d2791387 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -171,3 +171,5 @@ TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
+ BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private
++
++AB_OTA_PARTITIONS += spl_bak
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index 38dc56fb..c4dc1810 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -170,3 +170,4 @@ TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
++AB_OTA_PARTITIONS += spl_bak
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index 237c1452..cc56614d 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -171,3 +171,5 @@ TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
+ BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private
++
++AB_OTA_PARTITIONS += spl_bak

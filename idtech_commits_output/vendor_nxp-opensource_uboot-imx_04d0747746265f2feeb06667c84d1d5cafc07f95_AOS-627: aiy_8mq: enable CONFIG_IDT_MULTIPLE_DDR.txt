@@ -1,0 +1,103 @@
+04d0747746 George.Huang 2021-07-15
+
+AOS-627: aiy_8mq: enable CONFIG_IDT_MULTIPLE_DDR
+
+Change-Id: I83b7f1b075f1f1ff03d8fcd8e36de612486f7afd
+
+diff --git a/board/freescale/imx8mq_phanbell/Makefile b/board/freescale/imx8mq_phanbell/Makefile
+index 980c2d65f2..8f105adf9e 100644
+--- a/board/freescale/imx8mq_phanbell/Makefile
++++ b/board/freescale/imx8mq_phanbell/Makefile
+@@ -4,11 +4,11 @@
+ # SPDX-License-Identifier:      GPL-2.0+
+ #
+ 
+-obj-y += imx8mq_phanbell.o board_id.o board_id_cmd.o
+ obj-y += imx8mq_phanbell.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+ obj-y += board_id.o
++obj-y += board_id_cmd.o
+ obj-y += ddr/lpddr4_timing_kingston_4gb.o
+ endif
+diff --git a/board/freescale/imx8mq_phanbell/spl.c b/board/freescale/imx8mq_phanbell/spl.c
+index 4e98ef7553..9948f7e847 100644
+--- a/board/freescale/imx8mq_phanbell/spl.c
++++ b/board/freescale/imx8mq_phanbell/spl.c
+@@ -28,7 +28,9 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+-void spl_dram_init(void)
++extern void idt_spl_dram_init(void);
++
++static void spl_dram_init(void)
+ {
+ 	const int board_id = get_board_id();
+ 	printf("Board id: %i
+", board_id);
+@@ -268,7 +270,11 @@ void board_init_f(ulong dummy)
+ 	power_init_board();
+ 
+ 	/* DDR initialization */
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	idt_spl_dram_init();
++#else
+ 	spl_dram_init();
++#endif
+ 
+ 	board_init_r(NULL, 0);
+ }
+diff --git a/configs/imx8mq_phanbell_android_defconfig b/configs/imx8mq_phanbell_android_defconfig
+index a292606ab2..7eae3e848a 100644
+--- a/configs/imx8mq_phanbell_android_defconfig
++++ b/configs/imx8mq_phanbell_android_defconfig
+@@ -106,7 +106,6 @@ CONFIG_USB_GADGET=y
+ CONFIG_FASTBOOT=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+-CONFIG_BCB_SUPPORT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+ CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+@@ -132,7 +131,6 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+@@ -146,4 +144,4 @@ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_FB_ADDR=0x7F000000
+ CONFIG_NR_DRAM_BANKS=2
+-
++CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/imx8mq_phanbell_android_dual_defconfig b/configs/imx8mq_phanbell_android_dual_defconfig
+index b5d65e86cc..17e59c0cbf 100644
+--- a/configs/imx8mq_phanbell_android_dual_defconfig
++++ b/configs/imx8mq_phanbell_android_dual_defconfig
+@@ -106,7 +106,6 @@ CONFIG_USB_GADGET=y
+ CONFIG_FASTBOOT=y
+ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+-CONFIG_BCB_SUPPORT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+ CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+@@ -148,3 +147,4 @@ CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
++CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/imx8mq_phanbell_android_uuu_defconfig b/configs/imx8mq_phanbell_android_uuu_defconfig
+index 3019eb5f88..4e371c5405 100644
+--- a/configs/imx8mq_phanbell_android_uuu_defconfig
++++ b/configs/imx8mq_phanbell_android_uuu_defconfig
+@@ -131,3 +131,4 @@ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
++CONFIG_NR_DRAM_BANKS=2

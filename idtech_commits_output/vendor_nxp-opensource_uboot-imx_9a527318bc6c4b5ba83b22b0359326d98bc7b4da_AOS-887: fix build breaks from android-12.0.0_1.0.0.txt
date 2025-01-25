@@ -1,0 +1,52 @@
+9a527318bc George.Huang 2022-03-07
+
+AOS-887: fix build breaks from android-12.0.0_1.0.0
+
+Change-Id: I53d6586f28c93d6182dea5e887907793ad962972
+
+diff --git a/common/image-android.c b/common/image-android.c
+index 74b87af96b..d2299c4899 100644
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@ -190,7 +190,7 @@ static void append_androidboot_args(char *args, uint32_t *len)
+ 
+ 	if (idt_get_board_type(idt_board_type, BDINFO_DATA_SIZE)) {
+ 		sprintf(args_buf, " androidboot.board_type=%s", idt_board_type);
+-		strncat(args, args_buf, sizeof(commandline) - strlen(commandline));
++		strncat(args, args_buf, *len - strlen(args));
+ 	} else {
+ 		printf("WARN: failed to get idt_get_board_type
+");
+ 	}
+@@ -207,7 +207,7 @@ static void append_androidboot_args(char *args, uint32_t *len)
+ 			sprintf(args_buf, " androidboot.idt_orientation%s=%s",
+ 					(i == DISPLAY_MAIN)?"":append,
+ 					idt_disp_rotation);
+-			strncat(args, args_buf, sizeof(commandline) - strlen(commandline));
++			strncat(args, args_buf, *len - strlen(args));
+ 		} else {
+ 			break;
+ 		}
+@@ -217,7 +217,7 @@ static void append_androidboot_args(char *args, uint32_t *len)
+ 
+ 	if (idt_get_board_display_id(idt_display_id, BDINFO_DATA_SIZE)) {
+ 		sprintf(args_buf, " androidboot.idt_display_id=%s", idt_display_id);
+-		strncat(args, args_buf, sizeof(commandline) - strlen(commandline));
++		strncat(args, args_buf, *len - strlen(args));
+ 	}
+ 
+ 	sprintf(args_buf,
+diff --git a/drivers/video/nxp/imx/mipi_dsi_northwest.c b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+index de492290c1..b4645f1ec2 100644
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest.c
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+@@ -891,7 +891,9 @@ static int imx8mq_mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 		writel(0x7, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
+ 
+ 	writel(0x0, mipi_dsi->mmio_base + DPHY_LOCK_BYP);
++#ifndef DPHY_RTERM_SEL_REG_NA
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_RTERM_SEL);
++#endif
+ 	writel(0x0, mipi_dsi->mmio_base + DPHY_AUTO_PD_EN);
+ 	writel(0x2, mipi_dsi->mmio_base + DPHY_RXLPRP);
+ 	writel(0x2, mipi_dsi->mmio_base + DPHY_RXCDRP);

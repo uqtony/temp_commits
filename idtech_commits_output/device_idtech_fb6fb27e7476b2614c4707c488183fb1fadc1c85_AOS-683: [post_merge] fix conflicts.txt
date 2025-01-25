@@ -1,0 +1,2424 @@
+fb6fb27e George.Huang 2021-07-26
+
+AOS-683: [post_merge] fix conflicts
+
+Change-Id: I746f72b93c105ee258fa2f6c9c1156f2396ce00d
+
+diff --git a/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt b/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
+index 8697aa24..e179fb78 100644
+--- a/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
++++ b/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
+@@ -66,7 +66,7 @@
+         },
+         {
+             "label": "super",
+-            "size": "3584 MiB",
++            "size": "4096 MiB",
+             "guid": "auto",
+             "type_guid": "c1dedb9a-a0d3-42e4-b74d-0acf96833624"
+         },
+diff --git a/common/partition/device-partitions-14.4GB-ab_super.bpt b/common/partition/device-partitions-14.4GB-ab_super.bpt
+index 3bb84eeb..13c9a4c5 100644
+--- a/common/partition/device-partitions-14.4GB-ab_super.bpt
++++ b/common/partition/device-partitions-14.4GB-ab_super.bpt
+@@ -59,7 +59,7 @@
+         },
+         {
+             "label": "super",
+-            "size": "3584 MiB",
++            "size": "4096 MiB",
+             "guid": "auto",
+             "type_guid": "c1dedb9a-a0d3-42e4-b74d-0acf96833624"
+         },
+diff --git a/imx8m/bigcypress_8mp/BoardConfig.mk b/imx8m/bigcypress_8mp/BoardConfig.mk
+index 760e6215..3d059dbc 100644
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@ -84,10 +84,15 @@ BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/idt_testkey_rsa2048.pe
+ 
+ # -------@block_treble-------
+ # Vendor Interface manifest and compatibility
+-DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifeq ($(POWERSAVE),true)
++    DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest_powersave.xml
++else
++    DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++endif
+ ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
+ DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
+ endif
++
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ DEVICE_FRAMEWORK_COMPATIBILITY_MATRIX_FILE := $(IMX_DEVICE_PATH)/device_framework_matrix.xml
+ 
+@@ -124,7 +129,11 @@ BOARD_KERNEL_CMDLINE += swiotlb=65536
+ BOARD_KERNEL_CMDLINE += androidboot.lcd_density=246 androidboot.primary_display=imx-drm
+ 
+ # wifi config
+-BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
++ifeq ($(POWERSAVE),true)
++    BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para_powersave.conf
++else
++    BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
++endif
+ 
+ # low memory device build config
+ ifeq ($(LOW_MEMORY),true)
+@@ -133,6 +142,11 @@ else
+ BOARD_KERNEL_CMDLINE += cma=$(CMASIZE)@0x400M-0x1000M
+ endif
+ 
++# powersave config
++ifeq ($(POWERSAVE),true)
++    BOARD_KERNEL_CMDLINE += androidboot.powersave.usb=true
++endif
++
+ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+ BOARD_KERNEL_CMDLINE += androidboot.vendor.sysrq=1
+ endif
+@@ -141,8 +155,10 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-no-product.dtb
+   else
+-    # Default use basler + ov5640
+-    TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-basler-ov5640.dtb
++    # Default dual basler
++    TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-dual-basler.dtb
++    # basler + ov5640
++    TARGET_BOARD_DTS_CONFIG += imx8mp-basler-ov5640:imx8mp-evk-basler-ov5640.dtb
+     # Only ov5640
+     TARGET_BOARD_DTS_CONFIG += imx8mp-ov5640:imx8mp-evk.dtb
+     # Only basler
+diff --git a/imx8m/bigcypress_8mp/SharedBoardConfig.mk b/imx8m/bigcypress_8mp/SharedBoardConfig.mk
+index 454762ef..19c271b6 100644
+--- a/imx8m/bigcypress_8mp/SharedBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/SharedBoardConfig.mk
+@@ -67,6 +67,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-rpmsg.ko \
+     $(KERNEL_OUT)/drivers/rtc/rtc-snvs.ko \
+     $(KERNEL_OUT)/drivers/pci/controller/dwc/pci-imx6.ko \
++    $(KERNEL_OUT)/drivers/net/phy/realtek.ko \
+     $(KERNEL_OUT)/drivers/ptp/ptp.ko \
+     $(KERNEL_OUT)/drivers/pps/pps_core.ko \
+     $(KERNEL_OUT)/drivers/net/ethernet/freescale/fec.ko
+@@ -145,7 +146,10 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/video/backlight/pwm_bl.ko \
+     $(KERNEL_OUT)/drivers/mmc/host/cqhci.ko \
+     $(KERNEL_OUT)/drivers/mmc/host/sdhci-esdhc-imx.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/ion-alloc.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_sys_heap.ko \
+     $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_cma_heap.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_unmapped_heap.ko \
+     $(KERNEL_OUT)/drivers/reset/reset-imx7.ko \
+     $(KERNEL_OUT)/drivers/phy/freescale/phy-fsl-imx8mp-lvds.ko \
+     $(KERNEL_OUT)/drivers/phy/freescale/phy-fsl-samsung-hdmi.ko \
+@@ -172,18 +176,13 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/gpu/drm/panel/panel-raydium-rm67191.ko \
+     $(KERNEL_OUT)/drivers/gpu/drm/panel/panel-simple.ko \
+     $(KERNEL_OUT)/drivers/usb/dwc3/dwc3-imx8mp.ko \
+-    $(KERNEL_OUT)/drivers/usb/dwc3/dwc3.ko \
+     $(KERNEL_OUT)/drivers/usb/typec/mux/gpio-switch.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-hcd.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-pci.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-plat-hcd.ko \
+     $(KERNEL_OUT)/drivers/power/supply/dummy_battery.ko \
+     $(KERNEL_OUT)/drivers/nvmem/nvmem-imx-ocotp.ko \
+     $(KERNEL_OUT)/drivers/thermal/device_cooling.ko \
+     $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/cpufreq-dt.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/imx-cpufreq-dt.ko \
+-    $(KERNEL_OUT)/drivers/staging/media/imx/imx8-media-dev.ko \
+     $(KERNEL_OUT)/drivers/media/v4l2-core/v4l2-fwnode.ko \
+     $(KERNEL_OUT)/drivers/media/i2c/ov5640.ko \
+     $(KERNEL_OUT)/drivers/staging/media/imx/imx8-capture.ko \
+@@ -196,10 +195,11 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/trusty/trusty-log.ko \
+     $(KERNEL_OUT)/drivers/trusty/trusty-virtio.ko \
+     $(KERNEL_OUT)/drivers/trusty/trusty-ipc.ko \
++    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/basler-camera-driver-vvcam.ko \
+     $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-video.ko \
+-    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-isp.ko \
+     $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-dwe.ko \
+-    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/basler-camera-driver-vvcam.ko
++    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-isp.ko \
++    $(KERNEL_OUT)/drivers/staging/media/imx/imx8-media-dev.ko
+ endif
+ 
+ # -------@block_memory-------
+diff --git a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+index f7bcc3d5..8f92f43c 100644
+--- a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+@@ -14,7 +14,7 @@ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-evk-uuu-mic6g:vp6820_8mp_evk_android_u
+ 
+ ifeq ($(IMX8MP_USES_GKI),true)
+ TARGET_KERNEL_DEFCONFIG := gki_defconfig
+-TARGET_KERNEL_GKI_DEFCONF:= android_gki_defconfig
++TARGET_KERNEL_GKI_DEFCONF:= imx8mp_gki.fragment
+ else
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ endif
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp.mk b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+index 1938f281..613f1e00 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mp_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mp
+ 
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 1d7ce0e9..8894685e 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -160,6 +160,13 @@ endif
+ PRODUCT_PACKAGES += \
+     android.hardware.keymaster@4.0-service-imx
+ 
++# Confirmation UI
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.confirmationui@1.0-service.trusty \
++    securedisplayd-imx
++endif
++
+ # new gatekeeper HAL
+ PRODUCT_PACKAGES += \
+     android.hardware.gatekeeper@1.0-service.software-imx
+@@ -202,13 +209,16 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.rebootescrow.device=/dev/block/pmem0
+ 
+-#DRM Widevine 1.2 L3 support
++#DRM Widevine 1.3 L1 support
+ PRODUCT_PACKAGES += \
+     android.hardware.drm@1.3-service.widevine \
+     android.hardware.drm@1.3-service.clearkey \
+     libwvdrmcryptoplugin \
+     libwvhidl \
+     libwvdrmengine \
++    liboemcrypto \
++
++$(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee.mk)
+ 
+ # -------@block_audio-------
+ 
+@@ -237,19 +247,21 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json \
+-    $(IMX_DEVICE_PATH)/ov5640_camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/ov5640_camera_config_imx8mp.json \
+-    $(IMX_DEVICE_PATH)/isp_camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/isp_camera_config_imx8mp.json \
++    $(IMX_DEVICE_PATH)/camera_config_imx8mp-basler-ov5640.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp-basler-ov5640.json \
++    $(IMX_DEVICE_PATH)/camera_config_imx8mp-only-ov5640.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp-only-ov5640.json \
+     $(IMX_DEVICE_PATH)/external_camera_config.xml:$(TARGET_COPY_OUT_VENDOR)/etc/external_camera_config.xml
+ 
+ PRODUCT_SOONG_NAMESPACES += hardware/google/camera
+ PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/camera
+ 
+ # Copy isp files to board
++ifeq ($(PREBUILT_FSL_IMX_ISP),true)
+ ISP_PROPRIETARY := $(FSL_PROPRIETARY_PATH)/fsl-proprietary/isp
+ PRODUCT_COPY_FILES += \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/bin,$(TARGET_COPY_OUT_VENDOR)/bin) \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/lib64,$(TARGET_COPY_OUT_VENDOR)/lib64) \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/config,$(TARGET_COPY_OUT_VENDOR)/etc/configs/isp)
++endif
+ 
+ # ISP camera feature demo
+ PRODUCT_PACKAGES += \
+@@ -315,6 +327,7 @@ PRODUCT_PACKAGES += \
+     libNNGPUBinary-evis2 \
+     libNNGPUBinary-lite \
+     libNNGPUBinary-ulite \
++    libNNGPUBinary-nano \
+     libNNArchPerf \
+     libarchmodelSw
+ 
+@@ -460,17 +473,36 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mp.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mp.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+-    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
++    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc
++
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
++ifeq ($(POWERSAVE),true)
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/required_hardware_powersave.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
++else
++PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
++endif
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
++
++ifneq ($(POWERSAVE),true)
+ PRODUCT_COPY_FILES += \
+-    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+-    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
+     frameworks/native/data/etc/android.hardware.camera.external.xml:vendor/etc/permissions/android.hardware.camera.external.xml \
+     frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
+-    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
++    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml
++endif
++
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
++    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
+     frameworks/native/data/etc/android.hardware.ethernet.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.ethernet.xml \
+     frameworks/native/data/etc/android.hardware.screen.landscape.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.landscape.xml \
+     frameworks/native/data/etc/android.hardware.screen.portrait.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.portrait.xml \
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
+index 89d60ffc..73dba6ae 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mp_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mp_pci
+ 
+diff --git a/imx8m/bigcypress_8mp/ov5640_camera_config_imx8mp.json b/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
+similarity index 56%
+rename from imx8m/bigcypress_8mp/ov5640_camera_config_imx8mp.json
+rename to imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
+index 73b1b25b..ecfd9486 100644
+--- a/imx8m/bigcypress_8mp/ov5640_camera_config_imx8mp.json
++++ b/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
+@@ -10,6 +10,29 @@
+   "camera_metadata": [
+     {
+       "camera_type": "back",
++      "camera_name": "viv_v4l20",
++      "bus_info": "platform:viv0",
++      "orientation": "0",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "3840",
++      "ActiveArrayHeight": "2160",
++      "PixelArrayWidth": "3840",
++      "PixelArrayHeight": "2160",
++      "PhysicalWidth": "8.064",
++      "PhysicalHeight": "4.536",
++      "FocalLength": "4.0",
++      "MaxJpegSize": "6291456",
++      "MinFrameDuration": "33331760",
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
++    },
++    {
++      "camera_type": "front",
+       "camera_name": "mxc_isi.1.capture",
+       "orientation": "0",
+       "mplane": "1",
+@@ -24,22 +47,6 @@
+       "MaxJpegSize": "8388608",
+       "MinFrameDuration": "33331760",
+       "MaxFrameDuration": "300000000"
+-    },
+-    {
+-      "camera_type": "front",
+-      "camera_name": "uvc",
+-      "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "2.688",
+-      "PhysicalHeight": "1.512",
+-      "FocalLength": "3.42",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+     }
+   ]
+ }
+diff --git a/imx8m/bigcypress_8mp/camera_config_imx8mp-only-ov5640.json b/imx8m/bigcypress_8mp/camera_config_imx8mp-only-ov5640.json
+new file mode 100644
+index 00000000..31b1e298
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/camera_config_imx8mp-only-ov5640.json
+@@ -0,0 +1,29 @@
++{
++  "__readme": [
++    "Basic Camera HAL v3 configuration."
++  ],
++
++  "hal_version": "3",
++  "cam_blit_copy": "GPU_3D",
++  "cam_blit_csc": "GPU_3D",
++
++  "camera_metadata": [
++    {
++      "camera_type": "back",
++      "camera_name": "mxc_isi.0.capture",
++      "orientation": "0",
++      "mplane": "1",
++      "buffer_type": "dma",
++      "ActiveArrayWidth": "2592",
++      "ActiveArrayHeight": "1944",
++      "PixelArrayWidth": "2592",
++      "PixelArrayHeight": "1944",
++      "PhysicalWidth": "3.6288",
++      "PhysicalHeight": "2.7216",
++      "FocalLength": "3.37",
++      "MaxJpegSize": "8388608",
++      "MinFrameDuration": "33331760",
++      "MaxFrameDuration": "300000000"
++    }
++  ]
++}
+diff --git a/imx8m/bigcypress_8mp/camera_config_imx8mp.json b/imx8m/bigcypress_8mp/camera_config_imx8mp.json
+index 0c030b95..7acd8191 100644
+--- a/imx8m/bigcypress_8mp/camera_config_imx8mp.json
++++ b/imx8m/bigcypress_8mp/camera_config_imx8mp.json
+@@ -23,24 +23,36 @@
+       "FocalLength": "4.0",
+       "MaxJpegSize": "4194304",
+       "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
+     },
+     {
+       "camera_type": "front",
+-      "camera_name": "mxc_isi.1.capture",
++      "camera_name": "viv_v4l21",
++      "bus_info": "platform:viv1",
+       "orientation": "0",
+-      "mplane": "1",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "2592",
+-      "ActiveArrayHeight": "1944",
+-      "PixelArrayWidth": "2592",
+-      "PixelArrayHeight": "1944",
+-      "PhysicalWidth": "3.6288",
+-      "PhysicalHeight": "2.7216",
+-      "FocalLength": "3.37",
+-      "MaxJpegSize": "8388608",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "1920",
++      "ActiveArrayHeight": "1080",
++      "PixelArrayWidth": "1920",
++      "PixelArrayHeight": "1080",
++      "PhysicalWidth": "4.032",
++      "PhysicalHeight": "2.268",
++      "FocalLength": "4.0",
++      "MaxJpegSize": "4194304",
+       "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
+     }
+   ]
+ }
+diff --git a/imx8m/bigcypress_8mp/init.imx8mp.rc b/imx8m/bigcypress_8mp/init.imx8mp.rc
+index aebbee4a..472b4af3 100755
+--- a/imx8m/bigcypress_8mp/init.imx8mp.rc
++++ b/imx8m/bigcypress_8mp/init.imx8mp.rc
+@@ -33,6 +33,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/platform/soc@0/30c00000.bus/30e20000.audio-blk-ctrl/power/control auto
+     write /sys/devices/platform/soc@0/32c00000.bus/32ec0000.media-blk-ctrl/power/control auto
+     write /sys/devices/platform/soc@0/30c00000.bus/32fc0000.hdmi-blk-ctrl/power/control auto
++    write /sys/clk_ctrl/enable_clk_disable_unused 1
+ 
+ on property:sys.boot_completed=1
+     # update cpuset now that processors are up
+@@ -50,11 +51,14 @@ on property:sys.boot_completed=1
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
+ 
++on post-fs-data
++    mkdir /data/vendor/isp 0771 system camera
++
+ on early-boot
+-    export VSI_LOG_LEVEL 0
++    export ISP_LOG_LEVEL 4
+     start isp_media_server
+ 
+-service isp_media_server /vendor/bin/isp_media_server /vendor/etc/configs/isp/daA3840_30mc_1080P.json
++service isp_media_server /vendor/bin/isp_media_server
+     group camera
+     oneshot
+ 
+diff --git a/imx8m/bigcypress_8mp/init.rc b/imx8m/bigcypress_8mp/init.rc
+index c3dfbbef..16fd7cad 100644
+--- a/imx8m/bigcypress_8mp/init.rc
++++ b/imx8m/bigcypress_8mp/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -82,6 +78,8 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+ on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     start vendor.oemlock-1-0
++    start confirmationui-1-0
++    start securedisplayd-imx
+ 
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For bigcypress_8mp, when swap used about 400M, upgrade the level.
+@@ -253,3 +251,9 @@ on property:ro.boot.powersave.usb=true
+     #enable platform/32f10108.usb runtime_pm
+     write /sys/devices/platform/soc@0/32f10108.usb/38200000.dwc3/power/control auto
+     write /sys/devices/platform/soc@0/32f10108.usb/38200000.dwc3/xhci-hcd.0.auto/power/control auto
++
++# setenv append_bootargs androidboot.lpa.enable=1
++on property:ro.boot.lpa.enable=1
++    setprop vendor.audio.lpa.hold_second 20
++    setprop vendor.audio.lpa.period_ms 500
++    setprop vendor.audio.lpa.enable 1
+diff --git a/imx8m/bigcypress_8mp/isp_camera_config_imx8mp.json b/imx8m/bigcypress_8mp/isp_camera_config_imx8mp.json
+deleted file mode 100644
+index 1ed505f8..00000000
+--- a/imx8m/bigcypress_8mp/isp_camera_config_imx8mp.json
++++ /dev/null
+@@ -1,45 +0,0 @@
+-{
+-  "__readme": [
+-    "Basic Camera HAL v3 configuration."
+-  ],
+-
+-  "hal_version": "3",
+-  "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "GPU_3D",
+-
+-  "camera_metadata": [
+-    {
+-      "camera_type": "back",
+-      "camera_name": "viv_v4l20",
+-      "bus_info": "platform:viv0",
+-      "orientation": "0",
+-      "buffer_type": "mmap",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "4.032",
+-      "PhysicalHeight": "2.268",
+-      "FocalLength": "4.0",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+-    },
+-    {
+-      "camera_type": "front",
+-      "camera_name": "uvc",
+-      "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "2.688",
+-      "PhysicalHeight": "1.512",
+-      "FocalLength": "3.42",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+-    }
+-  ]
+-}
+diff --git a/imx8m/bigcypress_8mp/manifest_powersave.xml b/imx8m/bigcypress_8mp/manifest_powersave.xml
+new file mode 100644
+index 00000000..ebd80361
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/manifest_powersave.xml
+@@ -0,0 +1,148 @@
++<manifest version="1.0" type="device" target-level="5">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>4.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.4</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.keymaster</name>
++        <transport>hwbinder</transport>
++        <version>4.0</version>
++        <interface>
++            <name>IKeymasterDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.drm</name>
++        <transport>hwbinder</transport>
++        <version>1.3</version>
++        <interface>
++            <name>ICryptoFactory</name>
++        </interface>
++        <interface>
++            <name>IDrmFactory</name>
++        </interface>
++        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
++        <fqname>@1.3::IDrmFactory/clearkey</fqname>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>4.0</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>6.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++		<version>6.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/bigcypress_8mp/required_hardware_powersave.xml b/imx8m/bigcypress_8mp/required_hardware_powersave.xml
+new file mode 100644
+index 00000000..ff7f19a2
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/required_hardware_powersave.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2009 The Android Open Source Project
++     Copyright 2018 NXP
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<!-- These are the hardware components that are included in i.MX reference board
++-->
++<permissions>
++    <!-- This is Android and fully CTS compatible.  Basically this is for CTS tests to use. -->
++    <feature name="android.software.cts" />
++    <feature name="android.hardware.microphone" />
++    <feature name="android.software.cant_save_state" />
++    <feature name="android.software.home_screen" />
++    <feature name="android.software.input_methods" />
++    <feature name="android.hardware.location" />
++    <feature name="android.hardware.location.network" />
++    <feature name="android.hardware.bluetooth" />
++    <feature name="android.software.companion_device_setup" />
++    <feature name="android.software.autofill" />
++    <feature name="android.software.secure_lock_screen" />
++</permissions>
+diff --git a/imx8m/bigcypress_8mp/sepolicy/file_contexts b/imx8m/bigcypress_8mp/sepolicy/file_contexts
+index ad88cb47..3f41d1cb 100644
+--- a/imx8m/bigcypress_8mp/sepolicy/file_contexts
++++ b/imx8m/bigcypress_8mp/sepolicy/file_contexts
+@@ -21,3 +21,14 @@
+ /vendor/bin/video_test                      u:object_r:isp_exec:s0
+ /vendor/bin/isp_media_server                u:object_r:isp_exec:s0
+ /dev/v4l-subdev[0-9]*                       u:object_r:video_device:s0
++/data/vendor/isp(/.*)?                      u:object_r:isp_file:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup[0-9]*(/.*)?                             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                              u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                            u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.1.auto/wakeup/wakeup[0-9]*(/.*)?                 u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                                u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/bigcypress_8mp/sepolicy/isp.te b/imx8m/bigcypress_8mp/sepolicy/isp.te
+index da4a84de..477bf4c2 100644
+--- a/imx8m/bigcypress_8mp/sepolicy/isp.te
++++ b/imx8m/bigcypress_8mp/sepolicy/isp.te
+@@ -1,10 +1,15 @@
+ type isp, domain;
+ type isp_exec, exec_type, vendor_file_type, file_type;
++type isp_file, file_type, data_file_type;
+ 
+ # Started by init
+ init_daemon_domain(isp)
+ 
+ dontaudit isp self:capability { dac_override };
+ 
++allow isp isp_file:dir { add_name write search };
++allow isp isp_file:file { create lock open read write };
+ allow isp video_device:chr_file { open read write ioctl map getattr };
+ allow isp self:capability { sys_nice };
++allow isp sysfs:dir { open read };
++allow isp sysfs:file { open read };
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index f042306e..cd083279 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -105,7 +105,7 @@ BOARD_HAVE_BLUETOOTH_BCM := true
+ BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
+ 
+ # -------@block_sensor-------
+-BOARD_USE_ST_SENSOR_INPUT := true
++BOARD_USE_SENSOR_FUSION := true
+ 
+ # -------@block_kernel_bootimg-------
+ BOARD_KERNEL_BASE := 0x40400000
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq.mk b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+index d5ce21cb..fa431384 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mq
+ 
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index 976ff22e..8bdc1397 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -287,6 +287,7 @@ PRODUCT_PACKAGES += \
+         libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+         libNNGPUBinary-ulite \
++        libNNGPUBinary-nano \
+         libNNArchPerf \
+         libarchmodelSw
+ 
+@@ -303,11 +304,6 @@ PRODUCT_COPY_FILES += \
+ # GPU openCL icdloader config file
+ -include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/gpu-viv/icdloader/icdloader.mk
+ 
+-# -------@block_sensor-------
+-PRODUCT_PACKAGES += \
+-    android.hardware.sensors@1.0-impl \
+-    android.hardware.sensors@1.0-convert \
+-    android.hardware.sensors@1.0-service
+ 
+ # -------@block_wifi-------
+ PRODUCT_COPY_FILES += \
+@@ -402,10 +398,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
+index a307677e..9a1b37e5 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_pci.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mq_pci
+diff --git a/imx8m/bigcypress_8mq/camera_config_imx8mq.json b/imx8m/bigcypress_8mq/camera_config_imx8mq.json
+index 90b8e2f6..5b33cf56 100644
+--- a/imx8m/bigcypress_8mq/camera_config_imx8mq.json
++++ b/imx8m/bigcypress_8mq/camera_config_imx8mq.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/bigcypress_8mq/init.imx8mq.rc b/imx8m/bigcypress_8mq/init.imx8mq.rc
+index 25355d09..44613aae 100755
+--- a/imx8m/bigcypress_8mq/init.imx8mq.rc
++++ b/imx8m/bigcypress_8mq/init.imx8mq.rc
+@@ -24,9 +24,6 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
+ 
+-    # disable 3D composition overlay to fix video rotate problem
+-    setprop vendor.hwc.enable.overlay 0
+-
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/bigcypress_8mq/init.rc b/imx8m/bigcypress_8mq/init.rc
+index c817f240..30d41ee7 100644
+--- a/imx8m/bigcypress_8mq/init.rc
++++ b/imx8m/bigcypress_8mq/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -101,10 +97,6 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     setprop vendor.media.fsl_codec.flag 7
+ 
+     setprop camera.disable_zsl_mode 1
+-    setprop back_camera_name mx6s-csi0
+-    setprop back_camera_orient 0
+-    setprop front_camera_name mx6s-csi1
+-    setprop front_camera_orient 0
+ 
+    # Tweak the mmc device read ahead buffer size
+     write /sys/block/mmcblk0/queue/read_ahead_kb 2048
+@@ -186,12 +178,6 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     group system uhid
+     oneshot
+ 
+-service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+-    class hal
+-    user system
+-    group system wakelock input root
+-    capabilities BLOCK_SUSPEND SYS_NICE
+-
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+     class core
+diff --git a/imx8m/bigcypress_8mq/init.recovery.nxp.rc b/imx8m/bigcypress_8mq/init.recovery.nxp.rc
+index 477be025..6074b693 100644
+--- a/imx8m/bigcypress_8mq/init.recovery.nxp.rc
++++ b/imx8m/bigcypress_8mq/init.recovery.nxp.rc
+@@ -5,4 +5,4 @@ on init
+     setprop sys.usb.configfs 1
+ 
+ on post-fs-data
+-    setprop sys.usb.controller "5b130000.usb"
++    setprop sys.usb.controller "38100000.usb"
+diff --git a/imx8m/bigcypress_8mq/manifest.xml b/imx8m/bigcypress_8mq/manifest.xml
+index adad2fd1..c6b7c705 100644
+--- a/imx8m/bigcypress_8mq/manifest.xml
++++ b/imx8m/bigcypress_8mq/manifest.xml
+@@ -74,15 +74,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.sensors</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>ISensors</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.media.c2</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/bigcypress_8mq/sepolicy/file_contexts b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+index 586e5185..c83b5a88 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/file_contexts
++++ b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+@@ -21,3 +21,13 @@
+ /sys/devices/platform/leds/leds/(.*)/delay_off      u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+ /vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/kingscanyon_8mq/camera_config_imx8mq.json b/imx8m/kingscanyon_8mq/camera_config_imx8mq.json
+index a8bde1a0..892e7a8f 100644
+--- a/imx8m/kingscanyon_8mq/camera_config_imx8mq.json
++++ b/imx8m/kingscanyon_8mq/camera_config_imx8mq.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/kingscanyon_8mq/init.imx8mq.rc b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+index 25355d09..44613aae 100755
+--- a/imx8m/kingscanyon_8mq/init.imx8mq.rc
++++ b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+@@ -24,9 +24,6 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
+ 
+-    # disable 3D composition overlay to fix video rotate problem
+-    setprop vendor.hwc.enable.overlay 0
+-
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/kingscanyon_8mq/init.rc b/imx8m/kingscanyon_8mq/init.rc
+index e8f276a1..6d873b7f 100644
+--- a/imx8m/kingscanyon_8mq/init.rc
++++ b/imx8m/kingscanyon_8mq/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -101,7 +97,6 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     setprop vendor.media.fsl_codec.flag 7
+ 
+     setprop camera.disable_zsl_mode 1
+-    setprop front_camera_name mx6s-csi
+ 
+    # Tweak the mmc device read ahead buffer size
+     write /sys/block/mmcblk0/queue/read_ahead_kb 2048
+diff --git a/imx8m/kingscanyon_8mq/init.recovery.nxp.rc b/imx8m/kingscanyon_8mq/init.recovery.nxp.rc
+index db84a9ea..6074b693 100644
+--- a/imx8m/kingscanyon_8mq/init.recovery.nxp.rc
++++ b/imx8m/kingscanyon_8mq/init.recovery.nxp.rc
+@@ -3,3 +3,6 @@ on init
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+     setprop sys.usb.configfs 1
++
++on post-fs-data
++    setprop sys.usb.controller "38100000.usb"
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index d6adaff9..8af2e46d 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -283,6 +283,7 @@ PRODUCT_PACKAGES += \
+         libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+         libNNGPUBinary-ulite \
++        libNNGPUBinary-nano \
+         libNNArchPerf \
+         libarchmodelSw
+ 
+@@ -395,10 +396,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/file_contexts b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+index 586e5185..c83b5a88 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/file_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+@@ -21,3 +21,13 @@
+ /sys/devices/platform/leds/leds/(.*)/delay_off      u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+ /vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/redwood_8mq/camera_config_imx8mq.json b/imx8m/redwood_8mq/camera_config_imx8mq.json
+index f1709bb6..25e9bd9e 100644
+--- a/imx8m/redwood_8mq/camera_config_imx8mq.json
++++ b/imx8m/redwood_8mq/camera_config_imx8mq.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/redwood_8mq/init.imx8mq.rc b/imx8m/redwood_8mq/init.imx8mq.rc
+index 25355d09..44613aae 100755
+--- a/imx8m/redwood_8mq/init.imx8mq.rc
++++ b/imx8m/redwood_8mq/init.imx8mq.rc
+@@ -24,9 +24,6 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
+ 
+-    # disable 3D composition overlay to fix video rotate problem
+-    setprop vendor.hwc.enable.overlay 0
+-
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/redwood_8mq/init.rc b/imx8m/redwood_8mq/init.rc
+index b5d297b8..d846da35 100644
+--- a/imx8m/redwood_8mq/init.rc
++++ b/imx8m/redwood_8mq/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+diff --git a/imx8m/redwood_8mq/init.recovery.nxp.rc b/imx8m/redwood_8mq/init.recovery.nxp.rc
+index db84a9ea..6074b693 100644
+--- a/imx8m/redwood_8mq/init.recovery.nxp.rc
++++ b/imx8m/redwood_8mq/init.recovery.nxp.rc
+@@ -3,3 +3,6 @@ on init
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+     setprop sys.usb.configfs 1
++
++on post-fs-data
++    setprop sys.usb.controller "38100000.usb"
+diff --git a/imx8m/redwood_8mq/redwood_8mq.mk b/imx8m/redwood_8mq/redwood_8mq.mk
+index 78d539e2..89bd27fa 100644
+--- a/imx8m/redwood_8mq/redwood_8mq.mk
++++ b/imx8m/redwood_8mq/redwood_8mq.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := redwood_8mq
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index c92510a7..deffc0b1 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -283,6 +283,7 @@ PRODUCT_PACKAGES += \
+         libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+         libNNGPUBinary-ulite \
++        libNNGPUBinary-nano \
+         libNNArchPerf \
+         libarchmodelSw
+ 
+@@ -393,10 +394,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/redwood_8mq/redwood_8mq_go.mk b/imx8m/redwood_8mq/redwood_8mq_go.mk
+index 3c513577..f04e3a37 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_go.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_go.mk
+@@ -1,13 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mq_common.mk)
+ 
+-# Inherit common Android Go defaults.
+-$(call inherit-product, build/target/product/go_defaults_common.mk)
++# -------@block_common_config-------
+ 
+ # Overrides
+ PRODUCT_NAME := redwood_8mq_go
+diff --git a/imx8m/redwood_8mq/redwood_8mq_pci.mk b/imx8m/redwood_8mq/redwood_8mq_pci.mk
+index 1e6066e4..c2811403 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_pci.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_pci.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := redwood_8mq_pci
+ 
+diff --git a/imx8m/redwood_8mq/redwood_8mq_pcidev.mk b/imx8m/redwood_8mq/redwood_8mq_pcidev.mk
+index 5b606ff1..05ca531a 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_pcidev.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_pcidev.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/redwood_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := redwood_8mq_pcidev
+diff --git a/imx8m/redwood_8mq/sepolicy/file_contexts b/imx8m/redwood_8mq/sepolicy/file_contexts
+index ba4f0809..cddbc917 100644
+--- a/imx8m/redwood_8mq/sepolicy/file_contexts
++++ b/imx8m/redwood_8mq/sepolicy/file_contexts
+@@ -13,3 +13,13 @@
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/vp6820_8mn/camera_config_imx8mn.json b/imx8m/vp6820_8mn/camera_config_imx8mn.json
+index 978babcc..31b1e298 100644
+--- a/imx8m/vp6820_8mn/camera_config_imx8mn.json
++++ b/imx8m/vp6820_8mn/camera_config_imx8mn.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/vp6820_8mn/init.rc b/imx8m/vp6820_8mn/init.rc
+index 61fc3561..14ba04bd 100644
+--- a/imx8m/vp6820_8mn/init.rc
++++ b/imx8m/vp6820_8mn/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -82,6 +78,8 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+ on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     start vendor.oemlock-1-0
++    start confirmationui-1-0
++    start securedisplayd-imx
+ 
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For vp6820_8mn, when swap used about 400M, upgrade the level.
+diff --git a/imx8m/vp6820_8mn/init.usb.rc b/imx8m/vp6820_8mn/init.usb.rc
+index aa27af45..0f3ab0b9 100644
+--- a/imx8m/vp6820_8mn/init.usb.rc
++++ b/imx8m/vp6820_8mn/init.usb.rc
+@@ -44,7 +44,7 @@ on early-boot
+     mount functionfs mtp /dev/usb-ffs/mtp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
+     mount functionfs ptp /dev/usb-ffs/ptp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
+     setprop sys.usb.mtp.device_type 3
+-    setprop vendor.usb.config ${sys.usb.controller}
++    setprop vendor.usb.config "ci_hdrc.0"
+     write /sys/module/libcomposite/parameters/disable_l1_for_hs "y"
+     symlink /config/usb_gadget/g1/configs/b.1 /config/usb_gadget/g1/os_desc/b.1
+ 
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index b6a0f6c2..b2c344e2 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -149,6 +149,13 @@ endif
+ PRODUCT_PACKAGES += \
+     android.hardware.keymaster@4.0-service-imx
+ 
++# Confirmation UI
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.confirmationui@1.0-service.trusty \
++    securedisplayd-imx
++endif
++
+ #DRM Widevine 1.2 L3 support
+ PRODUCT_PACKAGES += \
+     android.hardware.drm@1.3-service.clearkey \
+@@ -284,6 +291,7 @@ PRODUCT_PACKAGES += \
+     libNNGPUBinary-evis2 \
+     libNNGPUBinary-lite \
+     libNNGPUBinary-ulite \
++    libNNGPUBinary-nano \
+     libNNArchPerf \
+     libarchmodelSw
+ 
+@@ -390,10 +398,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mn.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mn.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn_pci.mk b/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
+index 68807286..c7f7fb29 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn_pci.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mn.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mn_pci
+ 
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn_pcidev.mk b/imx8m/vp6820_8mn/vp6820_8mn_pcidev.mk
+index 52ad6a39..b6213714 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn_pcidev.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn_pcidev.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mn.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mn_pcidev
+diff --git a/imx8m/vp6820_8mp/BoardConfig.mk b/imx8m/vp6820_8mp/BoardConfig.mk
+index 91465122..b9d41981 100644
+--- a/imx8m/vp6820_8mp/BoardConfig.mk
++++ b/imx8m/vp6820_8mp/BoardConfig.mk
+@@ -84,10 +84,15 @@ BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/idt_testkey_rsa2048.pe
+ 
+ # -------@block_treble-------
+ # Vendor Interface manifest and compatibility
+-DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifeq ($(POWERSAVE),true)
++    DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest_powersave.xml
++else
++    DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++endif
+ ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
+ DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
+ endif
++
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ DEVICE_FRAMEWORK_COMPATIBILITY_MATRIX_FILE := $(IMX_DEVICE_PATH)/device_framework_matrix.xml
+ 
+@@ -124,7 +129,11 @@ BOARD_KERNEL_CMDLINE += swiotlb=65536
+ BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
+ 
+ # wifi config
+-BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
++ifeq ($(POWERSAVE),true)
++    BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para_powersave.conf
++else
++    BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
++endif
+ 
+ # low memory device build config
+ ifeq ($(LOW_MEMORY),true)
+@@ -133,6 +142,11 @@ else
+ BOARD_KERNEL_CMDLINE += cma=$(CMASIZE)@0x400M-0x1000M
+ endif
+ 
++# powersave config
++ifeq ($(POWERSAVE),true)
++    BOARD_KERNEL_CMDLINE += androidboot.powersave.usb=true
++endif
++
+ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+ BOARD_KERNEL_CMDLINE += androidboot.vendor.sysrq=1
+ endif
+@@ -141,8 +155,10 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-no-product.dtb
+   else
+-    # Default use basler + ov5640
+-    TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-basler-ov5640.dtb
++    # Default dual basler
++    TARGET_BOARD_DTS_CONFIG := imx8mp:imx8mp-evk-dual-basler.dtb
++    # basler + ov5640
++    TARGET_BOARD_DTS_CONFIG += imx8mp-basler-ov5640:imx8mp-evk-basler-ov5640.dtb
+     # Only ov5640
+     TARGET_BOARD_DTS_CONFIG += imx8mp-ov5640:imx8mp-evk.dtb
+     # Only basler
+diff --git a/imx8m/vp6820_8mp/SharedBoardConfig.mk b/imx8m/vp6820_8mp/SharedBoardConfig.mk
+index 454762ef..19c271b6 100644
+--- a/imx8m/vp6820_8mp/SharedBoardConfig.mk
++++ b/imx8m/vp6820_8mp/SharedBoardConfig.mk
+@@ -67,6 +67,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-rpmsg.ko \
+     $(KERNEL_OUT)/drivers/rtc/rtc-snvs.ko \
+     $(KERNEL_OUT)/drivers/pci/controller/dwc/pci-imx6.ko \
++    $(KERNEL_OUT)/drivers/net/phy/realtek.ko \
+     $(KERNEL_OUT)/drivers/ptp/ptp.ko \
+     $(KERNEL_OUT)/drivers/pps/pps_core.ko \
+     $(KERNEL_OUT)/drivers/net/ethernet/freescale/fec.ko
+@@ -145,7 +146,10 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/video/backlight/pwm_bl.ko \
+     $(KERNEL_OUT)/drivers/mmc/host/cqhci.ko \
+     $(KERNEL_OUT)/drivers/mmc/host/sdhci-esdhc-imx.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/ion-alloc.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_sys_heap.ko \
+     $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_cma_heap.ko \
++    $(KERNEL_OUT)/drivers/staging/android/ion/heaps/ion_unmapped_heap.ko \
+     $(KERNEL_OUT)/drivers/reset/reset-imx7.ko \
+     $(KERNEL_OUT)/drivers/phy/freescale/phy-fsl-imx8mp-lvds.ko \
+     $(KERNEL_OUT)/drivers/phy/freescale/phy-fsl-samsung-hdmi.ko \
+@@ -172,18 +176,13 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/gpu/drm/panel/panel-raydium-rm67191.ko \
+     $(KERNEL_OUT)/drivers/gpu/drm/panel/panel-simple.ko \
+     $(KERNEL_OUT)/drivers/usb/dwc3/dwc3-imx8mp.ko \
+-    $(KERNEL_OUT)/drivers/usb/dwc3/dwc3.ko \
+     $(KERNEL_OUT)/drivers/usb/typec/mux/gpio-switch.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-hcd.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-pci.ko \
+-    $(KERNEL_OUT)/drivers/usb/host/xhci-plat-hcd.ko \
+     $(KERNEL_OUT)/drivers/power/supply/dummy_battery.ko \
+     $(KERNEL_OUT)/drivers/nvmem/nvmem-imx-ocotp.ko \
+     $(KERNEL_OUT)/drivers/thermal/device_cooling.ko \
+     $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/cpufreq-dt.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/imx-cpufreq-dt.ko \
+-    $(KERNEL_OUT)/drivers/staging/media/imx/imx8-media-dev.ko \
+     $(KERNEL_OUT)/drivers/media/v4l2-core/v4l2-fwnode.ko \
+     $(KERNEL_OUT)/drivers/media/i2c/ov5640.ko \
+     $(KERNEL_OUT)/drivers/staging/media/imx/imx8-capture.ko \
+@@ -196,10 +195,11 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/trusty/trusty-log.ko \
+     $(KERNEL_OUT)/drivers/trusty/trusty-virtio.ko \
+     $(KERNEL_OUT)/drivers/trusty/trusty-ipc.ko \
++    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/basler-camera-driver-vvcam.ko \
+     $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-video.ko \
+-    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-isp.ko \
+     $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-dwe.ko \
+-    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/basler-camera-driver-vvcam.ko
++    $(TARGET_OUT_INTERMEDIATES)/VVCAM_OBJ/vvcam-isp.ko \
++    $(KERNEL_OUT)/drivers/staging/media/imx/imx8-media-dev.ko
+ endif
+ 
+ # -------@block_memory-------
+diff --git a/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
+index f7bcc3d5..8f92f43c 100644
+--- a/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
+@@ -14,7 +14,7 @@ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-evk-uuu-mic6g:vp6820_8mp_evk_android_u
+ 
+ ifeq ($(IMX8MP_USES_GKI),true)
+ TARGET_KERNEL_DEFCONFIG := gki_defconfig
+-TARGET_KERNEL_GKI_DEFCONF:= android_gki_defconfig
++TARGET_KERNEL_GKI_DEFCONF:= imx8mp_gki.fragment
+ else
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ endif
+diff --git a/imx8m/vp6820_8mp/ov5640_camera_config_imx8mp.json b/imx8m/vp6820_8mp/camera_config_imx8mp-basler-ov5640.json
+similarity index 56%
+rename from imx8m/vp6820_8mp/ov5640_camera_config_imx8mp.json
+rename to imx8m/vp6820_8mp/camera_config_imx8mp-basler-ov5640.json
+index 73b1b25b..ecfd9486 100644
+--- a/imx8m/vp6820_8mp/ov5640_camera_config_imx8mp.json
++++ b/imx8m/vp6820_8mp/camera_config_imx8mp-basler-ov5640.json
+@@ -10,6 +10,29 @@
+   "camera_metadata": [
+     {
+       "camera_type": "back",
++      "camera_name": "viv_v4l20",
++      "bus_info": "platform:viv0",
++      "orientation": "0",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "3840",
++      "ActiveArrayHeight": "2160",
++      "PixelArrayWidth": "3840",
++      "PixelArrayHeight": "2160",
++      "PhysicalWidth": "8.064",
++      "PhysicalHeight": "4.536",
++      "FocalLength": "4.0",
++      "MaxJpegSize": "6291456",
++      "MinFrameDuration": "33331760",
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
++    },
++    {
++      "camera_type": "front",
+       "camera_name": "mxc_isi.1.capture",
+       "orientation": "0",
+       "mplane": "1",
+@@ -24,22 +47,6 @@
+       "MaxJpegSize": "8388608",
+       "MinFrameDuration": "33331760",
+       "MaxFrameDuration": "300000000"
+-    },
+-    {
+-      "camera_type": "front",
+-      "camera_name": "uvc",
+-      "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "2.688",
+-      "PhysicalHeight": "1.512",
+-      "FocalLength": "3.42",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+     }
+   ]
+ }
+diff --git a/imx8m/vp6820_8mp/camera_config_imx8mp-only-ov5640.json b/imx8m/vp6820_8mp/camera_config_imx8mp-only-ov5640.json
+new file mode 100644
+index 00000000..31b1e298
+--- /dev/null
++++ b/imx8m/vp6820_8mp/camera_config_imx8mp-only-ov5640.json
+@@ -0,0 +1,29 @@
++{
++  "__readme": [
++    "Basic Camera HAL v3 configuration."
++  ],
++
++  "hal_version": "3",
++  "cam_blit_copy": "GPU_3D",
++  "cam_blit_csc": "GPU_3D",
++
++  "camera_metadata": [
++    {
++      "camera_type": "back",
++      "camera_name": "mxc_isi.0.capture",
++      "orientation": "0",
++      "mplane": "1",
++      "buffer_type": "dma",
++      "ActiveArrayWidth": "2592",
++      "ActiveArrayHeight": "1944",
++      "PixelArrayWidth": "2592",
++      "PixelArrayHeight": "1944",
++      "PhysicalWidth": "3.6288",
++      "PhysicalHeight": "2.7216",
++      "FocalLength": "3.37",
++      "MaxJpegSize": "8388608",
++      "MinFrameDuration": "33331760",
++      "MaxFrameDuration": "300000000"
++    }
++  ]
++}
+diff --git a/imx8m/vp6820_8mp/camera_config_imx8mp.json b/imx8m/vp6820_8mp/camera_config_imx8mp.json
+index 0c030b95..7acd8191 100644
+--- a/imx8m/vp6820_8mp/camera_config_imx8mp.json
++++ b/imx8m/vp6820_8mp/camera_config_imx8mp.json
+@@ -23,24 +23,36 @@
+       "FocalLength": "4.0",
+       "MaxJpegSize": "4194304",
+       "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
+     },
+     {
+       "camera_type": "front",
+-      "camera_name": "mxc_isi.1.capture",
++      "camera_name": "viv_v4l21",
++      "bus_info": "platform:viv1",
+       "orientation": "0",
+-      "mplane": "1",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "2592",
+-      "ActiveArrayHeight": "1944",
+-      "PixelArrayWidth": "2592",
+-      "PixelArrayHeight": "1944",
+-      "PhysicalWidth": "3.6288",
+-      "PhysicalHeight": "2.7216",
+-      "FocalLength": "3.37",
+-      "MaxJpegSize": "8388608",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "1920",
++      "ActiveArrayHeight": "1080",
++      "PixelArrayWidth": "1920",
++      "PixelArrayHeight": "1080",
++      "PhysicalWidth": "4.032",
++      "PhysicalHeight": "2.268",
++      "FocalLength": "4.0",
++      "MaxJpegSize": "4194304",
+       "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
++      "MaxFrameDuration": "300000000",
++      "ae_comp_min": "-4",
++      "ae_comp_max": "4",
++      "ae_comp_step_nummerator": "1",
++      "ae_comp_step_denominator": "2",
++      "exposure_ns_min": "68000",
++      "exposure_ns_max": "33360000"
+     }
+   ]
+ }
+diff --git a/imx8m/vp6820_8mp/init.imx8mp.rc b/imx8m/vp6820_8mp/init.imx8mp.rc
+index aebbee4a..472b4af3 100755
+--- a/imx8m/vp6820_8mp/init.imx8mp.rc
++++ b/imx8m/vp6820_8mp/init.imx8mp.rc
+@@ -33,6 +33,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/platform/soc@0/30c00000.bus/30e20000.audio-blk-ctrl/power/control auto
+     write /sys/devices/platform/soc@0/32c00000.bus/32ec0000.media-blk-ctrl/power/control auto
+     write /sys/devices/platform/soc@0/30c00000.bus/32fc0000.hdmi-blk-ctrl/power/control auto
++    write /sys/clk_ctrl/enable_clk_disable_unused 1
+ 
+ on property:sys.boot_completed=1
+     # update cpuset now that processors are up
+@@ -50,11 +51,14 @@ on property:sys.boot_completed=1
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
+ 
++on post-fs-data
++    mkdir /data/vendor/isp 0771 system camera
++
+ on early-boot
+-    export VSI_LOG_LEVEL 0
++    export ISP_LOG_LEVEL 4
+     start isp_media_server
+ 
+-service isp_media_server /vendor/bin/isp_media_server /vendor/etc/configs/isp/daA3840_30mc_1080P.json
++service isp_media_server /vendor/bin/isp_media_server
+     group camera
+     oneshot
+ 
+diff --git a/imx8m/vp6820_8mp/init.rc b/imx8m/vp6820_8mp/init.rc
+index c9a851f4..a29e7e04 100644
+--- a/imx8m/vp6820_8mp/init.rc
++++ b/imx8m/vp6820_8mp/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+@@ -82,6 +78,8 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+ on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     start vendor.oemlock-1-0
++    start confirmationui-1-0
++    start securedisplayd-imx
+ 
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For vp6820_8mp, when swap used about 400M, upgrade the level.
+@@ -253,3 +251,9 @@ on property:ro.boot.powersave.usb=true
+     #enable platform/32f10108.usb runtime_pm
+     write /sys/devices/platform/soc@0/32f10108.usb/38200000.dwc3/power/control auto
+     write /sys/devices/platform/soc@0/32f10108.usb/38200000.dwc3/xhci-hcd.0.auto/power/control auto
++
++# setenv append_bootargs androidboot.lpa.enable=1
++on property:ro.boot.lpa.enable=1
++    setprop vendor.audio.lpa.hold_second 20
++    setprop vendor.audio.lpa.period_ms 500
++    setprop vendor.audio.lpa.enable 1
+diff --git a/imx8m/vp6820_8mp/isp_camera_config_imx8mp.json b/imx8m/vp6820_8mp/isp_camera_config_imx8mp.json
+deleted file mode 100644
+index 1ed505f8..00000000
+--- a/imx8m/vp6820_8mp/isp_camera_config_imx8mp.json
++++ /dev/null
+@@ -1,45 +0,0 @@
+-{
+-  "__readme": [
+-    "Basic Camera HAL v3 configuration."
+-  ],
+-
+-  "hal_version": "3",
+-  "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "GPU_3D",
+-
+-  "camera_metadata": [
+-    {
+-      "camera_type": "back",
+-      "camera_name": "viv_v4l20",
+-      "bus_info": "platform:viv0",
+-      "orientation": "0",
+-      "buffer_type": "mmap",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "4.032",
+-      "PhysicalHeight": "2.268",
+-      "FocalLength": "4.0",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+-    },
+-    {
+-      "camera_type": "front",
+-      "camera_name": "uvc",
+-      "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "2.688",
+-      "PhysicalHeight": "1.512",
+-      "FocalLength": "3.42",
+-      "MaxJpegSize": "4194304",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
+-    }
+-  ]
+-}
+diff --git a/imx8m/vp6820_8mp/manifest_powersave.xml b/imx8m/vp6820_8mp/manifest_powersave.xml
+new file mode 100644
+index 00000000..ebd80361
+--- /dev/null
++++ b/imx8m/vp6820_8mp/manifest_powersave.xml
+@@ -0,0 +1,148 @@
++<manifest version="1.0" type="device" target-level="5">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>4.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.4</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.keymaster</name>
++        <transport>hwbinder</transport>
++        <version>4.0</version>
++        <interface>
++            <name>IKeymasterDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.drm</name>
++        <transport>hwbinder</transport>
++        <version>1.3</version>
++        <interface>
++            <name>ICryptoFactory</name>
++        </interface>
++        <interface>
++            <name>IDrmFactory</name>
++        </interface>
++        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
++        <fqname>@1.3::IDrmFactory/clearkey</fqname>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>4.0</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>6.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++		<version>6.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/vp6820_8mp/required_hardware_powersave.xml b/imx8m/vp6820_8mp/required_hardware_powersave.xml
+new file mode 100644
+index 00000000..ff7f19a2
+--- /dev/null
++++ b/imx8m/vp6820_8mp/required_hardware_powersave.xml
+@@ -0,0 +1,33 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2009 The Android Open Source Project
++     Copyright 2018 NXP
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<!-- These are the hardware components that are included in i.MX reference board
++-->
++<permissions>
++    <!-- This is Android and fully CTS compatible.  Basically this is for CTS tests to use. -->
++    <feature name="android.software.cts" />
++    <feature name="android.hardware.microphone" />
++    <feature name="android.software.cant_save_state" />
++    <feature name="android.software.home_screen" />
++    <feature name="android.software.input_methods" />
++    <feature name="android.hardware.location" />
++    <feature name="android.hardware.location.network" />
++    <feature name="android.hardware.bluetooth" />
++    <feature name="android.software.companion_device_setup" />
++    <feature name="android.software.autofill" />
++    <feature name="android.software.secure_lock_screen" />
++</permissions>
+diff --git a/imx8m/vp6820_8mp/sepolicy/file_contexts b/imx8m/vp6820_8mp/sepolicy/file_contexts
+index ad88cb47..3f41d1cb 100644
+--- a/imx8m/vp6820_8mp/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mp/sepolicy/file_contexts
+@@ -21,3 +21,14 @@
+ /vendor/bin/video_test                      u:object_r:isp_exec:s0
+ /vendor/bin/isp_media_server                u:object_r:isp_exec:s0
+ /dev/v4l-subdev[0-9]*                       u:object_r:video_device:s0
++/data/vendor/isp(/.*)?                      u:object_r:isp_file:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup[0-9]*(/.*)?                             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                              u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                            u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.1.auto/wakeup/wakeup[0-9]*(/.*)?                 u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                                u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/vp6820_8mp/sepolicy/genfs_contexts b/imx8m/vp6820_8mp/sepolicy/genfs_contexts
+index aa2c45b5..a688b5da 100644
+--- a/imx8m/vp6820_8mp/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mp/sepolicy/genfs_contexts
+@@ -13,6 +13,9 @@ genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/000
+ 
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/extcon u:object_r:sysfs_extcon:s0
+ 
++# for dumpstate to access the stat file
++genfscon sysfs /devices/platform/94400000.pmem/ndbus0/region0/namespace0.0/block/pmem0                                       u:object_r:sysfs_block_devices:s0
++
+ # android.system.suspend@1.0-service
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
+@@ -25,7 +28,4 @@ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/w
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup6    u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup7    u:object_r:sysfs_wakeup:s0
+ 
+-# for dumpstate to access the stat file
+-genfscon sysfs /devices/platform/94400000.pmem/ndbus0/region0/namespace0.0/block/pmem0                                       u:object_r:sysfs_block_devices:s0
+-
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+diff --git a/imx8m/vp6820_8mp/sepolicy/isp.te b/imx8m/vp6820_8mp/sepolicy/isp.te
+index da4a84de..477bf4c2 100644
+--- a/imx8m/vp6820_8mp/sepolicy/isp.te
++++ b/imx8m/vp6820_8mp/sepolicy/isp.te
+@@ -1,10 +1,15 @@
+ type isp, domain;
+ type isp_exec, exec_type, vendor_file_type, file_type;
++type isp_file, file_type, data_file_type;
+ 
+ # Started by init
+ init_daemon_domain(isp)
+ 
+ dontaudit isp self:capability { dac_override };
+ 
++allow isp isp_file:dir { add_name write search };
++allow isp isp_file:file { create lock open read write };
+ allow isp video_device:chr_file { open read write ioctl map getattr };
+ allow isp self:capability { sys_nice };
++allow isp sysfs:dir { open read };
++allow isp sysfs:file { open read };
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp.mk b/imx8m/vp6820_8mp/vp6820_8mp.mk
+index 796138e9..88ea4f48 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp.mk
+@@ -160,6 +160,13 @@ endif
+ PRODUCT_PACKAGES += \
+     android.hardware.keymaster@4.0-service-imx
+ 
++# Confirmation UI
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.confirmationui@1.0-service.trusty \
++    securedisplayd-imx
++endif
++
+ # new gatekeeper HAL
+ PRODUCT_PACKAGES += \
+     android.hardware.gatekeeper@1.0-service.software-imx
+@@ -202,13 +209,16 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.rebootescrow.device=/dev/block/pmem0
+ 
+-#DRM Widevine 1.2 L3 support
++#DRM Widevine 1.3 L1 support
+ PRODUCT_PACKAGES += \
+     android.hardware.drm@1.3-service.widevine \
+     android.hardware.drm@1.3-service.clearkey \
+     libwvdrmcryptoplugin \
+     libwvhidl \
+     libwvdrmengine \
++    liboemcrypto \
++
++$(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee.mk)
+ 
+ # -------@block_audio-------
+ 
+@@ -237,19 +247,21 @@ PRODUCT_COPY_FILES += \
+ 
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json \
+-    $(IMX_DEVICE_PATH)/ov5640_camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/ov5640_camera_config_imx8mp.json \
+-    $(IMX_DEVICE_PATH)/isp_camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/isp_camera_config_imx8mp.json \
++    $(IMX_DEVICE_PATH)/camera_config_imx8mp-basler-ov5640.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp-basler-ov5640.json \
++    $(IMX_DEVICE_PATH)/camera_config_imx8mp-only-ov5640.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp-only-ov5640.json \
+     $(IMX_DEVICE_PATH)/external_camera_config.xml:$(TARGET_COPY_OUT_VENDOR)/etc/external_camera_config.xml
+ 
+ PRODUCT_SOONG_NAMESPACES += hardware/google/camera
+ PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/camera
+ 
+ # Copy isp files to board
++ifeq ($(PREBUILT_FSL_IMX_ISP),true)
+ ISP_PROPRIETARY := $(FSL_PROPRIETARY_PATH)/fsl-proprietary/isp
+ PRODUCT_COPY_FILES += \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/bin,$(TARGET_COPY_OUT_VENDOR)/bin) \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/lib64,$(TARGET_COPY_OUT_VENDOR)/lib64) \
+     $(call find-copy-subdir-files,*,$(ISP_PROPRIETARY)/config,$(TARGET_COPY_OUT_VENDOR)/etc/configs/isp)
++endif
+ 
+ # ISP camera feature demo
+ PRODUCT_PACKAGES += \
+@@ -315,6 +327,7 @@ PRODUCT_PACKAGES += \
+     libNNGPUBinary-evis2 \
+     libNNGPUBinary-lite \
+     libNNGPUBinary-ulite \
++    libNNGPUBinary-nano \
+     libNNArchPerf \
+     libarchmodelSw
+ 
+@@ -460,17 +473,36 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mp.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mp.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+-    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
++    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc
++
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
++ifeq ($(POWERSAVE),true)
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/required_hardware_powersave.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
++else
++PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
++endif
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
++
++ifneq ($(POWERSAVE),true)
+ PRODUCT_COPY_FILES += \
+-    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+-    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
+     frameworks/native/data/etc/android.hardware.camera.external.xml:vendor/etc/permissions/android.hardware.camera.external.xml \
+     frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
+-    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
++    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml
++endif
++
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
++    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
+     frameworks/native/data/etc/android.hardware.ethernet.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.ethernet.xml \
+     frameworks/native/data/etc/android.hardware.screen.landscape.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.landscape.xml \
+     frameworks/native/data/etc/android.hardware.screen.portrait.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.portrait.xml \
+@@ -511,6 +543,7 @@ PRODUCT_PACKAGES += \
+     welcomeapp \
+     diagnosis \
+     otaupdater \
++    peripheralmanager \
+     watchdog
+ 
+ # Enable kernel log for diagnosis
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp_pci.mk b/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
+index dd8d66a4..25be1def 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp_pci.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mp.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mp_pci
+ 
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp_pcidev.mk b/imx8m/vp6820_8mp/vp6820_8mp_pcidev.mk
+index 56ecd212..37a2803b 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp_pcidev.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp_pcidev.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mp.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mp_pcidev
+diff --git a/imx8m/vp6820_8mq/camera_config_imx8mq.json b/imx8m/vp6820_8mq/camera_config_imx8mq.json
+index f1709bb6..25e9bd9e 100644
+--- a/imx8m/vp6820_8mq/camera_config_imx8mq.json
++++ b/imx8m/vp6820_8mq/camera_config_imx8mq.json
+@@ -5,7 +5,7 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
++  "cam_blit_csc": "GPU_3D",
+ 
+   "camera_metadata": [
+     {
+diff --git a/imx8m/vp6820_8mq/init.imx8mq.rc b/imx8m/vp6820_8mq/init.imx8mq.rc
+index 25355d09..44613aae 100755
+--- a/imx8m/vp6820_8mq/init.imx8mq.rc
++++ b/imx8m/vp6820_8mq/init.imx8mq.rc
+@@ -24,9 +24,6 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu3/online
+     chmod 0664 /sys/devices/system/cpu/cpu3/online
+ 
+-    # disable 3D composition overlay to fix video rotate problem
+-    setprop vendor.hwc.enable.overlay 0
+-
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index 18c4590d..52616dd6 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -40,10 +40,6 @@ on early-init && property:ro.boot.mode=charger
+ on init && property:vendor.skip.charger_not_need=0
+     start watchdogd
+ 
+-    # Support legacy paths
+-    symlink /sdcard /mnt/sdcard
+-    symlink /sdcard /storage/sdcard0
+-
+     # disable cursor blink for fbcon, if no splash screen support
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+diff --git a/imx8m/vp6820_8mq/init.recovery.nxp.rc b/imx8m/vp6820_8mq/init.recovery.nxp.rc
+index db84a9ea..6074b693 100644
+--- a/imx8m/vp6820_8mq/init.recovery.nxp.rc
++++ b/imx8m/vp6820_8mq/init.recovery.nxp.rc
+@@ -3,3 +3,6 @@ on init
+     write /sys/class/graphics/fbcon/cursor_blink 0
+ 
+     setprop sys.usb.configfs 1
++
++on post-fs-data
++    setprop sys.usb.controller "38100000.usb"
+diff --git a/imx8m/vp6820_8mq/sepolicy/file_contexts b/imx8m/vp6820_8mq/sepolicy/file_contexts
+index ba4f0809..cddbc917 100644
+--- a/imx8m/vp6820_8mq/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/file_contexts
+@@ -13,3 +13,13 @@
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq.mk b/imx8m/vp6820_8mq/vp6820_8mq.mk
+index 9e46e986..771bab79 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mq
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 6d560118..404d4539 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -283,6 +283,7 @@ PRODUCT_PACKAGES += \
+         libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+         libNNGPUBinary-ulite \
++        libNNGPUBinary-nano \
+         libNNArchPerf \
+         libarchmodelSw
+ 
+@@ -398,10 +399,17 @@ PRODUCT_PACKAGES += \
+ # Copy device related config and binary to board
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
+ 
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_go.mk b/imx8m/vp6820_8mq/vp6820_8mq_go.mk
+index f676fa2a..8b0fc2a7 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_go.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_go.mk
+@@ -1,14 +1,16 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
+ 
+ # Inherit common Android Go defaults.
+ $(call inherit-product, build/target/product/go_defaults_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mq_go
+ 
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_pci.mk b/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
+index 45987c23..455731de 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_pci.mk
+@@ -1,11 +1,13 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mq_pci
+ 
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_pcidev.mk b/imx8m/vp6820_8mq/vp6820_8mq_pcidev.mk
+index 837300e2..b09e61e2 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_pcidev.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_pcidev.mk
+@@ -1,10 +1,12 @@
+-# This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+-# It will inherit from FSL core product which in turn inherit from Google generic
++# -------@block_infrastructure-------
+ 
+ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
+ 
++# -------@block_common_config-------
++
+ # Overrides
+ PRODUCT_NAME := vp6820_8mq_pcidev

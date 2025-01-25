@@ -1,0 +1,121 @@
+2fb4760519b9 AndrewS 2020-07-23
+
+AOS-258: Add new device tree for a100 evt 1 devboard
+
+add regulator for IO-expander.
+correct pins in pinctrl_pca9539.
+add usb mux/demux pins.
+
+Change-Id: If8a3b5a3c406bd409dcceaeaf982009eabfbf849
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 6cf1aed84c95..b769898de6a7 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -138,7 +138,8 @@ dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk-idtech-spi.dtb \
+ 			 idt_a300_evt-0_devboard_hdmi-1_ktc2g.dtb \
+ 			 idt_imx8mn_evt-0_evk_rpmsg-0_mic2g.dtb \
+ 			 idt_imx8mn_evt-0_evk_evk-0_mic2g.dtb \
+-			 idt_a100_evt-0_devboard_evt-0_ktc2g.dtb
++			 idt_a100_evt-0_devboard_evt-0_ktc2g.dtb \
++			 idt_a100_evt-0_devboard_evt-1_ktc2g.dtb
+ 
+ dtb-$(CONFIG_ARCH_S32) += s32v234-evb.dtb \
+ 			  s32v234-sbc.dtb
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi
+new file mode 100644
+index 000000000000..6681c092e926
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi
+@@ -0,0 +1,70 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * A100 EVT-1 board DTS
++ * Copyright 2020 IDTech
++ */
++
++/dts-v1/;
++
++#include "idt_a100_evt-0_devboard_evt-0.dtsi"
++
++/ {
++	regulators {
++		vdd_1v8_main: fixedregulator-1v8 {
++			compatible = "regulator-fixed";
++			regulator-name = "vdd_1v8";
++			reg = <0>;
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-always-on;
++		};
++	};
++};
++
++&pinctrl_hog_1 {
++	fsl,pins = <
++		MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
++		MX8MN_IOMUXC_GPIO1_IO15_GPIO1_IO15		0x19  /* GPIO_05, DNI */
++		MX8MN_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x151 /* LTE_VBAT_EN */
++		MX8MN_IOMUXC_SAI5_RXD1_GPIO3_IO22		0x151 /* LTE_AP_READY */
++		MX8MN_IOMUXC_SAI5_RXC_GPIO3_IO20		0x151 /* LTE_PWR_KEY */
++		MX8MN_IOMUXC_SAI5_RXD2_GPIO3_IO23		0x19  /* LTE_RI */
++		MX8MN_IOMUXC_SAI5_RXD0_GPIO3_IO21		0x19  /* LTE_RESET_N */
++		MX8MN_IOMUXC_GPIO1_IO05_GPIO1_IO5		0x19  /* GPIO_03, VL53L1X_INT */
++		MX8MN_IOMUXC_GPIO1_IO13_GPIO1_IO13		0x19  /* GPIO_06, LSM303_INT1 */
++		MX8MN_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19  /* LTE_EXT_CODEC_EN, INT_MAG */
++	>;
++};
++
++&pinctrl_pca9539 {
++	fsl,pins = <
++		MX8MN_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x19  /* GPIO_01, nINT */
++		MX8MN_IOMUXC_GPIO1_IO01_GPIO1_IO1		0x51  /* GPIO_02, nRST */
++	>;
++};
++
++&exp1 {
++	compatible = "nxp,pca9539";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pca9539>;
++	reg = <0x74>;
++	vcc-supply = <&vdd_1v8_main>;
++	interrupt-parent = <&gpio1>;
++	interrupts = <12 IRQ_TYPE_LEVEL_LOW>;
++	#gpio-cells = <2>;
++	gpio-controller;
++};
++
++&usbotg1 {
++/delete-property/ usb-role-switch;
++	picophy,pre-emp-curr-control = <3>;
++	picophy,dc-vol-level-adjust = <7>;
++	dr_mode = "otg";
++	hnp-disable;
++	srp-disable;
++	adp-disable;
++	usbmux-gpio = <&exp1 8 GPIO_ACTIVE_HIGH>;		/* usb mux pin */
++	usbdemux-gpio = <&exp1 9 GPIO_ACTIVE_HIGH>;		/* usb demux pin */
++	extcon = <&typec_hd3ss3220>;
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1_ktc2g.dts b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1_ktc2g.dts
+new file mode 100644
+index 000000000000..ab6db450dacf
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1_ktc2g.dts
+@@ -0,0 +1,15 @@
++/*
++ * Dummy device-tree based om EVK with IDTech ID's
++ *
++ * Copyright 2020 IDTech
++ *
++ */
++
++/dts-v1/;
++
++#include "idt_a100_evt-0_devboard_evt-1.dtsi"
++
++/ {
++	model = "IDTECH A100 EVT-0 DEVBOARD EVT-1";
++	idt,prod-id = "idt_a100_evt-0_devboard_evt-1_ktc2g";
++};

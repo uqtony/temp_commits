@@ -1,0 +1,78 @@
+7c0b4bd302 George.Huang 2020-09-16
+
+AOS-288: imx8mn: imx8mp: remove spl_bak_[a|b] partitions
+
+- only 2 spl related partitions are necessary for imx8mn, imx8mp:
+  FASTBOOT_PARTITION_BOOTLOADER "bootloader0"
+  FASTBOOT_PARTITION_BOOTLOADER1 "bootloader1"
+
+- 6 spl related partitions are still necessary for imx8mq:
+  FASTBOOT_PARTITION_BOOTLOADER "bootloader0"
+  FASTBOOT_PARTITION_BOOTLOADER1 "bootloader1"
+  FASTBOOT_PARTITION_SPLTABLE_A "spl_tab_a"
+  FASTBOOT_PARTITION_SPLTABLE_B "spl_tab_b"
+  FASTBOOT_PARTITION_SPLBACKUP_A "spl_bak_a"
+  FASTBOOT_PARTITION_SPLBACKUP_B "spl_bak_b"
+
+Change-Id: I4600bf14a94815d4debc5482bf4ac89f2b1a8847
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 35910bc91f..8938335c58 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -259,27 +259,27 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	strcpy(ptable[PTN_BOOTLOADER1_INDEX].fstype, "raw");
+ 
+ #ifdef CONFIG_IDT_BACKUP_SPL
+-	/* spl_bak_a */
+-	strcpy(ptable[PTN_BACKUP_SPL_INDEX].name, FASTBOOT_PARTITION_SPLBACKUP_A);
+-	ptable[PTN_BACKUP_SPL_INDEX].start =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
+-	ptable[PTN_BACKUP_SPL_INDEX].length =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
+-	ptable[PTN_BACKUP_SPL_INDEX].partition_id = boot_partition;
+-	ptable[PTN_BACKUP_SPL_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+-	strcpy(ptable[PTN_BACKUP_SPL_INDEX].fstype, "raw");
+-
+-	/* spl_bak_b */
+-	strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].name, FASTBOOT_PARTITION_SPLBACKUP_B);
+-	ptable[PTN_BACKUP_SPL_INDEX + 1].start =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
+-	ptable[PTN_BACKUP_SPL_INDEX + 1].length =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
+-	ptable[PTN_BACKUP_SPL_INDEX + 1].partition_id = boot_partition + 1;
+-	ptable[PTN_BACKUP_SPL_INDEX + 1].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+-	strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].fstype, "raw");
+-
+ 	if (is_imx8mq()) {
++		/* spl_bak_a */
++		strcpy(ptable[PTN_BACKUP_SPL_INDEX].name, FASTBOOT_PARTITION_SPLBACKUP_A);
++		ptable[PTN_BACKUP_SPL_INDEX].start =
++					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX].length =
++					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX].partition_id = boot_partition;
++		ptable[PTN_BACKUP_SPL_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
++		strcpy(ptable[PTN_BACKUP_SPL_INDEX].fstype, "raw");
++
++		/* spl_bak_b */
++		strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].name, FASTBOOT_PARTITION_SPLBACKUP_B);
++		ptable[PTN_BACKUP_SPL_INDEX + 1].start =
++					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX + 1].length =
++					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX + 1].partition_id = boot_partition + 1;
++		ptable[PTN_BACKUP_SPL_INDEX + 1].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
++		strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].fstype, "raw");
++
+ 		/* spl_tab_a */
+ 		strcpy(ptable[PTN_BACKUP_SPL_INDEX + 2].name, FASTBOOT_PARTITION_SPLTABLE_A);
+ 		ptable[PTN_BACKUP_SPL_INDEX + 2].start = spl_start - 1;
+@@ -303,7 +303,6 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	int ret;
+ 	int current_idx = PTN_BOOTLOADER1_INDEX;
+ #ifdef CONFIG_IDT_BACKUP_SPL
+-	current_idx = PTN_BACKUP_SPL_INDEX + 1;
+ 	if (is_imx8mq())
+ 		current_idx = PTN_BACKUP_SPL_INDEX + 3;
+ #endif

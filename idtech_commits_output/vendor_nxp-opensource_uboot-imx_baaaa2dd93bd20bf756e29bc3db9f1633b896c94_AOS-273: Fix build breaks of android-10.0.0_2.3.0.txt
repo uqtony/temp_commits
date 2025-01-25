@@ -1,0 +1,118 @@
+baaaa2dd93 George.Huang 2020-07-24
+
+AOS-273: Fix build breaks of android-10.0.0_2.3.0
+
+Change-Id: I8f5a2b19a2191aa6e0ce8d8afb02d0e0cb0b7845
+
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index c7279f1a8d..98524e3d32 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -21,7 +21,6 @@
+ #include <asm/mach-imx/mxc_i2c.h>
+ #include <asm/arch/clock.h>
+ #include <asm/mach-imx/video.h>
+-#include <asm/arch/video_common.h>
+ #include <spl.h>
+ #include <power/pmic.h>
+ #include <power/pfuze100_pmic.h>
+@@ -32,6 +31,7 @@
+ #include <persist_idt.h>
+ #include <fb_fsl.h>
+ #include <dt_table.h>
++#include <video_fb.h>
+ #include <idt_ddr_select.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+@@ -70,24 +70,6 @@ int board_qspi_init(void)
+ }
+ #endif
+ 
+-int dram_init(void)
+-{
+-	unsigned int mem_size = PHYS_SDRAM_SIZE;
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	memcpy((void*)&mem_size, (void*)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+-	mem_size *= 1024;
+-	printf("idt set to ");
+-#endif
+-
+-	/* rom_pointer[1] contains the size of TEE occupies */
+-	if (rom_pointer[1])
+-		gd->ram_size = mem_size - rom_pointer[1];
+-	else
+-		gd->ram_size = mem_size;
+-
+-	return 0;
+-}
+-
+ #ifdef CONFIG_FEC_MXC
+ static int setup_fec(void)
+ {
+@@ -544,8 +526,8 @@ int get_dtbo_mipi_dsi_timing(void)
+ 			env_set("dtbo_slot", "b");
+ 
+ 	} else {
+-		printf("fastboot_flash_find_ptn misc fail: %d
+
+",
+-		       fpt_en_misc);
++		printf("fastboot_flash_find_ptn misc fail: %lu
+
+",
++		       (long unsigned int) fpt_en_misc);
+ 	}
+ 
+ 	return fdt_idx;
+diff --git a/board/freescale/imx8mq_evk/imx8mq_evk.c b/board/freescale/imx8mq_evk/imx8mq_evk.c
+index f030d815b1..fe569eebd2 100644
+--- a/board/freescale/imx8mq_evk/imx8mq_evk.c
++++ b/board/freescale/imx8mq_evk/imx8mq_evk.c
+@@ -65,24 +65,6 @@ int board_qspi_init(void)
+ }
+ #endif
+ 
+-int dram_init(void)
+-{
+-	unsigned int mem_size = PHYS_SDRAM_SIZE;
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	memcpy((void*)&mem_size, (void*)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+-	mem_size *= 1024;
+-	printf("idt set to ");
+-#endif
+-
+-	/* rom_pointer[1] contains the size of TEE occupies */
+-	if (rom_pointer[1])
+-		gd->ram_size = mem_size - rom_pointer[1];
+-	else
+-		gd->ram_size = mem_size;
+-
+-	return 0;
+-}
+-
+ #ifdef CONFIG_FEC_MXC
+ static int setup_fec(void)
+ {
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+index 1f7f03f56b..1b679811a5 100644
+--- a/include/configs/imx8mq_a300.h
++++ b/include/configs/imx8mq_a300.h
+@@ -167,7 +167,7 @@
+ 
+ #define CONFIG_SYS_SDRAM_BASE           0x40000000
+ #define PHYS_SDRAM                      0x40000000
+-#define PHYS_SDRAM_SIZE>>->-0x80000000 /* 2GB DDR */
++#define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
+ 
+ #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
+ #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
+@@ -237,9 +237,6 @@
+ #define CONFIG_BMP_32BPP
+ #define CONFIG_VIDEO_BMP_RLE8
+ #define CONFIG_VIDEO_BMP_LOGO
+-#define CONFIG_IMX_MIPI_DSI_BRIDGE
+-#define CONFIG_IMX_NORTHWEST_MIPI_DSI
+-#define CONFIG_HX8394F
+ #endif
+ 
+ #ifdef CONFIG_ANDROID_SUPPORT

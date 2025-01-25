@@ -1,0 +1,102 @@
+7aa3952b4b0a AndrewS 2021-01-07
+
+AOS-463: Fix muilti-display bug when secondary display connected with desktop HDMI display
+
+Symptom: While using some HDMI displays, secondary display be abnormal, display both primary
+         and secondary display layer.
+Root cause: Different HDMI displays might have different behaviors, some HDMI displays
+            will disconnect and reconnect during system init, while some will not. Previous
+            implementation did not consider this and so secondary display will be abnormal with
+            some HDMI displays.
+Solution: Perform non default displays traversal in WindowManagerService after system set
+          mDisplayEnabled to true, which means system is ready to kill boot animation and
+          bring launcher to display, and we perform non default displays traversal here to
+          update layer for all non default displays.
+
+Change-Id: Id116c0046c470572ac4eaa5001241c9f5a95576c
+
+diff --git a/core/java/android/hardware/display/DisplayManagerInternal.java b/core/java/android/hardware/display/DisplayManagerInternal.java
+index ad9bf0745779..0bcd44e02251 100644
+--- a/core/java/android/hardware/display/DisplayManagerInternal.java
++++ b/core/java/android/hardware/display/DisplayManagerInternal.java
+@@ -150,6 +150,13 @@ public abstract class DisplayManagerInternal {
+      */
+     public abstract void performTraversal(Transaction t);
+ 
++    /**
++     * Called by the window manager to perform non default displays
++     * traversals, which is to relayout displays for multi-display,
++     * while holding a surface flinger transaction.
++     */
++    public abstract void performNonDefaultDisplayTraversal(Transaction t);
++
+     /**
+      * Tells the display manager about properties of the display that depend on the windows on it.
+      * This includes whether there is interesting unique content on the specified logical display,
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index 1b37cd95e650..11f8401a6e1a 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1268,6 +1268,36 @@ public final class DisplayManagerService extends SystemService {
+         }
+     }
+ 
++    private void performNonDefaultDisplayTraversalInternal(SurfaceControl.Transaction t) {
++        // Configure each display device.
++        final int DisplayDeviceCount = mDisplayDevices.size();
++        for (int i = 0; i < DisplayDeviceCount; i++) {
++            DisplayDevice device = mDisplayDevices.get(i);
++            DisplayDeviceInfo deviceInfo = device.getDisplayDeviceInfoLocked();
++            boolean isDefault = (deviceInfo.flags
++                    & DisplayDeviceInfo.FLAG_DEFAULT_DISPLAY) != 0;
++            if (!isDefault) {
++                // clear view port first
++                DisplayViewport viewport;
++                final int viewportCount = mViewports.size();
++                for (int j = 0; j < viewportCount; j++) {
++                    viewport = mViewports.get(j);
++                    if (deviceInfo.uniqueId.equals(viewport.uniqueId)) {
++                        mViewports.remove(j);
++                        break;
++                    }
++                }
++                // re-configure non default displays to using it's own display layer
++                configureDisplayLocked(t, device);
++                device.performTraversalLocked(t);
++            }
++        }
++        // Tell the input system about these new viewports.
++        if (mInputManagerInternal != null) {
++            mHandler.sendEmptyMessage(MSG_UPDATE_VIEWPORT);
++        }
++    }
++
+     private void setDisplayPropertiesInternal(int displayId, boolean hasContent,
+             float requestedRefreshRate, int requestedModeId, boolean preferMinimalPostProcessing,
+             boolean inTraversal) {
+@@ -2624,6 +2654,11 @@ public final class DisplayManagerService extends SystemService {
+             performTraversalInternal(t);
+         }
+ 
++        @Override
++        public void performNonDefaultDisplayTraversal(SurfaceControl.Transaction t) {
++            performNonDefaultDisplayTraversalInternal(t);
++        }
++
+         @Override
+         public void setDisplayProperties(int displayId, boolean hasContent,
+                 float requestedRefreshRate, int requestedMode,
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 61d870dcc807..c1ed82c455ac 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -3483,6 +3483,9 @@ public class WindowManagerService extends IWindowManager.Stub
+ 
+         mPolicy.enableScreenAfterBoot();
+ 
++        // relayout non-default displays for multi-display
++        mDisplayManagerInternal.performNonDefaultDisplayTraversal(mTransaction);
++
+         // Make sure the last requested orientation has been applied.
+         updateRotationUnchecked(false, false);
+     }

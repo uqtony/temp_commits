@@ -1,0 +1,65 @@
+488556e3c max.yang 2021-04-15
+
+AOS-581: otatool supports to update ota certificates
+
+Change-Id: I46789e4daa98f281fdcd5cd972cf98b51184913e
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index ec160bf21..a2f32daf6 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -1,4 +1,5 @@
+ import base64
++import io
+ import os
+ import sys
+ import re
+@@ -18,7 +19,7 @@ from xml.etree import ElementTree
+ from distutils.spawn import find_executable
+ 
+ # VERSION: Android Ver.Major.Minor
+-OTATOOL_VERSION = "11.01.003"
++OTATOOL_VERSION = "11.01.004"
+ 
+ WS = None
+ idt_key_map = {}
+@@ -85,6 +86,18 @@ def IDTBuildKeyMap(misc_info):
+       devkeydir + "/networkstack": "SYS_Networkstack",
+       })
+ 
++def idt_write_ota_certs(output_zip):
++  ota_key_path = idt_cert_dir + "SYS_Release.x509.pem"
++  with open(ota_key_path, "r") as f:
++    ota_key_data = f.read()
++  temp_file = io.BytesIO()
++  certs_zip = zipfile.ZipFile(temp_file, "w")
++  common.ZipWriteStr(certs_zip, "releasekey.x509.pem", ota_key_data)
++  common.ZipClose(certs_zip)
++
++  common.ZipWriteStr(output_zip, "BOOT/RAMDISK/system/etc/security/otacerts.zip", temp_file.getvalue())
++  common.ZipWriteStr(output_zip, "SYSTEM/etc/security/otacerts.zip", temp_file.getvalue())
++
+ def sign_by_ca(data, key):
+   sig_hex = WS.doSign(key, data.encode('hex'))
+   sig = sig_hex.decode('hex')
+@@ -325,7 +338,10 @@ def handle_all_files_verbatim(input_zip, output_zip):
+       new_data = IDTReplaceCert(data)
+       common.ZipWriteStr(output_zip, out_info, new_data)
+ 
+-    #TODO: replace OTA certs
++    elif filename in (
++            "BOOT/RAMDISK/system/etc/security/otacerts.zip",
++            "SYSTEM/etc/security/otacerts.zip"):
++      pass
+ 
+     # Skip the care_map as we will regenerate the system/vendor images.
+     elif filename == "META/care_map.pb" or filename == "META/care_map.txt":
+@@ -341,6 +357,8 @@ def handle_all_files_verbatim(input_zip, output_zip):
+ 
+   sign_target_files_apks.ReplaceAvbSigningKeys(misc_info)
+ 
++  idt_write_ota_certs(output_zip)
++
+   if misc_info.get('avb_enable') == 'true':
+     sign_target_files_apks.RewriteAvbProps(misc_info)
+ 

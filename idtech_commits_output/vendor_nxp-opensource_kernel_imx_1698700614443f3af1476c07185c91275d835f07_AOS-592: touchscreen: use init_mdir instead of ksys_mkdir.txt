@@ -1,0 +1,30 @@
+169870061444 George.Huang 2021-05-06
+
+AOS-592: touchscreen: use init_mdir instead of ksys_mkdir
+
+since ksys_mkdir is deprecated
+
+Change-Id: I6e8d7739ca0c8e51898d25b909fe08d69fbd6387
+
+diff --git a/drivers/input/touchscreen/ili/ilitek_node.c b/drivers/input/touchscreen/ili/ilitek_node.c
+index c59f95e1b036..42bb1a4c1054 100644
+--- a/drivers/input/touchscreen/ili/ilitek_node.c
++++ b/drivers/input/touchscreen/ili/ilitek_node.c
+@@ -21,6 +21,7 @@
+  */
+ 
+ #include "ilitek.h"
++#include <linux/init_syscalls.h>
+ 
+ #define USER_STR_BUFF		PAGE_SIZE
+ #define IOCTL_I2C_BUFF		PAGE_SIZE
+@@ -287,7 +288,7 @@ static int dev_mkdir(char *name, umode_t mode)
+ 	ipio_info("mkdir: %s
+", name);
+ 	fs = get_fs();
+ 	set_fs(KERNEL_DS);
+-	err = ksys_mkdir(name, mode);
++	err = init_mkdir(name, mode);
+ 	set_fs(fs);
+ 
+ 	return err;

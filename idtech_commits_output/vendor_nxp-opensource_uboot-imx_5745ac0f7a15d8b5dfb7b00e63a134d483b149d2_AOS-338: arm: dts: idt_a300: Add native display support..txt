@@ -1,0 +1,131 @@
+5745ac0f7a Arthur Chen 2020-10-16
+
+AOS-338: arm: dts: idt_a300: Add native display support.
+
+Change-Id: I37d76e07d069601bee61f3767806afa4e2fd7704
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index cd506c2e7a..44bbbd84c7 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -792,6 +792,7 @@ dtb-$(CONFIG_ARCH_IMX8M) += \
+ 	imx8mq-ddr3l-val.dtb \
+ 	imx8mq-ddr4-val.dtb \
+ 	imx8mq-evk.dtb \
++	idt_a300_evt-0_devboard_evt-1.dtb \
+ 	imx8mp-evk.dtb \
+ 	imx8mm-ab2.dtb \
+ 	imx8mn-ddr4-ab2.dtb \
+diff --git a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+index 5e6a449182..81826f94b6 100644
+--- a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+@@ -2,6 +2,7 @@
+ /*
+  * Copyright 2017 NXP
+  * Copyright (C) 2017-2018 Pengutronix, Lucas Stach <kernel@pengutronix.de>
++ * Copyright (C) 2020 IDTECH
+  */
+ 
+ /dts-v1/;
+@@ -9,8 +10,8 @@
+ #include "imx8mq.dtsi"
+ 
+ / {
+-	model = "NXP i.MX8MQ EVK";
+-	compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
++	model = "IDTECH VP6820 A300";
++	compatible = "fsl,imx8mq-a300", "fsl,imx8mq";
+ 
+ 	chosen {
+ 		bootargs = "console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200";
+@@ -87,6 +88,33 @@
+ 			clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+ 		};
+ 	};
++
++	panel_backlight: backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	hx8394f_panel {
++		compatible = "himax,hx8394f";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		backlight = <&panel_backlight>;
++		dsi-lanes = <4>;
++		video-mode = <2>;	/* 0: burst mode
++					 * 1: non-burst mode with sync event
++					 * 2: non-burst mode with sync pulse
++					 */
++		panel-width-mm = <68>;
++		panel-height-mm = <121>;
++		status = "okay";
++
++		port {
++			hx8394f_from_dsim: endpoint {
++				remote-endpoint = <&dsim_to_hx8394f>;
++			};
++		};
++	};
+ };
+ 
+ &A53_0 {
+@@ -392,6 +420,43 @@
+ 	};
+ };
+ 
++&lcdif {
++	display = <&display0>;
++	status = "okay";
++
++	display0: display@0 {
++		bits-per-pixel = <24>;
++		bus-width = <24>;
++	};
++
++	port@0 {
++		lcdif_out: endpoint {
++			remote-endpoint = <&dsim_to_hx8394f>;
++		};
++	};
++};
++
++&dphy {
++	status = "okay";
++
++	port@0 {
++		dphy_out: endpoint {
++			remote-endpoint = <&dsim_to_hx8394f>;
++		};
++	};
++};
++
++&mipi_dsi {
++	status = "okay";
++	data-lanes-num = <4>;
++
++	port@1 {
++		dsim_to_hx8394f: endpoint {
++			remote-endpoint = <&hx8394f_from_dsim>;
++		};
++	};
++};
++
+ &iomuxc {
+ 	pinctrl-names = "default";
+ 
+@@ -603,4 +668,11 @@
+ 			MX8MQ_IOMUXC_UART4_TXD_GPIO5_IO29		0x16
+ 		>;
+ 	};
++
++	pinctrl_mipi_dsi_en: mipi_dsi_en {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19  /* DSI_RESET */
++			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  /* DSI_TE */
++		>;
++	};
+ };

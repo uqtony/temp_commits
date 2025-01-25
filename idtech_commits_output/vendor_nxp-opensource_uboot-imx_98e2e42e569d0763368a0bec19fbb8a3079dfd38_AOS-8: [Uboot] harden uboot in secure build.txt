@@ -1,0 +1,55 @@
+98e2e42e56 owen.wen 2020-03-16
+
+AOS-8: [Uboot] harden uboot in secure build
+
+1. only keep information command. Remove erase, flash, boot, etc
+2. production device cannot flash in fastboot mode
+3. production device can only be rescue(flash) via UUU
+4. fastboot mode is only for developer use, we don't expect customer using fastboot
+
+Change-Id: Id245a6fd0cc820d139ebc8725bd20981e85c791c
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index 224adcd85b..94203757fb 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -977,6 +977,16 @@ static const struct {
+ #endif
+ };
+ 
++/**
++ * Restricted commands in secure build fastboot daemon
++ */
++char *secure_fastboot_commands[] = {
++	"reboot-bootloader",
++	"reboot",
++	"getvar",
++	"continue"
++};
++
+ /**
+  * fastboot_handle_command - Handle fastboot command
+  *
+@@ -999,6 +1009,22 @@ int fastboot_handle_command(char *cmd_string, char *response)
+ 		strsep(&cmd_parameter, " ");
+ 	}
+ 
++#if defined(CONFIG_SECURE_BOOT) && !CONFIG_IS_ENABLED(FASTBOOT_UUU_SUPPORT)
++	bool pass = false;
++	for (i = 0; i < ARRAY_SIZE(secure_fastboot_commands); i++) {
++		if (!strncmp(secure_fastboot_commands[i], cmd_string, strlen(secure_fastboot_commands[i]))) {
++			pass = true;
++		}
++		if (!strncmp("oem", cmd_string, strlen("oem")) && !strncmp("getvar", cmd_parameter, strlen("getvar"))) {
++			pass = true;
++		}
++	}
++	if (!pass) {
++		fastboot_fail("not allowed command", response);
++		return -1;
++	}
++#endif
++
+ 	for (i = 0; i < ARRAY_SIZE(commands); i++) {
+ 		if (commands[i].command != NULL &&
+ 			!strcmp(commands[i].command, cmd_string)) {

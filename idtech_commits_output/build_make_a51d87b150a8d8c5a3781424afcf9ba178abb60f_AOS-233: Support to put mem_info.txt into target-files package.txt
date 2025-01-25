@@ -1,0 +1,35 @@
+a51d87b15 max.yang 2020-06-29
+
+AOS-233: Support to put mem_info.txt into target-files package
+
+  We need to put mem_info.txt to assist uuu script parsing mem_info.img
+
+Change-Id: I0d3db169fccba3251cbb8902ef33732ba7b2f814
+
+diff --git a/core/Makefile b/core/Makefile
+index 9cf3278d7..76b6b6083 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4195,7 +4195,7 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 
+ 	# Copy IDtech's images and scripts
+ 	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
+-	cp $(PRODUCT_OUT)/mem_info.img $(zip_root)/IMAGES/
++	cp $(PRODUCT_OUT)/mem_info.* $(zip_root)/IMAGES/
+ 	# Flashing script
+ 	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
+ 	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index 21751ab4b..0a1f967ce 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -95,7 +95,8 @@ def CopyUserImages(input_tmp, output_zip):
+       continue
+     if not image.endswith(".img") and not image.endswith(".sh") \
+        and not image.endswith(".imx") and not image.endswith(".bat") \
+-       and not image.startswith("spl"):
++       and not image.startswith("spl") \
++       and not image == "mem_info.txt":
+       continue
+     if image == "recovery-two-step.img":
+       continue

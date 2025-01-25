@@ -1,0 +1,65 @@
+449b2352b max.yang 2019-12-12
+
+AOS-44: [Release] Support to pack our images into target-file, and image_release.zip
+
+1. Pack all board_info images, flashing script, u-boot images, and bat files.
+2. The script inputs a target-file and outputs a image.zip, this zip should be able to
+   flash in linux/windows environment.
+3. The original script's purpose is for "fastboot update", but we don't use it.
+   So we modified this rule directly to avoid outputing 2 image.zip files.
+4. For flashing scripts, set permission to 755, other images set to 644
+
+Change-Id: I6a3a30421c2eeed35a9735a1ee84806c6037b235
+
+diff --git a/core/Makefile b/core/Makefile
+index 907622a62..f15100be8 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -2846,6 +2846,14 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	cp $(BUILT_BPTIMAGE_TARGET) $(zip_root)/IMAGES/
+ 	cp $(BUILT_BPTJSON_TARGET) $(zip_root)/IMAGES/
+ 
++	# Copy IDtech's images and scripts
++	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
++	# Flashing script
++	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
++	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
++	# U-boot
++	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
++
+ 	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+ 	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+ 	@# INSTALLED_RADIOIMAGE_TARGET.
+@@ -2960,8 +2968,8 @@ INTERNAL_UPDATE_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
+ 
+ $(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(ZIP2ZIP)
+ 	@echo "Package: $@"
+-	$(hide) $(ZIP2ZIP) -i $(BUILT_TARGET_FILES_PACKAGE) -o $@ \
+-	   OTA/android-info.txt:android-info.txt "IMAGES/*.img:."
++	$(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
++	    ./build/tools/releasetools/img_from_target_files.py $(BUILT_TARGET_FILES_PACKAGE) $@
+ 
+ .PHONY: updatepackage
+ updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index e6e8c9fff..ec390375e 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -82,11 +82,15 @@ def main(argv):
+     for image in sorted(os.listdir(images_path)):
+       if bootable_only and image not in ("boot.img", "recovery.img"):
+         continue
+-      if not image.endswith(".img"):
++      if not image.endswith(".img") and not image.endswith(".sh") \
++         and not image.endswith(".imx") and not image.endswith(".bat"):
+         continue
+       if image == "recovery-two-step.img":
+         continue
+-      common.ZipWrite(output_zip, os.path.join(images_path, image), image)
++      perm = 0o644
++      if image.endswith(".sh"):
++        perm = 0o755
++      common.ZipWrite(output_zip, os.path.join(images_path, image), image, perm)
+ 
+   finally:
+     print("cleaning up...")

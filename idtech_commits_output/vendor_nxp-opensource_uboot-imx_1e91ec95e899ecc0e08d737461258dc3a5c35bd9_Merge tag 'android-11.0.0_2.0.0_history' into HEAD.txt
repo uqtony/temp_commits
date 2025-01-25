@@ -1,0 +1,199 @@
+1e91ec95e8 George.Huang 2021-04-27
+
+Merge tag 'android-11.0.0_2.0.0_history' into HEAD
+
+android-11.0.0_2.0.0_history
+
+Change-Id: I653a239babfcca4b4daa455391a225a062ccfc31
+
+diff --cc arch/arm/dts/Makefile
+index 268ca54478,47cd054d84..33b79fd26e
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@@ -791,8 -796,7 +796,12 @@@ dtb-$(CONFIG_ARCH_IMX8M) += 
+  	imx8mq-ddr3l-val.dtb \
+  	imx8mq-ddr4-val.dtb \
+  	imx8mq-evk.dtb \
+++<<<<<<< HEAD
+ +	idt_a300_evt-0_devboard_evt-1.dtb \
+ +	idt_imx8mq_evt-0_ibr210_evt-0.dtb \
+++=======
++ 	imx8mp-ddr4-evk.dtb \
+++>>>>>>> android-11.0.0_2.0.0_history
+  	imx8mp-evk.dtb \
+  	imx8mm-ddr4-ab2.dtb \
+  	imx8mm-ab2.dtb \
+diff --cc arch/arm/mach-imx/imx8m/Kconfig
+index 6eb19d4f65,41c68a49a3..1dd5905356
+--- a/arch/arm/mach-imx/imx8m/Kconfig
++++ b/arch/arm/mach-imx/imx8m/Kconfig
+@@@ -112,11 -118,11 +124,19 @@@ config TARGET_IMX8MP_EV
+  	select SUPPORT_SPL
+  	select IMX8M_LPDDR4
+  
+++<<<<<<< HEAD
+ +config TARGET_IMX8MP_A200
+ +	bool "imx8mp_a200"
+ +	select IMX8MP
+ +	select SUPPORT_SPL
+ +	select IMX8M_LPDDR4
+++=======
++ config TARGET_IMX8MP_DDR4_EVK
++ 	bool "imx8mp DDR4 EVK board"
++ 	select IMX8MP
++ 	select SUPPORT_SPL
++ 	select IMX8M_DDR4
+++>>>>>>> android-11.0.0_2.0.0_history
+  
+  config TARGET_IMX8MM_AB2
+  	bool "imx8mm LPDDR4 Audio board 2.0"
+diff --cc board/freescale/imx8mn_evk/Makefile
+index 56d0a1ccbf,ad3ef8edd6..955c77ab33
+--- a/board/freescale/imx8mn_evk/Makefile
++++ b/board/freescale/imx8mn_evk/Makefile
+@@@ -12,11 -12,8 +12,12 @@@ ifdef CONFIG_IMX8MN_LOW_DRIVE_MOD
+  obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_ld.o
+  obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing_ld.o
+  else
+ +ifdef CONFIG_IDT_RAM_1GB
+ +obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_1g.o
+ +else
+  obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
+ +endif
+  obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing.o
++ obj-$(CONFIG_IMX8M_DDR3L) += ddr3l_timing.o
+  endif
+  endif
+diff --cc common/image-android.c
+index 7908fae35d,76ba6f0c1f..99584cc8b1
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@@ -100,35 -97,15 +100,43 @@@ static void append_kernel_cmdline(char 
+  			soc_type);
+  		strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
+  	}
++ 	/* append soc rev into bootargs */
++ 	char *soc_rev = env_get("soc_rev");
++ 	if (soc_rev) {
++ 		sprintf(newbootargs,
++ 			" androidboot.soc_rev=%s",
++ 			soc_rev);
++ 		strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
++ 	}
+  
+ +	/* append board type into bootargs */
+ +	char idt_board_type[BDINFO_DATA_SIZE] = "";
+ +
+ +	if (idt_get_board_type(idt_board_type, BDINFO_DATA_SIZE)) {
+ +		sprintf(newbootargs, " androidboot.board_type=%s", idt_board_type);
+ +		strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ +	} else {
+ +		printf("WARN: failed to get idt_get_board_type
+");
+ +	}
+ +
+ +	/* append display rotation into bootargs */
+ +	char *idt_disp_rotation;
+ +	char append[BDINFO_DATA_SIZE];
+ +
+ +	memset(append, 0, BDINFO_DATA_SIZE);
+ +	for (int i=0;i<MAX_DISPLAY_COUNT;i++) {
+ +		if ((idt_disp_rotation = get_disp_rotation(i)) != NULL) {
+ +			if (i != DISPLAY_MAIN)
+ +				sprintf(append, "_disp_%d", (i+1));
+ +			sprintf(newbootargs, " androidboot.idt_orientation%s=%s",
+ +					(i == DISPLAY_MAIN)?"":append,
+ +					idt_disp_rotation);
+ +			strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ +		} else {
+ +			break;
+ +		}
+ +	}
+ +
+  	sprintf(newbootargs,
+  			" androidboot.boot_device_root=mmcblk%d", mmc_map_to_kernel_blk(mmc_get_env_dev()));
+  	strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
+diff --cc include/configs/imx8mn_evk.h
+index d9d9188403,7db579265c..ed34b4cb51
+--- a/include/configs/imx8mn_evk.h
++++ b/include/configs/imx8mn_evk.h
+@@@ -198,11 -198,15 +198,20 @@@
+  
+  #define CONFIG_SYS_SDRAM_BASE           0x40000000
+  #define PHYS_SDRAM                      0x40000000
+++<<<<<<< HEAD
+ +/* IDT: default 1GB ddr, will dynamically get */
+ +#define PHYS_SDRAM_SIZE			0x40000000
+++=======
+  
+- #define CONFIG_SYS_MEMTEST_START    PHYS_SDRAM
+- #define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_SIZE >> 1))
++ #ifdef CONFIG_TARGET_IMX8MN_DDR3_EVK
++ #define PHYS_SDRAM_SIZE			0x40000000 /* 1GB DDR */
++ #else
++ #define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
++ #endif
+++>>>>>>> android-11.0.0_2.0.0_history
++ 
++ #define CONFIG_SYS_MEMTEST_START	0x60000000
++ #define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_SIZE >> 2))
+  
+  #define CONFIG_MXC_UART_BASE		UART2_BASE_ADDR
+  
+diff --cc include/configs/imx8mn_evk_android.h
+index f26cf0f695,66eef2eeef..a70f1f41a6
+--- a/include/configs/imx8mn_evk_android.h
++++ b/include/configs/imx8mn_evk_android.h
+@@@ -7,11 -7,6 +7,14 @@@
+  #ifndef IMX8MN_EVK_ANDROID_H
+  #define IMX8MN_EVK_ANDROID_H
+  
+++<<<<<<< HEAD
+ +#define CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_IDT_VALID_AVBKEY
+ +#ifdef CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+ +#endif
+++=======
+++>>>>>>> android-11.0.0_2.0.0_history
+  #define FSL_FASTBOOT_FB_DEV "mmc"
+  
+  #ifdef CONFIG_SYS_MALLOC_LEN
+diff --cc include/configs/imx8mp_evk_android.h
+index be2f517042,caf0724ffe..032c3809ad
+--- a/include/configs/imx8mp_evk_android.h
++++ b/include/configs/imx8mp_evk_android.h
+@@@ -7,11 -7,6 +7,14 @@@
+  #ifndef IMX8MP_EVK_ANDROID_H
+  #define IMX8MP_EVK_ANDROID_H
+  
+++<<<<<<< HEAD
+ +#define CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_IDT_VALID_AVBKEY
+ +#ifdef CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+ +#endif
+++=======
+++>>>>>>> android-11.0.0_2.0.0_history
+  #define FSL_FASTBOOT_FB_DEV "mmc"
+  
+  #ifdef CONFIG_SYS_MALLOC_LEN
+diff --cc include/configs/imx8mq_evk_android.h
+index 7c8d61bc9a,5c7e8640ad..267bf4a7c6
+--- a/include/configs/imx8mq_evk_android.h
++++ b/include/configs/imx8mq_evk_android.h
+@@@ -7,11 -7,6 +7,14 @@@
+  #ifndef IMX8MQ_EVK_ANDROID_H
+  #define IMX8MQ_EVK_ANDROID_H
+  
+++<<<<<<< HEAD
+ +#define CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_IDT_VALID_AVBKEY
+ +#ifdef CONFIG_ANDROID_AB_SUPPORT
+ +#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+ +#endif
+++=======
+++>>>>>>> android-11.0.0_2.0.0_history
+  #define FSL_FASTBOOT_FB_DEV "mmc"
+  
+  #ifdef CONFIG_SYS_MALLOC_LEN

@@ -1,0 +1,30 @@
+f6723a9 AndrewS 2021-05-31
+
+AOS-619: add ioctl VIDIOC_ENUM_FMT in camera HAL init
+
+wrong camera device node will be used if capability and format
+not be checked in init.
+
+Change-Id: I78f2c11330eb623694db88964280dc11d30a0159
+
+diff --git a/camera/CameraProviderHWLImpl.cpp b/camera/CameraProviderHWLImpl.cpp
+index 16c592a..834029e 100644
+--- a/camera/CameraProviderHWLImpl.cpp
++++ b/camera/CameraProviderHWLImpl.cpp
+@@ -279,6 +279,16 @@ int32_t CameraProviderHwlImpl::getNodeName(const char* devNode, char name[], siz
+     length -= strLen;
+     ALOGI("getNodeName: node name:%s, bus info: %s", name, vidCap.bus_info);
+ 
++    struct v4l2_fmtdesc vid_fmtdesc;
++    vid_fmtdesc.index = 0;
++    vid_fmtdesc.type  = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++
++    ret = ioctl(fd.get(), VIDIOC_ENUM_FMT, &vid_fmtdesc);
++    if (ret < 0) {
++        ALOGI("%s ENUM_FMT dev path:%s failed", __func__, devNode);
++        return ret;
++    }
++
+     strncat(name, ",", length);
+ 
+     return ret;

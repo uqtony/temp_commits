@@ -1,0 +1,154 @@
+d9f6e534 George.Huang 2020-07-02
+
+AOS-239: imx8mn: [RIL] Switch symlinks to regular files for modifying
+
+Change-Id: I1fb20f07481f508188bfdb93bc0ae761ae94a545
+
+diff --git a/imx8m/evk_a100/sepolicy b/imx8m/evk_a100/sepolicy
+deleted file mode 120000
+index 22edb4b8..00000000
+--- a/imx8m/evk_a100/sepolicy
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/sepolicy
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/sepolicy/file_contexts b/imx8m/evk_a100/sepolicy/file_contexts
+new file mode 100644
+index 00000000..31094e7e
+--- /dev/null
++++ b/imx8m/evk_a100/sepolicy/file_contexts
+@@ -0,0 +1,43 @@
++#sd boot
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/super            u:object_r:super_block_device:s0
++
++#emmc boot
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++
++#peripheral
++/vendor/bin/magd                u:object_r:sensors_exec:s0
++/vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
++/dev/mma8x5x                    u:object_r:sensors_device:s0
++/dev/ttymxc[0-9]*               u:object_r:tty_device:s0
++/dev/FreescaleAccelerometer     u:object_r:sensors_device:s0
++/dev/FreescaleMagnetometer      u:object_r:sensors_device:s0
++/dev/FreescaleGyroscope         u:object_r:sensors_device:s0
++/dev/sda[0-8]*                  u:object_r:fuse:s0
++
++#Thermal HAL service
++/vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
++
++/vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++#Neural Network HAL service
++/vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
+diff --git a/imx8m/evk_a100/sepolicy/genfs_contexts b/imx8m/evk_a100/sepolicy/genfs_contexts
+new file mode 100644
+index 00000000..c90131eb
+--- /dev/null
++++ b/imx8m/evk_a100/sepolicy/genfs_contexts
+@@ -0,0 +1,11 @@
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/extcon   u:object_r:sysfs_extcon:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/hctosys     u:object_r:sysfs_rtc:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply u:object_r:sysfs_batteryinfo:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b60000.mmc/mmc_host/mmc2/mmc2:0001/block/mmcblk2 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock0/ u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/32c00000.bus/32e10000.dsi_controller/32e10000.dsi_controller.0/backlight u:object_r:sysfs_leds:s0
++
++#sys/class/net
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net                                u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b40000.mmc/mmc_host/mmc0/mmc0:0001/mmc0:0001:1/net u:object_r:sysfs_net:s0
+diff --git a/imx8m/vp6820_8mn/sepolicy b/imx8m/vp6820_8mn/sepolicy
+deleted file mode 120000
+index 22edb4b8..00000000
+--- a/imx8m/vp6820_8mn/sepolicy
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/sepolicy
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/sepolicy/file_contexts b/imx8m/vp6820_8mn/sepolicy/file_contexts
+new file mode 100644
+index 00000000..31094e7e
+--- /dev/null
++++ b/imx8m/vp6820_8mn/sepolicy/file_contexts
+@@ -0,0 +1,43 @@
++#sd boot
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/super            u:object_r:super_block_device:s0
++
++#emmc boot
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++
++#peripheral
++/vendor/bin/magd                u:object_r:sensors_exec:s0
++/vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
++/dev/mma8x5x                    u:object_r:sensors_device:s0
++/dev/ttymxc[0-9]*               u:object_r:tty_device:s0
++/dev/FreescaleAccelerometer     u:object_r:sensors_device:s0
++/dev/FreescaleMagnetometer      u:object_r:sensors_device:s0
++/dev/FreescaleGyroscope         u:object_r:sensors_device:s0
++/dev/sda[0-8]*                  u:object_r:fuse:s0
++
++#Thermal HAL service
++/vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
++
++/vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++#Neural Network HAL service
++/vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
+diff --git a/imx8m/vp6820_8mn/sepolicy/genfs_contexts b/imx8m/vp6820_8mn/sepolicy/genfs_contexts
+new file mode 100644
+index 00000000..c90131eb
+--- /dev/null
++++ b/imx8m/vp6820_8mn/sepolicy/genfs_contexts
+@@ -0,0 +1,11 @@
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/extcon   u:object_r:sysfs_extcon:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/hctosys     u:object_r:sysfs_rtc:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply u:object_r:sysfs_batteryinfo:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b60000.mmc/mmc_host/mmc2/mmc2:0001/block/mmcblk2 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock0/ u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/32c00000.bus/32e10000.dsi_controller/32e10000.dsi_controller.0/backlight u:object_r:sysfs_leds:s0
++
++#sys/class/net
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net                                u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b40000.mmc/mmc_host/mmc0/mmc0:0001/mmc0:0001:1/net u:object_r:sysfs_net:s0

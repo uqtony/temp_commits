@@ -1,0 +1,43 @@
+9372fe404418 max.yang 2020-02-10
+
+AOS-106: [AB OTA] Make a partition type file-node under disk: mmcblk0boot[01]
+
+  1. We added partition on the file-node mmcblkboot0 + 33K for imx8mq
+  2. Add symbolic link bootloader_a to point here
+  3. The update_engine could driectly write into file-node without seeking an offset
+
+Change-Id: Ied52ec82716f08e57f9368e2e548dcceecaac073
+
+diff --git a/drivers/mmc/core/block.c b/drivers/mmc/core/block.c
+index da94d0a7ce5a..d7f90b1c7b39 100644
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -57,6 +57,8 @@
+ #include "quirks.h"
+ #include "sd_ops.h"
+ 
++#include <linux/of.h>
++
+ MODULE_ALIAS("mmc:block");
+ #ifdef MODULE_PARAM_PREFIX
+ #undef MODULE_PARAM_PREFIX
+@@ -2958,6 +2960,18 @@ static int mmc_blk_probe(struct mmc_card *card)
+ 	list_for_each_entry(part_md, &md->part, part) {
+ 		if (mmc_add_disk(part_md))
+ 			goto out;
++
++		/*
++		 * IDtech added, a file-node start from disk offset 33K
++		 * That's NXP's bootloader offset
++		 */
++		if ((part_md->area_type & MMC_BLK_DATA_AREA_BOOT)) {
++			if (of_machine_is_compatible("fsl,imx8mq")) {
++				/* 66 sectors=33K, 8126 sectors=4M-33K */
++				pr_info("IDTech added partition at offset 33k
+");
++				add_partition(part_md->disk, 1, 66, 8126, 0, NULL);
++			}
++		}
+ 	}
+ 
+ 	/* Add two debugfs entries */

@@ -1,0 +1,30 @@
+22afd5d59e46 George.Huang 2020-12-28
+
+AOS-443: fix build break of StatusBarNotification
+
+Log: frameworks/base/services/core/java/com/android/server/notification/NotificationManagerService.java:6095: error: sbn has private access in NotificationRecord
+      PackageInfo info = pm.getPackageInfo(r.sbn.getPackageName(), 0);
+                                            ^
+Reference: "4edc003044 Separate concept of VIC from DND"
+Change-Id: I8c2c9de6cd6f853c67b378d92c2e14550ef10e9d
+
+diff --git a/services/core/java/com/android/server/notification/NotificationManagerService.java b/services/core/java/com/android/server/notification/NotificationManagerService.java
+index d79a4ce572a1..88434177b8f1 100755
+--- a/services/core/java/com/android/server/notification/NotificationManagerService.java
++++ b/services/core/java/com/android/server/notification/NotificationManagerService.java
+@@ -6092,12 +6092,12 @@ public class NotificationManagerService extends SystemService {
+         // and is signed with platform key
+         PackageManager pm = getContext().getPackageManager();
+         try {
+-            PackageInfo info = pm.getPackageInfo(r.sbn.getPackageName(), 0);
++            PackageInfo info = pm.getPackageInfo(r.getSbn().getPackageName(), 0);
+             if (info.applicationInfo != null &&
+-                    r.sbn.getPackageName().startsWith("com.idtech") &&
++                    r.getSbn().getPackageName().startsWith("com.idtech") &&
+                     (r.getNotification().flags & FLAG_FOREGROUND_SERVICE) !=0 &&
+                     (info.applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_SIGNED_WITH_PLATFORM_KEY) != 0) {
+-                Slog.d(TAG, "Suppress the notification of package: " + r.sbn.getPackageName());
++                Slog.d(TAG, "Suppress the notification of package: " + r.getSbn().getPackageName());
+                 return true;
+             }
+         } catch (Exception e) {

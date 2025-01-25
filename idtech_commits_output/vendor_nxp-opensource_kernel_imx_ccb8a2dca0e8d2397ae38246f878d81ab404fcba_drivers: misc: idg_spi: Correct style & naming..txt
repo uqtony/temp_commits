@@ -1,0 +1,663 @@
+ccb8a2dca0e8 Arthur Chen 2020-03-06
+
+drivers: misc: idg_spi: Correct style & naming.
+
+    Add control chip select by idg_spi via gpiod.
+    Add recover data logic about IDG V5 1 byte offset issue.
+    Add SPI parameters initialization to fix invalid issue.
+
+Change-Id: Ia91b8343a190a3569cdb3c084873effd3be4f734
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index eb8d422f0e1b..98c882bedbd7 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -2,7 +2,7 @@
+  *  idg_spi driver
+  *
+  *  Copyright (c) 2020 ID TECH.
+- *  Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *  Author: Arthur Chen <arthur.chen@idtechproducts.com>
+  *
+  *  This program is free software; you can redistribute it and/or modify
+  *  it under the terms of the GNU General Public License version 2 as
+@@ -23,6 +23,8 @@
+ #include <linux/err.h>
+ #include <linux/sched.h>
+ #include <linux/of.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/mutex.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+@@ -34,6 +36,11 @@
+ 
+ #include "idg_spi.h"
+ 
++/* to fix v5 read issue */
++#define IDG_V5_ISSUE_RECOVERY	1  /* enable: 1, disable: 0 */
++
++#define IDG_DEBUG_INFO		0  /* enable: 1, disable: 0 */
++
+ static struct spi_device *idg_spi_tty;
+ 
+ struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
+@@ -253,9 +260,9 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ #if IDG_DEBUG_INFO
+ 	dev_info(&idg_tty->dev, "idg v5 from user data (%d bytes):
+", count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&spi->dev, "0x%.2X ", data[i]);
++		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 	for (i = 0; i < count; i += 2) {
+ 		ch4msb = idg_char2hex(user_buf[i]);
+ 		if (ch4msb < 0)
+@@ -276,13 +283,18 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
+ 	mutex_lock(&idg_dev->lock);
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
++	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
++	x->rx_nbits = SPI_NBITS_SINGLE;
+ 	x->len = ((IDG_HEADER_LEN + (count/2)) + NEOII_CRC_LEN);
+ 	x->speed_hz = idg_dev->clock_freq;
++	x->bits_per_word = idg_dev->bits_per_word;
+ 	m.spi = idg_tty;
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(idg_tty, &m);
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 	mutex_unlock(&idg_dev->lock);
+ 
+ ttyv5_write_out:
+@@ -416,9 +428,9 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ #if IDG_DEBUG_INFO
+ 	dev_info(&idg_tty->dev, "idg v2 from user data (%d bytes):
+", count);
+ 	for (i = 0; i < count; i++)
+-		dev_info(&spi->dev, "0x%.2X ", data[i]);
++		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[IDG_HEADER_LEN + i]);
+ 
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 	for (i = 0; i < count; i += 2) {
+ 		ch4msb = idg_char2hex(user_buf[i]);
+ 		if (ch4msb < 0)
+@@ -439,13 +451,18 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
+ 	mutex_lock(&idg_dev->lock);
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
++	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
++	x->rx_nbits = SPI_NBITS_SINGLE;
+ 	x->len = ((IDG_HEADER_LEN + (count/2)) + NEOII_CRC_LEN);
+ 	x->speed_hz = idg_dev->clock_freq;
++	x->bits_per_word = idg_dev->bits_per_word;
+ 	m.spi = idg_tty;
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(idg_tty, &m);
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 	mutex_unlock(&idg_dev->lock);
+ 
+ tty_write_out:
+@@ -509,19 +526,25 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	struct spi_transfer *x;
+ 	char idg_tx[BASE_READ_SIZE] = "";
+ 	char idg_rx[BASE_READ_SIZE] = "";
++
+ 	struct spi_message m_s;
+ 	struct spi_transfer *x_s_init;
+ 	struct spi_transfer *x_s;
+ 	char idg_tx_s[MAX_BUFFER_SIZE] = "";
+ 	char idg_rx_s[MAX_BUFFER_SIZE] = "";
+ 	char data[(BASE_READ_SIZE + MAX_BUFFER_SIZE)] = "";
+-	int invaild = 0;
++#if IDG_V5_ISSUE_RECOVERY
++	char recover[(BASE_READ_SIZE + MAX_BUFFER_SIZE)] = "";
++	bool recovered = false;
++	int idg_size_re;
++#endif /* IDG_V5_ISSUE_RECOVERY */
++	int err	= 0;
+ 	int idg_size;
+ 	int status;
+ 	int status_s;
+ #if IDG_DEBUG_INFO
+ 	int i;
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 
+ 	spi_message_init(&m);
+ 	spi_message_init(&m_s);
+@@ -540,12 +563,18 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
++#if IDG_DEBUG_INFO
+ 	dev_info(&spi->dev, "K81 returned
+");
++#endif /* IDG_DEBUG_INFO */
+ 	x->tx_buf = idg_tx;
++	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
++	x->rx_nbits = SPI_NBITS_SINGLE;
+ 	x->len = BASE_READ_SIZE;
+ 	x->speed_hz = idg_dev->clock_freq;
++	x->bits_per_word = idg_dev->bits_per_word;
+ 	mutex_lock(&idg_dev->lock);
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	m.spi = spi;
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -554,51 +583,190 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	mutex_unlock(&idg_dev->lock);
+ #if IDG_DEBUG_INFO
+ 	dev_info(&spi->dev, "first read (16 bytes)
+");
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ spi_report_out:
+ 	if (!status) {
+ 		memcpy(data, idg_rx, BASE_READ_SIZE);
+ 		idg_size = data[IDG_SIZE_MSB] << 8;
+ 		idg_size += data[IDG_SIZE_LSB];
+ #if IDG_DEBUG_INFO
++		dev_info(&spi->dev, "K81 size: %d
+", idg_size);
+ 		for (i = 0; i < BASE_READ_SIZE ; i++)
+ 			dev_info(&spi->dev, "0x%.2X ", data[i]);
+ 
+-#endif
+-		if (idg_size > (MAX_BUFFER_SIZE - BASE_READ_SIZE)) {
+-			dev_info(&spi->dev, "K81 return not ready
+");
++#endif /* IDG_DEBUG_INFO */
++		if ((idg_size > (MAX_BUFFER_SIZE - BASE_READ_SIZE)) ||
++		     (strncmp(data, NEOII_Header, NEOII_HEADER_LEN) != 0)) {
++#if IDG_V5_ISSUE_RECOVERY
++			idg_size_re = data[IDG_SIZE_MSB + RECOVER_OFFSET] << 8;
++			idg_size_re += data[IDG_SIZE_LSB + RECOVER_OFFSET];
++			memcpy(recover, &data[RECOVER_OFFSET],
++			       (BASE_READ_SIZE - RECOVER_OFFSET));
++			if ((idg_size_re > (MAX_BUFFER_SIZE - BASE_READ_SIZE))
++			    || (strncmp(recover, NEOII_Header,
++					NEOII_HEADER_LEN) != 0)) {
++#endif /* IDG_V5_ISSUE_RECOVERY */
++				dev_info(&spi->dev, "K81 return not ready
+");
++#if IDG_V5_ISSUE_RECOVERY
++#if IDG_DEBUG_INFO
++				dev_info(&spi->dev, "K81 re size: %d
+",
++					 idg_size_re);
++				for (i = 0; i < BASE_READ_SIZE ; i++)
++					dev_info(&spi->dev, "0x%.2X ",
++						 recover[i]);
++
++#endif /* IDG_DEBUG_INFO */
++				err = EBUSY;
++			} else if (idg_size_re == 0) {
++				/* Recovery logic for IDG V5 */
++#if IDG_DEBUG_INFO
++				dev_info(&spi->dev, "enter recovery
+");
++#endif /* IDG_DEBUG_INFO */
++				recovered = true;
++				x_s->tx_buf = idg_tx_s;
++				x_s->tx_nbits = SPI_NBITS_SINGLE;
++				x_s->rx_buf = idg_rx_s;
++				x_s->rx_nbits = SPI_NBITS_SINGLE;
++				x_s->len = RECOVER_OFFSET;
++				x_s->speed_hz = idg_dev->clock_freq;
++				x_s->bits_per_word = idg_dev->bits_per_word;
++				mutex_lock(&idg_dev->lock);
++				spin_lock_irq(&idg_dev->spi_lock);
++				m_s.spi = spi;
++				spin_unlock_irq(&idg_dev->spi_lock);
++				spi_message_add_tail(x_s, &m_s);
++				status_s = spi_sync(spi, &m_s);
++				gpiod_set_value_cansleep(idg_dev->spi_cs,
++							 CS_CLEAR);
++				mutex_unlock(&idg_dev->lock);
++#if IDG_DEBUG_INFO
++				dev_info(&spi->dev, "second re read "
++						    "(%d bytes)
+",
++					 (idg_size_re + RECOVER_OFFSET));
++#endif /* IDG_DEBUG_INFO */
++				if (!status_s) {
++					memcpy(&recover[BASE_READ_SIZE -
++							RECOVER_OFFSET],
++					       idg_rx_s, RECOVER_OFFSET);
++#if IDG_DEBUG_INFO
++					for (i = 0; i < RECOVER_OFFSET; i++)
++						dev_info(&spi->dev, "0x%.2X ",
++							recover[BASE_READ_SIZE -
++								RECOVER_OFFSET +
++								i]);
++
++#endif /* IDG_DEBUG_INFO */
++					if (CalculateCRC(recover,
++							 (idg_size_re +
++							  BASE_READ_SIZE))) {
++						dev_info(&spi->dev,
++							 "read data CRC "
++							 "error
+");
++						err = EINVAL;
++					}
++				} else {
++					pr_err("%s: idg spi re second read "
++					       "failed(%d)", DRVNAME, status_s);
++					err = EIO;
++#if IDG_DEBUG_INFO
++					for (i = 0; i < BASE_READ_SIZE ; i++)
++						dev_info(&spi->dev, "0x%.2X ",
++							idg_rx_s[i]);
++
++#endif /* IDG_DEBUG_INFO */
++				}
++			} else {
+ #if IDG_DEBUG_INFO
+-			for (i = 0; i < BASE_READ_SIZE ; i++)
+-				dev_info(&spi->dev, "0x%.2X ", idg_rx[i]);
++				dev_info(&spi->dev, "enter recovery
+");
++#endif /* IDG_DEBUG_INFO */
++				recovered = true;
++				x_s->tx_buf = idg_tx_s;
++				x_s->tx_nbits = SPI_NBITS_SINGLE;
++				x_s->rx_buf = idg_rx_s;
++				x_s->rx_nbits = SPI_NBITS_SINGLE;
++				x_s->len = (idg_size_re + RECOVER_OFFSET);
++				x_s->speed_hz = idg_dev->clock_freq;
++				x_s->bits_per_word = idg_dev->bits_per_word;
++				mutex_lock(&idg_dev->lock);
++				spin_lock_irq(&idg_dev->spi_lock);
++				m_s.spi = spi;
++				spin_unlock_irq(&idg_dev->spi_lock);
++				spi_message_add_tail(x_s, &m_s);
++				status_s = spi_sync(spi, &m_s);
++				gpiod_set_value_cansleep(idg_dev->spi_cs,
++							 CS_CLEAR);
++				mutex_unlock(&idg_dev->lock);
++#if IDG_DEBUG_INFO
++				dev_info(&spi->dev, "second re read "
++						    "(%d bytes)
+",
++					 (idg_size_re + RECOVER_OFFSET));
++#endif /* IDG_DEBUG_INFO */
++				if (!status_s) {
++					memcpy(&recover[BASE_READ_SIZE -
++							RECOVER_OFFSET],
++					       idg_rx_s,
++					       (idg_size_re + RECOVER_OFFSET));
++#if IDG_DEBUG_INFO
++					for (i = 0; i < (idg_size_re +
++							 RECOVER_OFFSET); i++)
++						dev_info(&spi->dev, "0x%.2X ",
++							recover[BASE_READ_SIZE -
++								RECOVER_OFFSET +
++								i]);
++
++#endif /* IDG_DEBUG_INFO */
++					if (CalculateCRC(recover,
++							 (idg_size_re +
++							  BASE_READ_SIZE))) {
++						dev_info(&spi->dev,
++							 "read data CRC "
++							 "error
+");
++						err = EINVAL;
++					}
++				} else {
++					pr_err("%s: idg spi re second read "
++					       "failed(%d)",
++						DRVNAME, status_s);
++						err = EIO;
++#if IDG_DEBUG_INFO
++					for (i = 0; i < BASE_READ_SIZE ; i++)
++						dev_info(&spi->dev, "0x%.2X ",
++							 idg_rx_s[i]);
+ 
+-#endif
+-			invaild++;
++#endif /* IDG_DEBUG_INFO */
++				}
++			}
++#endif /* IDG_V5_ISSUE_RECOVERY */
+ 		} else if (idg_size == 0) {
+ #if IDG_DEBUG_INFO
+ 			dev_info(&spi->dev, "idg header: %s
+", data);
+ 			dev_info(&spi->dev, "idg data length: %d
+", idg_size);
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 			/* CRC check */
+ 			if (CalculateCRC(data, BASE_READ_SIZE)) {
+ 				dev_info(&spi->dev, "read data CRC error
+");
+-				invaild++;
++				err = EINVAL;
+ 			}
+ 		} else {
+ 			x_s->tx_buf = idg_tx_s;
++			x_s->tx_nbits = SPI_NBITS_SINGLE;
+ 			x_s->rx_buf = idg_rx_s;
++			x_s->rx_nbits = SPI_NBITS_SINGLE;
+ 			x_s->len = idg_size;
+ 			x_s->speed_hz = idg_dev->clock_freq;
++			x_s->bits_per_word = idg_dev->bits_per_word;
+ 			mutex_lock(&idg_dev->lock);
+ 			spin_lock_irq(&idg_dev->spi_lock);
+ 			m_s.spi = spi;
+ 			spin_unlock_irq(&idg_dev->spi_lock);
+ 			spi_message_add_tail(x_s, &m_s);
+-			status = spi_sync(spi, &m_s);
++			status_s = spi_sync(spi, &m_s);
++			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 			mutex_unlock(&idg_dev->lock);
+ #if IDG_DEBUG_INFO
+ 			dev_info(&spi->dev, "second read (%d bytes)
+",
+ 				 idg_size);
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 			if (!status_s) {
+ 				memcpy(&data[BASE_READ_SIZE], idg_rx_s,
+ 				       idg_size);
+@@ -607,57 +775,116 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 					dev_info(&spi->dev, "0x%.2X ",
+ 						 data[BASE_READ_SIZE + i]);
+ 
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 				if (CalculateCRC(data,
+ 						 (idg_size + BASE_READ_SIZE))) {
+ 					dev_info(&spi->dev,
+ 						 "read data CRC error
+");
+-					invaild++;
++					err = EINVAL;
+ 				}
+ 			} else {
+ 				pr_err("%s: idg spi second read failed(%d)",
+ 				       DRVNAME, status_s);
+-					invaild++;
++				err = EIO;
+ #if IDG_DEBUG_INFO
+ 				for (i = 0; i < BASE_READ_SIZE ; i++)
+ 					dev_info(&spi->dev, "0x%.2X ",
+ 						 idg_rx_s[i]);
+ 
+-#endif
++#endif /* IDG_DEBUG_INFO */
+ 			}
+ 		}
+ 
+-		if ((!invaild) && (strncmp(&data[NEOII_HEADER_LEN],
+-					   NEOII_Header_V2,
+-					   NEOII_VERSION_LEN) == 0)) {
++#if IDG_V5_ISSUE_RECOVERY
++		if (recovered)
++			memcpy(data, recover, (BASE_READ_SIZE + idg_size_re));
++
++#endif /* IDG_V5_ISSUE_RECOVERY */
++		if ((!err) &&
++		    (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V2,
++			     NEOII_VERSION_LEN) == 0)) {
+ 			if (fifo_add_msg(idg_dev->v2_fifo,
+ 					 &data[IDG_HEADER_LEN])) {
+ 				fifo_clean(idg_dev->v2_fifo);
+ 				dev_info(&spi->dev, "FIFO v2 overflow, "
+-					 "cleaned
+");
++						    "cleaned
+");
+ 				fifo_add_msg(idg_dev->v2_fifo,
+ 					     &data[IDG_HEADER_LEN]);
+ 			}
+-		} else if ((!invaild) && (strncmp(&data[NEOII_HEADER_LEN],
+-						  NEOII_Header_V5,
+-						  NEOII_VERSION_LEN) == 0)) {
++		} else if ((!err) &&
++			   (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V5,
++				    NEOII_VERSION_LEN) == 0)) {
+ 			if (fifo_add_msg(idg_dev->v5_fifo,
+ 					 &data[IDG_HEADER_LEN])) {
+ 				fifo_clean(idg_dev->v5_fifo);
+ 				dev_info(&spi->dev, "FIFO v5 overflow. "
+-					 "cleaned
+");
++						    "cleaned
+");
+ 				fifo_add_msg(idg_dev->v5_fifo,
+ 					     &data[IDG_HEADER_LEN]);
+ 			}
+ 		} else {
+-			dev_info(&spi->dev, "read data failed
+");
++			switch (err) {
++			case EINVAL:
++				dev_info(&spi->dev, "read data failed "
++						    "by invalid
+");
++				memcpy(data, READ_ERROR_CRC_HD, ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_CRC,
++				       READ_ERROR_CRC_SIZE);
++				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++					fifo_clean(idg_dev->v2_fifo);
++					dev_info(&spi->dev, "FIFO v2 overflow, "
++							    "cleaned
+");
++					fifo_add_msg(idg_dev->v2_fifo, data);
++				}
++				break;
++			case EBUSY:
++				dev_info(&spi->dev, "read data failed
+");
++				memcpy(data, READ_ERROR_K81_HD, ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_K81,
++				       READ_ERROR_K81_SIZE);
++				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++					fifo_clean(idg_dev->v2_fifo);
++					dev_info(&spi->dev, "FIFO v2 overflow, "
++							    "cleaned
+");
++					fifo_add_msg(idg_dev->v2_fifo, data);
++				}
++				break;
++			case EIO:
++				if (status_s)
++					pr_err("%s: idg spi second "
++					       "report failed(%d)", DRVNAME,
++					       status_s);
++
++				memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE], READ_ERROR,
++				       READ_ERROR_SIZE);
++				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++					fifo_clean(idg_dev->v2_fifo);
++					dev_info(&spi->dev, "FIFO v2 overflow, "
++							    "cleaned
+");
++					fifo_add_msg(idg_dev->v2_fifo, data);
++				}
++				break;
++			default:
++				pr_err("%s: idg spi unknown error(%d)", DRVNAME,
++				       err);
++				break;
++			}
+ 		}
+ 	} else {
+ 		pr_err("%s: idg spi report failed(%d)", DRVNAME, status);
++		memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
++		memcpy(&data[ERROR_HD_SIZE], READ_ERROR, READ_ERROR_SIZE);
++		if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++			fifo_clean(idg_dev->v2_fifo);
++			dev_info(&spi->dev, "FIFO v2 overflow, cleaned
+");
++			fifo_add_msg(idg_dev->v2_fifo, data);
++		}
+ 	}
+ 	kfree(x_init);
+ 	if (x_s_init != NULL)
+ 		kfree(x_s_init);
++
+ }
+ 
+ static irqreturn_t idg_spi_irq_handler(int irq, void *handle)
+@@ -674,7 +901,6 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	struct idg_spi_device *idg_dev;
+ 	struct device_node *np = spi->dev.of_node;
+ 	unsigned long irq_flags;
+-	int cs_gpio = 0;
+ 	int irq = 0;
+ 	int err = 0;
+ 
+@@ -685,12 +911,6 @@ static int idg_spi_probe(struct spi_device *spi)
+ 		err = -ENODATA;
+ 		goto setup_error;
+ 	}
+-	cs_gpio = spi->cs_gpio;
+-	if (!cs_gpio) {
+-		dev_err(&spi->dev, "chipselect is not exist
+");
+-		err = -ENODATA;
+-		goto setup_error;
+-	}
+ 	err = of_property_read_u32(np, "spi-working-mode", &spi->mode);
+ 	if (err < 0) {
+ 		pr_err("%s: get mode failed(%d)", DRVNAME, err);
+@@ -729,7 +949,14 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	idg_dev->spi_dev = spi;
+ 	idg_dev->clock_freq = spi->max_speed_hz;
++	idg_dev->bits_per_word = spi->bits_per_word;
+ 	idg_spi_tty = spi;
++	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_HIGH);
++	if (!idg_dev->spi_cs) {
++		dev_err(&spi->dev, "chipselect is not exist
+");
++		err = -ENODATA;
++		goto idg_dev_error;
++	}
+ 	idg_dev->idg_irq = irq;
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+ 	dev_info(&spi->dev, "idg_irq: %d
+", idg_dev->idg_irq);
+@@ -738,26 +965,26 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	if (idg_dev->v2_fifo == NULL) {
+ 		dev_err(&spi->dev, "idg_spi fifo initial failed
+");
+ 		err = -ENOMEM;
+-		goto idg_dev_error;
++		goto idg_gpio_error;
+ 	}
+ 	idg_dev->v5_fifo = fifo_create(MAX_BUFFER_SIZE, FIFO_SIZE);
+ 	if (idg_dev->v5_fifo == NULL) {
+ 		dev_err(&spi->dev, "idg_spi v5 fifo initial failed
+");
+ 		err = -ENOMEM;
+-		goto idg_dev_error;
++		goto idg_gpio_error;
+ 	}
+ 	mutex_init(&idg_dev->lock);
+ 	idg_spi_tty_misc.parent = &spi->dev;
+ 	err = misc_register(&idg_spi_tty_misc);
+ 	if (err) {
+ 		pr_err("%s: spi_register_misc_driver failed(%d)", DRVNAME, err);
+-		goto idg_tty_error;
++		goto idg_gpio_error;
+ 	}
+ 	idgv5_spi_tty_misc.parent = &spi->dev;
+ 	err = misc_register(&idgv5_spi_tty_misc);
+ 	if (err) {
+ 		dev_err(&spi->dev, "failed to register idgv5 tty misc
+");
+-		goto idgv5_tty_error;
++		goto idg_tty_error;
+ 	}
+ 	init_waitqueue_head(&idg_dev->wait);
+ 	if (of_property_read_bool(np, "idg-low-triggered")) {
+@@ -796,6 +1023,8 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	misc_deregister(&idgv5_spi_tty_misc);
+ idg_tty_error:
+ 	misc_deregister(&idg_spi_tty_misc);
++idg_gpio_error:
++	kfree(idg_dev->spi_cs);
+ idg_dev_error:
+ 	kfree(idg_dev);
+ setup_error:
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index 48e235084664..706b7d06eaae 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -1,12 +1,12 @@
+ /*
+- * Driver for idg spi.
++ *  Driver for idg spi.
+  *
+- * Copyright (c) 2020 ID TECH.
+- * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *  Copyright (c) 2020 ID TECH.
++ *  Author: Arthur Chen <arthur.chen@idtechproducts.com>
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
+  */
+ 
+ #ifndef _IDG_SPI_H
+@@ -51,19 +51,39 @@
+ #define MSPI_MSG_COUNT		8
+ #define CRC_TABLE_SIZE		256
+ 
+-#define READ_ERROR		"ERROR"
+-#define READ_ERROR_SIZE		1
++/* custmized error info */
++#define ERROR_HD_SIZE		4
++
++#define READ_ERROR_HD		"\x00\x00\x00\x08"
++#define READ_ERROR		"ERROR_IO"
++#define READ_ERROR_SIZE		8
++
++#define READ_ERROR_K81_HD	"\x00\x00\x00\x09"
++#define READ_ERROR_K81		"ERROR_K81"
++#define READ_ERROR_K81_SIZE	9
++
++#define READ_ERROR_CRC_HD	"\x00\x00\x00\x09"
++#define READ_ERROR_CRC		"ERROR_CRC"
++#define READ_ERROR_CRC_SIZE	9
+ 
+ #define FIFO_SIZE		16
+ #define FIFO_OVERFLOW		(-1)
+ 
++/* Chip select setting purpose (for gpiod) */
++#define CS_SET			1
++#define CS_CLEAR		0
++
++/* For recover IDG V5 data from K81 */
+ #define RECOVER_OFFSET		1
+ 
+ struct idg_spi_device {
+ 				/* spi related */
+ 	struct spi_device	*spi_dev;
++				/* CS control by gpio */
++	struct gpio_desc	*spi_cs;
+ 	int			clock_freq;
+ 	int			idg_irq;
++	u8			bits_per_word;
+ 	spinlock_t		spi_lock; /* to get spi device safely */
+ 	wait_queue_head_t	wait;
+ 				/* protect related */

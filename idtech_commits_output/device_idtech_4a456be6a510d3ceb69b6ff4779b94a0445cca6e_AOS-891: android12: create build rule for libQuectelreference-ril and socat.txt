@@ -1,0 +1,42 @@
+4a456be6 owen.wen 2022-04-06
+
+AOS-891: android12: create build rule for libQuectelreference-ril and socat
+
+change filename to linreference-ril.so to fix below build time error
+error: DT_SONAME "libreference-ril.so" must be equal to the file name "libQuectelreference-ril".
+
+Change-Id: I72f35ee4f499c38cdf874d35a9179ca50b56fdcf
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 53bb6ea0..3ed55b69 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -370,12 +370,12 @@ PRODUCT_PACKAGES += \
+ # -------@block_modem-------
+ # Copy Quectel vendor RIL
+ PRODUCT_COPY_FILES += \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+     vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+     vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+     vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+     vendor/quectel/ip-up:/system/etc/ppp/ip-up
+ PRODUCT_PACKAGES += \
++    libreference-ril \
+     chat
+ 
+ # set LTE as default
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index c43737cf..d5f4b8eb 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -504,8 +504,8 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/imx8m/bringup_test.sh:$(TARGET_COPY_OUT_PRODUCT)/bin/bringup_test.sh
+ 
+ # install socat for USB bridge K81(connect ttyGS0 and ttyIDG)
+-PRODUCT_COPY_FILES += \
+-    $(IMX_DEVICE_PATH)/socat:$(TARGET_COPY_OUT_PRODUCT)/bin/socat
++PRODUCT_PACKAGES += \
++     socat
+ 
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.usbhid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.usbhid.sh

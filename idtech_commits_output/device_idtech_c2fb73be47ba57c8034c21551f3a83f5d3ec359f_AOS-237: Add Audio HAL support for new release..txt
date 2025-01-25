@@ -1,0 +1,99 @@
+c2fb73be Arthur Chen 2020-07-06
+
+AOS-237: Add Audio HAL support for new release.
+
+Change-Id: Icb6591abde056ec8eb1a2e66a6653f1fef25c806
+
+diff --git a/common/audio-json/rt5640_config.json b/common/audio-json/rt5640_config.json
+new file mode 100644
+index 00000000..06ded118
+--- /dev/null
++++ b/common/audio-json/rt5640_config.json
+@@ -0,0 +1,63 @@
++{
++  "driver_name": "rt5640-audio",
++  "supported_out_devices": ["speaker", "wired_headphone", "wired_headset"],
++  "supported_in_devices": ["wired_headset", "builtin_mic"],
++
++  "init_ctl": [
++    {"name": "DAC1 Playback Volume", "type": "int", "val": 140},
++    {"name": "DAC MIXL INF1 Switch", "type": "int", "val": 1},
++    {"name": "DAC MIXR INF1 Switch", "type": "int", "val": 1},
++    {"name": "Stereo DAC MIXL DAC L1 Switch", "type": "int", "val": 1},
++    {"name": "Stereo DAC MIXR DAC R1 Switch", "type": "int", "val": 1}
++  ],
++
++  "speaker_ctl": [
++    {"name": "Speaker Channel Switch", "type": "int", "val": 1},
++    {"name": "Speaker L Playback Switch", "type": "int", "val": 1},
++    {"name": "Speaker R Playback Switch", "type": "int", "val": 1},
++    {"name": "SPK MIXL DAC L1 Switch", "type": "int", "val": 1},
++    {"name": "SPK MIXR DAC R1 Switch", "type": "int", "val": 1},
++    {"name": "SPOL MIX SPKVOL L Switch", "type": "int", "val": 1},
++    {"name": "SPOL MIX SPKVOL R Switch", "type": "int", "val": 1},
++    {"name": "SPOR MIX SPKVOL R Switch", "type": "int", "val": 1},
++    {"name": "OUT MIXL SPK MIXL Switch", "type": "int", "val": 1},
++    {"name": "OUT MIXR SPK MIXR Switch", "type": "int", "val": 1},
++    {"name": "Speaker Playback Volume", "type": "int", "val": 39}
++  ],
++
++  "headphone_ctl": [
++    {"name": "HP Channel Switch", "type": "int", "val": 1},
++    {"name": "HP Playback Volume", "type": "int", "val": 30},
++    {"name": "HP L Playback Switch", "type": "int", "val": 1},
++    {"name": "HP R Playback Switch", "type": "int", "val": 1},
++    {"name": "HPO MIX HPVOL Switch", "type": "int", "val": 1},
++    {"name": "HPO MIX DAC1 Switch", "type": "int", "val": 1}
++  ],
++
++  "out_volume_ctl": [
++    "DAC1 Playback Volume"
++  ],
++
++  "headset_mic_ctl": [
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 60},
++    {"name": "RECMIXL BST2 Switch", "type": "int", "val": 1},
++    {"name": "RECMIXR BST2 Switch", "type": "int", "val": 1},
++    {"name": "Stereo ADC1 Mux", "type": "str", "val": "ADC"},
++    {"name": "Stereo ADC MIXL ADC1 Switch", "type": "int", "val": 1},
++    {"name": "Stereo ADC MIXR ADC1 Switch", "type": "int", "val": 1},
++    {"name": "RECMIXL INL Switch", "type": "int", "val": 1},
++    {"name": "RECMIXR INR Switch", "type": "int", "val": 1}
++  ],
++
++  "builtin_mic_ctl": [
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 60},
++    {"name": "RECMIXL BST2 Switch", "type": "int", "val": 1},
++    {"name": "RECMIXR BST2 Switch", "type": "int", "val": 1},
++    {"name": "Stereo1 ADC2 Mux", "type": "str", "val": "ADC"},
++    {"name": "Sto1 ADC MIXL ADC2 Switch", "type": "int", "val": 1},
++    {"name": "Sto1 ADC MIXR ADC2 Switch", "type": "int", "val": 1},
++    {"name": "I2S2 Func Switch", "type": "int", "val": 1}
++  ]
++}
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+index e5f76442..c55cac79 100644
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -93,6 +93,7 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+     device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+     device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++    device/idtech/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
+     device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index c07be9c7..3cafcb2e 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -96,6 +96,7 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+     device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+     device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++    device/idtech/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
+     device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)

@@ -1,0 +1,319 @@
+f5567db4e3 George.Huang 2020-06-12
+
+AOS-214: imx8mn: porting changes from imx8mq to imx8mn
+
+But disable CONFIG_IDT_VALID_AVBKEY temparorily
+
+Change-Id: If90b2dbfd62bb1427600d48a11e1b15d9f6283f6
+
+diff --git a/board/freescale/imx8mn_a100/Kconfig b/board/freescale/imx8mn_a100/Kconfig
+index 5a16a8c6bb..e875d67c5b 100644
+--- a/board/freescale/imx8mn_a100/Kconfig
++++ b/board/freescale/imx8mn_a100/Kconfig
+@@ -1,18 +1,41 @@
+-if TARGET_IMX8MN_EVK
++if TARGET_IMX8MN_A100
+ 
+ config SYS_BOARD
+-	default "imx8mn_evk"
++	default "imx8mn_a100"
+ 
+ config SYS_VENDOR
+ 	default "freescale"
+ 
+ config SYS_CONFIG_NAME
+-	default "imx8mn_evk"
++	default "imx8mn_a100"
+ 
+ config IMX8MN_FORCE_NOM_SOC
+ 	bool "Force to use nominal mode for SOC and ARM"
+ 	default n
+ 
++config IDT_VALID_AVBKEY
++	bool "IDT validate avb key before booting"
++	help
++	  This option should be enable when the vbmeta is signed by
++	  IDT key (This will be done on BoardCOnfig.mk), then u-boot
++	  should validate this key with build-in public key before
++	  booting into kernel.
++
++config IDT_DUAL_SPL
++	bool "IDT dual spl feature"
++	help
++	  This option could be enabled when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will help switch to new spl/bootloader
++	  pair even if SRK key set is changed.
++
++config IDT_BACKUP_SPL
++	bool "IDT backup spl feature"
++	help
++	  This option could be enabled when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will backup primary spl to offset
++	  0x200000 as secondary spl which will be loaded by Boot_ROM
++	  once if primary spl is corrupted.
++
+ source "board/freescale/common/Kconfig"
+ 
+ endif
+diff --git a/board/freescale/imx8mn_a100/Makefile b/board/freescale/imx8mn_a100/Makefile
+index 9511a70c31..504459ddd6 100644
+--- a/board/freescale/imx8mn_a100/Makefile
++++ b/board/freescale/imx8mn_a100/Makefile
+@@ -4,7 +4,7 @@
+ # SPDX-License-Identifier:      GPL-2.0+
+ #
+ 
+-obj-y += imx8mn_evk.o
++obj-y += imx8mn_a100.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+diff --git a/board/freescale/imx8mn_evk/Kconfig b/board/freescale/imx8mn_evk/Kconfig
+index 5a16a8c6bb..1d632aa98c 100644
+--- a/board/freescale/imx8mn_evk/Kconfig
++++ b/board/freescale/imx8mn_evk/Kconfig
+@@ -13,6 +13,29 @@ config IMX8MN_FORCE_NOM_SOC
+ 	bool "Force to use nominal mode for SOC and ARM"
+ 	default n
+ 
++config IDT_VALID_AVBKEY
++	bool "IDT validate avb key before booting"
++	help
++	  This option should be enable when the vbmeta is signed by
++	  IDT key (This will be done on BoardCOnfig.mk), then u-boot
++	  should validate this key with build-in public key before
++	  booting into kernel.
++
++config IDT_DUAL_SPL
++	bool "IDT dual spl feature"
++	help
++	  This option could be enabled when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will help switch to new spl/bootloader
++	  pair even if SRK key set is changed.
++
++config IDT_BACKUP_SPL
++	bool "IDT backup spl feature"
++	help
++	  This option could be enabled when CONFIG_DUAL_BOOTLOADER
++	  is also enabled. It will backup primary spl to offset
++	  0x200000 as secondary spl which will be loaded by Boot_ROM
++	  once if primary spl is corrupted.
++
+ source "board/freescale/common/Kconfig"
+ 
+ endif
+diff --git a/configs/imx8mn_a100_devboard_android_defconfig b/configs/imx8mn_a100_devboard_android_defconfig
+index 93cb1ab73b..d6dd0f0e3c 100644
+--- a/configs/imx8mn_a100_devboard_android_defconfig
++++ b/configs/imx8mn_a100_devboard_android_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+diff --git a/configs/imx8mn_a100_devboard_android_dual_defconfig b/configs/imx8mn_a100_devboard_android_dual_defconfig
+index 69909c304c..078a6da154 100644
+--- a/configs/imx8mn_a100_devboard_android_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_dual_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+@@ -91,3 +91,6 @@ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_SPL_MMC_WRITE=y
+ CONFIG_SPL_LIBDISK_SUPPORT=y
+ CONFIG_SPL_DOS_PARTITION=n
++
++CONFIG_IDT_DUAL_SPL=y
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_defconfig b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+index b6928f1e8b..8374b85a7d 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+index 413abb3b41..f55137fabb 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+@@ -92,3 +92,6 @@ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_SPL_MMC_WRITE=y
+ CONFIG_SPL_DOS_PARTITION=n
+ CONFIG_TRUSTY_UNLOCK_PERMISSION=y
++
++CONFIG_IDT_DUAL_SPL=y
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+index 5ff6619ef6..76324fdfc3 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+diff --git a/configs/imx8mn_a100_devboard_android_uuu_defconfig b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+index 9ff9c875a1..6c5fe3f30f 100644
+--- a/configs/imx8mn_a100_devboard_android_uuu_defconfig
++++ b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MN_EVK=y
++CONFIG_TARGET_IMX8MN_A100=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+ CONFIG_FIT=y
+@@ -93,3 +93,5 @@ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_LZ4=y
+ CONFIG_LIBAVB=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mn_evk_android_dual_defconfig b/configs/vp6820_8mn_evk_android_dual_defconfig
+index 69909c304c..cdee6fa75d 100644
+--- a/configs/vp6820_8mn_evk_android_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_dual_defconfig
+@@ -91,3 +91,6 @@ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_SPL_MMC_WRITE=y
+ CONFIG_SPL_LIBDISK_SUPPORT=y
+ CONFIG_SPL_DOS_PARTITION=n
++
++CONFIG_IDT_DUAL_SPL=y
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mn_evk_android_trusty_dual_defconfig b/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
+index 413abb3b41..85f9d603fd 100644
+--- a/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
+@@ -92,3 +92,6 @@ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_SPL_MMC_WRITE=y
+ CONFIG_SPL_DOS_PARTITION=n
+ CONFIG_TRUSTY_UNLOCK_PERMISSION=y
++
++CONFIG_IDT_DUAL_SPL=y
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mn_evk_android_uuu_defconfig b/configs/vp6820_8mn_evk_android_uuu_defconfig
+index 9ff9c875a1..e50b266ff5 100644
+--- a/configs/vp6820_8mn_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mn_evk_android_uuu_defconfig
+@@ -93,3 +93,5 @@ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_LZ4=y
+ CONFIG_LIBAVB=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++
++CONFIG_IDT_BACKUP_SPL=y
+diff --git a/include/configs/imx8mn_a100.h b/include/configs/imx8mn_a100.h
+index 4d862fbdcf..1c51b175dd 100644
+--- a/include/configs/imx8mn_a100.h
++++ b/include/configs/imx8mn_a100.h
+@@ -4,8 +4,8 @@
+  * SPDX-License-Identifier:	GPL-2.0+
+  */
+ 
+-#ifndef __IMX8MN_EVK_H
+-#define __IMX8MN_EVK_H
++#ifndef __IMX8MN_A100_H
++#define __IMX8MN_A100_H
+ 
+ #include <linux/sizes.h>
+ #include <asm/arch/imx-regs.h>
+@@ -333,7 +333,7 @@
+ #define CONFIG_OF_SYSTEM_SETUP
+ 
+ #if defined(CONFIG_ANDROID_SUPPORT)
+-#include "imx8mn_evk_android.h"
++#include "imx8mn_a100_android.h"
+ #endif
+ 
+ #endif
+diff --git a/include/configs/imx8mn_a100_android.h b/include/configs/imx8mn_a100_android.h
+index 1e7c9627b1..2303b84713 100644
+--- a/include/configs/imx8mn_a100_android.h
++++ b/include/configs/imx8mn_a100_android.h
+@@ -4,8 +4,8 @@
+  * SPDX-License-Identifier:	GPL-2.0+
+  */
+ 
+-#ifndef IMX8MN_EVK_ANDROID_H
+-#define IMX8MN_EVK_ANDROID_H
++#ifndef IMX8MN_A100_ANDROID_H
++#define IMX8MN_A100_ANDROID_H
+ 
+ #define CONFIG_BCB_SUPPORT
+ #define CONFIG_CMD_READ
+@@ -37,10 +37,17 @@
+ #undef CONFIG_EXTRA_ENV_SETTINGS
+ #undef CONFIG_BOOTCOMMAND
+ 
++#ifdef CONFIG_SECURE_BOOT
++#define UBOOT_DELAY_TIME 0	/* seconds */
++#else
++#define UBOOT_DELAY_TIME 1	/* seconds */
++#endif /* CONFIG_SECURE_BOOT */
++
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
+ 	"splashpos=m,m "			\
+ 	"fdt_high=0xffffffffffffffff "		\
+ 	"initrd_high=0xffffffffffffffff "	\
++	"bootdelay="__stringify(UBOOT_DELAY_TIME)" "	\
+ 
+ /* Enable mcu firmware flash */
+ #ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
+@@ -87,4 +94,4 @@
+ 
+ #define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
+ 
+-#endif /* IMX8MN_EVK_ANDROID_H */
++#endif /* IMX8MN_A100_ANDROID_H */
+diff --git a/include/configs/imx8mn_evk_android.h b/include/configs/imx8mn_evk_android.h
+index 1e7c9627b1..0314254ab9 100644
+--- a/include/configs/imx8mn_evk_android.h
++++ b/include/configs/imx8mn_evk_android.h
+@@ -37,10 +37,17 @@
+ #undef CONFIG_EXTRA_ENV_SETTINGS
+ #undef CONFIG_BOOTCOMMAND
+ 
++#ifdef CONFIG_SECURE_BOOT
++#define UBOOT_DELAY_TIME 0	/* seconds */
++#else
++#define UBOOT_DELAY_TIME 1	/* seconds */
++#endif /* CONFIG_SECURE_BOOT */
++
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
+ 	"splashpos=m,m "			\
+ 	"fdt_high=0xffffffffffffffff "		\
+ 	"initrd_high=0xffffffffffffffff "	\
++	"bootdelay="__stringify(UBOOT_DELAY_TIME)" "	\
+ 
+ /* Enable mcu firmware flash */
+ #ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT

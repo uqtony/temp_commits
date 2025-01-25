@@ -1,0 +1,68 @@
+db75b9483 max.yang 2020-11-27
+
+AOS-417: Adjusting packages based on user build condition
+
+  According to page:
+    https://atlassian.idtechproducts.com/confluence/pages/viewpage.action?pageId=89470439
+
+  1. packages based on user build, removed from production devices
+  2. adbd binary added by userdebug/user(production)/pcidev build
+
+Change-Id: I2d2ae64f6a072672b24b87dd31ef87ecda1502ae
+
+diff --git a/target/product/base_system.mk b/target/product/base_system.mk
+index 1faf27efe..d3580892e 100644
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@ -14,17 +14,18 @@
+ # limitations under the License.
+ #
+ 
+-# install adbd if string TARGET_PRODUCT contains no pci
+-ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
++# package removed on user build (production and pci)
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ PRODUCT_PACKAGES += \
+-    adbd \
+     monkey \
+     WallpaperBackup
+ endif
+-# adbd removed by above, for pcidev build, add it back
+-ifeq (pcidev,$(findstring pcidev, $(TARGET_PRODUCT)))
+-PRODUCT_PACKAGES += \
+-    adbd
++
++# adbd binary included by userdebug/production/pcidev, removed by pci-user
++ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
++PRODUCT_PACKAGES += adbd
++else ifeq (pcidev,$(findstring pcidev, $(TARGET_PRODUCT)))
++PRODUCT_PACKAGES += adbd
+ endif
+ 
+ # Base modules and settings for the system partition.
+diff --git a/target/product/handheld_system.mk b/target/product/handheld_system.mk
+index 7087ffece..d728a7073 100644
+--- a/target/product/handheld_system.mk
++++ b/target/product/handheld_system.mk
+@@ -31,7 +31,7 @@ $(call inherit-product-if-exists, external/hyphenation-patterns/patterns.mk)
+ $(call inherit-product-if-exists, frameworks/base/data/keyboards/keyboards.mk)
+ $(call inherit-product-if-exists, frameworks/webview/chromium/chromium.mk)
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ PRODUCT_PACKAGES += \
+     BasicDreams \
+     screenrecord \
+diff --git a/target/product/telephony_product.mk b/target/product/telephony_product.mk
+index ebfe7daeb..aaf7e5bb1 100644
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@ -17,7 +17,7 @@
+ # This is the list of modules that are specific to products that have telephony
+ # hardware, and install to the product partition.
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ PRODUCT_PACKAGES += \
+     EmergencyInfo \
+     Dialer

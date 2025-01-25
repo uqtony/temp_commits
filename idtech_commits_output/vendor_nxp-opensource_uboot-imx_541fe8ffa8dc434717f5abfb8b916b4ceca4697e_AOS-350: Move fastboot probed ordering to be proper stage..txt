@@ -1,0 +1,61 @@
+541fe8ffa8 Arthur Chen 2020-10-15
+
+AOS-350: Move fastboot probed ordering to be proper stage.
+
+    - Because we use fastboot api to get emmc partition and read data directly.
+    We can read board info parameter more stable without some duplicate
+    customized initializations in U-boot.
+    If without this, the "bdinfo_read()" in persist_idt will be failed.
+
+    - We need to get board info parameter just after storage components probed
+    and before other components initialized.
+    Currently, the first one of other components is "PCI device",
+    and the last one of storage components is "EEPROM device".
+    So we pick this location in the middle between "EEPROM device" and
+    "PCI device" for our proposal.
+
+    - Symptom: When reading board_info partition by bdinfo_read() in video_link,
+               it failed to read:
+
+               fsl_read_from_partition_multi: no board_info partition
+               FAILIDTINFO_RESULT_ERROR_IO.
+
+    - Root Cause: The fastboot_init() is late then video_link,
+                  but video_link is needed to read partition info
+                  which is settled by fastboot_init in progress.
+                  The bdinfo_read() is defineded in persist_idt
+                  and using fsl_read_from_partition_multi() for reading
+                  board_info partition data.
+
+    - Solution: Move fastboot_init in front of video_link and
+                also in the middle between EEPROM device PCI device for
+                matching board_info usage in the future.
+
+    - Verified: Fastboot works well on imx8mq/imx8mn/uuu usage.
+
+Change-Id: Id1fea98695adaf510fb210e7ce80e7678ff65c83
+
+diff --git a/common/board_r.c b/common/board_r.c
+index 8b8d490d6c..4399f2b6dc 100644
+--- a/common/board_r.c
++++ b/common/board_r.c
+@@ -829,6 +829,9 @@ static init_fnc_t init_sequence_r[] = {
+ 	mac_read_from_eeprom,
+ #endif
+ 	INIT_FUNC_WATCHDOG_RESET
++#ifdef CONFIG_FSL_FASTBOOT
++	initr_fastboot_setup,
++#endif
+ #if defined(CONFIG_PCI) && !defined(CONFIG_SYS_EARLY_PCI_INIT)
+ 	/*
+ 	 * Do pci configuration
+@@ -875,9 +878,6 @@ static init_fnc_t init_sequence_r[] = {
+ #ifdef CONFIG_BOARD_LATE_INIT
+ 	board_late_init,
+ #endif
+-#ifdef CONFIG_FSL_FASTBOOT
+-	initr_fastboot_setup,
+-#endif
+ #if defined(CONFIG_SCSI) && !defined(CONFIG_DM_SCSI)
+ 	INIT_FUNC_WATCHDOG_RESET
+ 	initr_scsi,

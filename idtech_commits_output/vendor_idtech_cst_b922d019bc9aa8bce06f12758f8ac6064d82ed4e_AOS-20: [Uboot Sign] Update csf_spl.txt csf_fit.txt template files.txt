@@ -1,0 +1,91 @@
+b922d01 max.yang 2019-11-14
+
+AOS-20: [Uboot Sign] Update csf_spl.txt csf_fit.txt template files
+
+1. These files are copied from:
+    $source/vendor/nxp-opensource/uboot-imx/doc/imx/habv4/csf_examples/mx8m_mx8mm/*
+2. Offset info are all removed, we need to fill it
+3. The build script will copy them into "UBOOT_OBJ", and add offset into file
+4. Ultimately, these files will be inputted into cst tool, and generate .bin files
+
+Change-Id: Icec588492b5e29b7aa9a7d40f970f26efd9471b4
+
+diff --git a/csf_fit.txt b/csf_fit.txt
+new file mode 100644
+index 0000000..869b207
+--- /dev/null
++++ b/csf_fit.txt
+@@ -0,0 +1,31 @@
++[Header]
++    Version = 4.3
++    Hash Algorithm = sha256
++    Engine = CAAM
++    Engine Configuration = 0
++    Certificate Format = X509
++    Signature Format = CMS
++
++[Install SRK]
++    # Index of the key location in the SRK table to be installed
++    File = "./release/crts/SRK_1_2_3_4_table.bin"
++    Source index = 0
++
++[Install CSFK]
++    # Key used to authenticate the CSF data
++    File = "./release/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem"
++
++[Authenticate CSF]
++
++[Install Key]
++    # Key slot index used to authenticate the key to be installed
++    Verification index = 0
++    # Target key slot in HAB key store where key will be installed
++    Target index = 2
++    # Key to install
++    File = "./release/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem"
++
++[Authenticate Data]
++    # Key slot index used to authenticate the image data
++    Verification index = 2
++    # Authenticate Start Address, Offset, Length and file
+diff --git a/csf_spl.txt b/csf_spl.txt
+new file mode 100644
+index 0000000..c5e6acb
+--- /dev/null
++++ b/csf_spl.txt
+@@ -0,0 +1,36 @@
++[Header]
++    Version = 4.3
++    Hash Algorithm = sha256
++    Engine = CAAM
++    Engine Configuration = 0
++    Certificate Format = X509
++    Signature Format = CMS
++
++[Install SRK]
++    # Index of the key location in the SRK table to be installed
++    File = "./release/crts/SRK_1_2_3_4_table.bin"
++    Source index = 0
++
++[Install CSFK]
++    # Key used to authenticate the CSF data
++    File = "./release/crts/CSF1_1_sha256_2048_65537_v3_usr_crt.pem"
++
++[Authenticate CSF]
++
++[Unlock]
++    # Leave Job Ring and DECO master ID registers Unlocked
++    Engine = CAAM
++    Features = MID
++
++[Install Key]
++    # Key slot index used to authenticate the key to be installed
++    Verification index = 0
++    # Target key slot in HAB key store where key will be installed
++    Target index = 2
++    # Key to install
++    File = "./release/crts/IMG1_1_sha256_2048_65537_v3_usr_crt.pem"
++
++[Authenticate Data]
++    # Key slot index used to authenticate the image data
++    Verification index = 2
++    # Authenticate Start Address, Offset, Length and file

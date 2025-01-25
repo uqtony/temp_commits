@@ -1,0 +1,84 @@
+de7af366fd George.Huang 2020-04-16
+
+AOS-151: Switch to correct hwpart if AB slot is changed in SPL
+
+Move this feature from uboot to spl
+
+Change-Id: Ie7fac1f26d6ccc20f63949b6467507b8802c9298
+
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index 8efc44a435..81dd70bd81 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -3,6 +3,7 @@
+  */
+ 
+ #include <common.h>
++#include <fb_fsl.h>
+ #include <fsl_avb.h>
+ #include <mmc.h>
+ #include <spl.h>
+@@ -442,6 +443,36 @@ end:
+ 		return 0;
+ }
+ #else /* CONFIG_PARSE_CONTAINER */
++#ifdef CONFIG_IDT_DUAL_SPL
++int check_hwpart_with_current_slot(struct mmc *mmc, size_t target_slot)
++{
++	int hwpart = -1, slot_part = -1;
++
++	slot_part = target_slot + 1; /* (target_slot + 1) equals hwpart */
++	if (slot_part != FASTBOOT_MMC_BOOT_PARTITION_ID &&
++	    slot_part != FASTBOOT_MMC_BOOT1_PARTITION_ID) {
++		printf("ERROR: Get the wrong slot_part=%d
+", slot_part);
++		return -1;
++	}
++	hwpart = (mmc->part_config >> 3) & PART_ACCESS_MASK;
++	if (hwpart != FASTBOOT_MMC_BOOT_PARTITION_ID &&
++	    hwpart != FASTBOOT_MMC_BOOT1_PARTITION_ID) {
++		printf("WARN: Get the unexpected hwpart=%d
+", hwpart);
++		return -1;
++	}
++	printf("hwpart=%d, slot_part=%d
+", hwpart, slot_part);
++	if (hwpart == slot_part) {
++		/* no more action */
++		return -1;
++	}
++	/* store slot_part */
++	printf("Force to set hwpart from %d to %d due to the changed slot
+",
++	    hwpart, slot_part);
++	mmc_set_part_conf(mmc, (u8)1, (u8)slot_part, (u8)0);
++	printf("Need to reboot
+");
++	return 0;
++}
++#endif
+ int mmc_load_image_raw_sector_dual_uboot(
+ 		struct spl_image_info *spl_image, struct mmc *mmc)
+ {
+@@ -497,6 +528,11 @@ int mmc_load_image_raw_sector_dual_uboot(
+ 	target_slot =
+ 	    (ab_data.slots[1].priority > ab_data.slots[0].priority) ? 1 : 0;
+ 
++#ifdef CONFIG_IDT_DUAL_SPL
++	if (check_hwpart_with_current_slot(mmc, target_slot) == 0)
++		do_reset(NULL, 0, 0, NULL);
++#endif
++
+ 	for (n = 0; n < 2; n++) {
+ 		if (!fsl_slot_is_bootable(&ab_data.slots[target_slot])) {
+ 			target_slot = (target_slot == 1 ? 0 : 1);
+@@ -1181,7 +1217,7 @@ AvbABFlowResult avb_ab_flow_fast(AvbABOps* ab_ops,
+ 		/* No bootable slots! */
+ 		avb_error("No bootable slots found.
+");
+ 		ret = AVB_AB_FLOW_RESULT_ERROR_NO_BOOTABLE_SLOTS;
+-#ifdef CONFIG_IDT_DUAL_SPL
++#if defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_IDT_DUAL_SPL)
+ 		fsl_avb_ab_data_init(&ab_data);
+ #endif
+ 		goto out;

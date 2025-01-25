@@ -1,0 +1,129 @@
+2b9be977 Jay 2021-12-23
+
+AOS-846: add usb configfs setting for serialport interface
+
+Change-Id: Iafc92010aeaa1475c38548f0df0083494ee0519f
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index de01340a..d9aa9618 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -515,13 +515,11 @@ check_idg_transaction_CT() {
+ 
+ # setup gadge serial for ttyIDG
+ idg_bridge() {
+-  setprop sys.usb.config none
+-  setprop sys.usb.configfs 0
+-  insmod /vendor/odm/lib/modules/g_cdc.ko
+-  insmod /vendor/odm/lib/modules/g_serial.ko
+-  stty -F /dev/ttyGS1 raw
+-  socat -u PIPE:/dev/ttyGS1 - | tee /dev/ttyIDG > /dev/null &
+-  socat -u exec:"cat /dev/ttyIDG" PIPE:/dev/ttyGS1 &
++  stty -F /dev/ttyGS0 raw
++  stty -F /dev/ttyGS0 -echo # disable echo, otherwise GS will repeat input
++  stty -F /dev/ttyGS0 -iuclc # disable upper case to lower case
++  socat -u PIPE:/dev/ttyGS0 - | tee /dev/ttyIDG > /dev/null &
++  socat -u exec:"cat /dev/ttyIDG" PIPE:/dev/ttyGS0
+ }
+ 
+ #####################################################
+diff --git a/imx8m/init.idt.bringuptest.rc b/imx8m/init.idt.bringuptest.rc
+index db64a30a..554cc000 100644
+--- a/imx8m/init.idt.bringuptest.rc
++++ b/imx8m/init.idt.bringuptest.rc
+@@ -147,3 +147,21 @@ service check_idg_transaction_CT /system/bin/sh /product/bin/bringup_test.sh che
+     seclabel u:r:shell:s0
+     writepid /dev/cpuset/system-background/tasks
+ 
++service idg_bridge /system/bin/sh /product/bin/bringup_test.sh idg_bridge
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service init_usbhid_sh /vendor/bin/init.usbhid.sh
++    class main
++    user root
++    group root system
++    disabled
++    oneshot
++
++on property:ro.build.type=userdebug
++    start init_usbhid_sh
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index d4c94122..b1ee2dc9 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -29,8 +29,6 @@ CONFIG_BACKLIGHT_LED=y
+ CONFIG_VCNL4000=y
+ CONFIG_VIDEO_DW9714=y
+ CONFIG_TYPEC_TPS65994=y
+-CONFIG_USB_G_SERIAL=m
+-CONFIG_USB_CDC_COMPOSITE=m
+ CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100
+ 
+ CONFIG_PARAVIRT=y
+diff --git a/imx8m/redwood_8mq/android_secure_defconfig b/imx8m/redwood_8mq/android_secure_defconfig
+index 3528940c..b576dfc0 100644
+--- a/imx8m/redwood_8mq/android_secure_defconfig
++++ b/imx8m/redwood_8mq/android_secure_defconfig
+@@ -1,5 +1,3 @@
+ # CONFIG_SERIAL_IMX_CONSOLE is not set
+ # CONFIG_DEBUG_FS is not set
+ # CONFIG_DEVMEM is not set
+-# CONFIG_USB_G_SERIAL is not set
+-# CONFIG_USB_CDC_COMPOSITE is not set
+diff --git a/imx8m/redwood_8mq/init.usbhid.sh b/imx8m/redwood_8mq/init.usbhid.sh
+new file mode 100644
+index 00000000..ad9a6fef
+--- /dev/null
++++ b/imx8m/redwood_8mq/init.usbhid.sh
+@@ -0,0 +1,4 @@
++#! /vendor/bin/sh
++
++mkdir /config/usb_gadget/g1/functions/acm.GS0
++ln -s /config/usb_gadget/g1/functions/acm.GS0 /config/usb_gadget/g1/configs/b.1/
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index 98dcda43..5096cb55 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -459,12 +459,10 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/imx8m/init.idt.bringuptest.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/init.idt.bringuptest.rc \
+     $(CONFIG_REPO_PATH)/imx8m/bringup_test.sh:$(TARGET_COPY_OUT_PRODUCT)/bin/bringup_test.sh
+ 
+-# install socat for USB bridge K81(connect ttyGS1 and ttyIDG)
++# install socat for USB bridge K81(connect ttyGS0 and ttyIDG)
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/socat:$(TARGET_COPY_OUT_PRODUCT)/bin/socat
+ 
+-# install g_cdc and g_serial for USB bridge K81
+-BOARD_ODM_KERNEL_MODULES += \
+-    $(KERNEL_OUT)/drivers/usb/gadget/legacy/g_cdc.ko \
+-    $(KERNEL_OUT)/drivers/usb/gadget/legacy/g_serial.ko
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.usbhid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.usbhid.sh
+ endif
+diff --git a/imx8m/redwood_8mq/sepolicy/file_contexts b/imx8m/redwood_8mq/sepolicy/file_contexts
+index b6196271..f4c92491 100644
+--- a/imx8m/redwood_8mq/sepolicy/file_contexts
++++ b/imx8m/redwood_8mq/sepolicy/file_contexts
+@@ -13,6 +13,7 @@
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++/vendor/bin/init\.usbhid\.sh                u:object_r:init-insmod-sh_exec:s0
+ 
+ # android.system.suspend@1.0-service
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/redwood_8mq/sepolicy/init-insmod-sh.te b/imx8m/redwood_8mq/sepolicy/init-insmod-sh.te
+new file mode 100644
+index 00000000..7d47ef8f
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/init-insmod-sh.te
+@@ -0,0 +1,3 @@
++allow init-insmod-sh configfs:dir  { write add_name remove_name create search };
++allow init-insmod-sh configfs:file  { write create open };
++allow init-insmod-sh configfs:lnk_file { create };

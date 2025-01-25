@@ -1,0 +1,174 @@
+4fc4e155c4 George.Huang 2020-01-20
+
+AOS-59: Switch to correct hwpart if AB slot is changed
+
+Hook at early stage of bootloader: fastboot_get_bootmode()
+  If current slot is a, then set hwpart=1 (bootloader0)
+  If current slot is b, then set hwpart=2 (bootloader1)
+  If slot info from misc partition is incorrect, then do nothing
+
+Test log of normal boot with slot a:
+  U-Boot SPL 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800)
+  ...
+  U-Boot 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800
+  ...
+  hwpart=1, slot_part=1
+  Fastboot: Normal
+  Normal Boot
+
+Test log of setting slot from a to b:
+  U-Boot SPL 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800)
+  ...
+  U-Boot 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800
+  ...
+  hwpart=1, slot_part=2
+  Force to set hwpart from 1 to 2 due to the changed slot
+  Need to reboot
+  resetting ...
+
+  U-Boot SPL 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800)
+  ...
+  U-Boot 2018.03-00002-g0442ada28e (Jan 16 2020 - 14:33:47 +0800
+  ...
+  hwpart=2, slot_part=2
+  Fastboot: Normal
+  Normal Boot
+
+Change-Id: Ia95862f06485f0c060c9e002835110e8846d89b6
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 3d8f415fd0..09d0e29cfb 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -633,6 +633,64 @@ find_out:
+ 	return fdt_idx;
+ }
+ 
++#ifdef IDT_DUAL_BOOTLOADER
++
++int check_hwpart_with_current_slot(void) {
++	int mmcc = mmc_get_env_dev();
++	struct blk_desc *dev_desc = NULL;
++	struct mmc *mmc;
++	int hwpart = -1, slot_part = -1;
++	size_t target_slot;
++	AvbABData ab_data, ab_data_orig;
++
++	mmc = find_mmc_device(mmcc);
++	if (!mmc) {
++		printf("ERROR: boota: cannot find '%d' mmc device
+", mmcc);
++		return -1;
++	}
++	dev_desc = blk_get_dev("mmc", mmcc);
++	if (NULL == dev_desc) {
++		printf("ERROR: Block device MMC %d not supported
+", mmcc);
++		return -1;
++	}
++	if (mmc_init(mmc)) {
++		printf("ERROR: mmc%d init failed
+", mmcc);
++		return -1;
++	}
++	if (fsl_load_metadata_dual_uboot(dev_desc, &ab_data,
++					&ab_data_orig)) {
++		printf("ERROR: fsl_load_metadata_dual_uboot failed
+");
++		return -1;
++	}
++
++	target_slot =
++	    (ab_data.slots[1].priority > ab_data.slots[0].priority) ? 1 : 0;
++	slot_part = target_slot + 1; /* (target_slot + 1) equals hwpart */
++	if (slot_part != FASTBOOT_MMC_BOOT_PARTITION_ID && slot_part != FASTBOOT_MMC_BOOT1_PARTITION_ID) {
++		printf("ERROR: Get the wrong slot_part=%d
+", slot_part);
++		return -1;
++	}
++	hwpart = (mmc->part_config >> 3) & PART_ACCESS_MASK;
++	if (hwpart != FASTBOOT_MMC_BOOT_PARTITION_ID && hwpart != FASTBOOT_MMC_BOOT1_PARTITION_ID) {
++		printf("WARN: Get the unexpected hwpart=%d
+", hwpart);
++		return -1;
++	}
++	printf("hwpart=%d, slot_part=%d
+", hwpart, slot_part);
++	if (hwpart == slot_part) {
++		/* no more action */
++		return -1;
++	}
++	/* switch to slot_part */
++	mmc_switch_part(mmc, slot_part);
++
++	/* store slot_part */
++	printf("Force to set hwpart from %d to %d due to the changed slot
+", hwpart, slot_part);
++	mmc_set_part_conf(mmc, (u8)1, (u8)slot_part, (u8)0);
++	printf("Need to reboot
+");
++	return 0;
++}
++#endif
++
+ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 
+ 	ulong addr = 0;
+@@ -652,6 +710,11 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 		goto fail;
+ 	}
+ 
++#ifdef IDT_DUAL_BOOTLOADER
++	if (check_hwpart_with_current_slot() == 0)
++		do_reset(NULL, 0, 0, NULL);
++#endif
++
+ 	/* get bootmode, default to boot "boot" */
+ 	if (argc > 1) {
+ 		is_recovery_mode =
+diff --git a/include/fsl_avb.h b/include/fsl_avb.h
+index 89396708c9..3dad5b26ae 100644
+--- a/include/fsl_avb.h
++++ b/include/fsl_avb.h
+@@ -281,4 +281,17 @@ bool hab_is_enabled(void);
+ /* Return if device is in spl recovery mode. */
+ bool is_spl_recovery(void);
+ 
++/* Ensure all unbootable and/or illegal states are marked as the
++ * canonical 'unbootable' state, e.g. priority=0, tries_remaining=0,
++ * and successful_boot=0. This is a copy of slot_normalize from
++ * external/avb/libavb_ab/avb_ab_flow.c.
++ */
++void fsl_slot_normalize(AvbABSlotData* slot);
++
++/* Load metadate from misc partition.
++ */
++int fsl_load_metadata_dual_uboot(struct blk_desc *dev_desc,
++				AvbABData* ab_data,
++				AvbABData* ab_data_orig);
++
+ #endif /* __FSL_AVB_H__ */
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index 091304b67c..e828faf05b 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -63,7 +63,7 @@ bool fsl_slot_is_bootable(AvbABSlotData* slot) {
+ }
+ #endif /* CONFIG_DUAL_BOOTLOADER || !CONFIG_SPL_BUILD */
+ 
+-#if defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_SPL_BUILD)
++#if (defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_SPL_BUILD)) || defined(IDT_DUAL_BOOTLOADER)
+ 
+ #define FSL_AB_METADATA_MISC_PARTITION_OFFSET 2048
+ #define PARTITION_NAME_LEN 13
+@@ -214,6 +214,10 @@ int fsl_load_metadata_dual_uboot(struct blk_desc *dev_desc,
+ 	}
+ }
+ 
++#endif // (CONFIG_DUAL_BOOTLOADER && CONFIG_SPL_BUILD) || IDT_DUAL_BOOTLOADER
++
++#if defined(CONFIG_DUAL_BOOTLOADER) && defined(CONFIG_SPL_BUILD)
++
+ #if !defined(CONFIG_XEN) && defined(CONFIG_IMX_TRUSTY_OS)
+ static int spl_verify_rbidx(struct mmc *mmc, AvbABSlotData *slot,
+ 			struct spl_image_info *spl_image)

@@ -1,0 +1,304 @@
+ce9e85a0 max.yang 2020-03-18
+
+AOS-121: [U-boot] Script should specify -bdinfo and choose matched u-boot to flash
+
+  1. With this patch, no need to use "-u devboard" or "-u evk"
+  2. For android-info, we might append/extend mb_model in the future, we still need
+     to do som_model and mb_model check, modify condition to match as least 1 of each
+  3. Move board_info checking function forward so that we can choose uuu u-boot earlier
+
+Change-Id: If8d6647e5b14ff31a7e096205efbff9e8868a3ee
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index c0dd1b5d..7ecdb3d9 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -64,6 +64,7 @@ set ser_num=
+ set fastboot_tool=fastboot
+ set /A error_level=0
+ set /A flag=1
++set board_type=
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -484,21 +485,21 @@ FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android
+ FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
+ FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
+ FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
+-set /A match=0
+-FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match+=1)
+-FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match+=1)
+-IF NOT [%match%] == [2] (
+-    echo Error: %som_model% %mb_model% and values in android-info.txt are mismatched
++set /A match_som=0
++set /A match_mb=0
++FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
++FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
++IF NOT [%match_som%] == [1] (
++    echo Error: %som_model% and values in android-info.txt are mismatched
++    set /A error_level=3 && goto :exit
++)
++IF NOT [%match_mb%] GEQ [1] (
++    echo Error: %mb_model% and values in android-info.txt are mismatched
+     set /A error_level=3 && goto :exit
+ )
+ goto :eof
+ 
+ :flash_android
+-call :check_board_info
+-if [%ERRORLEVEL%] == [2] goto :exit
+-call :check_android_info
+-if [%ERRORLEVEL%] == [3] goto :exit
+-
+ call :flash_partition gpt || set /A error_level=1 && goto :exit
+ 
+ %fastboot_tool% getvar all 2> fastboot_var.log
+@@ -513,14 +514,24 @@ find "recovery" fastboot_var.log > nul && set /A support_recovery=1
+ find "boot_b" fastboot_var.log > nul && set /A support_dualslot=1
+ del fastboot_var.log
+ 
++if %support_board_info% == 1 (
++    call :check_board_info
++    if [%ERRORLEVEL%] == [2] goto :exit
++    call :check_android_info
++    if [%ERRORLEVEL%] == [3] goto :exit
++)
++if %support_board_info% == 1 (
++    set board_type=-%mb_model%
++)
++
+ :: some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+ 
+ :: uboot or spl&bootloader
+ if %support_dual_bootloader% == 1 (
+-    set bootloader_flashed_to_board=spl-%soc_name%%uboot_feature%.bin
+-    set uboot_proper_to_be_flashed=bootloader-%soc_name%%uboot_feature%.img
++    set bootloader_flashed_to_board=spl-%soc_name%%board_type%%uboot_feature%.bin
++    set uboot_proper_to_be_flashed=bootloader-%soc_name%%board_type%%uboot_feature%.img
+ ) else (
+-    set bootloader_flashed_to_board=u-boot-%soc_name%%uboot_feature%.imx
++    set bootloader_flashed_to_board=u-boot-%soc_name%%board_type%%uboot_feature%.imx
+ )
+ 
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index aa86186b..b3556fe9 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -209,31 +209,36 @@ function check_board_info
+ 
+ function check_android_info
+ {
+-    match=0
++    match_som=0
++    match_mb=0
++
+     if [ ! -f ${image_directory}${android_info_file} ]; then
+         echo -e ${RED}android-info.txt not found${STD}
+         exit 1;
+     fi
+     for val in `grep "som_model=" ${image_directory}${android_info_file} |sed "s|^som_model=||g" |sed "s|\|| |g"`;
+     do
+-        [ "${som_model}" == "${val}" ] && match=$((match + 1))
++        [ "${som_model}" == "${val}" ] && match_som=$((match_som + 1))
+     done
++
++    if [ ! ${match_som} -eq 1 ]; then
++        echo -e ${RED}${som_model} and values in android-info.txt are mismatched
++	exit 1
++    fi
++
+     for val in `grep "mb_model=" ${image_directory}${android_info_file} |sed "s|^mb_model=||g" |sed "s|\|| |g"`;
+     do
+-        [ "${mb_model}" == "${val}" ] && match=$((match + 1))
++        [ "${mb_model}" == "${val}" ] && match_mb=$((match_mb + 1))
+     done
+ 
+-    if [ ! ${match} -eq 2 ]; then
+-        echo -e ${RED}${som_model} ${mb_model} and values in android-info.txt are mismatched
++    if [ ! ${match_mb} -ge 1 ]; then
++        echo -e ${RED}${mb_model} and values in android-info.txt are mismatched
+         exit 1
+     fi
+ }
+ 
+ function flash_android
+ {
+-    check_board_info
+-    check_android_info
+-
+     # a precondition: the location of gpt partition and the partition for uboot or spl(in dual bootloader condition)
+     # should be the same for the u-boot just boot up the board and the on to be flashed to the board
+     flash_partition "gpt"
+@@ -247,14 +252,20 @@ function flash_android
+     # use boot_b to check whether current gpt support a/b slot
+     grep -q "boot_b" /tmp/fastboot_var.log && support_dualslot=1
+ 
++    if [ ${support_board_info} -eq 1 ]; then
++        check_board_info
++        check_android_info
++        board_type="-${mb_model}"
++    fi
++
+     # some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+ 
+     # uboot or spl&bootloader
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+-        bootloader_flashed_to_board="spl-${soc_name}${uboot_feature}.bin"
+-        uboot_proper_to_be_flashed="bootloader-${soc_name}${uboot_feature}.img"
++        bootloader_flashed_to_board="spl-${soc_name}${board_type}${uboot_feature}.bin"
++        uboot_proper_to_be_flashed="bootloader-${soc_name}${board_type}${uboot_feature}.img"
+     else
+-        bootloader_flashed_to_board="u-boot-${soc_name}${ramsize}${uboot_feature}.imx"
++        bootloader_flashed_to_board="u-boot-${soc_name}${board_type}${ramsize}${uboot_feature}.imx"
+     fi
+ 
+     # in the source code, if AB slot feature is supported, uboot partition name is bootloader0, otherwise it's bootloader
+@@ -370,6 +381,7 @@ GREEN='[0;32m'
+ YELLOW='[0;33m'
+ ramsize=""
+ ramsizetest=0
++board_type=""
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 5fdf6d99..0f648b3f 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -77,6 +77,7 @@ set dual_bootloader_partition=
+ set /A daemon_mode=0
+ set /A flag=1
+ set /A dryrun=0
++set board_type=
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -348,9 +349,19 @@ goto :without_sdps
+ set sdp=SDPS
+ :without_sdps
+ 
++if %support_board_info% == 1 (
++    call :check_board_info
++    if [%ERRORLEVEL%] == [2] goto :exit
++    call :check_android_info
++    if [%ERRORLEVEL%] == [3] goto :exit
++)
++if %support_board_info% == 1 (
++    set board_type=-%mb_model%
++)
++
+ :: default bootloader image name
+-set bootloader_used_by_uuu=u-boot-%soc_name%-%board%-uuu.imx
+-set bootloader_flashed_to_board=u-boot-%soc_name%%uboot_feature%.imx
++set bootloader_used_by_uuu=u-boot-%soc_name%%board_type%-%board%-uuu.imx
++set bootloader_flashed_to_board=u-boot-%soc_name%%board_type%%uboot_feature%.imx
+ 
+ 
+ :: find the names of the bootloader used by uuu
+@@ -797,21 +808,21 @@ FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android
+ FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
+ FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
+ FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
+-set /A match=0
+-FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match+=1)
+-FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match+=1)
+-IF NOT [%match%] == [2] (
+-    echo Error: %som_model% %mb_model% and values in android-info.txt are mismatched
++set /A match_som=0
++set /A match_mb=0
++FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
++FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
++IF NOT [%match_som%] == [1] (
++    echo Error: %som_model% and values in android-info.txt are mismatched
++    set /A error_level=3 && goto :exit
++)
++IF NOT [%match_mb%] GEQ [1] (
++    echo Error: %mb_model% and values in android-info.txt are mismatched
+     set /A error_level=3 && goto :exit
+ )
+ goto :eof
+ 
+ :flash_android
+-call :check_board_info
+-if [%ERRORLEVEL%] == [2] goto :exit
+-call :check_android_info
+-if [%ERRORLEVEL%] == [3] goto :exit
+-
+ :: if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+ if %support_dual_bootloader% == 1 (
+     set bootloader_flashed_to_board=spl-%soc_name%%uboot_feature%.bin
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 243c2a42..95a54c7e 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -261,30 +261,35 @@ function check_board_info
+ 
+ function check_android_info
+ {
+-    match=0
++    match_som=0
++    match_mb=0
++
+     if [ ! -f ${image_directory}${android_info_file} ]; then
+         echo -e ${RED}android-info.txt not found${STD}
+         exit 1;
+     fi
+     for val in `grep "som_model=" ${image_directory}${android_info_file} |sed "s|^som_model=||g" |sed "s|\|| |g"`;
+     do
+-        [ "${som_model}" == "${val}" ] && match=$((match + 1))
++        [ "${som_model}" == "${val}" ] && match_som=$((match_som + 1))
+     done
++
++    if [ ! ${match_som} -eq 1 ]; then
++        echo -e ${RED}${som_model} and values in android-info.txt are mismatched
++        exit 1
++    fi
++
+     for val in `grep "mb_model=" ${image_directory}${android_info_file} |sed "s|^mb_model=||g" |sed "s|\|| |g"`;
+     do
+-        [ "${mb_model}" == "${val}" ] && match=$((match + 1))
++        [ "${mb_model}" == "${val}" ] && match_mb=$((match_mb + 1))
+     done
+ 
+-    if [ ! ${match} -eq 2 ]; then
+-        echo -e ${RED}${som_model} ${mb_model} and values in android-info.txt are mismatched
++    if [ ! ${match_mb} -ge 1 ]; then
++        echo -e ${RED}${mb_model} and values in android-info.txt are mismatched
+         exit 1
+     fi
+ }
+ function flash_android
+ {
+-    check_board_info
+-    check_android_info
+-
+     # if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+         bootloader_flashed_to_board=spl-${soc_name}${uboot_feature}.bin
+@@ -425,6 +430,7 @@ daemon_mode=0
+ dryrun=0
+ ramsize=""
+ ramsizetest=0
++board_type=""
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -700,9 +706,15 @@ if [[ ${soc_name#imx8q} != ${soc_name} ]] || [[ ${soc_name} == "imx8mn" ]]; then
+     sdp="SDPS"
+ fi
+ 
++if [ ${support_board_info} -eq 1 ]; then
++    check_board_info
++    check_android_info
++    board_type="-${mb_model}"
++fi
++
+ # default bootloader image name
+-bootloader_used_by_uuu=u-boot-${soc_name}-${board}-uuu.imx
+-bootloader_flashed_to_board="u-boot-${soc_name}${ramsize}${uboot_feature}.imx"
++bootloader_used_by_uuu=u-boot-${soc_name}${board_type}-${board}-uuu.imx
++bootloader_flashed_to_board="u-boot-${soc_name}${board_type}${ramsize}${uboot_feature}.imx"
+ 
+ # find the names of the bootloader used by uuu
+ if [ "${soc_name}" = imx8mm ]; then

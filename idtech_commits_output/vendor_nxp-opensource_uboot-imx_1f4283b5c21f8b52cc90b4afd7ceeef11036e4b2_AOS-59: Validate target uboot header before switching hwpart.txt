@@ -1,0 +1,95 @@
+1f4283b5c2 George.Huang 2020-01-30
+
+AOS-59: Validate target uboot header before switching hwpart
+
+Change-Id: I8f27ad23986ed5ae9b28b4bcdab1e10c77098ad4
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 09d0e29cfb..d1c0ac4969 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -54,6 +54,11 @@
+ #define FDT_PART_NAME "dtbo"
+ #endif
+ 
++#ifdef IDT_DUAL_BOOTLOADER
++#include <imximage.h>
++#include <memalign.h>
++#endif
++
+ /* Offset (in u32's) of start and end fields in the zImage header. */
+ #define ZIMAGE_START_ADDR	10
+ #define ZIMAGE_END_ADDR	11
+@@ -635,12 +640,40 @@ find_out:
+ 
+ #ifdef IDT_DUAL_BOOTLOADER
+ 
++extern ulong bootloader_mmc_offset(void);
++
++int check_uboot_header(struct mmc *mmc, unsigned long sector) {
++	void *buf;
++	flash_header_v2_t *headerv2;
++	unsigned long count = 0;
++	buf = malloc_cache_aligned(mmc_get_blk_desc(mmc)->blksz);
++	if (buf == NULL) {
++		printf("ERROR: %s: calloc failed!
+", __func__);
++		return -1;
++	}
++	memset(buf, 0, mmc_get_blk_desc(mmc)->blksz);
++	count = blk_dread(mmc_get_blk_desc(mmc), sector, 1, buf);
++	if (count == 0) {
++		printf("ERROR: Failed to read bootloader header
+");
++		free(buf);
++		return -1;
++	}
++	headerv2 = buf;
++	if (headerv2->header.tag == IVT_HEADER_TAG) {
++		free(buf);
++		return 0;
++	}
++	free(buf);
++	return -1;
++}
++
+ int check_hwpart_with_current_slot(void) {
+ 	int mmcc = mmc_get_env_dev();
+ 	struct blk_desc *dev_desc = NULL;
+ 	struct mmc *mmc;
+ 	int hwpart = -1, slot_part = -1;
+ 	size_t target_slot;
++	size_t blk_offset_uboot = 0;
+ 	AvbABData ab_data, ab_data_orig;
+ 
+ 	mmc = find_mmc_device(mmcc);
+@@ -683,6 +716,13 @@ int check_hwpart_with_current_slot(void) {
+ 	/* switch to slot_part */
+ 	mmc_switch_part(mmc, slot_part);
+ 
++	/* make sure uboot header equals IVT_HEADER_TAG (0x1d) */
++	blk_offset_uboot = (size_t)(bootloader_mmc_offset() / dev_desc->blksz);
++	printf("check_uboot_header at offset=0x%x blocks with hwpart=%d ...
+", (unsigned int)blk_offset_uboot, slot_part);
++	if (check_uboot_header(mmc, blk_offset_uboot) != 0) {
++		printf("ERROR: Can not find valid uboot header with slot_part=%d
+", slot_part);
++		return -1;
++	}
+ 	/* store slot_part */
+ 	printf("Force to set hwpart from %d to %d due to the changed slot
+", hwpart, slot_part);
+ 	mmc_set_part_conf(mmc, (u8)1, (u8)slot_part, (u8)0);
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 07a250a29c..6656ad9bed 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -54,7 +54,7 @@ enum {
+ struct fastboot_ptentry g_ptable[MAX_PTN];
+ unsigned int g_pcount;
+ 
+-static ulong bootloader_mmc_offset(void)
++ulong bootloader_mmc_offset(void)
+ {
+ 	if (is_imx8mq() || is_imx8mm() || (is_imx8() && is_soc_rev(CHIP_REV_A)))
+ 		return 0x8400;

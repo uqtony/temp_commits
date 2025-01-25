@@ -1,0 +1,49 @@
+5353fcc8d7c7 George.Huang 2020-06-03
+
+Fix miscellaneous build breaks in kernel
+
+Change-Id: Ia8d12479fc9133b142c82d6894d700f7bba38fe1
+
+diff --git a/drivers/input/touchscreen/ili/ilitek_main.c b/drivers/input/touchscreen/ili/ilitek_main.c
+index 74762c835a39..4ff8366e87e1 100644
+--- a/drivers/input/touchscreen/ili/ilitek_main.c
++++ b/drivers/input/touchscreen/ili/ilitek_main.c
+@@ -798,7 +798,7 @@ int ilitek_tddi_init(void)
+ 		ipio_err("Failed to create fw upgrade thread
+");
+ 	}
+ 
+-	idev->ws = wakeup_source_register("ili_wakelock");
++	idev->ws = wakeup_source_register(NULL, "ili_wakelock");
+ 	if (!idev->ws)
+ 		ipio_err("wakeup source request failed
+");
+ 
+diff --git a/drivers/input/touchscreen/ili/ilitek_plat_nxp.c b/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
+index 51fc5c963733..86845dbcf0f1 100644
+--- a/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
++++ b/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
+@@ -399,10 +399,8 @@ static int ilitek_plat_notifier_fb(struct notifier_block *self, unsigned long ev
+ 			if (TP_SUSPEND_PRIO) {
+ #ifdef CONFIG_DRM_MSM
+ 				if (event != MSM_DRM_EARLY_EVENT_BLANK)
+-#else
+-				if (event != FB_EARLY_EVENT_BLANK)
+-#endif
+ 					return NOTIFY_DONE;
++#endif
+ 			} else {
+ #ifdef CONFIG_DRM_MSM
+ 				if (event != MSM_DRM_EVENT_BLANK)
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index 954bb3d6fbc0..3e20f51ea128 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -1175,7 +1175,6 @@ static struct phy_driver ksphy_driver[] = {
+ 	.phy_id_mask	= MICREL_PHY_ID_MASK,
+ 	.name		= "Microchip KSZ9131 Gigabit PHY",
+ 	.features	= PHY_GBIT_FEATURES,
+-	.flags		= PHY_HAS_INTERRUPT,
+ 	.driver_data	= &ksz9021_type,
+ 	.probe		= kszphy_probe,
+ 	.config_init	= ksz9131_config_init,

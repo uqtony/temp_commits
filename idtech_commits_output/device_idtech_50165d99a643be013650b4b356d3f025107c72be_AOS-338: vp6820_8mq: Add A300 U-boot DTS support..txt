@@ -1,0 +1,57 @@
+50165d99 Arthur Chen 2020-10-16
+
+AOS-338: vp6820_8mq: Add A300 U-boot DTS support.
+
+    - hard coded the SOC, SOM and BOARD by data from BoardConfig.mk
+    (device/idtech/<soc>/<product name>) to synchronize the format.
+    Because the "AndroidUboot.mk" is excluded in Makefile
+    (device/idtech/common/build) to separate building progress
+    in current design. It's not available to use BOARD_SOM_TYPE,
+    BOARD_TYPE and BOARD_SOC_TYPE directly.
+    - add condition for a300 purpose and compatible with NXP orgin design.
+
+Change-Id: I9f2ff1c3880a353be6c816261c41232d7e593265
+
+diff --git a/imx8m/vp6820_8mq/AndroidUboot.mk b/imx8m/vp6820_8mq/AndroidUboot.mk
+index 06a2fe2a..6cbcc489 100644
+--- a/imx8m/vp6820_8mq/AndroidUboot.mk
++++ b/imx8m/vp6820_8mq/AndroidUboot.mk
+@@ -1,6 +1,13 @@
+ # uboot.imx in android combine scfw.bin and uboot.bin
+ MAKE += SHELL=/bin/bash
+ 
++# compatible with the orgin design about imx-mkimage, add import value about SOC
++MKIMGFLAG := SOC=iMX8MQ
++# to synchronize the SOM depends on BOARD_SOM_TYPE in BoardConfig.mk
++MKIMGFLAG += SOM=a300
++# to synchronize the BOARD depends on BOARD_TYPE in BoardConfig.mk
++MKIMGFLAG += BOARD=DEVBOARD
++
+ ifneq ($(AARCH64_GCC_CROSS_COMPILE),)
+ ATF_CROSS_COMPILE := $(strip $(AARCH64_GCC_CROSS_COMPILE))
+ else
+@@ -13,7 +20,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	cp $(UBOOT_OUT)/arch/arm/dts/imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+@@ -29,11 +36,11 @@ define build_imx_uboot
+ 	cp $(IMX_PATH)/arm-trusted-firmware/build/`echo $(2) | cut -d '-' -f1`/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/bl31.bin; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M flash_hdmi_spl_uboot || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M print_fit_hab || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ $(MKIMGFLAG) flash_hdmi_spl_uboot || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ $(MKIMGFLAG) print_fit_hab || exit 1; \
+ 	else \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M flash_evk_dual_bootloader || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ $(MKIMGFLAG) flash_evk_dual_bootloader || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ $(MKIMGFLAG) PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \

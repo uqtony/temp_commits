@@ -1,0 +1,21 @@
+62847d195445 AndrewS 2021-02-03
+
+AOS-525: decrease mNextNonDefaultDisplayId while display device be removed
+
+decrease mNextNonDefaultDisplayId while display device be removed, which is display id argument of class LogicalDisplay for display device.
+
+Change-Id: I3ec6c170b7ff584279ef82408417c87959b0f3f4
+
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index f8fd8b4969c3..1f1e9a35b2a1 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1240,6 +1240,8 @@ public final class DisplayManagerService extends SystemService {
+             if (!display.isValidLocked()) {
+                 mLogicalDisplays.removeAt(i);
+                 handleLogicalDisplayRemoved(displayId);
++                if (mNextNonDefaultDisplayId > Display.DEFAULT_DISPLAY)
++                    mNextNonDefaultDisplayId--;
+                 changed = true;
+             } else if (!mTempDisplayInfo.equals(display.getDisplayInfoLocked())) {
+                 handleLogicalDisplayChanged(displayId, display);

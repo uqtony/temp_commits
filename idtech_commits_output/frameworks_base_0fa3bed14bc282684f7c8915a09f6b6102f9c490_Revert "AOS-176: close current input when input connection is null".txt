@@ -1,0 +1,27 @@
+0fa3bed14bc2 Brian Lee 2022-01-20
+
+Revert "AOS-176: close current input when input connection is null"
+
+This reverts commit ca3c06e04a5921af8e9fffb1f1bb5bd1ade06062.
+
+Reason for revert: This patch cause issue AOS-829.
+In freeform mode can't switch two apps.
+
+Change-Id: I3860ee520bbe89b734f6543906412c3fca9f16fd
+
+diff --git a/core/java/android/view/inputmethod/InputMethodManager.java b/core/java/android/view/inputmethod/InputMethodManager.java
+index d1c15888a4f1..5f8b13b5b548 100644
+--- a/core/java/android/view/inputmethod/InputMethodManager.java
++++ b/core/java/android/view/inputmethod/InputMethodManager.java
+@@ -1917,11 +1917,6 @@ public final class InputMethodManager {
+         tba.fieldId = view.getId();
+         InputConnection ic = view.onCreateInputConnection(tba);
+         if (DEBUG) Log.v(TAG, "Starting input: tba=" + tba + " ic=" + ic);
+-        if (ic == null) {
+-            if (DEBUG) Log.v(TAG, "ABORT input: no input connection for current view");
+-            closeCurrentInput();
+-            return false;
+-        }
+ 
+         synchronized (mH) {
+             // Now that we are locked again, validate that our state hasn't

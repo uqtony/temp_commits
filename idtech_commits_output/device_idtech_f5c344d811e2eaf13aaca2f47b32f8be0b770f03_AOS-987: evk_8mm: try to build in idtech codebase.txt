@@ -1,0 +1,91 @@
+f5c344d8 George.Huang 2022-04-15
+
+AOS-987: evk_8mm: try to build in idtech codebase
+
+Change-Id: I3ed2b786356aec2a529be83cc817693ea9bae1c1
+
+diff --git a/common/build/dtbo_evk.mk b/common/build/dtbo_evk.mk
+new file mode 120000
+index 00000000..ace1abae
+--- /dev/null
++++ b/common/build/dtbo_evk.mk
+@@ -0,0 +1 @@
++../../../nxp/common/build/dtbo.mk
+\ No newline at end of file
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index 13cc77c2..f50b4fe5 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -27,6 +27,7 @@
+ # Copied from build/target/product/AndroidProducts.mk
+ 
+ PRODUCT_MAKEFILES := \
++  $(LOCAL_DIR)/evk_8mm/evk_8mm.mk \
+   $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq.mk \
+   $(LOCAL_DIR)/bigcypress_8mp/bigcypress_8mp.mk \
+   $(LOCAL_DIR)/kingscanyon_8mq/kingscanyon_8mq.mk \
+@@ -49,6 +50,8 @@ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/redwood_8mm/redwood_8mm_pcidev.mk \
+ 
+ COMMON_LUNCH_CHOICES := \
++  evk_8mm-user \
++  evk_8mm-userdebug \
+   bigcypress_8mq-user \
+   bigcypress_8mq-userdebug \
+   bigcypress_8mp-user \
+diff --git a/imx8m/evk_8mm/AndroidBoard.mk b/imx8m/evk_8mm/AndroidBoard.mk
+index 75defabe..88e1f42c 100644
+--- a/imx8m/evk_8mm/AndroidBoard.mk
++++ b/imx8m/evk_8mm/AndroidBoard.mk
+@@ -1,6 +1,6 @@
+ LOCAL_PATH := $(call my-dir)
+ 
+-include $(CONFIG_REPO_PATH)/common/build/dtbo.mk
++include $(CONFIG_REPO_PATH)/common/build/dtbo_evk.mk
+ include $(CONFIG_REPO_PATH)/common/build/imx-recovery.mk
+ include $(CONFIG_REPO_PATH)/common/build/gpt.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+diff --git a/imx8m/evk_8mm/BoardConfig.mk b/imx8m/evk_8mm/BoardConfig.mk
+index 9458eaf6..2176cc3c 100644
+--- a/imx8m/evk_8mm/BoardConfig.mk
++++ b/imx8m/evk_8mm/BoardConfig.mk
+@@ -71,9 +71,9 @@ BOARD_ROOT_EXTRA_FOLDERS += metadata
+ ENABLE_CFI=false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ # The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/idt_testkey_rsa2048.pem
+ 
+ BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+diff --git a/imx8m/evk_8mm/device_framework_matrix.xml b/imx8m/evk_8mm/device_framework_matrix.xml
+index c8b5825c..cc7247b5 100644
+--- a/imx8m/evk_8mm/device_framework_matrix.xml
++++ b/imx8m/evk_8mm/device_framework_matrix.xml
+@@ -7,4 +7,11 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="aidl" optional="true">
++        <name>android.hardware.kioskled</name>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </compatibility-matrix>
+diff --git a/imx8m/evk_8mm/evk_8mm.mk b/imx8m/evk_8mm/evk_8mm.mk
+index b9048fa5..a3ec55d7 100644
+--- a/imx8m/evk_8mm/evk_8mm.mk
++++ b/imx8m/evk_8mm/evk_8mm.mk
+@@ -1,6 +1,6 @@
+ # -------@block_infrastructure-------
+ 
+-CONFIG_REPO_PATH := device/nxp
++CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 

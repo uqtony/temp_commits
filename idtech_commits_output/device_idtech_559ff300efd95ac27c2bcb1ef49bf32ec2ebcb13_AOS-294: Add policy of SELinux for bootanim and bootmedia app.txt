@@ -1,0 +1,71 @@
+559ff300 Jay 2020-08-13
+
+AOS-294: Add policy of SELinux for bootanim and bootmedia app
+
+Create a directory /data/idtech to store bootsplash and bootanimation.
+Also add policy of SELinux for this directory and app bootanim and
+com.idtech.amsbootmediasync.
+
+Change-Id: Ie63f6879bbae70a2c5ec210026f0e8a47037ce92
+
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index f67499c4..d5b45005 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -34,3 +34,5 @@ service device_policy /system/bin/sh /product/etc/init/hw/device_policy.sh
+ 
+ on property:sys.boot_completed=1
+     start device_policy
++    mkdir /data/idtech 0777 sdcard_rw sdcard_rw
++
+diff --git a/imx8m/sepolicy/bootanim.te b/imx8m/sepolicy/bootanim.te
+index f4958a90..f31a2d91 100644
+--- a/imx8m/sepolicy/bootanim.te
++++ b/imx8m/sepolicy/bootanim.te
+@@ -1,4 +1,5 @@
+ typeattribute bootanim system_writes_vendor_properties_violators;
++typeattribute bootanim mlstrustedsubject;
+ 
+ get_prop(bootanim, vendor_default_prop)
+ 
+@@ -6,3 +7,5 @@ allow bootanim ashmem_device:chr_file {execute};
+ allow bootanim self:process execmem;
+ allow bootanim rootfs:lnk_file {getattr};
+ allow bootanim hal_configstore_default:binder { call };
++allow bootanim idtech_data_file:dir search;
++allow bootanim idtech_data_file:file { map open read };
+diff --git a/imx8m/sepolicy/file.te b/imx8m/sepolicy/file.te
+index 62cba8dd..5d84b3d3 100644
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@ -6,3 +6,4 @@ type binderfs, fs_type;
+ type binderfs_logs, fs_type;
+ type binderfs_logs_proc, fs_type;
+ type sysfs_usb_uevent, sysfs_type, fs_type;
++type idtech_data_file, file_type, data_file_type, core_data_file_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 8e1db34a..7ff1f1b4 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /vendor/app(/.*)?               u:object_r:same_process_hal_file:s0
+ /data/vendor/ss(/.*)?           u:object_r:tee_data_file:s0
+ /data/vendor/.opencl-cache(/.*)?       u:object_r:opencl_cache_file:s0
++/data/idtech(/.*)?             u:object_r:idtech_data_file:s0
+ 
+ ###############################################
+ # same-process HAL files and their dependencies
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index 975b5804..f34a155f 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -1,4 +1,9 @@
+ typeattribute platform_app system_writes_vendor_properties_violators;
++typeattribute platform_app mlstrustedsubject;
++
++allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
++allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
++allow platform_app idtech_data_file:dir { add_name write };
+ 
+ get_prop(platform_app, vendor_default_prop)
+ set_prop(platform_app, public_vendor_default_prop)

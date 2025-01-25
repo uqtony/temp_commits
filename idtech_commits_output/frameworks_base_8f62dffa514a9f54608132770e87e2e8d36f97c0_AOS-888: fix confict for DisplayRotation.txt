@@ -1,0 +1,78 @@
+8f62dffa514a AndrewS 2022-02-25
+
+AOS-888: fix confict for DisplayRotation
+
+Change-Id: I130acfe49f7ae11ab858d225f3a91fa8eed513a2
+
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index c68098617700..24373a09b389 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -436,17 +436,15 @@ public class DisplayRotation {
+      *         THE SCREEN.
+      */
+     boolean updateRotationUnchecked(boolean forceUpdate) {
+-<<<<<<< HEAD
+         // check if IDT lock orientation property been set
+         boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
+         if (lock_orientation) {
+             return false;
+         }
+-=======
++
+         final boolean useShellTransitions =
+                 mService.mAtmService.getTransitionController().getTransitionPlayer() != null;
+ 
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         final int displayId = mDisplayContent.getDisplayId();
+         if (!forceUpdate && !useShellTransitions) {
+             if (mDeferredRotationPauseCount > 0) {
+@@ -926,7 +924,6 @@ public class DisplayRotation {
+         }
+     }
+ 
+-<<<<<<< HEAD
+     /**
+      * mRotationChanged will be set to ture in DisplayContent applyRotationLocked().
+      * and set to false in WindowManagerService freezeRotation() after freezeDisplayRotation()
+@@ -939,17 +936,8 @@ public class DisplayRotation {
+         mRotationChanged = changed;
+     }
+ 
+-    /**
+-     * Returns {@code true} if this display rotation takes app requested orientation into
+-     * consideration; {@code false} otherwise. For the time being the only case where this is {@code
+-     * false} is when {@link #isFixedToUserRotation()} is {@code true}.
+-     */
+-    boolean respectAppRequestedOrientation() {
+-        return !isFixedToUserRotation();
+-=======
+     int getFixedToUserRotationMode() {
+         return mFixedToUserRotation;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     }
+ 
+     public int getLandscapeRotation() {
+@@ -1676,7 +1664,7 @@ public class DisplayRotation {
+             resolver.registerContentObserver(Settings.System.getUriFor(
+                     Settings.System.USER_ROTATION), false, this,
+                     UserHandle.USER_ALL);
+-<<<<<<< HEAD
++
+             // registerContentObserver for different displays.
+             if (isDefaultDisplay) {
+                 resolver.registerContentObserver(Settings.System.getUriFor(
+@@ -1697,12 +1685,11 @@ public class DisplayRotation {
+                         break;
+                  }
+             }
+-=======
++
+             resolver.registerContentObserver(
+                     Settings.Secure.getUriFor(Settings.Secure.CAMERA_AUTOROTATE), false, this,
+                     UserHandle.USER_ALL);
+ 
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+             updateSettings();
+         }
+ 

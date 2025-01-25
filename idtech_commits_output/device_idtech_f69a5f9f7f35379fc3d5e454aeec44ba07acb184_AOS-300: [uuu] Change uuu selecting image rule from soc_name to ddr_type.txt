@@ -1,0 +1,151 @@
+f69a5f9f max.yang 2020-08-24
+
+AOS-300: [uuu] Change uuu selecting image rule from soc_name to ddr_type
+
+Change-Id: Ia195ebd65a574a90bc21b6192093c2e462e69749
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 3e7a528e..1311f543 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -22,6 +22,7 @@ set mb_plc=
+ set mb_rev=
+ set mb_opt=
+ set dev_ddr=
++set ddr_type=-lpddr4
+ set board_info_file=
+ set board_info_temp=
+ set mem_info_file=mem_info.img
+@@ -603,15 +604,17 @@ if %support_board_info% == 1 (
+ if %support_board_info% == 1 (
+     set board_type=-%mb_model%
+ )
+-
++if [%som_model%] == [imx8mn] if [%mb_model%] == [evk] (
++    set ddr_type=-ddr4
++)
+ :: some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+ 
+ :: uboot or spl&bootloader
+ if %support_dual_bootloader% == 1 (
+-    set bootloader_flashed_to_board=spl-%soc_name%%board_type%%uboot_feature%.bin
+-    set uboot_proper_to_be_flashed=bootloader-%soc_name%%board_type%%uboot_feature%.img
++    set bootloader_flashed_to_board=spl-%soc_name%%ddr_type%%uboot_feature%.bin
++    set uboot_proper_to_be_flashed=bootloader-%soc_name%%ddr_type%%uboot_feature%.img
+ ) else (
+-    set bootloader_flashed_to_board=u-boot-%soc_name%%board_type%%uboot_feature%.imx
++    set bootloader_flashed_to_board=u-boot-%soc_name%%ddr_type%%uboot_feature%.imx
+ )
+ 
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index b3abeae3..e7b1bdee 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -298,14 +298,18 @@ function flash_android
+         board_type="-${mb_model}"
+     fi
+ 
++    if [ "${som_model}" = "imx8mn" ] && [ "${mb_model}" = "evk" ]; then
++        ddr_type="-ddr4"
++    fi
++
+     # some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+ 
+     # uboot or spl&bootloader
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+-        bootloader_flashed_to_board="spl-${soc_name}${board_type}${uboot_feature}.bin"
+-        uboot_proper_to_be_flashed="bootloader-${soc_name}${board_type}${uboot_feature}.img"
++        bootloader_flashed_to_board="spl-${soc_name}${ddr_type}${uboot_feature}.bin"
++        uboot_proper_to_be_flashed="bootloader-${soc_name}${ddr_type}${uboot_feature}.img"
+     else
+-        bootloader_flashed_to_board="u-boot-${soc_name}${board_type}${ramsize}${uboot_feature}.imx"
++        bootloader_flashed_to_board="u-boot-${soc_name}${ddr_type}${ramsize}${uboot_feature}.imx"
+     fi
+ 
+     # in the source code, if AB slot feature is supported, uboot partition name is bootloader0, otherwise it's bootloader
+@@ -436,6 +440,7 @@ mb_model=""
+ mb_plc=""
+ mb_rev=""
+ dev_ddr=""
++ddr_type="-lpddr4"
+ board_info_file=""
+ board_info_temp=""
+ mem_info_file="mem_info.img"
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 59e99557..2433b401 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -23,6 +23,7 @@ set mb_plc=
+ set mb_rev=
+ set mb_opt=
+ set dev_ddr=
++set ddr_type=-lpddr4
+ set board_info_file=
+ set board_info_temp=
+ set mem_info_file=mem_info.img
+@@ -408,9 +409,13 @@ if %support_board_info% == 1 (
+ FOR /F "tokens=1,2,3,4,5 delims=-" %%F IN ("%uboot_feature%") DO (SET uboot_feature_opt=%%F %%G %%H %%I %%J)
+ FOR %%F IN (%uboot_feature_opt%) DO (if [%%F] == [signed] set is_signed=-%%F)
+ 
++if [%som_model%] == [imx8mn] if [%mb_model%] == [evk] (
++    set ddr_type=-ddr4
++)
++
+ :: default bootloader image name
+-set bootloader_used_by_uuu=u-boot-%soc_name%%board_type%-%board%-uuu%is_signed%.imx
+-set bootloader_flashed_to_board=u-boot-%soc_name%%board_type%%uboot_feature%.imx
++set bootloader_used_by_uuu=u-boot-%soc_name%%ddr_type%-%board%-uuu-%dev_ddr%%is_signed%.imx
++set bootloader_flashed_to_board=u-boot-%soc_name%%ddr_type%%uboot_feature%.imx
+ 
+ 
+ :: find the names of the bootloader used by uuu
+@@ -938,8 +943,8 @@ goto :eof
+ :flash_android
+ :: if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+ if %support_dual_bootloader% == 1 (
+-    set bootloader_flashed_to_board=spl-%soc_name%%board_type%%uboot_feature%.bin
+-    set uboot_proper_to_be_flashed=bootloader-%soc_name%%board_type%%uboot_feature%.img
++    set bootloader_flashed_to_board=spl-%soc_name%%ddr_type%%uboot_feature%.bin
++    set uboot_proper_to_be_flashed=bootloader-%soc_name%%ddr_type%%uboot_feature%.img
+     :: # specially handle xen related condition
+     if [%dtb_feature%] == [xen] (
+         if [%soc_name%] == [imx8qm] (
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index defc6224..6503edea 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -326,8 +326,8 @@ function flash_android
+ {
+     # if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+-        bootloader_flashed_to_board=spl-${soc_name}${board_type}${uboot_feature}.bin
+-        uboot_proper_to_be_flashed=bootloader-${soc_name}${board_type}${uboot_feature}.img
++        bootloader_flashed_to_board=spl-${soc_name}${ddr_type}${uboot_feature}.bin
++        uboot_proper_to_be_flashed=bootloader-${soc_name}${ddr_type}${uboot_feature}.img
+         # specially handle xen related condition
+         if [[ "${soc_name}" = imx8qm ]] && [[ "${dtb_feature}" = xen ]]; then
+             uboot_proper_to_be_flashed=bootloader-${soc_name}-${dtb_feature}.img
+@@ -453,6 +453,7 @@ mb_model=""
+ mb_plc=""
+ mb_rev=""
+ dev_ddr=""
++ddr_type="-lpddr4"
+ board_info_file=""
+ board_info_temp=""
+ mem_info_file="mem_info.img"
+@@ -840,9 +841,12 @@ if [ `echo ${uboot_feature} |sed "s|.*-||g"` == "signed" ]; then
+     is_signed="-signed"
+ fi
+ 
++if [ "${som_model}" = "imx8mn" ] && [ "${mb_model}" = "evk" ]; then
++    ddr_type="-ddr4"
++fi
+ # default bootloader image name
+-bootloader_used_by_uuu=u-boot-${soc_name}${board_type}-${board}-uuu${is_signed}.imx
+-bootloader_flashed_to_board="u-boot-${soc_name}${board_type}${ramsize}${uboot_feature}.imx"
++bootloader_used_by_uuu=u-boot-${soc_name}${ddr_type}-${board}-uuu-${dev_ddr}${is_signed}.imx
++bootloader_flashed_to_board="u-boot-${soc_name}${ddr_type}${ramsize}${uboot_feature}.imx"
+ 
+ # find the names of the bootloader used by uuu
+ if [ "${soc_name}" = imx8mm ] || [ "${soc_name}" = imx8mn ]; then

@@ -1,0 +1,42 @@
+a9c721da95 owen.wen 2019-10-31
+
+AOS-16: always allow OEM UNLOCKED when userdebug build
+
+Change-Id: I2bcd6d285922eae96c9858444a0ae26eebf28eb9
+Signed-off-by: owen.wen <owen.wen@idtechproducts.com>
+Reviewed-on: https://gerrit.idtechproducts.com/c/android-imx/uboot-imx/+/442
+Reviewed-by: Owen Wen <Owen.Wen@idtechproducts.com>
+Reviewed-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Tested-by: Owen Wen <Owen.Wen@idtechproducts.com>
+(cherry picked from commit 1d00ca917cbce69759c171c446a86bc1bfb11fd7)
+
+diff --git a/Makefile b/Makefile
+index f3c917734e..c78ffe1f2f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -659,6 +659,9 @@ KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
+ 
+ include scripts/Makefile.extrawarn
+ 
++ifeq (1,$(USERDEBUG))
++KBUILD_CFLAGS += -D__USERDEBUG__
++endif
+ # Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
+ KBUILD_CPPFLAGS += $(KCPPFLAGS)
+ KBUILD_AFLAGS += $(KAFLAGS)
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_command.c b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+index 9fb8e2b916..d26f7ef8ec 100755
+--- a/drivers/fastboot/fb_fsl/fb_fsl_command.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_command.c
+@@ -360,6 +360,9 @@ static FbLockState do_fastboot_unlock(bool force)
+ 		printf("The device is already unlocked
+");
+ 		return FASTBOOT_UNLOCK;
+ 	}
++#ifdef __USERDEBUG__
++	force = true;
++#endif
+ 	if ((fastboot_lock_enable() == FASTBOOT_UL_ENABLE) || force) {
+ 		printf("It is able to unlock device. %d
+",fastboot_lock_enable());
+ 

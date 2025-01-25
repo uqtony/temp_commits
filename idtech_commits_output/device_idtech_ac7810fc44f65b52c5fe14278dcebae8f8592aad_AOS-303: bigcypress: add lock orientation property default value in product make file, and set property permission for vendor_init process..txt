@@ -1,0 +1,63 @@
+ac7810fc AndrewS 2020-09-10
+
+AOS-303: bigcypress: add lock orientation property default value in product make file, and set property permission for vendor_init process.
+
+Change-Id: Ifcf65cb84383c1d138d2328d73e4d367372dff0b
+
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp.mk b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+index 67195159..8a515d42 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp.mk
+@@ -10,3 +10,10 @@ PRODUCT_NAME := bigcypress_8mp
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
++
++# set persist.idt.lock_orientation as 1 in default prop file, and
++# if user modified property value it would be stored in /data/property,
++# and init process will first load default prop value, and overwrite it
++# if find key in /data/property
++PRODUCT_PROPERTY_OVERRIDES += \
++    persist.idt.lock_orientation=1
+diff --git a/imx8m/bigcypress_8mp/init.idt.product.rc b/imx8m/bigcypress_8mp/init.idt.product.rc
+deleted file mode 120000
+index d26277b2..00000000
+--- a/imx8m/bigcypress_8mp/init.idt.product.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8m/bigcypress_8mq/init.idt.product.rc
+\ No newline at end of file
+diff --git a/imx8m/bigcypress_8mp/init.idt.product.rc b/imx8m/bigcypress_8mp/init.idt.product.rc
+new file mode 100644
+index 00000000..472708d2
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/init.idt.product.rc
+@@ -0,0 +1,4 @@
++on early-boot
++
++    # HDMI display performance improve
++    setprop ro.idt.hdmi_performance_improve 1
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq.mk b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+index da2bab70..91c06c36 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+@@ -10,3 +10,10 @@ PRODUCT_NAME := bigcypress_8mq
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
++
++# set persist.idt.lock_orientation as 1 in default prop file, and
++# if user modified property value it would be stored in /data/property,
++# and init process will first load default prop value, and overwrite it
++# if find key in /data/property
++PRODUCT_PROPERTY_OVERRIDES += \
++    persist.idt.lock_orientation=1
+diff --git a/imx8m/sepolicy/vendor_init.te b/imx8m/sepolicy/vendor_init.te
+index 70e67e09..2ebdfb2a 100644
+--- a/imx8m/sepolicy/vendor_init.te
++++ b/imx8m/sepolicy/vendor_init.te
+@@ -13,3 +13,4 @@ set_prop(vendor_init, vendor_bluetooth_prop)
+ set_prop(vendor_init, public_vendor_default_prop)
+ set_prop(vendor_init, vendor_default_prop)
+ get_prop(vendor_init, default_prop)
++set_prop(vendor_init, idtech_prop)

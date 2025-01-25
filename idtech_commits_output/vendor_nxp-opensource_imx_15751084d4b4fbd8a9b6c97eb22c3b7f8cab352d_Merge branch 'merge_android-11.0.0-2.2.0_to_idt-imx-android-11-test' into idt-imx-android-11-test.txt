@@ -1,0 +1,471 @@
+1575108 jenkins 2021-07-19
+
+Merge branch 'merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test' into idt-imx-android-11-test
+
+Change-Id: I12c562741d27e19d780c13a9a596e48aa0d66114
+
+diff --cc camera/CameraDeviceHWLImpl.h
+index 38ac52a,fd02a52..5ca6068
+--- a/camera/CameraDeviceHWLImpl.h
++++ b/camera/CameraDeviceHWLImpl.h
+@@@ -104,10 -101,8 +101,13 @@@ protected
+      status_t adjustPreviewResolutions();
+  
+  private:
+-     uint32_t camera_id_;
++     uint32_t camera_id_ = 0;
+  
+++<<<<<<< HEAD
+ +  //  std::unique_ptr<HalCameraMetadata> static_metadata_;
+ +    CameraMetadata *m_meta = nullptr;
+++=======
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+      HwlCameraProviderCallback mCallback;
+  
+  public:
+@@@ -122,7 -119,7 +124,11 @@@
+      int mMaxWidth = 0;
+      int mMaxHeight = 0;
+  
+++<<<<<<< HEAD
+ +     // preview and picture format.
+++=======
++     // preview and picture format.
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+      PixelFormat mPicturePixelFormat = 0;
+      PixelFormat mPreviewPixelFormat = 0;
+  
+@@@ -132,8 -129,8 +138,12 @@@
+  
+      int mSensorFormats[MAX_SENSOR_FORMAT];
+      int mSensorFormatCount = 0;
+++<<<<<<< HEAD
+ +    char mDevPath[CAMAERA_FILENAME_LENGTH];
+++=======
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  
++     std::vector<std::shared_ptr<char*>> mDevPath;
+  
+      CscHw mCamBlitCopyType;
+      CscHw mCamBlitCscType;
+diff --cc camera/CameraDeviceSessionHWLImpl.cpp
+index a05ef9c,bb56680..5688dda
+--- a/camera/CameraDeviceSessionHWLImpl.cpp
++++ b/camera/CameraDeviceSessionHWLImpl.cpp
+@@@ -67,52 -88,73 +88,84 @@@ status_t CameraDeviceSessionHwlImpl::In
+  {
+      int ret;
+      camera_id_ = camera_id;
+-     m_meta = pMeta;
+  
+-     if ((pMeta == NULL) || (pDev == NULL))
++     static_metadata_ = std::move(pMeta);
++ 
++     if (pDev == NULL)
+          return BAD_VALUE;
+  
+++<<<<<<< HEAD
+ +    // get camera format from property
+ +    char value[PROPERTY_VALUE_MAX];
+ +    property_get("persist.idt.camera_format", value, "");
+ +    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+ +        mMJPEG_format = true;
+ +    }
+ +
+ +    ALOGI("Initialize, meta %p, entry count %d", m_meta->GetStaticMeta(), (int)m_meta->GetStaticMeta()->GetEntryCount());
+++=======
++     m_meta = pDev->m_meta->Clone();
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  
++     ALOGI("Initialize, meta %p, entry count %d", static_metadata_.get(), static_metadata_->GetEntryCount());
++ 
++     mDevPath = pDev->mDevPath;
+      CameraSensorMetadata *cam_metadata = &(pDev->mSensorData);
++     pVideoStreams.resize(mDevPath.size());
++     for (int i = 0; i < mDevPath.size(); ++i) {
++         ALOGI("%s: create video stream for camera %s, buffer type %d, path %s",
++                 __func__,
++                 cam_metadata->camera_name,
++                 cam_metadata->buffer_type,
++                 *mDevPath[i]);
++ 
++         if (strstr(cam_metadata->camera_name, UVC_NAME)) {
++             pVideoStreams[i] = new UvcStream(*mDevPath[i], this);
++         } else if(strstr(cam_metadata->camera_name, ISP_SENSOR_NAME)) {
++             pVideoStreams[i] = new ISPCameraMMAPStream(this);
++             ((ISPCameraMMAPStream *)pVideoStreams[i])->createISPWrapper(*mDevPath[i], &mSensorData);
++         } else if (cam_metadata->buffer_type == CameraSensorMetadata::kMmap) {
++             pVideoStreams[i] = new MMAPStream(this);
++         } else if (cam_metadata->buffer_type == CameraSensorMetadata::kDma) {
++             pVideoStreams[i] = new DMAStream((bool)cam_metadata->mplane, this);
++         } else {
++             ALOGE("%s: unsupported camera %s, or unsupported buffer type %d", __func__, cam_metadata->camera_name, cam_metadata->buffer_type);
++             return BAD_VALUE;
++         }
+  
+-     ALOGI("%s: create video stream for camera %s, buffer type %d, path %s",
+-           __func__,
+-           cam_metadata->camera_name,
+-           cam_metadata->buffer_type,
+-           pDev->mDevPath);
+- 
+-     if (strstr(cam_metadata->camera_name, UVC_NAME))
+-         pVideoStream = new UvcStream(pDev->mDevPath, this);
+-     else if(strstr(cam_metadata->camera_name, ISP_SENSOR_NAME)) {
+-         pVideoStream = new ISPCameraMMAPStream(this);
+-         ((ISPCameraMMAPStream *)pVideoStream)->createISPWrapper(pDev->mDevPath, &mSensorData);
+-     }
+-     else if (cam_metadata->buffer_type == CameraSensorMetadata::kMmap)
+-         pVideoStream = new MMAPStream(this);
+-     else if (cam_metadata->buffer_type == CameraSensorMetadata::kDma)
+-         pVideoStream = new DMAStream((bool)cam_metadata->mplane, this);
+-     else {
+-         ALOGE("%s: unsupported camera %s, or unsupported buffer type %d", __func__, cam_metadata->camera_name, cam_metadata->buffer_type);
+-         return BAD_VALUE;
+-     }
++         ALOGI("%s: VideoStream[%d] %p created, device path %s", __func__, i, pVideoStreams[i], *mDevPath[i]);
+  
+-     ALOGI("%s: pVideoStream %p created", __func__, pVideoStream);
++         if (pVideoStreams[i] == NULL)
++             return BAD_VALUE;
+  
+-     if (pVideoStream == NULL)
+-         return BAD_VALUE;
++         ret = pVideoStreams[i]->openDev(*mDevPath[i]);
++         if (ret) {
++             ALOGE("pVideoStreams[%d]->openDev failed, ret %d",i, ret);
++             return BAD_VALUE;
++         }
++     }
+  
+-     ret = pVideoStream->openDev(pDev->mDevPath);
+-     if (ret) {
+-         ALOGE("pVideoStream->openDev failed, ret %d", ret);
+-         return BAD_VALUE;
++     if ((physical_device_map_.get() != nullptr) && (!physical_device_map_->empty())) {
++         is_logical_device_ = true;
++         // If possible map the available focal lengths to individual physical devices
++         camera_metadata_ro_entry_t logical_entry, physical_entry;
++         ret = static_metadata_->Get(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, &logical_entry);
++         if ((ret == OK) && (logical_entry.count > 0)) {
++             for (size_t i = 0; i < logical_entry.count; i++) {
++                 for (const auto &it : *physical_device_map_) {
++                     ret = it.second->Get(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, &physical_entry);
++                     if ((ret == OK) && (physical_entry.count > 0)) {
++                         if (logical_entry.data.f[i] == physical_entry.data.f[0]) {
++                             physical_focal_length_map_[physical_entry.data.f[0]] = it.first;
++                             ALOGI("%s: current_focal_length_ camera id: %d====
+", __FUNCTION__, it.first);
++                             break;
++                         }
++                     }
++                 }
++             }
++         }
++         current_focal_length_ = logical_entry.data.f[0];
++         ALOGI("%s: current_focal_length_ set: %5.2f
+", __FUNCTION__, logical_entry.data.f[0]);
+      }
+  
+      pMemManager = fsl::MemoryManager::getInstance();
+@@@ -465,14 -668,9 +679,14 @@@ status_t CameraDeviceSessionHwlImpl::Pr
+              mJpegBuilder->reset();
+              mJpegBuilder->setMetadata(&requestMeta);
+  
+ +            if (mMJPEG_format) {
+ +                fsl::ImageProcess *imageProcess = fsl::ImageProcess::getInstance();
+ +                CscHw csc_hw = NONE;
+ +                imageProcess->handleFrame(*dstBuf, *srcBuf, csc_hw);
+ +            }
+              ret = processJpegBuffer(srcBuf, dstBuf, &requestMeta);
+          } else
+-             processFrameBuffer(srcBuf, dstBuf, &requestMeta);
++             ret = processFrameBuffer(srcBuf, dstBuf, &requestMeta);
+  
+          DumpStream(srcBuf->mVirtAddr, srcBuf->mFormatSize, dstBuf->mVirtAddr, dstBuf->mFormatSize, dstBuf->mStream->id());
+  
+@@@ -655,16 -853,14 +869,20 @@@ int32_t CameraDeviceSessionHwlImpl::pro
+      jpegBlob->jpeg_size = mJpegBuilder->getImageSize();
+  
+      ALOGI("%s, dstbuf size %d, %d, jpeg_size %d, max jpeg size %d",
+-           __func__,
+-           (int)dstBuf->mSize,
+-           captureSize,
+-           jpegBlob->jpeg_size,
+-           maxJpegSize);
++             __func__,
++             (int)dstBuf->mSize,
++             captureSize,
++             jpegBlob->jpeg_size,
++             maxJpegSize);
+  
+  err_out:
+++<<<<<<< HEAD
+ +    if (mainJpeg != NULL) {
+ +        delete mainJpeg;
+ +    }
+++=======
++     delete mainJpeg;
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  
+      if (thumbJpeg != NULL) {
+          delete thumbJpeg;
+@@@ -1046,16 -1347,52 +1369,57 @@@ status_t CameraDeviceSessionHwlImpl::Su
+          }
+  
+          PipelineInfo *pipeline_info = map_pipeline_info[pipeline_id];
+-         pVideoStream->SetBufferNumber(pipeline_info->hal_streams->at(configIdx).max_buffers + 1);
+  
+-         // v4l2 hard code to use yuv422i. If in future other foramts are used, need refine code, maybe configed in json
+-         ret = pVideoStream->ConfigAndStart(HAL_PIXEL_FORMAT_YCbCr_422_I,
+-                                             pipeline_info->streams->at(configIdx).width,
+-                                             pipeline_info->streams->at(configIdx).height,
++         //TODO need to refine for logical's configIdx ?
++         if(is_logical_request_) {
++             auto stat = requests[i].settings->Get(ANDROID_LENS_FOCAL_LENGTH, &entry);
++             if ((stat == OK) && (entry.count == 1)) {
++                 current_focal_length_ = entry.data.f[0];
++                 ALOGI("%s: requests' focal length set: %5.2f",__FUNCTION__, entry.data.f[0]);
++             } else {
++                 ALOGW("%s: Focal length absent from request!", __FUNCTION__);
++             }
++ 
++             ret = 0;
++             for (size_t index = 0; index < pVideoStreams.size(); index++) {
++                 pVideoStreams[index]->SetBufferNumber(pipeline_info->hal_streams->at(i).max_buffers + 1);
++                 ret += pVideoStreams[index]->ConfigAndStart(HAL_PIXEL_FORMAT_YCbCr_422_I,
++                                             pipeline_info->streams->at(i).width,
++                                             pipeline_info->streams->at(i).height,
+                                              fps);
++             }
++         } else {
++             pVideoStreams[0]->SetBufferNumber(pipeline_info->hal_streams->at(configIdx).max_buffers + 1);
++ 
++             uint32_t format = HAL_PIXEL_FORMAT_YCbCr_422_I;
++             if(pipeline_info->hal_streams->at(configIdx).override_format == HAL_PIXEL_FORMAT_RAW16) {
++                 format = HAL_PIXEL_FORMAT_RAW16;
++             }
++ 
++             // v4l2 hard code to use yuv422i. If in future other foramts are used, need refine code, maybe configed in json
++             ret = pVideoStreams[0]->ConfigAndStart(format,
++                                                 pipeline_info->streams->at(configIdx).width,
++                                                 pipeline_info->streams->at(configIdx).height,
++                                                 fps);
++         }
++ 
+          if (ret) {
+++<<<<<<< HEAD
+ +            delete(pipeline_request);
+ +            ALOGE("%s: pVideoStream->ConfigAndStart failed, ret %d", __func__, ret);
+++=======
++             delete(frame_request);
++             ALOGE("%s: pVideoStreams[%d]->ConfigAndStart failed, ret %d", __func__,i, ret);
++             int stream_size = pVideoStreams.size();
++             for (int i = 0; i < stream_size; ++i) {
++                 if (pVideoStreams[i]) {
++                     pVideoStreams[i]->Stop();
++                     pVideoStreams[i]->closeDev();
++                     delete pVideoStreams[i];
++                     pVideoStreams[i] = NULL;
++                 }
++             }
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+              return ret;
+          }
+      }
+diff --cc camera/CameraMetadata.h
+index 5e8969f,07639d6..949cf23
+--- a/camera/CameraMetadata.h
++++ b/camera/CameraMetadata.h
+@@@ -74,8 -76,6 +76,11 @@@ private
+      HalCameraMetadata *m_request_meta = nullptr; // meta from framework
+  
+      mutable std::mutex metadata_lock_;
+++<<<<<<< HEAD
+ +
+ +    CameraDeviceHwlImpl *mDev = NULL;
+++=======
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  };
+  
+  }  // namespace android
+diff --cc camera/ISPWrapper.cpp
+index d925a93,c5fb4fa..092d52e
+--- a/camera/ISPWrapper.cpp
++++ b/camera/ISPWrapper.cpp
+@@@ -252,28 -271,35 +271,57 @@@ int ISPWrapper::viv_private_ioctl(cons
+      ecs.count = 1;
+  
+      ret = ioctl(m_fd, VIDIOC_G_EXT_CTRLS, &ecs);
+++<<<<<<< HEAD
+ +    if (ret != 0)
+ +        return ret;
+ +
+ +    strcpy(ec.string, jsonRequest.toStyledString().c_str());
+ +
+ +    ret = ioctl(m_fd, VIDIOC_S_EXT_CTRLS, &ecs);
+ +    if (ret != 0)
+ +        return ret;
+ +
+ +    ret = ioctl(m_fd, VIDIOC_G_EXT_CTRLS, &ecs);
+ +    if (ret != 0)
+ +        return ret;
+ +
+ +    Json::Reader reader;
+ +    if (!reader.parse(ec.string, jsonResponse, true)) {
+ +        ALOGE("Could not parse configuration file: %s",
+ +          reader.getFormattedErrorMessages().c_str());
+ +        return BAD_VALUE;
+ +    }
+++=======
++     if (ret != 0) {
++         ALOGV("==== ret %, line %d", ret, __LINE__);
++   //      goto failed;
++     }
++     strcpy(ec.string, jsonRequest.toStyledString().c_str());
++ 
++     ret = ioctl(m_fd, VIDIOC_S_EXT_CTRLS, &ecs);
++     if (ret != 0) {
++         ALOGI("==== ret %, line %d", ret, __LINE__);
++         goto failed;
++     }
++     ret = ioctl(m_fd, VIDIOC_G_EXT_CTRLS, &ecs);
++     if (ret != 0) {
++         ALOGV("==== ret %, line %d", ret, __LINE__);
++       //  goto failed;
++     }
++ 
++     if (!reader.parse(ec.string, jsonResponse, true)) {
++         ALOGE("Could not parse configuration file: %s",
++           reader.getFormattedErrorMessages().c_str());
++         ret = BAD_VALUE;
++         goto failed;
++     } else
++         ret = jsonResponse["MC_RET"].asInt();
++ 
++ failed:
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+      delete ec.string;
+      ec.string = NULL;
+-     return jsonResponse["MC_RET"].asInt();
++     return ret;
+  }
+  
+  
+diff --cc camera/ImageProcess.cpp
+index 15749fa,966ced3..6073b1e
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@@ -651,55 -637,17 +651,69 @@@ int ImageProcess::convertNV12toNV21(Imx
+      return 0;
+  }
+  
+++<<<<<<< HEAD
+ +// This function will convert MJPG stream to YUY2 stream and store it in input buffer
+ +// srcBuf: input frame from UVC MJPG stream
+ +int ImageProcess::convertMJPGToYUY2(ImxStreamBuffer& srcBuf)
+ +{
+ +    ImxStream *src = srcBuf.mStream;
+ +    uint32_t width = src->width();
+ +    uint32_t height = src->height();
+ +    uint32_t half_width = (width + 1) / 2;
+ +    uint32_t half_height = (height + 1) / 2;
+ +    uint8_t* y_component = NULL;
+ +    uint8_t* u_component = NULL;
+ +    uint8_t* v_component = NULL;
+ +    uint32_t ret = 0;
+ +
+ +    y_component = (uint8_t*)malloc(width * height);
+ +    if (!y_component) {
+ +        ret = -EINVAL;
+ +        goto err_out;
+ +    }
+ +    u_component = (uint8_t*)malloc(half_width * half_height);
+ +    if (!u_component) {
+ +        ret = -EINVAL;
+ +        goto err_out;
+ +    }
+ +    v_component = (uint8_t*)malloc(half_width * half_height);
+ +    if (!v_component) {
+ +        ret = -EINVAL;
+ +        goto err_out;
+ +    }
+ +    // convert MJPEG to I420
+ +    ret = libyuv::MJPGToI420((uint8_t *)srcBuf.mVirtAddr, srcBuf.mSize,
+ +                    y_component, width, u_component, half_width, v_component, half_width,
+ +                    width, height, width, height);
+ +    if (ret)
+ +        goto err_out;
+ +
+ +    // convert I420 to YUYV
+ +    ret = libyuv::I420ToYUY2(y_component, width, u_component, half_width, v_component, half_width,
+ +                  (uint8_t *)srcBuf.mVirtAddr, width*2, width, height);
+ +
+ +err_out:
+ +    if (y_component)
+ +        free(y_component);
+ +    if (u_component)
+ +        free(u_component);
+ +    if (v_component)
+ +        free(v_component);
+ +
+ +    return ret;
+++=======
++ static void Revert16BitEndian(uint8_t *pSrc, uint8_t *pDst, uint32_t pixels)
++ {
++     ALOGV("enter Revert16BitEndian, src %p, dst %p, pixels %d", pSrc, pDst, pixels);
++ 
++     for(uint32_t i = 0; i < pixels; i++) {
++         uint32_t offset = i*2;
++         pDst[offset] = pSrc[offset + 1];
++         pDst[offset + 1] = pSrc[offset];
++     }
++ 
++     return;
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  }
+  
+  int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf)
+@@@ -734,11 -682,11 +748,19 @@@
+          cl_YUYVtoNV12SP(mCLHandle, (uint8_t *)srcBuf.mVirtAddr,
+                      (uint8_t *)dstBuf.mVirtAddr, dst->width(), dst->height(), false, bOutputCached);
+      } else if (src->format() == dst->format()) {
+++<<<<<<< HEAD
+ +        if (mMJPEG_format) {
+ +            convertMJPGToYUY2(srcBuf);
+ +	}
+ +        cl_YUYVCopyByLine(mCLHandle, (uint8_t *)dstBuf.mVirtAddr,
+ +                 dst->width(), dst->height(),
+++=======
++         if (HAL_PIXEL_FORMAT_RAW16 == src->format())
++             Revert16BitEndian((uint8_t *)srcBuf.mVirtAddr, (uint8_t *)dstBuf.mVirtAddr, src->width()*src->height());
++         else
++             cl_YUYVCopyByLine(mCLHandle, (uint8_t *)dstBuf.mVirtAddr,
++                 dst->width(), dst->height(),
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+                  (uint8_t *)srcBuf.mVirtAddr, src->width(), src->height(), false, bOutputCached);
+      } else {
+          ALOGI("%s:%d, opencl don't support format convert from 0x%x to 0x%x",
+diff --cc usb/Usb.cpp
+index 740f8ae,8f7f1dc..589b4ab
+--- a/usb/Usb.cpp
++++ b/usb/Usb.cpp
+@@@ -657,11 -656,9 +657,17 @@@ void *work(void *param) 
+    payload.uevent_fd = uevent_fd;
+    payload.usb = (android::hardware::usb::V1_1::implementation::Usb *)param;
+  
+++<<<<<<< HEAD
+ +  ret = fcntl(uevent_fd, F_SETFL, O_NONBLOCK);
+ +  if (ret != 0) {
+ +    ALOGE("uevent_init: set uevent_fd O_NONBLOCK flag failed
+");
+ +    close(uevent_fd);
+ +    return NULL;
+++=======
++   if (fcntl(uevent_fd, F_SETFL, O_NONBLOCK)) {
++     ALOGE("fcntl fail to set uevent_fd as nonblock mode");
++     goto error;
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+    }
+  
+    ev.events = EPOLLIN;

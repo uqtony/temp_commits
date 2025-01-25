@@ -1,0 +1,135 @@
+54bca175b513 Arthur Chen 2020-04-30
+
+driver: misc: idg_spi: To match K81 CRC check.
+
+    This is for NEOII protocol CRC calculation defined in K81.
+    The change is that IDG frame CRC verification rule
+    about the 2 bytes appended on tail of frame.
+    The difference between NEOII protocol CRC and generic CRC is that
+    check on host to check both little-endian and big-endian way,
+    if either one is correct, host could consider CRC check as passed.
+    To synchronize the CRC verification rule between K81 & Android platform.
+
+Change-Id: I9452fa40cf607706ee43193c3535ea0a7e99b6c9
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index b445238049b6..07f16308777b 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -45,6 +45,8 @@
+ 
+ #define IDG_DEBUG_INFO		0  /* enable: 1, disable: 0 */
+ 
++#define IDG_K81_CRC_RULE	1  /* enable: 1, disable: 0 */
++
+ static struct spi_device *idg_spi_tty;
+ 
+ struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
+@@ -182,6 +184,20 @@ unsigned short CalculateCRC(unsigned char *Buffer, unsigned int Len)
+ 	return Crc;
+ }
+ 
++/* K81 crc rule for read IDG */
++bool k81_crc(unsigned char *Buffer, unsigned int Len)
++{
++	bool verify = true;
++	unsigned short crc = CalculateCRC(Buffer, (Len - NEOII_CRC_LEN));
++	unsigned short rt_crc = (Buffer[Len - 1] << 8) + (Buffer[Len - 2]);
++	unsigned short rt_crc_inv = (Buffer[Len - 2] << 8) + (Buffer[Len - 1]);
++
++	if ((crc != rt_crc) && (crc != rt_crc_inv))
++		verify = false;
++
++	return verify;
++}
++
+ int idg_char2hex(int raw)
+ {
+ 	if ((raw >= NUM_ASCII) && (raw <= (NUM_ASCII + 9)))
+@@ -712,6 +728,16 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 								i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
++#if IDG_K81_CRC_RULE
++					if (!k81_crc(recover,
++						     (idg_size_re +
++						      BASE_READ_SIZE))) {
++						dev_info(&spi->dev,
++							 "read data CRC "
++							 "error
+");
++						err = EINVAL;
++					}
++#else
+ 					if (CalculateCRC(recover,
+ 							 (idg_size_re +
+ 							  BASE_READ_SIZE))) {
+@@ -720,6 +746,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 							 "error
+");
+ 						err = EINVAL;
+ 					}
++#endif /* IDG_K81_CRC_RULE */
+ 				} else {
+ 					pr_err("%s: idg spi re second read "
+ 					       "failed(%d)", DRVNAME, status_s);
+@@ -727,7 +754,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ #if IDG_DEBUG_INFO
+ 					for (i = 0; i < BASE_READ_SIZE ; i++)
+ 						dev_info(&spi->dev, "0x%.2X ",
+-							idg_rx_s[i]);
++							 idg_rx_s[i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
+ 				}
+@@ -771,6 +798,16 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 								i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
++#if IDG_K81_CRC_RULE
++					if (!k81_crc(recover,
++						     (idg_size_re +
++						      BASE_READ_SIZE))) {
++						dev_info(&spi->dev,
++							 "read data CRC "
++							 "error
+");
++						err = EINVAL;
++					}
++#else
+ 					if (CalculateCRC(recover,
+ 							 (idg_size_re +
+ 							  BASE_READ_SIZE))) {
+@@ -779,6 +816,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 							 "error
+");
+ 						err = EINVAL;
+ 					}
++#endif /* IDG_K81_CRC_RULE */
+ 				} else {
+ 					pr_err("%s: idg spi re second read "
+ 					       "failed(%d)",
+@@ -832,12 +870,21 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 						 data[BASE_READ_SIZE + i]);
+ 
+ #endif /* IDG_DEBUG_INFO */
++#if IDG_K81_CRC_RULE
++				if (!k81_crc(data,
++					     (idg_size + BASE_READ_SIZE))) {
++					dev_info(&spi->dev,
++						 "read data CRC error
+");
++					err = EINVAL;
++				}
++#else
+ 				if (CalculateCRC(data,
+ 						 (idg_size + BASE_READ_SIZE))) {
+ 					dev_info(&spi->dev,
+ 						 "read data CRC error
+");
+ 					err = EINVAL;
+ 				}
++#endif /* IDG_K81_CRC_RULE */
+ 			} else {
+ 				pr_err("%s: idg spi second read failed(%d)",
+ 				       DRVNAME, status_s);

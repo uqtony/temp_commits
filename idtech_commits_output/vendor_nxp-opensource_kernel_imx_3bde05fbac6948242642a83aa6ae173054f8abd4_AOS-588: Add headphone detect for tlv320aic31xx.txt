@@ -1,0 +1,81 @@
+3bde05fbac69 jay deng 2021-05-03
+
+AOS-588: Add headphone detect for tlv320aic31xx
+
+Add interrupt configuration and setup jack handler for headphone
+detection
+
+Change-Id: If95f2970e96dfd5ea64ec9d9171fd4943e5ea6cb
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi
+index d09a76946ba3..08961a27ef7f 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-2.dtsi
+@@ -92,7 +92,9 @@ tlv320aic31xx: tlv320aic31xx@18 {
+ 		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+ 		clock-names = "mclk";
+ 		ai31xx-micbias-vg = <MICBIAS_AVDDV>;
+-		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
++
+ 
+ 		HPVDD-supply = <&reg_audio_hp_vdd>;
+ 		SPRVDD-supply = <&reg_audio_spr_vdd>;
+diff --git a/sound/soc/fsl/imx-tlv320aic31xx.c b/sound/soc/fsl/imx-tlv320aic31xx.c
+index 74bd48f56af8..4409cbac2256 100644
+--- a/sound/soc/fsl/imx-tlv320aic31xx.c
++++ b/sound/soc/fsl/imx-tlv320aic31xx.c
+@@ -8,6 +8,7 @@
+ #include <linux/i2c.h>
+ #include <linux/clk.h>
+ #include <sound/soc.h>
++#include <sound/jack.h>
+ 
+ #include "../codecs/tlv320aic31xx.h"
+ #include "fsl_sai.h"
+@@ -15,6 +16,13 @@
+ 
+ #define DAI_NAME_SIZE	32
+ 
++static struct snd_soc_jack hp_jack;
++
++static struct snd_soc_jack_pin hp_jack_pin = {
++	.pin	= "Headphone",
++	.mask	= SND_JACK_HEADPHONE,
++};
++
+ struct imx_tlv320aic31xx_data {
+ 	struct snd_soc_dai_link dai;
+ 	struct snd_soc_card card;
+@@ -27,6 +35,7 @@ struct imx_tlv320aic31xx_data {
+ static int imx_tlv320aic31xx_dai_init(struct snd_soc_pcm_runtime *rtd)
+ {
+ 	struct imx_tlv320aic31xx_data *data = snd_soc_card_get_drvdata(rtd->card);
++	struct snd_soc_component *component = rtd->codec_dai->component;
+ 	struct device *dev = rtd->card->dev;
+ 	int ret;
+ 
+@@ -37,6 +46,20 @@ static int imx_tlv320aic31xx_dai_init(struct snd_soc_pcm_runtime *rtd)
+ 		return ret;
+ 	}
+ 
++	ret =  snd_soc_card_jack_new(rtd->card, "Headphone Jack",
++				     SND_JACK_HEADPHONE, &hp_jack,
++				     &hp_jack_pin, 1);
++	if (ret) {
++		dev_err(dev, "Can't create Headphone jack
+");
++		return ret;
++	}
++
++	ret = snd_soc_component_set_jack(component, &hp_jack, NULL);
++	if (ret) {
++		dev_err(dev, "Can't set jack
+");
++		return ret;
++	}
++
+ 	return 0;
+ }
+ 

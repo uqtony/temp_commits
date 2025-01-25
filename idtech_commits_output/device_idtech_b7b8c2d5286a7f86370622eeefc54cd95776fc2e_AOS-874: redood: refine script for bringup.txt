@@ -1,0 +1,761 @@
+b7b8c2d5 George.Huang 2022-01-17
+
+AOS-874: redood: refine script for bringup
+
+- Execute bringup_test_stageall.sh or bringup_test_stageall.bat
+  to get the test result:
+==== STAGE1 ================== ======
+date:                          20220115_21:05:54
+product_name:                  REDWOOD_8MQ
+sw_version:                    ubuntu01151513
+serial_number:                 150K000013
+emmc_size:                     15 GB
+lpddr_size:                    4 GB
+sdcard_size:                   8 GB
+usb_hub:                       OK
+usb_modem:                     OK
+usb_2.0_host:                  OK
+usb_3.0_host:                  OK
+usb_2.0_host:                  OK
+i2c-0_power_seq:               OK
+i2c-0_pd1_dis:                 OK
+i2c-0_pd2_otg:                 OK
+i2c-2_audio_codec:             OK
+i2c-2_light_sensor:            OK
+i2c-2_pcie_clock:              OK
+light_sensor_input:            OK_0.020000
+modem_ec25                     OK
+pcie_wifi:                     OK
+pcie_bridge:                   OK
+uart_rs232:                    OK
+uart_bt:                       OK
+uart_reserved:                 OK
+eth0:                          OK
+idg_spi:                       OK
+============================== ======
+==== STAGE2 ================== ======
+date:                          20220115_21:06:00
+product_name:                  REDWOOD_8MQ
+sw_version:                    ubuntu01151513
+serial_number:                 150K000013
+usb_hub:                       OK
+usb_modem:                     OK
+usb_2.0_host:                  OK
+usb_3.0_host:                  OK
+usb_2.0_host:                  OK
+i2c-0_touch_panel:             OK
+i2c-1_vcm:                     SKIP
+i2c-1_front_cam:               OK
+i2c-1_mipi_bridge:             OK
+i2c-1_backlight:               OK
+i2c-1_scan_cam:                OK
+i2c-1_prox_sensor:             OK
+i2c-2_mic:                     OK
+led_front_cam_flash:           OK
+led_front_cam_status:          OK
+led_device_status:             OK
+light_sensor_input:            OK_0.030000
+light_sensor_raw:              OK_40
+prox_sensor:                   OK
+============================== ======
+
+Change-Id: I6703a66bce58da80ac72c6b4664d2d22ced261c0
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index d9aa9618..6660e200 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -1,24 +1,87 @@
+ #!/system/bin/sh
+ 
+-LOG_TAG="bringup_test"
+-RST_TAG="result"
+-LOG_PATH="/data/local/tmp/${LOG_TAG}.log"
+-RST_PATH="/data/local/tmp/${RST_TAG}.log"
+-
+-rm -f $RST_PATH
++set_log_path() {
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  LOG_TAG="bringup_test"
++  RST_TAG="bringup_result"
++  SN=`getprop ro.serialno`
++  LOG_PATH="/data/local/tmp/${SN}_${LOG_TAG}_${test_idx}.txt"
++  RST_PATH="/data/local/tmp/${SN}_${RST_TAG}_${test_idx}.txt"
++}
+ 
+ logi() {
+-#  echo "I $LOG_TAG: $1" >> ${LOG_PATH}
+-  echo "$1" |sed "s|^|I ${LOG_TAG}: |g" >> ${LOG_PATH}
++  echo -e "$1" |sed "s|^|I ${LOG_TAG}: |g" >> ${LOG_PATH}
+ }
+ 
+ loge() {
+-#  echo "E $LOG_TAG: $1" >> ${LOG_PATH}
+-  echo "$1" |sed "s|^|E ${LOG_TAG}: |g" >> ${LOG_PATH}
++  echo -e "$1" |sed "s|^|E ${LOG_TAG}: |g" >> ${LOG_PATH}
+ }
+ 
+ log_rst() {
+-  printf "%-40s %s
+" "$1" "$2" >> ${RST_PATH}
++  rst_key="$1"
++  rst_val="$2"
++  if [ -z "$2" -o "$rst_val" == "FAIL" ]; then
++    rst_val="FAIL"
++    loge "$rst_key $rst_val"
++  else
++    logi "$rst_key $rst_val"
++  fi
++  printf "%-30s %s
+" "$rst_key" "$rst_val" >> ${RST_PATH}
++}
++
++unset_test_array() {
++  unset test_array
++  unset test_key
++  unset test_num
++  unset test_path
++  unset test_size
++  unset test_rst
++  unset test_idx
++}
++
++check_dev_info() {
++  logi "== check_dev_info"
++
++  key="date:"
++  val=`TZ=Asia/Taipei date +%Y%m%d_%H:%M:%S`
++  log_rst "$key" "$val"
++
++  key="product_name:"
++  val=`getprop ro.product.model`
++  log_rst "$key" "$val"
++
++  key="sw_version:"
++  val=`getprop ro.vendor.build.fingerprint |cut -d\/ -f5 |cut -d: -f1`
++  log_rst "$key" "$val"
++
++  key="serial_number:"
++  val=`getprop ro.serialno`
++  log_rst "$key" "$val"
++
++  logi ""
++}
++
++check_dev_size() {
++  logi "== check_dev_size"
++  unset_test_array
++
++  key="emmc_size:"
++  val=`cat /sys/block/mmcblk0/size`
++  [ -n "$val" ] && val="$((val / 1024 / 1024 * 512 / 1024 + 1)) GB"
++  log_rst "$key" "${val}"
++
++  key="lpddr_size:"
++  val=`cat /proc/meminfo |grep MemTotal: |cut -F2`
++  [ -n "$val" ] && val="$((val / 1024 / 1024 + 1)) GB"
++  log_rst "$key" "${val}"
++
++  key="sdcard_size:"
++  val=`df /mnt/media_rw/* |grep public |head -n1 |cut -F2` 2> /dev/null
++  [ -n "$val" ] && val="$((val / 1024 / 1024 + 1)) GB"
++  log_rst "$key" "${val}"
++
++  logi ""
+ }
+ 
+ check_modem() {
+@@ -26,63 +89,91 @@ check_modem() {
+   idx=0
+   idx_limit=3
+   # vendor: Quectel Wireless Solutions Co., Ltd.
+-  vendor_id="2c7c"
+   # product:   EG95   EC25   LTE modem
+-  product_id=("0195" "0125")
+-  product_num=${#product_id[@]}
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    test_array=("2c7c:0125")
++    test_key=("modem_ec25")
++    test_num=${#test_array[@]}
++  fi
++  if [ -z $test_num ]; then
++    test_array=("2c7c:0195")
++    test_key=("modem_eg95")
++    test_num=${#test_array[@]}
++  fi
+ 
+   while [ $idx -lt $idx_limit ]; do
+     idx=$((idx + 1))
+     ret=1
+-    for i in $(seq 0 $((product_num - 1))); do
+-      eval "lsusb |grep -q 'ID ${vendor_id}:${product_id[i]}$'"
++    for i in $(seq 0 $((test_num - 1))); do
++      eval "lsusb |grep -q 'ID ${test_array[i]}$'"
+       ret=$((ret & $?))
+     done
+     if [ $ret -eq 0 ]; then
+-      logi "modem is found"
+-      log_rst "modem:" "OK"
++      log_rst "${test_key[i]}" "OK"
+       break
+     else
+       sleep 1
+     fi
+   done
+   if [ $ret -ne 0 ]; then
+-    loge "modem not found"
+-    log_rst "modem:" "FAIL"
++    log_rst "${test_key[i]}" "FAIL"
+   fi
+   logi ""
+ }
+ 
+ check_uart() {
+-# uart1: /dev/ttymxc0, /sys/class/tty/ttymxc0
+-# uart3: /dev/ttymxc2, /sys/class/tty/ttymxc2
++# uart1: /dev/ttymxc0, /sys/class/tty/ttymxc0 for rs232
++# uart3: /dev/ttymxc2, /sys/class/tty/ttymxc2 for rs232 reserved
+ # uart2: /dev/ttymxc1, /sys/class/tty/ttymxc1 for BT
++  logi "== check_uart: ${uart_node}[0-1]"
++  unset_test_array
++
+   uart_node="/dev/ttymxc"
+-  logi "== check_uart: ${uart_node}[0-2]"
+-  for ii in $(seq 0 2); do
+-    test_node="${uart_node}${ii}"
+-    if [ -e "${test_node}" ]; then
+-      logi "${test_node} is found"
+-      log_rst "uart ${test_node}:" "OK"
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    test_key=("uart_rs232" "uart_bt" "uart_reserved")
++    test_num=${#test_key[@]}
++  fi
++  if [ -z $test_num ]; then
++    test_key=(`ls ${uart_node}*`)
++    test_num=${#test_key[@]}
++  fi
++  for i in $(seq 0 $((test_num - 1))); do
++    test_path="${uart_node}${i}"
++    if [ -e "${test_path}" ]; then
++      log_rst "${test_key[i]}:" "OK"
+     else
+-      loge "${test_node} not found"
+-      log_rst "uart ${test_node}:" "FAIL"
++      log_rst "${test_key[i]}:" "FAIL"
+     fi
+   done
++
+   logi ""
+ }
+ 
+ check_pcie() {
+ # lspci
+   logi "== check_pcie: lspci"
+-  pcie_num=`lspci |wc -l`
+-  if [ $pcie_num -ge 1 ]; then
+-    logi "${pcie_num} pcie devices are found"
+-    log_rst "PCI:" "OK"
+-  else
+-    loge "${pcie_num} pcie devices are not found"
+-    log_rst "PCI:" "FAIL"
++  unset_test_array
++
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    test_array=("1b4b:2b42" "16c3:abcd")
++    test_key=("pcie_wifi" "pcie_bridge")
++    test_num=${#test_array[@]}
++  fi
++  if [ -z $test_num ]; then
++    test_array=(`lspci |cut -F4`)
++    test_key=(`lspci |cut -F4 |sed "s|^|pcie_|g"`)
++    test_num=${#test_array[@]}
+   fi
++
++  for i in $(seq 0 $((test_num - 1))); do
++    eval "lspci |grep -q ': ${test_array[i]}$'"
++    if [ $? -eq 0 ]; then
++      log_rst "${test_key[i]}:" "OK"
++    else
++      log_rst "${test_key[i]}:" "FAIL"
++    fi
++  done
++
+   logi "`lspci`"
+   logi ""
+ }
+@@ -90,166 +181,260 @@ check_pcie() {
+ check_eth() {
+ # ifconfig
+   logi "== check_eth: ifconfig"
+-  pcie_num=`ifconfig -S eth0 |wc -l`
+-  if [ $pcie_num -ge 1 ]; then
+-    logi "eth0 is found"
+-    log_rst "eth:" "OK"
++  unset_test_array
++
++  test_num=`ifconfig -S eth0 |wc -l`
++  if [ $test_num -ge 1 ]; then
++    log_rst "eth0:" "OK"
+   else
+-    loge "eth0 is not found"
+-    log_rst "eth:" "FAIL"
++    log_rst "eth0:" "FAIL"
+   fi
++
+   logi "`ifconfig -S`"
+   logi ""
+ }
+ 
+ check_i2c() {
+ # i2cdetect -y 0-2
+-  logi "== check_i2c: i2cdetect -y [0-2]"
++  unset_test_array
++
++# test_idx: 0: all / 1: stage1 / 2: stage2
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  logi "== check_i2c group${test_idx}: i2cdetect -y [0-2]"
+   if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
+-    i2c_array=("0-0008" "0-0020" "0-0024" "0-0055" \
+-               "1-000c" "1-0010" "1-002c" "1-0036" "1-0037" "1-0051" \
+-               "2-0018" "2-0045" "2-004e" "2-0068")
+-    i2c_num=${#i2c_array[@]}
++#    test_array=("0-0008" "0-0020" "0-0024" "0-0055" \
++#               "1-000c" "1-0010" "1-002c" "1-0036" "1-0037" "1-0051" \
++#               "2-0018" "2-0045" "2-004e" "2-0068")
++#    test_key=("i2c-0_power_seq" "i2c-0_pd1_dis" "i2c-0_pd2_otg" "i2c-0_touch_panel" \
++#             "i2c-1_vcm" "i2c-1_front_cam" "i2c-1_mipi_bridge" "i2c-1_backlight" "i2c-1_scan_cam" "i2c-1_prox_sensor" \
++#             "i2c-2_audio_codec" "i2c-2_light_sensor" "i2c-2_mic" "i2c-2_pcie_clock")
++    test_array1=("0-0008" "0-0020" "0-0024" \
++                "2-0018" "2-0045" "2-0068")
++    test_key1=("i2c-0_power_seq" "i2c-0_pd1_dis" "i2c-0_pd2_otg" \
++              "i2c-2_audio_codec" "i2c-2_light_sensor" "i2c-2_pcie_clock")
++    test_array2=("0-0055" \
++                "1-000c" "1-0010" "1-002c" "1-0036" "1-0037" "1-0051" \
++                "2-004e")
++    test_key2=("i2c-0_touch_panel" \
++              "i2c-1_vcm" "i2c-1_front_cam" "i2c-1_mipi_bridge" "i2c-1_backlight" "i2c-1_scan_cam" "i2c-1_prox_sensor" \
++              "i2c-2_mic")
++    if [ $test_idx -eq 1 ]; then
++      test_array=(${test_array1[@]})
++      test_key=(${test_key1[@]})
++    elif [ $test_idx -eq 2 ]; then
++      test_array=(${test_array2[@]})
++      test_key=(${test_key2[@]})
++    else
++      test_array=(${test_array1[@]} ${test_array2[@]})
++      test_key=(${test_key1[@]} ${test_key2[@]})
++    fi
++    test_num=${#test_array[@]}
+     dev_exception="1-000c"
+   fi
+-  if [ -z $i2c_num ]; then
+-    i2c_array=(`ls /sys/bus/i2c/devices/`)
+-    i2c_num=${#i2c_array[@]}
++  if [ -z $test_num ]; then
++    test_array=(`ls /sys/bus/i2c/devices/ |grep -v i2c`)
++    test_key=(`ls /sys/bus/i2c/devices/ |grep -v i2c |sed "s|^|i2c-|g"`)
++    test_num=${#test_array[@]}
+   fi
+-  for i in $(seq 0 $((i2c_num - 1))); do
+-    i2c_addr=`echo ${i2c_array[$i]} |cut -d'-' -f1`
+-    dev_path="/sys/bus/i2c/devices/${i2c_array[$i]}"
+-    dev_name=`cat ${dev_path}/name`
+-    [ -z "$dev_name" ] && dev_name="XXXXXX"
+-    dev_addr=`echo ${i2c_array[$i]} |cut -d'-' -f2`
+-    if [ "${i2c_array[$i]}" == "${dev_exception}" ]; then
+-      dev_status="skipped"
++  for i in $(seq 0 $((test_num - 1))); do
++    i2c_addr=`echo ${test_array[$i]} |cut -d'-' -f1`
++    dev_path="/sys/bus/i2c/devices/${test_array[$i]}"
++    dev_addr=`echo ${test_array[$i]} |cut -d'-' -f2`
++    if [ "${test_array[$i]}" == "${dev_exception}" ]; then
++      dev_status="SKIP"
++      log_rst "${test_key[i]}:" "SKIP"
+     else
+-      dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00`
++      dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00 2> /dev/null`
+       ret=$?
+       if [ "$ret" = 0 ]; then
+-        log_rst "I2C $i2c_addr 0x${dev_addr} $dev_name:" "OK"
++        log_rst "${test_key[i]}:" "OK"
+       else
+-        log_rst "I2C $i2c_addr 0x${dev_addr} $dev_name:" "FAIL"
++        log_rst "${test_key[i]}:" "FAIL"
+       fi
+     fi
+     [ -z "$dev_status" ] && dev_status="XXXX"
+-    logi "${dev_path}: ${dev_name}: ${dev_status}"
++    logi "${dev_path}: ${test_key[i]}: ${dev_status}"
+   done
+-  for ii in $(seq 0 2); do
+-    logi "`i2cdetect -y ${ii}`"
++  for i in $(seq 0 2); do
++    logi "`i2cdetect -y ${i}`"
+   done
++
+   logi ""
+ }
+ 
+ check_usb() {
+-# /sys/bus/usb/devices/*/product
+-  logi "== check_usb: cat /sys/bus/usb/devices/XX/product"
+-  usb_found=0
+-  for dev_path in `ls -d /sys/bus/usb/devices/*`; do
+-    [ ! -f "${dev_path}/manufacturer" ] && continue
+-    dev_vendor=`cat ${dev_path}/manufacturer`
+-    dev_product=`cat ${dev_path}/product`
+-    logi "${dev_path}: ${dev_vendor}: ${dev_product}"
+-    usb_found=1
+-  done
+-  if [ $usb_found = "1" ];then
+-    log_rst "USB:" "OK"
+-  else
+-    log_rst "USB:" "FAIL"
++  logi "== check_usb lsusb"
++  unset_test_array
++
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    test_array=("0424:2514" "2c7c:0125" "1d6b:0002" "1d6b:0003" "1d6b:0002")
++    test_key=("usb_hub" "usb_modem" "usb_2.0_host" "usb_3.0_host" "usb_2.0_host")
++    test_num=${#test_array[@]}
++  fi
++  if [ -z $test_num ]; then
++    test_array=(`lsusb |cut -F6`)
++    test_key=(`lsusb |cut -F6 |sed "s|^|usb_|g"`)
++    test_num=${#test_array[@]}
+   fi
++  for i in $(seq 0 $((test_num - 1))); do
++    eval "lsusb |grep -q 'ID ${test_array[i]}$'"
++    ret=$?
++    if [ "$ret" -eq 0 ]; then
++      log_rst "${test_key[i]}:" "OK"
++    else
++      log_rst "${test_key[i]}:" "FAIL"
++    fi
++  done
++
++  logi "`lsusb`"
+   logi ""
+ }
+ 
+ check_led() {
+   logi "== check_led:"
+-  logi "echo 255 > /sys/class/leds/front-cam:flash/brightness"
+-  echo 255 > /sys/class/leds/front-cam:flash/brightness
++  unset_test_array
++
++  test_path=/sys/class/leds/front-cam:flash/brightness
++  test_key="led_front_cam_flash"
++  logi "echo 255 > ${test_path}"
++  echo 255 > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+-    logi "front camera flash LED: OK"
+-    log_rst "front camera flash LED:" "OK"
++    log_rst "${test_key}:" "OK"
+   else
+-    logi "front camera flash LED: FAIL"
+-    log_rst "front camera flash LED:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > /sys/class/leds/front-cam:flash/brightness
++  echo 0 > ${test_path}
+ 
+-  logi "echo 255 > /sys/class/leds/front-cam:status/brightness"
+-  echo 255 > /sys/class/leds/front-cam:status/brightness
++  test_path=/sys/class/leds/front-cam:status/brightness
++  test_key="led_front_cam_status"
++  logi "echo 255 > ${test_path}"
++  echo 255 > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+-    logi "front camera status LED: OK"
+-    log_rst "front camera status LED:" "OK"
++    log_rst "${test_key}:" "OK"
+   else
+-    logi "front camera status LED: FAIL"
+-    log_rst "front camera status LED:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > /sys/class/leds/front-cam:status/brightness
++  echo 0 > ${test_path}
+ 
+-  logi "echo 255 > /sys/class/leds/device:status/brightness"
+-  echo 255 > /sys/class/leds/device:status/brightness
++  test_path=/sys/class/leds/device:status/brightness
++  test_key="led_device_status"
++  logi "echo 255 > ${test_path}"
++  echo 255 > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+-    logi "device status LED: OK"
+-    log_rst "device status LED:" "OK"
++    log_rst "${test_key}:" "OK"
+   else
+-    logi "device status LED: FAIL"
+-    log_rst "device status LED:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > /sys/class/leds/device:status/brightness
+-}
++  echo 0 > ${test_path}
+ 
+-check_sensor() {
+-  logi "== check_sensor:"
++  logi ""
++}
+ 
+-  logi "cat /sys/bus/iio/devices/iio:device0/in_proximity_raw"
+-  logi "`cat /sys/bus/iio/devices/iio:device0/in_proximity_raw`"
+-  cat /sys/bus/iio/devices/iio:device0/in_proximity_raw
+-  ret=$?
+-  if [ "$ret" = 0 ]; then
+-    log_rst "Proxmity Sensor:" "OK"
++check_prox_sensor() {
++  logi "== check_prox_sensor:"
++  unset_test_array
++
++  test_path=/sys/bus/iio/devices/iio\:device[01]/in_proximity_raw
++  test_key="prox_sensor"
++  [ -f ${test_path} ] && test_rst=`cat ${test_path}`
++  logi "cat ${test_path}"
++  logi "$test_rst"
++  if [ ! -z "$test_rst" ]; then
++    log_rst "${test_key}:" "OK_${test_rst}"
+   else
+-    log_rst "Proxmity Sensor:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
+ 
+-  logi "cat /sys/bus/iio/devices/iio:device1/in_illuminance_input"
+-  logi "`cat /sys/bus/iio/devices/iio:device1/in_illuminance_input`"
+-  cat /sys/bus/iio/devices/iio:device1/in_illuminance_input
+-  ret=$?
+-  if [ "$ret" = 0 ]; then
+-    log_rst "Ambient Light Sensor:" "OK"
++  logi ""
++}
++
++check_light_sensor() {
++  logi "== check_light_sensor:"
++  unset_test_array
++
++  test_idx="input"
++  [ ! -z $1 ] && test_idx=$1
++  test_path=/sys/bus/iio/devices/iio\:device[01]/in_illuminance_${test_idx}
++  test_key="light_sensor_${test_idx}"
++  [ -f ${test_path} ] && test_rst=`cat ${test_path}`
++  logi "cat ${test_path}"
++  logi "$test_rst"
++  if [ ! -z "$test_rst" ]; then
++    log_rst "${test_key}:" "OK_${test_rst}"
+   else
+-    log_rst "Ambient Light Sensor:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
++
++  logi ""
+ }
+ 
+-check_bringup() {
+-  logi "==== START ===="
++check_bringup_stage1() {
++  log_rst "==== STAGE1 ==================" "======"
++  check_dev_info
++  check_dev_size
++  check_usb
++  check_i2c 1
++# check_dp_display
++  check_light_sensor "input"
++# check_audio
+   check_modem
+-  check_uart
++# check_sim
+   check_pcie
++# check_wifi
++  check_uart
++# check_bt
+   check_eth
+-  check_sdcard 1000 0
+-  check_usb
+   check_idg_version
++  log_rst "==============================" "======"
++}
++
++check_bringup_stage2() {
++  log_rst "==== STAGE2 ==================" "======"
++  check_dev_info
++  check_usb
++  check_i2c 2
++# check display/backlight/tp
++# check camera
+   check_led
+-  check_sensor
+-  check_i2c
+-  logi "====  END  ===="
++  check_light_sensor "input"
++  check_light_sensor "raw"
++  check_prox_sensor
++# check_mic
++  log_rst "==============================" "======"
++}
++
++check_bringup() {
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++
++  if [ $test_idx -eq 1 ]; then
++    check_bringup_stage1
++  elif [ $test_idx -eq 2 ]; then
++    check_bringup_stage2
++  else
++    check_bringup_stage1
++    check_bringup_stage2
++  fi
+ }
+ 
+ check_sdcard() {
+   # default test 3GB
++  unset_test_array
++
+   test_size=3000000
+   [ ! -z "$1" ] && test_size="$1"
+   sleep_sec=10
+   [ ! -z "$2" ] && sleep_sec="$2"
+   logi "== check_sdcard $test_size KB"
+-  sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6)
++
++  sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6) 2> /dev/null
+   if [ -z "$sdcard_path" ]; then
+     # sleep 10 seconds and try again if sdcard not exist
+     logi "sdcard not found(df /mnt/media_rw/* | grep vold/public | cut -F6)"
+@@ -264,19 +449,23 @@ check_sdcard() {
+       logi "sdcard writing... abort"
+     fi
+   fi
++
+   logi ""
+ }
+ 
+ check_idg_version() {
+   logi "== check idg version"
++  unset_test_array
++
++  test_key="idg_spi"
+   logi "idg_console_tool 2 29000000" # get version
+   logi "`idg_console_tool 2 29000000`"
+   idg_console_tool 2 29000000 | grep -q AP6800
+   ret=$?
+-  if [ $ret = "0" ];then
+-    log_rst "IDG:" "OK"
++  if [ "$ret" = 0 ]; then
++    log_rst "${test_key}:" "OK"
+   else
+-    log_rst "IDG:" "FAIL"
++    log_rst "${test_key}:" "FAIL"
+   fi
+   logi ""
+ }
+@@ -532,23 +721,25 @@ if [ "$(type $1)" != "$1 is a function" ];then
+   exit 1
+ fi
+ 
++set_log_path $2
++
+ repeat_times=$(getprop idt.repeat_times)
+ if [ ! -z "$repeat_times" ];then
+   # execute infinitly if 2nd argument is 0
+   if [ "$repeat_times" = "0" ];then
+     while true
+     do
+-      $1
++      $@
+     done
+   fi
+   # execute as many as 2nd argument specified
+   i=0
+   while [ $i -lt $repeat_times ]
+   do
+-    $1
++    $@
+     i=$(($i+1))
+   done
+ else
+   # execute 1 time if 2nd argument not set
+-  $1
++  $@
+ fi
+diff --git a/imx8m/bringup_test_stageall.bat b/imx8m/bringup_test_stageall.bat
+new file mode 100644
+index 00000000..787bcffc
+--- /dev/null
++++ b/imx8m/bringup_test_stageall.bat
+@@ -0,0 +1,31 @@
++
++@echo off
++
++set /A test_idx=0
++::set test_script=/data/local/tmp/bringup_test.sh
++set test_script=/product/bin/bringup_test.sh
++set adb_tool=adb.exe
++
++%adb_tool% wait-for-device
++FOR /L %%x in (0, 1, 2) DO (
++  FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop sys.boot_completed') DO set rst=%%a
++  if [%rst%] == [1] (goto break)
++  timeout /t 5 >nul
++)
++FOR /L %%x in (0, 1, 6) DO (
++  FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop sys.boot_completed') DO set rst=%%a
++  if [%rst%] == [1] (goto break)
++  timeout /t 5 >nul
++)
++:break
++
++%adb_tool% root
++%adb_tool% shell setenforce 0
++FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop ro.serialno') DO set SN=%%a
++
++%adb_tool% shell %test_script% check_bringup %test_idx%
++%adb_tool% pull /data/local/tmp/%SN%_bringup_test_%test_idx%.txt
++%adb_tool% pull /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++%adb_tool% shell tail -n54 /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++
++PAUSE
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+new file mode 100755
+index 00000000..ce3466b4
+--- /dev/null
++++ b/imx8m/bringup_test_stageall.sh
+@@ -0,0 +1,26 @@
++#!/bin/bash
++
++# test_idx: 0: all / 1: stage1 / 2: stage2
++test_idx=0
++#test_script="/data/local/tmp/bringup_test.sh"
++test_script="/product/bin/bringup_test.sh"
++
++adb wait-for-device
++for i in $(seq 0 90); do
++  sleep 1
++  rst=`adb shell getprop sys.boot_completed`
++  [ -z "$rst" ] && continue
++  [ "$rst" -eq 1 ] && break
++done
++adb root
++adb shell setenforce 0
++SN=`adb shell getprop ro.serialno`
++
++#adb shell rm -f /data/local/tmp/*
++#adb push bringup_test.sh ${test_script}
++#adb shell chmod +x ${test_script}
++
++adb shell ${test_script} check_bringup ${test_idx}
++adb pull /data/local/tmp/${SN}_bringup_test_${test_idx}.txt
++adb pull /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
++adb shell tail -n54 /data/local/tmp/${SN}_bringup_result_${test_idx}.txt

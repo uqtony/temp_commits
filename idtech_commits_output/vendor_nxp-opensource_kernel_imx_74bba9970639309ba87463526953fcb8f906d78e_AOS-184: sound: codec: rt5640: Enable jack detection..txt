@@ -1,0 +1,255 @@
+74bba9970639 Arthur Chen 2020-06-01
+
+AOS-184: sound: codec: rt5640: Enable jack detection.
+
+    Add build condition for DEV board design.
+    Change jack detection initialization logic to match DEV board working.
+    Jack detection is workable internal rt5640.
+    And sound stream output is switched by rt5640 automatically.
+    Currently, interrupt is only for reading status about JD1 pin from rt5640.
+
+Change-Id: Iacc1704e0ebb35f58ea79dfded2916d8452d50ee
+
+diff --git a/sound/soc/codecs/rt5640.c b/sound/soc/codecs/rt5640.c
+index 999bf74937ff..28aafaf62d73 100644
+--- a/sound/soc/codecs/rt5640.c
++++ b/sound/soc/codecs/rt5640.c
+@@ -42,6 +42,8 @@
+ 
+ #define RT5640_PR_BASE (RT5640_PR_RANGE_BASE + (0 * RT5640_PR_SPACING))
+ 
++#define IDTECH_CUSTOMIZED_DESIGN		1  /* enabled: 1, disabled: 0 */
++
+ static const struct regmap_range_cfg rt5640_ranges[] = {
+ 	{ .name = "PR", .range_min = RT5640_PR_BASE,
+ 	  .range_max = RT5640_PR_BASE + 0xb4,
+@@ -2097,6 +2099,8 @@ int rt5640_sel_asrc_clk_src(struct snd_soc_component *component,
+ }
+ EXPORT_SYMBOL_GPL(rt5640_sel_asrc_clk_src);
+ 
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* sample code setting not for DEV board */
++
+ static void rt5640_enable_micbias1_for_ovcd(struct snd_soc_component *component)
+ {
+ 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(component);
+@@ -2156,6 +2160,8 @@ static bool rt5640_micbias1_ovcd(struct snd_soc_component *component)
+ 	return (val & RT5640_MB1_OC_STATUS);
+ }
+ 
++#endif /* sample code setting not for DEV board */
++
+ static bool rt5640_jack_inserted(struct snd_soc_component *component)
+ {
+ 	struct rt5640_priv *rt5640 = snd_soc_component_get_drvdata(component);
+@@ -2179,6 +2185,8 @@ static bool rt5640_jack_inserted(struct snd_soc_component *component)
+ #define BP_POLL_MAXCOUNT	200 /* assume something is wrong after this */
+ #define BP_THRESHOLD		3
+ 
++
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* sample code setting not for DEV board */
+ static void rt5640_start_button_press_work(struct snd_soc_component *component)
+ {
+ 	struct rt5640_priv *rt5640 = snd_soc_component_get_drvdata(component);
+@@ -2245,8 +2253,12 @@ static void rt5640_button_press_work(struct work_struct *work)
+ 	schedule_delayed_work(&rt5640->bp_work, msecs_to_jiffies(BP_POLL_TIME));
+ }
+ 
++#endif /* sample code setting not for DEV board */
++
+ static int rt5640_detect_headset(struct snd_soc_component *component)
+ {
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* sample code setting not for DEV board */
++
+ 	int i, headset_count = 0, headphone_count = 0;
+ 
+ 	/*
+@@ -2285,8 +2297,15 @@ static int rt5640_detect_headset(struct snd_soc_component *component)
+ 				return SND_JACK_HEADSET;
+ 		}
+ 	}
++#endif /* sample code setting not for DEV board */
+ 
+-	dev_err(component->dev, "Error detecting headset vs headphones, bad contact?, assuming headphones
+");
++/*
++ * For DEV board notification testing
++ * TODO: using micbias1 detection to check MIC is exist or not
++ */
++
++	dev_err(component->dev, "Error detecting headset vs headphones, "
++		"bad contact?, assuming headphones
+");
+ 	return SND_JACK_HEADPHONE;
+ }
+ 
+@@ -2296,7 +2315,9 @@ static void rt5640_jack_work(struct work_struct *work)
+ 		container_of(work, struct rt5640_priv, jack_work);
+ 	struct snd_soc_component *component = rt5640->component;
+ 	int status;
++	u32 reg;
+ 
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* sample code setting not for DEV board */
+ 	if (!rt5640_jack_inserted(component)) {
+ 		/* Jack removed, or spurious IRQ? */
+ 		if (rt5640->jack->status & SND_JACK_HEADPHONE) {
+@@ -2346,6 +2367,36 @@ static void rt5640_jack_work(struct work_struct *work)
+ 		 */
+ 		queue_work(system_long_wq, &rt5640->jack_work);
+ 	}
++#else /* IDTECH_CUSTOMIZED_DESIGN */
++
++/*
++ * For DEV board notification testing
++ * TODO: register input device then emit input event: SW_JACK_PHYSICAL_INSERT 7
++ */
++
++	if (!rt5640_jack_inserted(component)) {
++		/* Jack removed, or spurious IRQ? */
++		if (rt5640->jack->status & SND_JACK_HEADPHONE) {
++			reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++			dev_info(component->dev, "jack unplugged, "
++				 "RT5640_INT_IRQ_ST: 0x%x, val: 0x%x
+",
++				 RT5640_INT_IRQ_ST, reg);
++		}
++	} else if (!(rt5640->jack->status & SND_JACK_HEADPHONE)) {
++		/* Jack inserted */
++		status = rt5640_detect_headset(component);
++		reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++		dev_info(component->dev, "jack unplugged, "
++			 "detect status %#02x
+"
++			 "RT5640_GPIO_CTRL1: 0x%x, val: 0x%x
+",
++			 status, RT5640_INT_IRQ_ST, reg);
++	} else {
++		reg = snd_soc_component_read32(component, RT5640_INT_IRQ_ST);
++		dev_info(component->dev, "jack interrupt triggered, "
++			 "RT5640_GPIO_CTRL1: 0x%x, val: 0x%x
+",
++			 RT5640_INT_IRQ_ST, reg);
++	}
++#endif /* IDTECH_CUSTOMIZED_DESIGN */
+ }
+ 
+ static irqreturn_t rt5640_irq(int irq, void *data)
+@@ -2371,6 +2422,7 @@ static void rt5640_enable_jack_detect(struct snd_soc_component *component,
+ {
+ 	struct rt5640_priv *rt5640 = snd_soc_component_get_drvdata(component);
+ 
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* sample code setting not for DEV board */
+ 	/* Select JD-source */
+ 	snd_soc_component_update_bits(component, RT5640_JD_CTRL,
+ 		RT5640_JD_MASK, rt5640->jd_src);
+@@ -2426,7 +2478,44 @@ static void rt5640_enable_jack_detect(struct snd_soc_component *component,
+ 		rt5640_enable_micbias1_for_ovcd(component);
+ 		rt5640_enable_micbias1_ovcd_irq(component);
+ 	}
++#else /* IDTECH_CUSTOMIZED_DESIGN */
++
++	/* For DEV board setting headset detection */
++
++	/* Power down IN1N */
++	snd_soc_component_update_bits(component, RT5640_PWR_ANLG2,
++	(0x1 << 15), (0x0 << 15));
++
++	/* Select JD-source */
++	snd_soc_component_update_bits(component, RT5640_JD_CTRL,
++				      RT5640_JD_MASK | RT5640_JD_HP_MASK |
++				      RT5640_JD_HP_TRG_HI | RT5640_JD_SPL_MASK |
++				      RT5640_JD_SPL_TRG_MASK |
++				      RT5640_JD_SPR_MASK |
++				      RT5640_JD_SPR_TRG_MASK,
++				      rt5640->jd_src | RT5640_JD_HP_EN |
++				      RT5640_JD_HP_TRG_HI | RT5640_JD_SPL_EN |
++				      RT5640_JD_SPL_TRG_LO | RT5640_JD_SPR_EN |
++				      RT5640_JD_SPR_TRG_LO);
++
++	/* Select GPIO01 as an interrupt */
++	snd_soc_component_update_bits(component, RT5640_GPIO_CTRL1,
++				      RT5640_GP1_PIN_MASK, RT5640_GP1_PIN_IRQ);
++	/* Select IRQ/GPIO1 source */
++	snd_soc_component_update_bits(component, RT5640_IRQ_CTRL1,
++				      RT5640_IRQ_JD_MASK | RT5640_JD_STKY_MASK,
++				      RT5640_IRQ_JD_NOR | RT5640_JD_STKY_EN);
++	if (rt5640->jd_inverted)
++		snd_soc_component_update_bits(component, RT5640_IRQ_CTRL1,
++					      RT5640_JD_P_MASK,
++					      RT5640_JD_P_INV);
++	else
++		snd_soc_component_update_bits(component, RT5640_IRQ_CTRL1,
++					      RT5640_JD_P_MASK,
++					      RT5640_JD_P_NOR);
+ 
++	rt5640->jack = jack;
++#endif /* IDTECH_CUSTOMIZED_DESIGN */
+ 	enable_irq(rt5640->irq);
+ 	/* sync initial jack state */
+ 	queue_work(system_long_wq, &rt5640->jack_work);
+@@ -2439,11 +2528,13 @@ static void rt5640_disable_jack_detect(struct snd_soc_component *component)
+ 	disable_irq(rt5640->irq);
+ 	rt5640_cancel_work(rt5640);
+ 
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* no micbias1 detection setting */
+ 	if (rt5640->jack->status & SND_JACK_MICROPHONE) {
+ 		rt5640_disable_micbias1_ovcd_irq(component);
+ 		rt5640_disable_micbias1_for_ovcd(component);
+ 		snd_soc_jack_report(rt5640->jack, 0, SND_JACK_BTN_0);
+ 	}
++#endif /* no micbias1 detection setting */
+ 
+ 	rt5640->jack = NULL;
+ }
+@@ -2467,7 +2558,16 @@ static int rt5640_probe(struct snd_soc_component *component)
+ 	u32 dmic2_data_pin = 0;
+ 	bool dmic_en = false;
+ 	u32 val;
++#if IDTECH_CUSTOMIZED_DESIGN
++	struct snd_soc_jack *jack;
++	int ret;
+ 
++	jack = devm_kzalloc(component->dev, sizeof(struct snd_soc_jack),
++			    GFP_KERNEL);
++	if (jack)
++		mutex_init(&jack->mutex);
++
++#endif /* IDTECH_CUSTOMIZED_DESIGN */
+ 	/* Check if MCLK provided */
+ 	rt5640->mclk = devm_clk_get(component->dev, "mclk");
+ 	if (PTR_ERR(rt5640->mclk) == -EPROBE_DEFER)
+@@ -2589,6 +2689,13 @@ static int rt5640_probe(struct snd_soc_component *component)
+ 				 val);
+ 	}
+ 
++#if IDTECH_CUSTOMIZED_DESIGN
++	ret = snd_soc_component_set_jack(component, jack, NULL);
++	if (ret < 0)
++		dev_err(component->dev, "ASoC: Failed to set_jack: %d
+", ret);
++
++#endif /* IDTECH_CUSTOMIZED_DESIGN */
++
+ 	return 0;
+ }
+ 
+@@ -2829,7 +2936,9 @@ static int rt5640_i2c_probe(struct i2c_client *i2c,
+ 
+ 	rt5640->hp_mute = 1;
+ 	rt5640->irq = irq;
++#if !(IDTECH_CUSTOMIZED_DESIGN) /* no button support yet */
+ 	INIT_DELAYED_WORK(&rt5640->bp_work, rt5640_button_press_work);
++#endif /* no button support yet */
+ 	INIT_WORK(&rt5640->jack_work, rt5640_jack_work);
+ 
+ 	/* Make sure work is stopped on probe-error / remove */
+@@ -2838,8 +2947,8 @@ static int rt5640_i2c_probe(struct i2c_client *i2c,
+ 		return ret;
+ 
+ 	ret = devm_request_irq(&i2c->dev, rt5640->irq, rt5640_irq,
+-			       IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
+-			       | IRQF_ONESHOT, "rt5640", rt5640);
++			       IRQF_TRIGGER_RISING | IRQF_ONESHOT,
++			       "rt5640", rt5640);
+ 	if (ret == 0) {
+ 		/* Gets re-enabled by rt5640_set_jack() */
+ 		disable_irq(rt5640->irq);

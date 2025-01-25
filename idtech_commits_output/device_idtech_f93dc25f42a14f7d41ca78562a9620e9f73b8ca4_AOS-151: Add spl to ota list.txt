@@ -1,0 +1,109 @@
+f93dc25f George.Huang 2020-04-14
+
+AOS-151: Add spl to ota list
+
+Layout of spl_a/spl_bak_a and spl_b/spl_bak_b
+                                                                      PART_OFF
+             ------- +-----------------------------+ partition_start  0x0
+                     |           padding           |
+                     +-----------------------------+ spl_table_off    0x8200   = 32.5 K = 65 sector
+                     |    Secondary Image Table    |
+                     +-----------------------------+ primary_off      0x8400   = 33 K   = 66 sector
+                     |                             |
+                     |            spl_a            |
+                     |                             |
+                     |                             |
+                     |                             |
+                     |                             |
+             ------- +-----------------------------+ secondary_off    0x200000 = 2048 K = 4096 sector
+                     |                             |
+                     |          spl_bak_a          |
+                     |                             |
+                     |                             |
+                     |                             |
+                     |                             |
+                     +-----------------------------+ secondary_end    0x3F7C00 = 4063 K = 8126 sector
+                     |           padding           |
+                     |                             |
+             ------- +-----------------------------+ partition_end    0x400000 = 4096 K = 8192 sector
+
+Change-Id: Ib94c48916afc31f3c5eff8b91cb2f38855362d00
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index f37c9b66..9ea6d9a5 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -104,9 +104,9 @@ BOARD_GPU_LIBDRM := libdrm_imx
+ 
+ AB_OTA_UPDATER := true
+ ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl
+ else
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl
+ endif
+ BOARD_BUILD_SYSTEM_ROOT_IMAGE := true
+ TARGET_NO_RECOVERY := true
+diff --git a/imx8m/sepolicy/device.te b/imx8m/sepolicy/device.te
+index e0aa0aeb..fb355d4c 100644
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@ -9,3 +9,4 @@ type sysfs_block_devices, sysfs_type, fs_type;
+ type mmc_rpmb_char_device, dev_type;
+ type latency_device, dev_type;
+ type bootloader_block_device, dev_type;
++type spl_block_device, dev_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 3172795f..4c9ffed9 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -89,12 +89,6 @@
+ /dev/cpu_dma_latency u:object_r:latency_device:s0
+ /vendor/bin/hw/android\.hardware\.oemlock@1\.0-service\.imx      u:object_r:hal_oemlock_impl_exec:s0
+ 
+-# bootloader
+-/dev/block/mmcblk0boot0        u:object_r:bootloader_block_device:s0
+-/dev/block/mmcblk0boot0p1      u:object_r:bootloader_block_device:s0
+-/dev/block/mmcblk0boot1        u:object_r:bootloader_block_device:s0
+-/dev/block/mmcblk0boot1p1      u:object_r:bootloader_block_device:s0
+-
+ # lsusb command
+ /sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+diff --git a/imx8m/sepolicy/update_engine_common.te b/imx8m/sepolicy/update_engine_common.te
+index 03964b39..19e6bd17 100644
+--- a/imx8m/sepolicy/update_engine_common.te
++++ b/imx8m/sepolicy/update_engine_common.te
+@@ -1,2 +1,3 @@
+ allow update_engine_common vbmeta_block_device:blk_file rw_file_perms;
+ allow update_engine_common bootloader_block_device:blk_file rw_file_perms;
++allow update_engine_common spl_block_device:blk_file rw_file_perms;
+diff --git a/imx8m/vp6820_8mq/init.imx8mq.rc b/imx8m/vp6820_8mq/init.imx8mq.rc
+index 261b7db5..4b3cb375 100755
+--- a/imx8m/vp6820_8mq/init.imx8mq.rc
++++ b/imx8m/vp6820_8mq/init.imx8mq.rc
+@@ -42,5 +42,5 @@ on property:sys.boot_completed=1
+ 
+ on init
+     #IDtech added for AB ota update bootloader
+-    symlink   /dev/block/mmcblk0boot0p1   /dev/block/by-name/bootloader_a
+-    symlink   /dev/block/mmcblk0boot1p1   /dev/block/by-name/bootloader_b
++    symlink   /dev/block/mmcblk0boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk0boot1p1   /dev/block/by-name/spl_b
+diff --git a/imx8m/vp6820_8mq/sepolicy/file_contexts b/imx8m/vp6820_8mq/sepolicy/file_contexts
+index dd14203b..d3afb845 100644
+--- a/imx8m/vp6820_8mq/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/file_contexts
+@@ -21,6 +21,11 @@
+ /dev/block/platform/30b40000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
+ /dev/block/platform/30b40000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
+ /dev/block/platform/30b40000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/30b40000\.usdhc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
++
++# spl
++/dev/block/mmcblk0boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk0boot[01]p[1-9]      u:object_r:spl_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0

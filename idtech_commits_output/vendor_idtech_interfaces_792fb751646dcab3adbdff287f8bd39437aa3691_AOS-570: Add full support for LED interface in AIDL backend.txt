@@ -1,0 +1,393 @@
+792fb75 jay deng 2021-04-08
+
+AOS-570: Add full support for LED interface in AIDL backend
+
+Add below function:
+    setLedBrightness: Set specific LED brightness
+    getLedListSize  : get led list size
+    getLedList      : get led list, should execute getLedListSize
+                      first and according size to locate byte array
+    getLedModeSize  : get led mode list size
+    getLedMode      : get led mode list and current mode, should
+                      execute getLedModeSize first and according size
+                      to locate byte array
+    setLedMode      : set led mode
+
+AIDL limitation     : output parameter only support byte array
+
+Change-Id: Id2fa9e369eae856a26d37f36e697e774d91aa5d3
+
+diff --git a/kioskled/Android.bp b/kioskled/Android.bp
+index e1ce7ca..bd20e42 100644
+--- a/kioskled/Android.bp
++++ b/kioskled/Android.bp
+@@ -12,6 +12,7 @@ cc_binary {
+         "android.hardware.kioskled-ndk_platform",
+         "liblog",
+         "libutils",
++        "libjsoncpp",
+     ],
+     srcs: [
+         "aidl/Kioskled.cpp",
+diff --git a/kioskled/aidl/Kioskled.cpp b/kioskled/aidl/Kioskled.cpp
+index ef71907..daea404 100644
+--- a/kioskled/aidl/Kioskled.cpp
++++ b/kioskled/aidl/Kioskled.cpp
+@@ -4,6 +4,18 @@
+ 
+ #include <android-base/logging.h>
+ #include <fcntl.h>
++#include <json/json.h>
++#include <iostream>
++#include <fstream>
++
++static int filter(const struct dirent *entry) {
++  if (!strcmp(entry->d_name, ".") ||
++      !strcmp(entry->d_name, "..") ||
++      !strcmp(entry->d_name, "mmc0::") ||
++      !strcmp(entry->d_name, "mmc1::"))
++    return false;
++  return true;
++}
+ 
+ namespace aidl {
+ namespace android {
+@@ -27,31 +39,266 @@ int Kioskled::write_int(char const* path, int8_t value) {
+   return 0;
+ }
+ 
+-ScopedAStatus Kioskled::setLed(int8_t idx, int8_t onOff) {
++int Kioskled::getLedNodeById(uint8_t idx, std::string *path) {
++  int count = 0, ret = 0;
++  struct dirent **entry_list;
++
++  count = scandir(DEF_LED_ROOT_PATH, &entry_list, filter, alphasort);
++  if (count <= 0)
++    return -1;
++
++  if (idx >= count || idx < 0) {
++    ret = -1;
++    goto err;
++  }
++
++  *path = entry_list[idx]->d_name;
++
++err:
++  for (int i=0; i<count; i++) {
++    struct dirent *entry = entry_list[i];
++
++    free(entry);
++  }
++  free(entry_list);
++
++  return ret;
++}
++
++int Kioskled::readLedModeList(uint8_t idx, std::string *mode) {
++  int ret = 0;
++  std::string node;
++
++  ret = getLedNodeById(idx, &node);
++  if (ret)
++    return ret;
++
++  std::fstream fs;
++  std::string path;
++  path = DEF_LED_ROOT_PATH;
++  path.append(node);
++  path.append(DEF_LED_MODE_CTL);
++  fs.open(path, std::fstream::in);
++
++  std::string line;
++  while(getline(fs, line)) {
++    (*mode).append(line);
++  }
++  fs.close();
++  return ret;
++}
++
++ScopedAStatus Kioskled::setLedMode(int8_t idx, const std::string& modedata) {
++  int ret = 0;
++  std::string node;
++  std::string modelist;
++
++  ret = getLedNodeById(idx, &node);
++  if (ret)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_BAD_INDEX, "Invalid index"));
++
++  ret = readLedModeList(idx, &modelist);
++  if (ret)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_BAD_INDEX, "Invalid index"));
++
++  Json::Value jsonmode;
++  Json::Reader reader;
++
++  reader.parse(modedata, jsonmode);
++  std::string mode, delay_on, delay_off;
++
++  mode = jsonmode["mode"].asString();
++  std::size_t found = modelist.find(mode);
++  if (found == std::string::npos)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_BAD_VALUE, "Invalid mode type"));
++
++  std::fstream fs;
++  std::string path;
++  path = DEF_LED_ROOT_PATH;
++  path.append(node);
++  path.append(DEF_LED_MODE_CTL);
++  fs.open(path, std::fstream::out);
++
++  fs << mode;
++  fs.close();
++
++  /* Handle timer mode case */
++  if (!mode.compare(DEF_LED_TIMER_MODE)) {
++    int delayCnt = 0;
++    delay_on = jsonmode["OnInterval"].asString();
++    delay_off = jsonmode["OffInterval"].asString();
++
++    if (!delay_on.empty()) {
++      path = DEF_LED_ROOT_PATH;
++      path.append(node);
++      path.append(DEF_LED_DELAY_ON);
++
++      /* Waiting file node,  */
++      while(!access(path.c_str(), F_OK)) {
++        delayCnt++;
++        if (delayCnt>5)
++          break;
++        usleep(50000);
++      }
++
++      /* Update led on interval */
++      fs.open(path, std::fstream::out);
++      fs << delay_on;
++      fs.close();
++    }
++
++    if (!delay_on.empty()) {
++      path = DEF_LED_ROOT_PATH;
++      path.append(node);
++      path.append(DEF_LED_DELAY_OFF);
++
++      /* Waiting file node,  */
++      while(!access(path.c_str(), F_OK)) {
++        delayCnt++;
++        if (delayCnt>5)
++          break;
++        usleep(50000);
++      }
++
++      /* Update led off interval */
++      fs.open(path, std::fstream::out);
++      fs << delay_off;
++      fs.close();
++    }
++  }
++
++  return ScopedAStatus::ok();
++}
++
++ScopedAStatus Kioskled::getLedModeSize(int8_t idx, std::vector<int8_t>* size) {
++  std::vector<int8_t> ledmode;
++  std::vector<int8_t> vec;
++  int length = 0;
++
++  getLedMode(idx, &ledmode);
++
++  length = ledmode.size();
++  vec.reserve(2);
++  for(int i=0; i<2; i++) {
++    vec.push_back(length & 0xFF);
++    length >>= 8;
++  }
++  *size = vec;
++
++  return ScopedAStatus::ok();
++}
++
++ScopedAStatus Kioskled::getLedMode(int8_t idx, std::vector<int8_t>* modeinfo) {
++  int ret = 0;
++  std::string modelist;
++  std::string capability;
++
++  ret = readLedModeList(idx, &modelist);
++  if (ret)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_BAD_INDEX, "Invalid index"));
++
++  std::string line, pattern = " ", selectPattern = "[";
++  size_t left, right, selectIdx;
++  Json::Value cap, root;
++  Json::FastWriter writer;
++
++  right = modelist.find(pattern);
++  left = 0;
++  selectIdx = modelist.find(selectPattern);
++  /* Transfer to JSON format */
++  while (right != std::string::npos) {
++    if (right-left) {
++      if (selectIdx == left) {
++        /* Skip select pattern */
++        cap["Capability"].append(modelist.substr(left+1, right-left-2));
++        cap["Current Mode"].append(modelist.substr(left+1, right-left-2));
++      } else
++        cap["Capability"].append(modelist.substr(left, right-left));
++    }
++    left = right + pattern.size();
++    right = modelist.find(pattern, left);
++  }
++
++  root.append(cap);
++  capability = writer.write(root);
++
++  std::vector<int8_t> vec(capability.begin(), capability.end());
++  *modeinfo = vec;
++
++  return ScopedAStatus::ok();
++}
++
++ScopedAStatus Kioskled::getLedListSize(std::vector<int8_t>* size) {
++  std::vector<int8_t> ledlist;
++  std::vector<int8_t> vec;
++  int length = 0;
++
++  getLedList(&ledlist);
++  length = ledlist.size();
++  vec.reserve(2);
++  for(int i=0; i<2; i++) {
++    vec.push_back(length & 0xFF);
++    length >>= 8;
++  }
++  *size = vec;
++
++  return ScopedAStatus::ok();
++}
++
++ScopedAStatus Kioskled::getLedList(std::vector<int8_t>* ledlist) {
++  int count = 0;
++  struct dirent **entry_list;
++  std::string out;
++  Json::Value led, root;
++  Json::FastWriter writer;
++
++  count = scandir(DEF_LED_ROOT_PATH, &entry_list, filter, alphasort);
++  if (count <= 0)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_NOT_ENOUGH_DATA, "No any leds found"));
++    /* Transfer to JSON format */
++  for (int i=0; i<count; i++) {
++    struct dirent *entry = entry_list[i];
++
++    led["idx"] = i;
++    led["name"] = entry->d_name;
++    root["Leds"].append(led);
++    free(entry);
++  }
++  out = writer.write(root);
++  std::vector<int8_t> vec(out.begin(), out.end());
++  *ledlist = vec;
++  free(entry_list);
++
++  return ScopedAStatus::ok();
++}
++
++ScopedAStatus Kioskled::setLedBrightness(int8_t idx, int8_t onOff) {
+   LOG(INFO) << "Kioskled setting led: " << static_cast<int16_t>(idx)
+             << " to: " << static_cast<int16_t>(onOff);
+ 
+-  switch (idx) {
+-    case KIOSK_LED_4:
+-      write_int(DEF_KIOSK_LED_4, onOff);
+-      break;
++  int ret = 0;
++  std::string node;
+ 
+-    case KIOSK_LED_5:
+-      write_int(DEF_KIOSK_LED_5, onOff);
+-      break;
++  ret = getLedNodeById(idx, &node);
++  if (ret)
++    return ndk::ScopedAStatus(AStatus_fromServiceSpecificErrorWithMessage(
++             STATUS_BAD_INDEX, "Invalid index"));
+ 
+-    case KIOSK_LED_6:
+-      write_int(DEF_KIOSK_LED_6, onOff);
+-      break;
++  std::fstream fs;
++  std::string path;
++  path = DEF_LED_ROOT_PATH;
++  path.append(node);
++  path.append(DEF_LED_BRIGHTNESS_CTL);
++  fs.open(path, std::fstream::out);
+ 
+-    case KIOSK_LED_7:
+-      write_int(DEF_KIOSK_LED_7, onOff);
+-      break;
++  fs << std::to_string(uint8_t(onOff));
++  fs.close();
+ 
+-    default:
+-      LOG(ERROR) << "Invalid led index";
+-      break;
+-  }
+   return ScopedAStatus::ok();
+ }
+ 
+diff --git a/kioskled/aidl/Kioskled.h b/kioskled/aidl/Kioskled.h
+index 0a49397..f1166c4 100644
+--- a/kioskled/aidl/Kioskled.h
++++ b/kioskled/aidl/Kioskled.h
+@@ -3,18 +3,15 @@
+ #pragma once
+ 
+ #include <aidl/android/hardware/kioskled/BnKioskled.h>
++#include <dirent.h>
+ 
+-#define DEF_KIOSK_LED_4  "/sys/class/leds/LED_KIOSK_4/brightness"
+-#define DEF_KIOSK_LED_5  "/sys/class/leds/LED_KIOSK_5/brightness"
+-#define DEF_KIOSK_LED_6  "/sys/class/leds/LED_KIOSK_6/brightness"
+-#define DEF_KIOSK_LED_7  "/sys/class/leds/LED_KIOSK_7/brightness"
+-
+-enum {
+-  KIOSK_LED_4 = 4,
+-  KIOSK_LED_5,
+-  KIOSK_LED_6,
+-  KIOSK_LED_7,
+-};
++#define DEF_LED_ROOT_PATH		"/sys/class/leds/"
++#define DEF_LED_BRIGHTNESS_CTL		"/brightness"
++#define DEF_LED_MODE_CTL		"/trigger"
++#define DEF_LED_NORMAL_MODE		"none"
++#define DEF_LED_TIMER_MODE		"timer"
++#define DEF_LED_DELAY_ON		"/delay_on"
++#define DEF_LED_DELAY_OFF		"/delay_off"
+ 
+ namespace aidl {
+ namespace android {
+@@ -25,10 +22,18 @@ using ::aidl::android::hardware::kioskled::BnKioskled;
+ using ::ndk::ScopedAStatus;
+ 
+ class Kioskled : public BnKioskled {
+-  public:
+-    ScopedAStatus setLed(int8_t idx, int8_t onOff) override;
+-  private:
+-    int write_int(char const* path, int8_t value);
++public:
++	ScopedAStatus setLedBrightness(int8_t idx, int8_t onOff) override;
++	ScopedAStatus getLedListSize(std::vector < int8_t > *size) override;
++	ScopedAStatus getLedList(std::vector < int8_t > *ledlist) override;
++	ScopedAStatus getLedModeSize(int8_t idx, std::vector < int8_t > *size) override;
++	ScopedAStatus getLedMode(int8_t idx, std::vector < int8_t > *modeinfo) override;
++	ScopedAStatus setLedMode(int8_t idx, const std::string & modedata) override;
++
++private:
++	int write_int(char const *path, int8_t value);
++	int getLedNodeById(uint8_t idx, std::string * path);
++	int readLedModeList(uint8_t idx, std::string * modedata);
+ };
+ 
+ }  // namespace kioskled

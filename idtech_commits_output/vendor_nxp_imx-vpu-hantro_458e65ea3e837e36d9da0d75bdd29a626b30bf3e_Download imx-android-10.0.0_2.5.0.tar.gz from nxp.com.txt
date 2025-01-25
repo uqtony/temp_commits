@@ -1,0 +1,3856 @@
+458e65e jenkins 2020-10-22
+
+Download imx-android-10.0.0_2.5.0.tar.gz from nxp.com
+
+Change-Id: I30daa5be5000c0f33c7a61a6d09c21362471de90
+
+diff --git a/Android.bp b/Android.bp
+index 8abe5a1..16d6296 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -40,26 +40,7 @@ cc_defaults {
+     ],
+ }
+ 
+-cc_defaults {
+-    name: "IMX_VPU_INCLUDES",
+-    include_dirs: [
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/memalloc",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/pcidriver",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/pp",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/inc",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/common",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/hevc",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/config",
+-        "vendor/nxp/imx-vpu-hantro/openmax_il/headers",
+-        "vendor/nxp/imx-vpu-hantro/openmax_il/source",
+-        "device/fsl/common/kernel-headers",
+-        "system/core/libion/kernel-headers",
+-        "system/core/libion",
+-        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/h264high",
+-    ],
+-
+ 
+-}
+ 
+ cc_defaults {
+     name: "IMX_VPU_G1_CFLAGS",
+@@ -92,20 +73,6 @@ cc_defaults {
+ }
+ 
+ 
+-cc_defaults {
+-    name: "IMX_VPU_ENC_INCLUDES",
+-    include_dirs: [
+-        "vendor/nxp/imx-vpu-hantro/openmax_il/headers",
+-        "vendor/nxp/imx-vpu-hantro/openmax_il/source",
+-        "vendor/nxp/imx-vpu-hantro/openmax_il/source/encoder",
+-        "vendor/nxp/imx-vpu-hantro/h1_encoder/software/inc",
+-        "vendor/nxp/imx-vpu-hantro/h1_encoder/software/source/common",
+-        "device/fsl/common/kernel-headers",
+-        "system/core/libion/kernel-headers",
+-        "system/core/libion",
+-    ],
+-}
+-
+ // add this defaults to enable debug
+ cc_defaults {
+     name: "IMX_VPU_ENABLE_DEBUG_DEFAULTS",
+@@ -133,6 +100,19 @@ IMX_VPU_DEC_DEFAULTS {
+         "IMX_VPU_FLAGS_DEFAULTS",
+         //"IMX_VPU_ENABLE_DEBUG_DEFAULTS",
+     ],
++
++    include_dirs: [
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/memalloc",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/pcidriver",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/pp",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/inc",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/common",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/hevc",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/config",
++        "vendor/nxp/imx-vpu-hantro/openmax_il/headers",
++        "vendor/nxp/imx-vpu-hantro/openmax_il/source",
++        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/linux/h264high",
++    ],
+ }
+ 
+ IMX_VPU_ENC_DEFAULTS {
+@@ -141,6 +121,14 @@ IMX_VPU_ENC_DEFAULTS {
+         "IMX_VPU_FLAGS_DEFAULTS",
+         //"IMX_VPU_ENABLE_DEBUG_DEFAULTS",
+     ],
++
++    include_dirs: [
++        "vendor/nxp/imx-vpu-hantro/openmax_il/headers",
++        "vendor/nxp/imx-vpu-hantro/openmax_il/source",
++        "vendor/nxp/imx-vpu-hantro/openmax_il/source/encoder",
++        "vendor/nxp/imx-vpu-hantro/h1_encoder/software/inc",
++        "vendor/nxp/imx-vpu-hantro/h1_encoder/software/source/common",
++    ],
+ }
+ 
+ 
+diff --git a/Android_g1.bp b/Android_g1.bp
+index fa0ef7f..635c709 100644
+--- a/Android_g1.bp
++++ b/Android_g1.bp
+@@ -4,11 +4,8 @@ cc_library_shared {
+     defaults: [
+         "IMX_VPU_DEC_DEFAULTS",
+         "IMX_VPU_G1_CFLAGS",
+-        "IMX_VPU_INCLUDES",
+     ],
+ 
+-    include_dirs: ["device/fsl/common/kernel-headers"],
+-
+     srcs: [
+         "decoder_sw/software/linux/dwl/dwl_linux.c",
+         "decoder_sw/software/linux/dwl/dwl_linux_sc.c",
+diff --git a/Android_hantro.bp b/Android_hantro.bp
+index 6efa763..a31f7ac 100644
+--- a/Android_hantro.bp
++++ b/Android_hantro.bp
+@@ -1,11 +1,8 @@
+ cc_library_shared {
+     name: "libhantro",
+ 
+-    include_dirs: ["device/fsl/common/kernel-headers"],
+-
+     defaults: [
+         "IMX_VPU_DEC_DEFAULTS",
+-        "IMX_VPU_INCLUDES",
+     ],
+ 
+     srcs: [
+diff --git a/Android_hantro_h1.bp b/Android_hantro_h1.bp
+index 6eac912..8f84ca3 100644
+--- a/Android_hantro_h1.bp
++++ b/Android_hantro_h1.bp
+@@ -10,7 +10,6 @@ cc_library_shared {
+     defaults: [
+         "IMX_VPU_ENC_DEFAULTS",
+         "IMX_VPU_G1_LDFLAGS",
+-        "IMX_VPU_ENC_INCLUDES",
+     ],
+ 
+     cflags: ["-DEWL_NO_HW_TIMEOUT"],
+@@ -29,8 +28,6 @@ cc_library_shared {
+         },
+     },
+ 
+-    include_dirs: ["device/fsl/common/kernel-headers"],
+-
+     local_include_dirs: [
+         "h1_encoder/software/source/vp8",
+         "h1_encoder/software/source/h264",
+diff --git a/decoder_sw/software/linux/dwl/Android.bp b/decoder_sw/software/linux/dwl/Android.bp
+index 2bb4f41..a1e7569 100644
+--- a/decoder_sw/software/linux/dwl/Android.bp
++++ b/decoder_sw/software/linux/dwl/Android.bp
+@@ -3,7 +3,6 @@ cc_library_static {
+ 
+     defaults: [
+         "IMX_VPU_DEC_DEFAULTS",
+-        "IMX_VPU_INCLUDES",
+     ],
+     srcs: [
+         "dwl_linux.c",
+diff --git a/decoder_sw/software/linux/dwl/dwl_linux.c b/decoder_sw/software/linux/dwl/dwl_linux.c
+index b56c4b0..24770d4 100755
+--- a/decoder_sw/software/linux/dwl/dwl_linux.c
++++ b/decoder_sw/software/linux/dwl/dwl_linux.c
+@@ -1338,8 +1338,11 @@ void DWLFreeLinear(const void *instance, struct DWLLinearMem *info) {
+     case DWL_MEM_TYPE_VPU_ONLY:
+     case DWL_MEM_TYPE_SLICE:
+ #endif // CFG_SECURE_DATA_PATH
+-      if (info->virtual_address != NULL)
++      if (info->virtual_address != NULL) {
+         munmap(info->virtual_address, info->size);
++	info->virtual_address = NULL;
++	info->bus_address = 0;
++      }
+       break;
+ #ifdef CFG_SECURE_DATA_PATH
+     case DWL_MEM_TYPE_DPB:
+@@ -1355,16 +1358,61 @@ void DWLFreeLinear(const void *instance, struct DWLLinearMem *info) {
+   if (info->ion_fd >= 0)
+     close(info->ion_fd);
+ #else // USE_ION
+-  if (info->virtual_address != NULL)
++  if (info->virtual_address != NULL) {
+     munmap(info->virtual_address, info->size);
++    info->virtual_address = NULL;
++  }
+ 
+-  if (info->bus_address != 0)
++  if (info->bus_address != 0) {
+     ioctl(dec_dwl->fd_memalloc, MEMALLOC_IOCSFREEBUFFER, &info->bus_address);
++    info->bus_address = 0;
++  }
+ #endif // USE_ION
+ 
+ 
+ }
+ 
++
++/*------------------------------------------------------------------------------
++    Function name   : DWLFlushCache
++    Description     : Flush the data in the cached buffer
++
++    Return type     : i32 - 0 for success or a negative error code
++
++    Argument        : const void * instance - DWL instance
++    Argument        : void *info - place cached buffer parameters
++------------------------------------------------------------------------------*/
++
++i32 DWLFlushCache(const void *instance, struct DWLLinearMem *info) {
++  struct HANTRODWL *dec_dwl = (struct HANTRODWL *)instance;
++#ifdef USE_ION
++
++  struct dma_buf_sync dma_sync;
++
++  assert(dec_dwl != NULL);
++  assert(info != NULL);
++
++  if (info->ion_fd <= 0)
++    return DWL_OK;
++
++  dma_sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_START;
++
++  if (ioctl(info->ion_fd, DMA_BUF_IOCTL_SYNC, &dma_sync) < 0) {
++      DWL_DEBUG("%s DMA_BUF_IOCTL_SYNC DMA_BUF_SYNC_START failed", __FUNCTION__);
++      return DWL_ERROR;
++  }
++
++  dma_sync.flags = DMA_BUF_SYNC_RW | DMA_BUF_SYNC_END;
++
++  if (ioctl(info->ion_fd, DMA_BUF_IOCTL_SYNC, &dma_sync) < 0) {
++      DWL_DEBUG("%s DMA_BUF_IOCTL_SYNC DMA_BUF_SYNC_END failed", __FUNCTION__);
++      return DWL_ERROR;
++  }
++
++#endif
++  return DWL_OK;
++}
++
+ /*------------------------------------------------------------------------------
+     Function name   : DWLWriteReg
+     Description     : Write a value to a hardware IO register
+diff --git a/decoder_sw/software/linux/dwl/dwl_pc.c b/decoder_sw/software/linux/dwl/dwl_pc.c
+index e60c720..5391b30 100755
+--- a/decoder_sw/software/linux/dwl/dwl_pc.c
++++ b/decoder_sw/software/linux/dwl/dwl_pc.c
+@@ -632,8 +632,10 @@ void DWLFreeRefFrm(const void *instance, struct DWLLinearMem *info) {
+   }
+ #else
+   free(info->virtual_address);
+-  info->size = 0;
+ #endif /* ASIC_TRACE_SUPPORT */
++  info->virtual_address = NULL;
++  info->bus_address = 0;
++  info->size = 0;
+ }
+ 
+ /*------------------------------------------------------------------------------
+@@ -694,6 +696,22 @@ void DWLFreeLinear(const void *instance, struct DWLLinearMem *info) {
+          dwl_inst->linear_total, dwl_inst->linear_alloc_count, (void *)info->virtual_address);
+   free(info->virtual_address);
+   info->size = 0;
++  info->virtual_address = NULL;
++  info->bus_address = 0;
++}
++
++/*------------------------------------------------------------------------------
++    Function name   : DWLFlushCache
++    Description     : Flush the data in the cached buffer
++
++    Return type     : i32 - 0 for success or a negative error code
++
++    Argument        : const void * instance - DWL instance
++    Argument        : void *info - place cached buffer parameters
++------------------------------------------------------------------------------*/
++i32 DWLFlushCache(const void *instance, struct DWLLinearMem *info) {
++  // Do nothing for C-Model.
++  return DWL_OK;
+ }
+ 
+ /*------------------------------------------------------------------------------
+diff --git a/decoder_sw/software/source/Android.bp b/decoder_sw/software/source/Android.bp
+index f507922..0655ec9 100644
+--- a/decoder_sw/software/source/Android.bp
++++ b/decoder_sw/software/source/Android.bp
+@@ -8,7 +8,6 @@ cc_defaults {
+     defaults: [
+         "IMX_VPU_DEC_DEFAULTS",
+         "IMX_VPU_G1_CFLAGS",
+-        "IMX_VPU_INCLUDES",
+     ],
+ 
+     arch: {
+diff --git a/decoder_sw/software/source/avs/avsdecapi.c b/decoder_sw/software/source/avs/avsdecapi.c
+index ed90c1f..c109533 100755
+--- a/decoder_sw/software/source/avs/avsdecapi.c
++++ b/decoder_sw/software/source/avs/avsdecapi.c
+@@ -677,7 +677,7 @@ AvsDecRet AvsDecDecode(AvsDecInst dec_inst,
+             AVS_API_TRC("AvsDecDecode# AVSDEC_NONREF_PIC_SKIPPED
+");
+           }
+           if (!dec_cont->ApiStorage.first_field && dec_cont->pp_enabled)
+-            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+           ret = AvsHandleVlcModeError(dec_cont, input->pic_id);
+           error_concealment = 1;
+         } else
+@@ -702,7 +702,7 @@ AvsDecRet AvsDecDecode(AvsDecInst dec_inst,
+           return AVSDEC_STREAM_NOT_SUPPORTED;
+         }
+         if (!dec_cont->ApiStorage.first_field && dec_cont->pp_enabled)
+-          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+         ret = AvsHandleVlcModeError(dec_cont, input->pic_id);
+         error_concealment = 1;
+         break;
+@@ -869,7 +869,7 @@ AvsDecRet AvsDecDecode(AvsDecInst dec_inst,
+           }
+ 
+           if (dec_cont->pp_enabled) {
+-            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+           }
+           ret = AvsHandleVlcModeError(dec_cont, input->pic_id);
+           error_concealment = 1;
+@@ -1231,11 +1231,12 @@ u32 AvsHandleVlcModeError(DecContainer * dec_cont, u32 pic_num) {
+ 
+   /* error in first picture -> set reference to grey */
+   if(!dec_cont->StrmStorage.frame_number) {
++#if 0
+     (void) DWLmemset(dec_cont->StrmStorage.
+                      p_pic_buf[(i32)dec_cont->StrmStorage.work_out].data.
+                      virtual_address, 128,
+                      384 * dec_cont->StrmStorage.total_mbs_in_frame);
+-
++#endif
+     AvsDecPreparePicReturn(dec_cont);
+ 
+     /* no pictures finished -> return STRM_PROCESSED */
+@@ -1996,7 +1997,7 @@ AvsDecRet AvsDecNextPicture_INTERNAL(AvsDecInst dec_inst,
+       if(BqueueWaitBufNotInUse(&dec_cont->StrmStorage.bq, pic_index) != HANTRO_OK)
+         return AVSDEC_ABORTED;
+       if(dec_cont->pp_enabled) {
+-        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ #endif
+ 
+@@ -2008,7 +2009,7 @@ AvsDecRet AvsDecNextPicture_INTERNAL(AvsDecInst dec_inst,
+         BqueueSetBufferAsUsed(&dec_cont->StrmStorage.bq, pic_index);
+         dec_cont->StrmStorage.p_pic_buf[pic_index].first_show = 0;
+         if(dec_cont->pp_enabled)
+-          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ 
+       dec_cont->StrmStorage.picture_info[dec_cont->fifo_index] = *picture;
+@@ -2067,9 +2068,7 @@ AvsDecRet AvsDecPictureConsumed(AvsDecInst dec_inst, AvsDecPicture * picture) {
+ 
+   if (!dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers; i++) {
+-      if(picture->output_picture_bus_address == dec_cont->StrmStorage.p_pic_buf[i].data.bus_address
+-          && (addr_t)picture->output_picture
+-          == (addr_t)dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address) {
++      if(picture->output_picture_bus_address == dec_cont->StrmStorage.p_pic_buf[i].data.bus_address) {
+         if(dec_cont->pp_instance == NULL) {
+           BqueuePictureRelease(&dec_cont->StrmStorage.bq, i);
+         }
+@@ -2077,7 +2076,7 @@ AvsDecRet AvsDecPictureConsumed(AvsDecInst dec_inst, AvsDecPicture * picture) {
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue,(u32 *)picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+     return (AVSDEC_OK);
+   }
+   return (AVSDEC_PARAM_ERROR);
+@@ -3617,6 +3616,7 @@ AvsDecRet AvsDecGetBufferInfo(AvsDecInst dec_inst, AvsDecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -3625,7 +3625,7 @@ AvsDecRet AvsDecGetBufferInfo(AvsDecInst dec_inst, AvsDecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return AVSDEC_WAITING_FOR_BUFFER;
+ }
+@@ -3635,7 +3635,6 @@ AvsDecRet AvsDecAddBuffer(AvsDecInst dec_inst, struct DWLLinearMem *info) {
+   AvsDecRet dec_ret = AVSDEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return AVSDEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/avs/avsdecapi_internal.c b/decoder_sw/software/source/avs/avsdecapi_internal.c
+index 02cfe88..878c3eb 100755
+--- a/decoder_sw/software/source/avs/avsdecapi_internal.c
++++ b/decoder_sw/software/source/avs/avsdecapi_internal.c
+@@ -191,10 +191,12 @@ AvsDecRet AvsAllocateBuffers(DecContainer * dec_cont) {
+         InputQueueAddBuffer(dec_cont->pp_buffer_queue, &pp_buffer);
+       }
+     }
++#if 0
+     /* initialize first picture buffer (work_out is 1 for the first picture)
+      * grey, may be used as reference in certain error cases */
+     (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                      128, 384 * dec_cont->StrmStorage.total_mbs_in_frame);
++#endif
+ #else
+     if (dec_cont->pp_enabled) {
+       for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+@@ -211,10 +213,12 @@ AvsDecRet AvsAllocateBuffers(DecContainer * dec_cont) {
+           return (AVSDEC_MEMFAIL);
+         }
+       }
++#if 0
+       /* initialize first picture buffer (work_out is 1 for the first picture)
+        * grey, may be used as reference in certain error cases */
+       (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                        128, 384 * dec_cont->StrmStorage.total_mbs_in_frame);
++#endif
+     }
+ #endif
+   }
+@@ -463,7 +467,7 @@ void AvsFreeBuffers(DecContainer * dec_cont) {
+   /* Reference images */
+ #ifndef USE_EXTERNAL_BUFFER
+   for(i = 0; i < dec_cont->StrmStorage.num_buffers; i++) {
+-    if (dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++    if (dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl, &dec_cont->StrmStorage.p_pic_buf[i].data);
+       dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+       dec_cont->StrmStorage.p_pic_buf[i].data.bus_address = 0;
+@@ -471,7 +475,7 @@ void AvsFreeBuffers(DecContainer * dec_cont) {
+   }
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.pp_buffer[i].virtual_address != NULL) {
++      if(dec_cont->StrmStorage.pp_buffer[i].bus_address != 0) {
+         DWLFreeLinear(dec_cont->dwl,
+                       &dec_cont->StrmStorage.pp_buffer[i]);
+         dec_cont->StrmStorage.pp_buffer[i].virtual_address = NULL;
+@@ -487,7 +491,7 @@ void AvsFreeBuffers(DecContainer * dec_cont) {
+ #else
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++      if(dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+         DWLFreeRefFrm(dec_cont->dwl,
+                       &dec_cont->StrmStorage.p_pic_buf[i].data);
+         dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+diff --git a/decoder_sw/software/source/common/Android.mk b/decoder_sw/software/source/common/Android.mk
+deleted file mode 100755
+index c54a505..0000000
+--- a/decoder_sw/software/source/common/Android.mk
++++ /dev/null
+@@ -1,31 +0,0 @@
+-LOCAL_PATH := $(call my-dir)
+-include $(CLEAR_VARS)
+-
+-LOCAL_SRC_FILES := \
+-    bqueue.c \
+-    commonconfig.c \
+-    fifo.c \
+-    raster_buffer_mgr.c \
+-    regdrv.c \
+-    sw_stream.c \
+-    input_queue.c \
+-    sw_util.c \
+-    stream_corrupt.c \
+-	workaround.c \
+-	refbuffer.c \
+-	tiledref.c \
+-	errorhandling.c \
+-	../pp/ppapi.c \
+-	../pp/ppinternal.c \
+-	regdrv_g1.c
+-        
+-LOCAL_CFLAGS += $(IMX_VPU_CFLAGS) 
+-
+-LOCAL_LDFLAGS += $(IMX_VPU_LDFLAGS)
+- 
+-LOCAL_C_INCLUDES += $(IMX_VPU_INCLUDES)
+-
+-LOCAL_MODULE:= lib_imx_vsi_common
+-LOCAL_MODULE_TAGS := optional
+-include $(BUILD_STATIC_LIBRARY)
+-
+diff --git a/decoder_sw/software/source/common/input_queue.c b/decoder_sw/software/source/common/input_queue.c
+index 7eccf5e..098ad4d 100755
+--- a/decoder_sw/software/source/common/input_queue.c
++++ b/decoder_sw/software/source/common/input_queue.c
+@@ -213,7 +213,7 @@ struct DWLLinearMem *InputQueueGetBuffer(InputQueue queue, u32 wait) {
+   buffer = (struct DWLLinearMem *)((addr_t )j);
+ 
+   for (i = 0; i < q->n_buffers; i++) {
+-    if (q->buffers[i].virtual_address == buffer->virtual_address) {
++    if (q->buffers[i].bus_address == buffer->bus_address) {
+       break;
+     }
+   }
+@@ -278,7 +278,7 @@ void InputQueueWaitPending(InputQueue queue) {
+ #endif /* BUFFER_QUEUE_PRINT_STATUS */
+ }
+ 
+-struct DWLLinearMem *InputQueueReturnBuffer(InputQueue queue, const u32 *addr) {
++struct DWLLinearMem *InputQueueReturnBuffer(InputQueue queue, const addr_t addr) {
+ #ifdef BUFFER_QUEUE_PRINT_STATUS
+   printf(__FUNCTION__);
+   printf("()");
+@@ -292,7 +292,7 @@ struct DWLLinearMem *InputQueueReturnBuffer(InputQueue queue, const u32 *addr) {
+   struct DWLLinearMem *buffer = NULL;
+ 
+   for (i = 0; i < q->n_buffers; i++) {
+-    if (q->buffers[i].virtual_address == addr) {
++    if (q->buffers[i].bus_address == addr) {
+       buffer = &q->buffers[i];
+       break;
+     }
+@@ -411,7 +411,7 @@ void InputQueueWaitNotUsed(InputQueue queue) {
+ #endif
+ }
+ 
+-void InputQueueWaitBufNotUsed(InputQueue queue, const u32 *addr) {
++void InputQueueWaitBufNotUsed(InputQueue queue, const addr_t addr) {
+ #ifdef BUFFER_QUEUE_PRINT_STATUS
+   printf(__FUNCTION__);
+   printf("()");
+@@ -422,7 +422,7 @@ void InputQueueWaitBufNotUsed(InputQueue queue, const u32 *addr) {
+   struct DWLLinearMem *buffer = NULL;
+   struct IQueue* q = (struct IQueue*)queue;
+   for (i = 0; i < q->n_buffers; i++) {
+-    if (q->buffers[i].virtual_address == addr) {
++    if (q->buffers[i].bus_address == addr) {
+       buffer = &q->buffers[i];
+       break;
+     }
+@@ -440,7 +440,7 @@ void InputQueueWaitBufNotUsed(InputQueue queue, const u32 *addr) {
+ #endif /* BUFFER_QUEUE_PRINT_STATUS */
+ }
+ 
+-void InputQueueSetBufAsUsed(InputQueue queue, const u32 *addr) {
++void InputQueueSetBufAsUsed(InputQueue queue, const addr_t addr) {
+ #ifdef BUFFER_QUEUE_PRINT_STATUS
+   printf(__FUNCTION__);
+   printf("()");
+@@ -451,7 +451,7 @@ void InputQueueSetBufAsUsed(InputQueue queue, const u32 *addr) {
+   struct DWLLinearMem *buffer = NULL;
+   struct IQueue* q = (struct IQueue*)queue;
+   for (i = 0; i < q->n_buffers; i++) {
+-    if (q->buffers[i].virtual_address == addr) {
++    if (q->buffers[i].bus_address == addr) {
+       buffer = &q->buffers[i];
+       break;
+     }
+diff --git a/decoder_sw/software/source/common/input_queue.h b/decoder_sw/software/source/common/input_queue.h
+index 7d7b26a..0ddd49f 100755
+--- a/decoder_sw/software/source/common/input_queue.h
++++ b/decoder_sw/software/source/common/input_queue.h
+@@ -61,14 +61,14 @@ struct DWLLinearMem *InputQueueGetBuffer(InputQueue queue, u32 wait);
+ /* Function to wait until all buffers are in available status. */
+ void InputQueueWaitNotUsed(InputQueue queue);
+ 
+-void InputQueueWaitBufNotUsed(InputQueue queue, const u32 *addr);
++void InputQueueWaitBufNotUsed(InputQueue queue, const addr_t addr);
+ 
+-void InputQueueSetBufAsUsed(InputQueue queue, const u32 *addr);
++void InputQueueSetBufAsUsed(InputQueue queue, const addr_t addr);
+ 
+ void InputQueueAddBuffer(InputQueue queue, struct DWLLinearMem *buffer);
+ 
+ /* Return buffer to input queue so that it can be used freely. */
+-struct DWLLinearMem *InputQueueReturnBuffer(InputQueue queue, const u32 *addr);
++struct DWLLinearMem *InputQueueReturnBuffer(InputQueue queue, const addr_t addr);
+ 
+ void InputQueueWaitPending(InputQueue queue);
+ 
+diff --git a/decoder_sw/software/source/common/raster_buffer_mgr.c b/decoder_sw/software/source/common/raster_buffer_mgr.c
+index 8e9d4f7..a4dc52d 100755
+--- a/decoder_sw/software/source/common/raster_buffer_mgr.c
++++ b/decoder_sw/software/source/common/raster_buffer_mgr.c
+@@ -215,7 +215,7 @@ void RbmAddPpBuffer(RasterBufferMgr instance, struct DWLLinearMem *pp_buffer, i3
+   InputQueueAddBuffer(inst->pp_queue, pp_buffer);
+ }
+ 
+-struct DWLLinearMem * RbmReturnPpBuffer(RasterBufferMgr instance, const u32 *addr) {
++struct DWLLinearMem * RbmReturnPpBuffer(RasterBufferMgr instance, const addr_t addr) {
+   RasterBufferMgrInst* inst = (RasterBufferMgrInst*)instance;
+ 
+   return (InputQueueReturnBuffer(inst->pp_queue, addr));
+diff --git a/decoder_sw/software/source/common/raster_buffer_mgr.h b/decoder_sw/software/source/common/raster_buffer_mgr.h
+index 8c811fd..1369344 100755
+--- a/decoder_sw/software/source/common/raster_buffer_mgr.h
++++ b/decoder_sw/software/source/common/raster_buffer_mgr.h
+@@ -63,7 +63,7 @@ void RbmRelease(RasterBufferMgr inst);
+ #ifdef USE_EXTERNAL_BUFFER
+ struct DWLLinearMem RbmNextReleaseBuffer(RasterBufferMgr inst);
+ void RbmAddPpBuffer(RasterBufferMgr instance, struct DWLLinearMem *pp_buffer, i32 i);
+-struct DWLLinearMem * RbmReturnPpBuffer(RasterBufferMgr instance, const u32 *addr);
++struct DWLLinearMem * RbmReturnPpBuffer(RasterBufferMgr instance, const addr_t addr);
+ void RbmReturnAllPpBuffer(RasterBufferMgr instance);
+ void RbmResetPpBuffer(RasterBufferMgr instance);
+ void RbmWaitPending(RasterBufferMgr instance);
+diff --git a/decoder_sw/software/source/common/workaround.c b/decoder_sw/software/source/common/workaround.c
+index 9ab94b0..b43c8e0 100755
+--- a/decoder_sw/software/source/common/workaround.c
++++ b/decoder_sw/software/source/common/workaround.c
+@@ -326,8 +326,10 @@ void InitWorkarounds(u32 dec_mode, workaround_t *p_workarounds) {
+   }
+ 
+ 
++#ifndef DISABLE_CPU_ACCESS
+   if (dec_mode == 5 /*MPEG2*/ )
+     p_workarounds->mpeg.start_code = HANTRO_TRUE;
++#endif
+ 
+ }
+ 
+diff --git a/decoder_sw/software/source/h264high/h264decapi.c b/decoder_sw/software/source/h264high/h264decapi.c
+index 602a309..312bb60 100755
+--- a/decoder_sw/software/source/h264high/h264decapi.c
++++ b/decoder_sw/software/source/h264high/h264decapi.c
+@@ -1795,8 +1795,9 @@ RESOURCE_NOT_READY:
+         if (dec_cont->storage.partial_freeze) {
+           dpbStorage_t *dpb_partial = &dec_cont->storage.dpb[1];
+           do {
+-            ref_data = h264bsdGetRefPicDataVlcMode(dpb_partial,
+-                                                   dpb_partial->list[index], 0);
++            struct DWLLinearMem ref = h264bsdGetRefPicDataVlcMode(dpb_partial,
++                                      dpb_partial->list[index], 0);
++            ref_data = ref.virtual_address;
+             index++;
+           } while(index < 16 && ref_data == NULL);
+         }
+@@ -1970,7 +1971,7 @@ RESOURCE_NOT_READY:
+           h264RemoveNoBumpOutput(&storage->dpb[0], (&storage->dpb[0])->num_out - (&storage->dpb[1])->num_out);
+ 
+         if(dec_cont->pp_enabled) {
+-          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, storage->dpb->current_out->ds_data->virtual_address);
++          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, storage->dpb->current_out->ds_data->bus_address);
+         }
+         /* we trust our memcpy; ignore return value */
+         (void) DWLmemcpy(&storage->dpb[0], &storage->dpb[1],
+@@ -2077,8 +2078,9 @@ RESOURCE_NOT_READY:
+         if (dec_cont->storage.partial_freeze) {
+           dpbStorage_t *dpb_partial = &dec_cont->storage.dpb[1];
+           do {
+-            ref_data = h264bsdGetRefPicDataVlcMode(dpb_partial,
+-                                                   dpb_partial->list[index], 0);
++            struct DWLLinearMem ref = h264bsdGetRefPicDataVlcMode(dpb_partial,
++                                      dpb_partial->list[index], 0);
++            ref_data = ref.virtual_address;
+             index++;
+           } while(index < 16 && ref_data == NULL);
+         }
+@@ -2255,7 +2257,7 @@ RESOURCE_NOT_READY:
+ 
+       h264UpdateAfterPictureDecode(dec_cont);
+       if(dec_cont->pp_enabled)
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.dpb->current_out->ds_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.dpb->current_out->ds_data->bus_address);
+ 
+       /* PP will run in H264DecNextPicture() for this concealed picture */
+ 
+@@ -3259,6 +3261,7 @@ void h264InitPicFreezeOutput(decContainer_t * dec_cont, u32 from_old_dpb) {
+ 
+   /* update status of decoded image (relevant only for  multi-Core) */
+   /* current out is always in dpb[0] */
++  if (dec_cont->b_mc)
+   {
+     dpbPicture_t *current_out = storage->dpb->current_out;
+ 
+@@ -3272,7 +3275,9 @@ void h264InitPicFreezeOutput(decContainer_t * dec_cont, u32 from_old_dpb) {
+   u32 index = 0;
+   const u8 *ref_data;
+   do {
+-    ref_data = h264bsdGetRefPicDataVlcMode(dpb, dpb->list[index], 0);
++    struct DWLLinearMem ref = h264bsdGetRefPicDataVlcMode(dpb,
++                              dpb->list[index], 0);
++    ref_data = ref.virtual_address;
+     index++;
+   } while(index < 16 && ref_data == NULL);
+ #endif
+@@ -3784,8 +3789,7 @@ H264DecRet H264DecPictureConsumed(H264DecInst dec_inst,
+     /* find the mem descriptor for this specific buffer, base view first */
+     dpb = dec_cont->storage.dpbs[0];
+     for(i = 0; i < dpb->tot_buffers; i++) {
+-      if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address &&
+-          picture->output_picture == dpb->pic_buffers[i].virtual_address) {
++      if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address) {
+         id = i;
+         break;
+       }
+@@ -3796,8 +3800,7 @@ H264DecRet H264DecPictureConsumed(H264DecInst dec_inst,
+       dpb = dec_cont->storage.dpbs[1];
+       /* find the mem descriptor for this specific buffer */
+       for(i = 0; i < dpb->tot_buffers; i++) {
+-        if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address &&
+-            picture->output_picture == dpb->pic_buffers[i].virtual_address) {
++        if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address) {
+           id = i;
+           break;
+         }
+@@ -3809,7 +3812,7 @@ H264DecRet H264DecPictureConsumed(H264DecInst dec_inst,
+ 
+     PopOutputPic(&dec_cont->fb_list, dpb->pic_buff_id[id]);
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+   }
+ 
+   return H264DEC_OK;
+@@ -3972,7 +3975,7 @@ H264DecRet H264DecNextPicture_INTERNAL(H264DecInst dec_inst,
+ 
+     /* Consume reference buffer when only output pp buffer. */
+     if (dec_cont->pp_enabled) {
+-      InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue, output->output_picture);
++      InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue, output->output_picture_bus_address);
+       PopOutputPic(&dec_cont->fb_list, out_pic->mem_idx);
+     }
+ 
+@@ -4227,6 +4230,7 @@ H264DecRet H264DecGetBufferInfo(H264DecInst dec_inst, H264DecBufferInfo *mem_inf
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -4235,7 +4239,7 @@ H264DecRet H264DecGetBufferInfo(H264DecInst dec_inst, H264DecBufferInfo *mem_inf
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return H264DEC_WAITING_FOR_BUFFER;
+ }
+@@ -4245,7 +4249,7 @@ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+   H264DecRet dec_ret = H264DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
++      //X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return H264DEC_PARAM_ERROR;
+@@ -4282,9 +4286,11 @@ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+           dpb->pic_buff_id[i] = id;
+         }
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+         void *base =
+           (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+         (void)DWLmemset(base, 0, info->size - dpb->dir_mv_offset);
++#endif
+ 
+         dec_cont->buffer_index[0]++;
+         if(dec_cont->buffer_index[0] < dpb->tot_buffers)
+@@ -4307,10 +4313,11 @@ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+         dpb->pic_buff_id[i] = id;
+         dpb[1].pic_buff_id[i] = id;
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+         void *base =
+           (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+         (void)DWLmemset(base, 0, info->size - dpb->dir_mv_offset);
+-
++#endif
+         dec_cont->buffer_index[0]++;
+         dpb->tot_buffers++;
+         dpb[1].tot_buffers++;
+@@ -4350,10 +4357,11 @@ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+             dpb->pic_buff_id[idx[i]] = id;
+           }
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+           void *base =
+             (char *)(dpb->pic_buffers[idx[i]].virtual_address) + dpb->dir_mv_offset;
+           (void)DWLmemset(base, 0, info->size - dpb->dir_mv_offset);
+-
++#endif
+           dec_cont->buffer_index[i]++;
+           if(dec_cont->buffer_index[i] < dpb->tot_buffers)
+             dec_ret = H264DEC_WAITING_FOR_BUFFER;
+@@ -4377,10 +4385,11 @@ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+       }
+       dpb->pic_buff_id[idx[i]] = id;
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+       void *base =
+         (char *)(dpb->pic_buffers[idx[i]].virtual_address) + dpb->dir_mv_offset;
+       (void)DWLmemset(base, 0, info->size - dpb->dir_mv_offset);
+-
++#endif
+       dec_cont->buffer_index[i]++;
+       dpb->tot_buffers++;
+ 
+diff --git a/decoder_sw/software/source/h264high/h264decmcapi.c b/decoder_sw/software/source/h264high/h264decmcapi.c
+index 4309871..9cffd18 100755
+--- a/decoder_sw/software/source/h264high/h264decmcapi.c
++++ b/decoder_sw/software/source/h264high/h264decmcapi.c
+@@ -207,8 +207,7 @@ H264DecRet H264DecMCPictureConsumed(H264DecInst dec_inst,
+   /* find the mem descriptor for this specific buffer, base view first */
+   dpb = dec_cont->storage.dpbs[0];
+   for(i = 0; i < dpb->tot_buffers; i++) {
+-    if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address &&
+-        picture->output_picture == dpb->pic_buffers[i].virtual_address) {
++    if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address) {
+       id = i;
+       break;
+     }
+@@ -219,8 +218,7 @@ H264DecRet H264DecMCPictureConsumed(H264DecInst dec_inst,
+     dpb = dec_cont->storage.dpbs[1];
+     /* find the mem descriptor for this specific buffer */
+     for(i = 0; i < dpb->tot_buffers; i++) {
+-      if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address &&
+-          picture->output_picture == dpb->pic_buffers[i].virtual_address) {
++      if(picture->output_picture_bus_address == dpb->pic_buffers[i].bus_address) {
+         id = i;
+         break;
+       }
+diff --git a/decoder_sw/software/source/h264high/h264hwd_asic.c b/decoder_sw/software/source/h264high/h264hwd_asic.c
+index 1dc0055..3c2330a 100755
+--- a/decoder_sw/software/source/h264high/h264hwd_asic.c
++++ b/decoder_sw/software/source/h264high/h264hwd_asic.c
+@@ -426,6 +426,7 @@ u32 H264RunAsic(decContainer_t * dec_cont, DecAsicBuffers_t * p_asic_buff) {
+         SetDecRegister(dec_cont->h264_regs, HWIF_WRITE_MVS_E, 0);
+ 
+       /* make sure that output pic sync memory is cleared */
++      if (dec_cont->b_mc)
+       {
+         char *sync_base =
+           (char *) (p_asic_buff->out_buffer->virtual_address) +
+@@ -489,8 +490,9 @@ skipped_high_profile:
+       u32 pic_id0 = 0;
+       u32 pic_id1 = 0;
+       u32 flags = dec_cont->b_mc ? REFBU_DONT_USE_STATS : 0;
+-      const u8 *pic_id0_valid = NULL;
+-      const u8 *pic_id1_valid = NULL;
++      addr_t pic_id0_valid = 0;
++      addr_t pic_id1_valid = 0;
++      struct DWLLinearMem buf;
+       u32 is_intra_frame = IS_I_SLICE(p_slice_header->slice_type);
+       refbuMode_e ref_buff_mode;
+ 
+@@ -508,27 +510,29 @@ skipped_high_profile:
+       /* Find first valid reference picture for pic_id0 */
+       for (i = 0 ; i < 16 ; ++i) {
+         pic_id0 = i;
+-        pic_id0_valid = h264bsdGetRefPicDataVlcMode(dpb + 1, pic_id0, 0);
+-        if(pic_id0_valid != NULL)
++	buf =  h264bsdGetRefPicDataVlcMode(dpb + 1, pic_id0, 0);
++	pic_id0_valid = buf.bus_address;
++        if(pic_id0_valid)
+           break;
+       }
+       /* Find 2nd valid reference picture for pic_id1 */
+       for (++i ; i < 16 ; ++i) {
+         pic_id1 = i;
+-        pic_id1_valid = h264bsdGetRefPicDataVlcMode(dpb + 1, pic_id1, 0);
+-        if(pic_id1_valid != NULL)
++        buf = h264bsdGetRefPicDataVlcMode(dpb + 1, pic_id1, 0);
++	pic_id1_valid = buf.bus_address;
++        if(pic_id1_valid)
+           break;
+       }
+ 
+       /* If pic_id0 is not valid, just tell reference buffer that this is
+          an Intra frame, which will implicitly disable buffering. */
+-      if(pic_id0_valid == NULL) {
++      if(pic_id0_valid == 0) {
+         is_intra_frame = 1;
+-      } else if ((p_pps->num_ref_idx_l0_active > 1) && (pic_id1_valid != NULL)) {
++      } else if ((p_pps->num_ref_idx_l0_active > 1) && (pic_id1_valid != 0)) {
+         flags |= REFBU_MULTIPLE_REF_FRAMES;
+       }
+ 
+-      if(pic_id1_valid == NULL) {
++      if(pic_id1_valid == 0) {
+         /* make sure that double buffer uses valid picId */
+         pic_id1 = pic_id0;
+       }
+@@ -1409,6 +1413,7 @@ void H264SetupVlcRegs(decContainer_t * dec_cont) {
+ 
+   /* reference picture flags */
+ 
++  struct DWLLinearMem buf;
+   /* TODO separate fields */
+   if(p_slice_header->field_pic_flag) {
+     ASSERT(dec_cont->h264_profile_support != H264_BASELINE_PROFILE);
+@@ -1424,10 +1429,13 @@ void H264SetupVlcRegs(decContainer_t * dec_cont) {
+           (p_dpb->current_out->pic_code_type[0] == DEC_PIC_TYPE_I
+            && p_dpb->current_out->is_idr[0] == 0) &&
+           IS_P_SLICE(p_slice_header->slice_type) &&
+-          (i & 1) && dec_cont->pic_number == 1)
+-        tmp = h264bsdGetRefPicDataVlcMode(p_dpb, i-1, 1) != NULL;
+-      else
+-        tmp = h264bsdGetRefPicDataVlcMode(p_dpb, i, 1) != NULL;
++          (i & 1) && dec_cont->pic_number == 1) {
++        buf = h264bsdGetRefPicDataVlcMode(p_dpb, i-1, 1);
++        tmp = (buf.bus_address != 0);
++      } else {
++        buf = h264bsdGetRefPicDataVlcMode(p_dpb, i, 1);
++        tmp = (buf.bus_address != 0);
++      }
+ 
+       valid_flags = valid_flags << 1 | tmp;
+     }
+@@ -1441,7 +1449,8 @@ void H264SetupVlcRegs(decContainer_t * dec_cont) {
+                       p_dpb->buffer[n].status[1] == 3;
+       long_termflags = long_termflags << 1 | long_term_tmp;
+ 
+-      tmp = h264bsdGetRefPicDataVlcMode(p_dpb, n, 0) != NULL;
++      buf = h264bsdGetRefPicDataVlcMode(p_dpb, n, 0);
++      tmp = (buf.bus_address != 0);
+       valid_flags = valid_flags << 1 | tmp;
+     }
+     valid_flags <<= 16;
+diff --git a/decoder_sw/software/source/h264high/h264hwd_dpb.c b/decoder_sw/software/source/h264high/h264hwd_dpb.c
+index 70fdb0d..85ccf21 100755
+--- a/decoder_sw/software/source/h264high/h264hwd_dpb.c
++++ b/decoder_sw/software/source/h264high/h264hwd_dpb.c
+@@ -1255,7 +1255,7 @@ u32 h264bsdMarkDecRefPic(dpbStorage_t * dpb,
+               (dpb->buffer[i].status[0] == UNUSED && dpb->buffer[i].status[1] == UNUSED)) {
+             SET_STATUS(dpb->buffer[i], UNUSED, FRAME);
+             if(storage->pp_enabled && dpb->buffer[i].to_be_displayed) {
+-              InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->virtual_address);
++              InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->bus_address);
+             }
+             dpb->buffer[i].to_be_displayed = 0;
+             DpbBufFree(dpb, i);
+@@ -1264,7 +1264,7 @@ u32 h264bsdMarkDecRefPic(dpbStorage_t * dpb,
+           if (dpb->buffer[i].pic_num < 0 && dpb->buffer[i].to_be_displayed) {
+             SET_STATUS(dpb->buffer[i], UNUSED, FRAME);
+             if(storage->pp_enabled && dpb->buffer[i].to_be_displayed) {
+-              InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->virtual_address);
++              InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->bus_address);
+             }
+             dpb->buffer[i].to_be_displayed = 0;
+             DpbBufFree(dpb, i);
+@@ -1334,13 +1334,13 @@ u32 h264bsdMarkDecRefPic(dpbStorage_t * dpb,
+           DEBUG_PRINT(("Same frame num in DPB buf %d and DBP buf %d -> flush
+", i, j));
+           SET_STATUS(dpb->buffer[i], UNUSED, FRAME);
+           if(storage->pp_enabled && dpb->buffer[i].to_be_displayed) {
+-            InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->virtual_address);
++            InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->bus_address);
+           }
+           dpb->buffer[i].to_be_displayed = 0;
+           DpbBufFree(dpb, i);
+           SET_STATUS(dpb->buffer[j], UNUSED, FRAME);
+           if(storage->pp_enabled && dpb->buffer[j].to_be_displayed) {
+-            InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[j].ds_data->virtual_address);
++            InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[j].ds_data->bus_address);
+           }
+           dpb->buffer[j].to_be_displayed = 0;
+           DpbBufFree(dpb, j);
+@@ -1484,28 +1484,30 @@ i32 h264bsdGetRefPicData(const dpbStorage_t * dpb, u32 index) {
+ 
+ ------------------------------------------------------------------------------*/
+ 
+-u8 *h264bsdGetRefPicDataVlcMode(const dpbStorage_t * dpb, u32 index,
++struct DWLLinearMem h264bsdGetRefPicDataVlcMode(const dpbStorage_t * dpb, u32 index,
+                                 u32 field_mode) {
+ 
+   /* Variables */
++  struct DWLLinearMem empty;
++  (void)DWLmemset(&empty, 0, sizeof(struct DWLLinearMem));
+ 
+   /* Code */
+ 
+   if(!field_mode) {
+     if(index >= dpb->dpb_size)
+-      return (NULL);
++      return empty;
+     else if(!IS_EXISTING(dpb->buffer[index], FRAME))
+-      return (NULL);
++      return empty;
+     else
+-      return (u8 *) (dpb->buffer[index].data->virtual_address);
++      return *(dpb->buffer[index].data);
+   } else {
+     const u32 field = (index & 1) ? BOTFIELD : TOPFIELD;
+     if(index / 2 >= dpb->dpb_size)
+-      return (NULL);
++      return empty;
+     else if(!IS_EXISTING(dpb->buffer[index / 2], field))
+-      return (NULL);
++      return empty;
+     else
+-      return (u8 *) (dpb->buffer[index / 2].data->virtual_address);
++      return  *(dpb->buffer[index / 2].data);
+   }
+ 
+ }
+@@ -1921,6 +1923,7 @@ u32 h264bsdInitDpb(
+       dpb->pic_buff_id[i] = id;
+     }
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+     if(p_dpb_params->is_high_supported) {
+       /* reset direct motion vectors */
+       void * base = (char *) (dpb->pic_buffers[i].virtual_address) +
+@@ -1932,6 +1935,7 @@ u32 h264bsdInitDpb(
+              dpb->sync_mc_offset;
+       (void)DWLmemset(base, ~0, 32);
+     }
++#endif
+ 
+     if (((storage_t *)(dpb->storage))->pp_enabled) {
+       /* Add PP output buffers. */
+@@ -1947,7 +1951,7 @@ u32 h264bsdInitDpb(
+     }
+ #else
+     if (!((storage_t *)(dpb->storage))->pp_enabled) {
+-      if (dpb->pic_buffers[i].virtual_address == NULL)
++      if (dpb->pic_buffers[i].bus_address == 0)
+         return H264DEC_WAITING_FOR_BUFFER;
+     } else {
+       dpb->pic_buffers[i].mem_type = DWL_MEM_TYPE_DPB;
+@@ -1973,6 +1977,7 @@ u32 h264bsdInitDpb(
+         dpb->pic_buff_id[i] = id;
+       }
+ 
++#ifdef SET_EMPTY_PICTURE_DATA
+       if(p_dpb_params->is_high_supported) {
+         /* reset direct motion vectors */
+         void * base = (char *) (dpb->pic_buffers[i].virtual_address) +
+@@ -1984,6 +1989,7 @@ u32 h264bsdInitDpb(
+                dpb->sync_mc_offset;
+         (void)DWLmemset(base, ~0, 32);
+       }
++#endif
+ 
+     }
+ #endif
+@@ -2715,7 +2721,7 @@ void h264bsdFreeDpb(
+ 
+   for(i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-    if(dpb->pic_buffers[i].virtual_address != NULL)
++    if(dpb->pic_buffers[i].bus_address)
+ #endif
+     {
+ #ifdef USE_EXTERNAL_BUFFER
+@@ -3054,7 +3060,7 @@ void h264EmptyDpb(dpbStorage_t *dpb) {
+ #ifdef USE_OMXIL_BUFFER
+   for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-    if (dpb->pic_buffers[i].virtual_address != NULL)
++    if (dpb->pic_buffers[i].bus_address)
+ #endif
+     {
+       if (dpb->pic_buff_id[i] != FB_NOT_VALID_ID) {
+@@ -3127,7 +3133,7 @@ void h264DpbRecover(dpbStorage_t *dpb, u32 curr_frame_num, i32 curr_poc) {
+       buffer[i].status[0] = UNUSED;
+       buffer[i].status[1] = UNUSED;
+       if(storage->pp_enabled && dpb->buffer[i].to_be_displayed) {
+-        InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->virtual_address);
++        InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->bus_address);
+       }
+       buffer[i].to_be_displayed = 0;
+       DpbBufFree(dpb, i);
+@@ -3140,7 +3146,7 @@ void h264DpbRecover(dpbStorage_t *dpb, u32 curr_frame_num, i32 curr_poc) {
+ 
+       if(buffer[i].to_be_displayed && diff_poc >= 64) {
+         if(storage->pp_enabled && dpb->buffer[i].to_be_displayed) {
+-          InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->virtual_address);
++          InputQueueReturnBuffer(storage->pp_buffer_queue, dpb->buffer[i].ds_data->bus_address);
+         }
+         buffer[i].to_be_displayed = 0;
+         DpbBufFree(dpb, i);
+diff --git a/decoder_sw/software/source/h264high/h264hwd_dpb.h b/decoder_sw/software/source/h264high/h264hwd_dpb.h
+index 2ee2b85..6d37e68 100755
+--- a/decoder_sw/software/source/h264high/h264hwd_dpb.h
++++ b/decoder_sw/software/source/h264high/h264hwd_dpb.h
+@@ -235,7 +235,7 @@ void h264bsdInitRefPicList(dpbStorage_t * dpb);
+ void *h264bsdAllocateDpbImage(dpbStorage_t * dpb);
+ 
+ i32 h264bsdGetRefPicData(const dpbStorage_t * dpb, u32 index);
+-u8 *h264bsdGetRefPicDataVlcMode(const dpbStorage_t * dpb, u32 index,
++struct DWLLinearMem  h264bsdGetRefPicDataVlcMode(const dpbStorage_t * dpb, u32 index,
+                                 u32 field_mode);
+ 
+ u32 h264bsdReorderRefPicList(dpbStorage_t * dpb,
+diff --git a/decoder_sw/software/source/hevc/Android.mk b/decoder_sw/software/source/hevc/Android.mk
+deleted file mode 100755
+index 38bbd61..0000000
+--- a/decoder_sw/software/source/hevc/Android.mk
++++ /dev/null
+@@ -1,34 +0,0 @@
+-LOCAL_PATH := $(call my-dir)
+-include $(CLEAR_VARS)
+-
+-LOCAL_SRC_FILES := \
+-    hevc_asic.c \
+-    hevc_byte_stream.c \
+-    hevcdecapi.c \
+-    hevc_decoder.c \
+-    hevc_dpb.c \
+-    hevc_fb_mngr.c \
+-    hevc_nal_unit.c \
+-    hevc_pic_order_cnt.c \
+-    hevc_pic_param_set.c \
+-    hevc_seq_param_set.c \
+-    hevc_slice_header.c \
+-    hevc_storage.c \
+-    hevc_util.c \
+-    hevc_exp_golomb.c \
+-    hevc_vui.c \
+-    hevc_sei.c \
+-    hevc_video_param_set.c \
+-
+-        
+-LOCAL_CFLAGS += $(IMX_VPU_CFLAGS)
+-
+-
+-LOCAL_LDFLAGS += $(IMX_VPU_LDFLAGS)
+- 
+-LOCAL_C_INCLUDES += $(IMX_VPU_INCLUDES)
+-
+-LOCAL_MODULE:= lib_imx_vsi_hevc
+-LOCAL_MODULE_TAGS := optional
+-include $(BUILD_STATIC_LIBRARY)
+-
+diff --git a/decoder_sw/software/source/hevc/hevc_dpb.c b/decoder_sw/software/source/hevc/hevc_dpb.c
+index ed20f83..1d44d2e 100755
+--- a/decoder_sw/software/source/hevc/hevc_dpb.c
++++ b/decoder_sw/software/source/hevc/hevc_dpb.c
+@@ -197,7 +197,7 @@ void *HevcAllocateDpbImage(struct DpbStorage *dpb, i32 pic_order_cnt,
+ #ifdef USE_EXTERNAL_BUFFER
+       if (storage->raster_buffer_mgr) {
+         if (dpb->current_out->pp_data != NULL) {
+-          RbmReturnPpBuffer(storage->raster_buffer_mgr, dpb->current_out->pp_data->virtual_address);
++          RbmReturnPpBuffer(storage->raster_buffer_mgr, dpb->current_out->pp_data->bus_address);
+         }
+       }
+       return NULL;
+@@ -320,12 +320,14 @@ u32 HevcInitDpb(const void *dwl, struct DpbStorage *dpb,
+       dpb->pic_buff_id[i] = id;
+     }
+ 
++#ifdef CLEAR_OUT_BUFFER
+     if (dpb->pic_buffers[i].virtual_address != NULL)
+     {
+       void *base =
+         (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+       (void)DWLmemset(base, 0, dpb_params->buff_size - dpb->dir_mv_offset);
+     }
++#endif
+   }
+ 
+ 
+@@ -491,7 +493,7 @@ u32 HevcInitDpb(const void *dec_inst, struct DpbStorage *dpb,
+     for (i = 0; i < dpb->tot_buffers; i++) {
+       /* yuv picture + direct mode motion vectors */
+       /* TODO(min): request external buffers. */
+-      if (dpb->pic_buffers[i].virtual_address == NULL) {
++      if (dpb->pic_buffers[i].bus_address == 0) {
+         dec_cont->next_buf_size = dpb_params->buff_size;
+         dec_cont->buf_to_free = NULL;
+         dec_cont->buf_type = REFERENCE_BUFFER;
+@@ -524,12 +526,14 @@ u32 HevcInitDpb(const void *dec_inst, struct DpbStorage *dpb,
+         dpb->pic_buff_id[i] = id;
+       }
+ 
++#ifdef CLEAR_OUT_BUFFER
+       if (dpb->pic_buffers[i].virtual_address != NULL)
+       {
+         void *base =
+           (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+         (void)DWLmemset(base, 0, dpb_params->buff_size - dpb->dir_mv_offset);
+       }
++#endif
+     }
+   }
+ 
+@@ -698,7 +702,7 @@ void HevcDpbMarkOlderUnused(struct DpbStorage *dpb, i32 pic_order_cnt, u32 hrd_p
+ #ifdef USE_EXTERNAL_BUFFER
+         /* For raster/dscale buffer, return to input buffer queue. */
+         if (dpb->storage->raster_buffer_mgr) {
+-          RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr, dpb->buffer[i].pp_data->virtual_address);
++          RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr, dpb->buffer[i].pp_data->bus_address);
+         }
+ #endif
+       }
+@@ -1032,7 +1036,7 @@ void HevcFreeDpb(const void *dwl, struct DpbStorage *dpb) {
+ 
+   for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-    if (dpb->pic_buffers[i].virtual_address != NULL)
++    if (dpb->pic_buffers[i].bus_address)
+ #endif
+     {
+       DWLFreeRefFrm(dwl, dpb->pic_buffers + i);
+@@ -1058,7 +1062,7 @@ i32 HevcFreeDpbExt(const void *dec_inst, struct DpbStorage *dpb) {
+     /* Client will make sure external memory to be freed.*/
+     for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-      if (dpb->pic_buffers[i].virtual_address != NULL)
++      if (dpb->pic_buffers[i].bus_address)
+ #endif
+       {
+         if (dpb->pic_buff_id[i] != FB_NOT_VALID_ID)
+@@ -1076,7 +1080,7 @@ i32 HevcFreeDpbExt(const void *dec_inst, struct DpbStorage *dpb) {
+   } else {
+     for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-      if (dpb->pic_buffers[i].virtual_address != NULL)
++      if (dpb->pic_buffers[i].bus_address)
+ #endif
+       {
+         DWLFreeRefFrm(dec_cont->dwl, dpb->pic_buffers + i);
+@@ -1098,7 +1102,7 @@ i32 HevcFreeDpb(const void *dec_inst, struct DpbStorage *dpb) {
+ 
+   for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-    if (dpb->pic_buffers[i].virtual_address != NULL)
++    if (dpb->pic_buffers[i].bus_address)
+ #endif
+     {
+       if (!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
+@@ -1269,7 +1273,7 @@ void HevcEmptyDpb(const void *dec_inst, struct DpbStorage *dpb) {
+        * raster/downscal buffer. */
+       if (dpb->storage->raster_buffer_mgr) {
+         RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr,
+-                          dpb->buffer[i].pp_data->virtual_address);
++                          dpb->buffer[i].pp_data->bus_address);
+       }
+     }
+     SET_STATUS(dpb->buffer[i], UNUSED);
+@@ -1315,7 +1319,7 @@ void HevcEmptyDpb(const void *dec_inst, struct DpbStorage *dpb) {
+   if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
+     for (i = 0; i < dpb->tot_buffers; i++) {
+ #ifdef USE_NULL_POINTER_PROTECT
+-      if (dpb->pic_buffers[i].virtual_address != NULL)
++      if (dpb->pic_buffers[i].bus_address)
+ #endif
+       {
+         if (dpb->pic_buff_id[i] != FB_NOT_VALID_ID) {
+diff --git a/decoder_sw/software/source/hevc/hevc_fb_mngr.c b/decoder_sw/software/source/hevc/hevc_fb_mngr.c
+index 84a832e..460fe1d 100755
+--- a/decoder_sw/software/source/hevc/hevc_fb_mngr.c
++++ b/decoder_sw/software/source/hevc/hevc_fb_mngr.c
+@@ -630,7 +630,7 @@ void RemoveTempOutputAll(struct FrameBufferList *fb_list, struct DpbStorage *dpb
+           if (dpb->storage->raster_buffer_mgr &&
+               dpb->buffer[j].pp_data != NULL) {
+             RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr,
+-                              dpb->buffer[j].pp_data->virtual_address);
++                              dpb->buffer[j].pp_data->bus_address);
+           }
+           break;
+         }
+@@ -663,7 +663,7 @@ void RemoveOutputAll(struct FrameBufferList *fb_list, struct DpbStorage *dpb) {
+           if (dpb->storage->raster_buffer_mgr &&
+               dpb->buffer[j].pp_data != NULL) {
+             RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr,
+-                              dpb->buffer[j].pp_data->virtual_address);
++                              dpb->buffer[j].pp_data->bus_address);
+           }
+           break;
+         }
+@@ -695,7 +695,7 @@ void RemoveOutputAll(struct FrameBufferList *fb_list, struct DpbStorage *dpb) {
+     } else {
+       if (dpb->storage->raster_buffer_mgr) {
+         RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr,
+-                          fb_list->out_fifo[rd_id].pic.output_picture);
++                          fb_list->out_fifo[rd_id].pic.output_picture_bus_address);
+       }
+     }
+ 
+diff --git a/decoder_sw/software/source/hevc/hevcdecapi.c b/decoder_sw/software/source/hevc/hevcdecapi.c
+index 1178ed3..6f9c266 100755
+--- a/decoder_sw/software/source/hevc/hevcdecapi.c
++++ b/decoder_sw/software/source/hevc/hevcdecapi.c
+@@ -1071,7 +1071,7 @@ RESOURCE_NOT_READY:
+                 dec_cont->storage.dpb->current_out->pic_order_cnt_lsb = 0;
+ #ifdef USE_EXTERNAL_BUFFER
+                 if (dec_cont->storage.raster_buffer_mgr)
+-                  RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->virtual_address);
++                  RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->bus_address);
+ #endif
+                 dec_cont->drop_curr_pic = 1;
+               }
+@@ -1455,7 +1455,7 @@ void HevcInitPicFreezeOutput(struct HevcDecContainer *dec_cont,
+       dec_cont->storage.dpb->current_out->status = UNUSED;
+ #ifdef USE_EXTERNAL_BUFFER
+       if (storage->raster_buffer_mgr)
+-        RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->virtual_address);
++        RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->bus_address);
+ #endif
+       dec_cont->drop_curr_pic = 1;
+     }
+@@ -1708,7 +1708,7 @@ enum DecRet HevcDecNextPictureInternal(struct HevcDecContainer *dec_cont) {
+   out_pic.output_rfc_luma_bus_address = dpb_out->data->bus_address + dec_cont->storage.dpb[0].cbs_tbl_offsety;
+   out_pic.output_rfc_chroma_base = dpb_out->data->virtual_address + dec_cont->storage.dpb[0].cbs_tbl_offsetc;
+   out_pic.output_rfc_chroma_bus_address = dpb_out->data->bus_address + dec_cont->storage.dpb[0].cbs_tbl_offsetc;
+-  ASSERT(out_pic.output_picture);
++  //ASSERT(out_pic.output_picture);
+   ASSERT(out_pic.output_picture_bus_address);
+   out_pic.pic_id = dpb_out->pic_id;
+   out_pic.decode_id = dpb_out->decode_id;
+@@ -1887,8 +1887,7 @@ enum DecRet HevcDecPictureConsumed(HevcDecInst dec_inst,
+     /* If it's external reference buffer, consumed it as usual.*/
+     /* find the mem descriptor for this specific buffer */
+     for (id = 0; id < dpb->tot_buffers; id++) {
+-      if (pic.output_picture_bus_address == dpb->pic_buffers[id].bus_address &&
+-          pic.output_picture == dpb->pic_buffers[id].virtual_address) {
++      if (pic.output_picture_bus_address == dpb->pic_buffers[id].bus_address) {
+         break;
+       }
+     }
+@@ -1902,7 +1901,7 @@ enum DecRet HevcDecPictureConsumed(HevcDecInst dec_inst,
+   } else {
+     /* For raster/dscale buffer, return to input buffer queue. */
+     if (storage->raster_buffer_mgr) {
+-      if (RbmReturnPpBuffer(storage->raster_buffer_mgr, picture->output_picture) == NULL)
++      if (RbmReturnPpBuffer(storage->raster_buffer_mgr, picture->output_picture_bus_address) == NULL)
+         return DEC_PARAM_ERROR;
+     }
+   }
+@@ -2004,7 +2003,7 @@ void HevcDropCurrentPicutre(struct HevcDecContainer *dec_cont) {
+   dec_cont->storage.dpb->current_out->status = UNUSED;
+ #ifdef USE_EXTERNAL_BUFFER
+   if (storage->raster_buffer_mgr)
+-    RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->virtual_address);
++    RbmReturnPpBuffer(storage->raster_buffer_mgr, dec_cont->storage.dpb->current_out->pp_data->bus_address);
+ #endif
+   if (dec_cont->storage.no_reordering) {
+     dec_cont->storage.dpb->num_out--;
+@@ -2027,7 +2026,6 @@ enum DecRet HevcDecAddBuffer(HevcDecInst dec_inst,
+   struct Storage *storage = &dec_cont->storage;
+ 
+   if (dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->logical_size < dec_cont->next_buf_size) {
+     return DEC_PARAM_ERROR;
+@@ -2078,11 +2076,13 @@ enum DecRet HevcDecAddBuffer(HevcDecInst dec_inst,
+         dpb->pic_buff_id[i] = id;
+       }
+ 
++#ifdef CLEAR_OUT_BUFFER
+       {
+         void *base =
+           (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+         (void)DWLmemset(base, 0, info->logical_size - dpb->dir_mv_offset);
+       }
++#endif
+ 
+       dec_cont->buffer_index++;
+       dec_cont->buf_num--;
+@@ -2099,12 +2099,13 @@ enum DecRet HevcDecAddBuffer(HevcDecInst dec_inst,
+       if (id == FB_NOT_VALID_ID) return MEMORY_ALLOCATION_ERROR;
+       dpb->pic_buff_id[i] = id;
+ 
++#ifdef CLEAR_OUT_BUFFER
+       {
+         void *base =
+           (char *)(dpb->pic_buffers[i].virtual_address) + dpb->dir_mv_offset;
+         (void)DWLmemset(base, 0, info->logical_size - dpb->dir_mv_offset);
+       }
+-
++#endif
+       dec_cont->buffer_index++;
+       dec_cont->buf_num = 0;
+       /* TODO: protect this variable, which may be changed in two threads. */
+@@ -2150,7 +2151,7 @@ enum DecRet HevcDecAddBuffer(HevcDecInst dec_inst,
+       if (storage->raster_buffer_mgr) {
+         dec_cont->_buf_to_free = RbmNextReleaseBuffer(storage->raster_buffer_mgr);
+ 
+-        if (dec_cont->_buf_to_free.virtual_address != 0) {
++        if (dec_cont->_buf_to_free.bus_address != 0) {
+           dec_cont->buf_to_free = &dec_cont->_buf_to_free;
+           dec_cont->next_buf_size = 0;
+           dec_cont->buf_num = 1;
+@@ -2320,7 +2321,7 @@ enum DecRet HevcDecGetBufferInfo(HevcDecInst dec_inst, struct HevcDecBufferInfo
+       if (storage->raster_buffer_mgr) {
+         dec_cont->_buf_to_free = RbmNextReleaseBuffer(storage->raster_buffer_mgr);
+ 
+-        if (dec_cont->_buf_to_free.virtual_address != 0) {
++        if (dec_cont->_buf_to_free.bus_address != 0) {
+           dec_cont->buf_to_free = &dec_cont->_buf_to_free;
+           dec_cont->next_buf_size = 0;
+           dec_cont->rbm_release = 1;
+@@ -2377,13 +2378,14 @@ enum DecRet HevcDecGetBufferInfo(HevcDecInst dec_inst, struct HevcDecBufferInfo
+ 
+     // TODO(min): here we assume that the buffer should be freed externally.
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+   mem_info->next_buf_size = dec_cont->next_buf_size;
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+-  ASSERT((mem_info->buf_num && mem_info->next_buf_size) || (mem_info->buf_to_free.virtual_address != NULL));
++  ASSERT((mem_info->buf_num && mem_info->next_buf_size) || (mem_info->buf_to_free.bus_address != 0));
+ #ifdef ASIC_TRACE_SUPPORT
+   mem_info->is_frame_buffer = dec_cont->is_frame_buffer;
+ #endif
+diff --git a/decoder_sw/software/source/inc/dwl.h b/decoder_sw/software/source/inc/dwl.h
+index 6991f03..0e05dee 100755
+--- a/decoder_sw/software/source/inc/dwl.h
++++ b/decoder_sw/software/source/inc/dwl.h
+@@ -178,6 +178,10 @@ u8 DWLPrivateAreaReadByte(const u8 *p);
+ void DWLPrivateAreaWriteByte(u8 *p, u8 data);
+ void * DWLPrivateAreaMemcpy(void *d,  const void *s,  u32 n);
+ void * DWLPrivateAreaMemset(void *p,  i32 c, u32 n);
++
++/* Cache flush */
++i32 DWLFlushCache(const void *instance, struct DWLLinearMem *info);
++
+ /* Decoder wrapper layer functionality. */
+ struct DWL {
+   /* HW sharing */
+diff --git a/decoder_sw/software/source/jpeg/jpegdecapi.c b/decoder_sw/software/source/jpeg/jpegdecapi.c
+index fa35e8c..f7f2499 100755
+--- a/decoder_sw/software/source/jpeg/jpegdecapi.c
++++ b/decoder_sw/software/source/jpeg/jpegdecapi.c
+@@ -314,21 +314,26 @@ void JpegDecRelease(JpegDecInst dec_inst) {
+   }
+   /* if not user allocated memories */
+   if(!PTR_JPGC->info.user_alloc_mem) {
+-    if(PTR_JPGC->asic_buff.out_luma_buffer.virtual_address != NULL) {
++    if(PTR_JPGC->asic_buff.out_luma_buffer.bus_address != 0) {
+       DWLFreeRefFrm(dwl, &(PTR_JPGC->asic_buff.out_luma_buffer));
+       PTR_JPGC->asic_buff.out_luma_buffer.virtual_address = NULL;
++      PTR_JPGC->asic_buff.out_luma_buffer.bus_address = 0;
+     }
+-    if(PTR_JPGC->asic_buff.out_chroma_buffer.virtual_address != NULL) {
++    if(PTR_JPGC->asic_buff.out_chroma_buffer.bus_address != 0) {
+       DWLFreeRefFrm(dwl, &(PTR_JPGC->asic_buff.out_chroma_buffer));
+       PTR_JPGC->asic_buff.out_chroma_buffer.virtual_address = NULL;
++      PTR_JPGC->asic_buff.out_chroma_buffer.bus_address = 0;
+     }
+-    if(PTR_JPGC->asic_buff.out_chroma_buffer2.virtual_address != NULL) {
++    if(PTR_JPGC->asic_buff.out_chroma_buffer2.bus_address != 0) {
+       DWLFreeRefFrm(dwl, &(PTR_JPGC->asic_buff.out_chroma_buffer2));
+       PTR_JPGC->asic_buff.out_chroma_buffer2.virtual_address = NULL;
++      PTR_JPGC->asic_buff.out_chroma_buffer2.bus_address = 0;
+     }
+   } else {
+     PTR_JPGC->asic_buff.out_luma_buffer.virtual_address = NULL;
++    PTR_JPGC->asic_buff.out_luma_buffer.bus_address = 0;
+     PTR_JPGC->asic_buff.out_chroma_buffer.virtual_address = NULL;
++    PTR_JPGC->asic_buff.out_chroma_buffer.bus_address = 0;
+   }
+ 
+   if(dec_inst) {
+@@ -1642,12 +1647,8 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+   }
+ 
+   /* check user allocated null */
+-  if((p_dec_in->picture_buffer_y.virtual_address == NULL &&
+-      p_dec_in->picture_buffer_y.bus_address != 0) ||
+-      (p_dec_in->picture_buffer_y.virtual_address != NULL &&
++  if((p_dec_in->picture_buffer_y.virtual_address != NULL &&
+        p_dec_in->picture_buffer_y.bus_address == 0) ||
+-      (p_dec_in->picture_buffer_cb_cr.virtual_address == NULL &&
+-       p_dec_in->picture_buffer_cb_cr.bus_address != 0) ||
+       (p_dec_in->picture_buffer_cb_cr.virtual_address != NULL &&
+        p_dec_in->picture_buffer_cb_cr.bus_address == 0)) {
+     JPEGDEC_API_TRC("JpegDecDecode# ERROR: NULL parameter");
+@@ -1879,7 +1880,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+     if(PTR_JPGC->pp_instance == NULL) {
+       p_dec_out->output_picture_y.virtual_address =
+         PTR_JPGC->info.out_luma.virtual_address;
+-      ASSERT(p_dec_out->output_picture_y.virtual_address);
++      //ASSERT(p_dec_out->output_picture_y.virtual_address);
+ 
+       /* output set */
+       p_dec_out->output_picture_y.bus_address =
+@@ -1890,7 +1891,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+       if(PTR_JPGC->image.size_chroma) {
+         p_dec_out->output_picture_cb_cr.virtual_address =
+           PTR_JPGC->info.out_chroma.virtual_address;
+-        ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
++        //ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
+ 
+         p_dec_out->output_picture_cb_cr.bus_address =
+           PTR_JPGC->info.out_chroma.bus_address;
+@@ -2390,7 +2391,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+           if(PTR_JPGC->pp_instance == NULL) {
+             p_dec_out->output_picture_y.virtual_address =
+               PTR_JPGC->info.out_luma.virtual_address;
+-            ASSERT(p_dec_out->output_picture_y.virtual_address);
++            //ASSERT(p_dec_out->output_picture_y.virtual_address);
+ 
+             /* output set */
+             p_dec_out->output_picture_y.bus_address =
+@@ -2401,7 +2402,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+             if(PTR_JPGC->image.size_chroma) {
+               p_dec_out->output_picture_cb_cr.virtual_address =
+                 PTR_JPGC->info.out_chroma.virtual_address;
+-              ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
++              //ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
+ 
+               p_dec_out->output_picture_cb_cr.bus_address =
+                 PTR_JPGC->info.out_chroma.bus_address;
+@@ -2446,7 +2447,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+             if(PTR_JPGC->pp_instance == NULL) {
+               p_dec_out->output_picture_y.virtual_address =
+                 PTR_JPGC->info.out_luma.virtual_address;
+-              ASSERT(p_dec_out->output_picture_y.virtual_address);
++              //ASSERT(p_dec_out->output_picture_y.virtual_address);
+ 
+               /* output set */
+               p_dec_out->output_picture_y.bus_address =
+@@ -2457,8 +2458,8 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+               if(PTR_JPGC->image.size_chroma) {
+                 p_dec_out->output_picture_cb_cr.virtual_address =
+                   PTR_JPGC->info.out_chroma.virtual_address;
+-                ASSERT(p_dec_out->output_picture_cb_cr.
+-                       virtual_address);
++                //ASSERT(p_dec_out->output_picture_cb_cr.
++                //       virtual_address);
+ 
+                 p_dec_out->output_picture_cb_cr.bus_address =
+                   PTR_JPGC->info.out_chroma.bus_address;
+@@ -2607,7 +2608,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+                   !PTR_JPGC->info.no_slice_irq_for_user) {
+                 p_dec_out->output_picture_y.virtual_address =
+                   PTR_JPGC->info.out_luma.virtual_address;
+-                ASSERT(p_dec_out->output_picture_y.virtual_address);
++                //ASSERT(p_dec_out->output_picture_y.virtual_address);
+ 
+                 /* output set */
+                 p_dec_out->output_picture_y.bus_address =
+@@ -2618,8 +2619,8 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+                 if(PTR_JPGC->image.size_chroma) {
+                   p_dec_out->output_picture_cb_cr.virtual_address =
+                     PTR_JPGC->info.out_chroma.virtual_address;
+-                  ASSERT(p_dec_out->output_picture_cb_cr.
+-                         virtual_address);
++                  //ASSERT(p_dec_out->output_picture_cb_cr.
++                  //       virtual_address);
+ 
+                   p_dec_out->output_picture_cb_cr.bus_address =
+                     PTR_JPGC->info.out_chroma.bus_address;
+@@ -2747,7 +2748,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+             !PTR_JPGC->info.no_slice_irq_for_user) {
+           p_dec_out->output_picture_y.virtual_address =
+             PTR_JPGC->info.out_luma.virtual_address;
+-          ASSERT(p_dec_out->output_picture_y.virtual_address);
++          //ASSERT(p_dec_out->output_picture_y.virtual_address);
+ 
+           /* output set */
+           p_dec_out->output_picture_y.bus_address =
+@@ -2758,7 +2759,7 @@ JpegDecRet JpegDecDecode(JpegDecInst dec_inst, JpegDecInput * p_dec_in,
+           if(PTR_JPGC->image.size_chroma) {
+             p_dec_out->output_picture_cb_cr.virtual_address =
+               PTR_JPGC->info.out_chroma.virtual_address;
+-            ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
++            //ASSERT(p_dec_out->output_picture_cb_cr.virtual_address);
+ 
+             p_dec_out->output_picture_cb_cr.bus_address =
+               PTR_JPGC->info.out_chroma.bus_address;
+diff --git a/decoder_sw/software/source/jpeg/jpegdecinternal.c b/decoder_sw/software/source/jpeg/jpegdecinternal.c
+index d1d03ef..ee44335 100755
+--- a/decoder_sw/software/source/jpeg/jpegdecinternal.c
++++ b/decoder_sw/software/source/jpeg/jpegdecinternal.c
+@@ -217,11 +217,17 @@ void JpegDecClearStructs(JpegDecContainer * jpeg_dec_cont, u32 mode) {
+     jpeg_dec_cont->info.out_luma.virtual_address = NULL;
+     jpeg_dec_cont->info.out_chroma.virtual_address = NULL;
+     jpeg_dec_cont->info.out_chroma2.virtual_address = NULL;
++    jpeg_dec_cont->info.out_luma.bus_address = 0;
++    jpeg_dec_cont->info.out_chroma.bus_address = 0;
++    jpeg_dec_cont->info.out_chroma2.bus_address = 0;
+ 
+     /* user allocated addresses */
+     jpeg_dec_cont->info.given_out_luma.virtual_address = NULL;
+     jpeg_dec_cont->info.given_out_chroma.virtual_address = NULL;
+     jpeg_dec_cont->info.given_out_chroma2.virtual_address = NULL;
++    jpeg_dec_cont->info.given_out_luma.bus_address = 0;
++    jpeg_dec_cont->info.given_out_chroma.bus_address = 0;
++    jpeg_dec_cont->info.given_out_chroma2.bus_address = 0;
+   }
+ 
+   /* asic running flag */
+@@ -1345,9 +1351,9 @@ JpegDecRet JpegDecAllocateResidual(JpegDecContainer * jpeg_dec_cont) {
+   /* if pipelined PP -> decoder's output is not written external memory */
+   if(PTR_JPGC->pp_instance == NULL ||
+       (PTR_JPGC->pp_instance != NULL && !PTR_JPGC->pp_control.use_pipeline)) {
+-    if(PTR_JPGC->info.given_out_luma.virtual_address == NULL) {
++    if(PTR_JPGC->info.given_out_luma.bus_address == 0) {
+       /* allocate luminance output */
+-      if(PTR_JPGC->asic_buff.out_luma_buffer.virtual_address == NULL) {
++      if(PTR_JPGC->asic_buff.out_luma_buffer.bus_address == 0) {
+         tmp =
+           DWLMallocRefFrm(PTR_JPGC->dwl, (PTR_JPGC->image.size_luma),
+                           &(PTR_JPGC->asic_buff.out_luma_buffer));
+@@ -1378,9 +1384,9 @@ JpegDecRet JpegDecAllocateResidual(JpegDecContainer * jpeg_dec_cont) {
+ 
+     /* allocate chrominance output */
+     if(PTR_JPGC->image.size_chroma) {
+-      if(PTR_JPGC->info.given_out_chroma.virtual_address == NULL) {
++      if(PTR_JPGC->info.given_out_chroma.bus_address == 0) {
+         if(PTR_JPGC->info.operation_type != JPEGDEC_BASELINE) {
+-          if(PTR_JPGC->asic_buff.out_chroma_buffer.virtual_address == NULL) {
++          if(PTR_JPGC->asic_buff.out_chroma_buffer.bus_address == 0) {
+             tmp =
+               DWLMallocRefFrm(PTR_JPGC->dwl,
+                               (PTR_JPGC->image.size_chroma / 2),
+@@ -1389,7 +1395,7 @@ JpegDecRet JpegDecAllocateResidual(JpegDecContainer * jpeg_dec_cont) {
+               return (JPEGDEC_MEMFAIL);
+           }
+ 
+-          if(PTR_JPGC->asic_buff.out_chroma_buffer2.virtual_address == NULL) {
++          if(PTR_JPGC->asic_buff.out_chroma_buffer2.bus_address == 0) {
+             tmp =
+               DWLMallocRefFrm(PTR_JPGC->dwl,
+                               (PTR_JPGC->image.size_chroma / 2),
+@@ -1398,7 +1404,7 @@ JpegDecRet JpegDecAllocateResidual(JpegDecContainer * jpeg_dec_cont) {
+               return (JPEGDEC_MEMFAIL);
+           }
+         } else {
+-          if(PTR_JPGC->asic_buff.out_chroma_buffer.virtual_address == NULL) {
++          if(PTR_JPGC->asic_buff.out_chroma_buffer.bus_address == 0) {
+             tmp =
+               DWLMallocRefFrm(PTR_JPGC->dwl,
+                               (PTR_JPGC->image.size_chroma),
+diff --git a/decoder_sw/software/source/mpeg2/mpeg2decapi.c b/decoder_sw/software/source/mpeg2/mpeg2decapi.c
+index 9e5f7f1..0243562 100755
+--- a/decoder_sw/software/source/mpeg2/mpeg2decapi.c
++++ b/decoder_sw/software/source/mpeg2/mpeg2decapi.c
+@@ -797,7 +797,7 @@ Mpeg2DecRet Mpeg2DecDecode(Mpeg2DecInst dec_inst,
+             MPEG2_API_TRC("Mpeg2DecDecode# MPEG2DEC_NONREF_PIC_SKIPPED
+");
+           }
+           if (!dec_cont->ApiStorage.first_field && dec_cont->pp_enabled)
+-            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+           ret = mpeg2HandleVlcModeError(dec_cont, input->pic_id);
+           error_concealment = HANTRO_TRUE;
+           Mpeg2CheckReleasePpAndHw(dec_cont);
+@@ -828,7 +828,7 @@ Mpeg2DecRet Mpeg2DecDecode(Mpeg2DecInst dec_inst,
+ 
+       case DEC_PIC_HDR_RDY_ERROR:
+         if (!dec_cont->ApiStorage.first_field && dec_cont->pp_enabled)
+-          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++          InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+         ret = mpeg2HandleVlcModeError(dec_cont, input->pic_id);
+         error_concealment = HANTRO_TRUE;
+         /* copy output parameters for this PIC */
+@@ -997,6 +997,10 @@ Mpeg2DecRet Mpeg2DecDecode(Mpeg2DecInst dec_inst,
+           dec_cont->FrameDesc.frame_height,
+           dec_cont->Hdrs.picture_structure == TOPFIELD,
+           dec_cont->dpb_mode);
++
++        if (DWLFlushCache(dec_cont->dwl,
++          &dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].data))
++          return MPEG2DEC_MEMFAIL;
+       }
+       if (!dec_cont->asic_running && dec_cont->StrmStorage.partial_freeze)
+         PreparePartialFreeze(
+@@ -1060,7 +1064,7 @@ Mpeg2DecRet Mpeg2DecDecode(Mpeg2DecInst dec_inst,
+           MPEG2FLUSH;
+ 
+           if (dec_cont->pp_enabled) {
+-            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+           }
+           ret = mpeg2HandleVlcModeError(dec_cont, input->pic_id);
+           error_concealment = HANTRO_TRUE;
+@@ -1457,11 +1461,13 @@ u32 mpeg2HandleVlcModeError(DecContainer * dec_cont, u32 pic_num) {
+     dec_cont->StrmStorage.error_in_hdr = 1;
+ 
+     /* Don't do it if first field has been decoded successfully */
++#if 0
+     if (!dec_cont->field_rdy)
+       (void) DWLmemset(dec_cont->StrmStorage.
+                        p_pic_buf[dec_cont->StrmStorage.work_out].data.
+                        virtual_address, 128,
+                        384 * dec_cont->FrameDesc.total_mb_in_frame);
++#endif
+ 
+     mpeg2DecPreparePicReturn(dec_cont);
+ 
+@@ -2654,7 +2660,7 @@ Mpeg2DecRet Mpeg2DecNextPicture_INTERNAL(Mpeg2DecInst dec_inst,
+         return MPEG2DEC_ABORTED;
+ 
+       if(dec_cont->pp_enabled) {
+-        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ #endif
+       /* set this buffer as used */
+@@ -2663,7 +2669,7 @@ Mpeg2DecRet Mpeg2DecNextPicture_INTERNAL(Mpeg2DecInst dec_inst,
+         BqueueSetBufferAsUsed(&dec_cont->StrmStorage.bq, pic_index);
+         dec_cont->StrmStorage.p_pic_buf[pic_index].first_show = 0;
+         if(dec_cont->pp_enabled)
+-          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ 
+       dec_cont->StrmStorage.picture_info[dec_cont->fifo_index] = *picture;
+@@ -2721,9 +2727,7 @@ Mpeg2DecRet Mpeg2DecPictureConsumed(Mpeg2DecInst dec_inst, Mpeg2DecPicture * pic
+ 
+   if (!dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers; i++) {
+-      if(picture->output_picture_bus_address == dec_cont->StrmStorage.p_pic_buf[i].data.bus_address
+-          && (addr_t)picture->output_picture
+-          == (addr_t)dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address) {
++      if(picture->output_picture_bus_address == dec_cont->StrmStorage.p_pic_buf[i].data.bus_address) {
+         if(dec_cont->pp_instance == NULL) {
+           BqueuePictureRelease(&dec_cont->StrmStorage.bq, i);
+         }
+@@ -2731,7 +2735,7 @@ Mpeg2DecRet Mpeg2DecPictureConsumed(Mpeg2DecInst dec_inst, Mpeg2DecPicture * pic
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue,(u32 *)picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+     return (MPEG2DEC_OK);
+   }
+   return (MPEG2DEC_PARAM_ERROR);
+@@ -4176,6 +4180,7 @@ Mpeg2DecRet Mpeg2DecGetBufferInfo(Mpeg2DecInst dec_inst, Mpeg2DecBufferInfo *mem
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -4184,7 +4189,7 @@ Mpeg2DecRet Mpeg2DecGetBufferInfo(Mpeg2DecInst dec_inst, Mpeg2DecBufferInfo *mem
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return MPEG2DEC_WAITING_FOR_BUFFER;
+ }
+@@ -4194,7 +4199,6 @@ Mpeg2DecRet Mpeg2DecAddBuffer(Mpeg2DecInst dec_inst, struct DWLLinearMem *info)
+   Mpeg2DecRet dec_ret = MPEG2DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return MPEG2DEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/mpeg2/mpeg2decapi_internal.c b/decoder_sw/software/source/mpeg2/mpeg2decapi_internal.c
+index d62ed74..982f12e 100755
+--- a/decoder_sw/software/source/mpeg2/mpeg2decapi_internal.c
++++ b/decoder_sw/software/source/mpeg2/mpeg2decapi_internal.c
+@@ -234,10 +234,12 @@ Mpeg2DecRet mpeg2AllocateBuffers(DecContainer * dec_cont) {
+         InputQueueAddBuffer(dec_cont->pp_buffer_queue, &pp_buffer);
+       }
+     }
++#if 0
+     /* initialize first picture buffer (work_out is 1 for the first picture)
+      * grey, may be used as reference in certain error cases */
+     (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                      128, 384 * dec_cont->FrameDesc.total_mb_in_frame);
++#endif
+ #else
+     if (dec_cont->pp_enabled) {
+       for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+@@ -254,10 +256,12 @@ Mpeg2DecRet mpeg2AllocateBuffers(DecContainer * dec_cont) {
+           return (MPEG2DEC_MEMFAIL);
+         }
+       }
++#if 0
+       /* initialize first picture buffer (work_out is 1 for the first picture)
+        * grey, may be used as reference in certain error cases */
+       (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                        128, 384 * dec_cont->FrameDesc.total_mb_in_frame);
++#endif
+     }
+ #endif
+   }
+@@ -739,7 +743,7 @@ void mpeg2FreeBuffers(DecContainer * dec_cont) {
+   }
+ #ifndef USE_EXTERNAL_BUFFER
+   for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-    if(dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++    if(dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl,
+                     &dec_cont->StrmStorage.p_pic_buf[i].data);
+       dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+@@ -748,7 +752,7 @@ void mpeg2FreeBuffers(DecContainer * dec_cont) {
+   }
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.pp_buffer[i].virtual_address != NULL) {
++      if(dec_cont->StrmStorage.pp_buffer[i].bus_address != 0) {
+         DWLFreeLinear(dec_cont->dwl,
+                       &dec_cont->StrmStorage.pp_buffer[i]);
+         dec_cont->StrmStorage.pp_buffer[i].virtual_address = NULL;
+@@ -764,7 +768,7 @@ void mpeg2FreeBuffers(DecContainer * dec_cont) {
+ #else
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++      if(dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+         DWLFreeRefFrm(dec_cont->dwl,
+                       &dec_cont->StrmStorage.p_pic_buf[i].data);
+         dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+diff --git a/decoder_sw/software/source/mpeg4/mp4decapi.c b/decoder_sw/software/source/mpeg4/mp4decapi.c
+index d54cc45..77c173c 100755
+--- a/decoder_sw/software/source/mpeg4/mp4decapi.c
++++ b/decoder_sw/software/source/mpeg4/mp4decapi.c
+@@ -976,7 +976,7 @@ MP4DecRet MP4DecDecode(MP4DecInst dec_inst,
+             }
+ 
+             if (dec_cont->pp_enabled)
+-              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+             ret = HandleVlcModeError(dec_cont, input->pic_id);
+             error_concealment = HANTRO_TRUE;
+             MP4DEC_UPDATE_POUTPUT;
+@@ -1656,7 +1656,7 @@ void MP4DecRelease(MP4DecInst dec_inst) {
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+   for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++)
+-    if(dec_cont->StrmStorage.data[i].virtual_address != NULL)
++    if(dec_cont->StrmStorage.data[i].bus_address != 0)
+       DWLFreeRefFrm(dec_cont->dwl, &dec_cont->StrmStorage.data[i]);
+ #endif
+   if (dec_cont->pp_buffer_queue)
+@@ -2165,7 +2165,7 @@ u32 RunDecoderAsic(DecContainer * dec_container, addr_t strm_bus_address) {
+       sizeof(dec_container->StrmStorage.p_pic_buf) / sizeof(dec_container->StrmStorage.p_pic_buf[0]))
+     return 0;
+ 
+-  ASSERT(MP4DecResolveVirtual(dec_container,
++  ASSERT(MP4DecResolveBus(dec_container,
+                               dec_container->StrmStorage.work_out) != 0);
+   ASSERT(dec_container->rlc_mode || strm_bus_address != 0);
+   dec_container->pp_control.input_bus_luma = 0;
+@@ -2981,7 +2981,7 @@ MP4DecRet MP4DecNextPicture_INTERNAL(MP4DecInst dec_inst, MP4DecPicture * pictur
+       if (BqueueWaitBufNotInUse(&dec_cont->StrmStorage.bq, pic_index) != HANTRO_OK)
+         return MP4DEC_ABORTED;
+       if(dec_cont->pp_enabled) {
+-        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ #endif
+ 
+@@ -2991,7 +2991,7 @@ MP4DecRet MP4DecNextPicture_INTERNAL(MP4DecInst dec_inst, MP4DecPicture * pictur
+         BqueueSetBufferAsUsed(&dec_cont->StrmStorage.bq, pic_index);
+         dec_cont->StrmStorage.p_pic_buf[pic_index].first_show = 0;
+         if(dec_cont->pp_enabled)
+-          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++          InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ 
+       dec_cont->StrmStorage.picture_info[dec_cont->fifo_index] = *picture;
+@@ -3057,15 +3057,13 @@ MP4DecRet MP4DecPictureConsumed(MP4DecInst dec_inst, MP4DecPicture * picture) {
+ 
+   if (!dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers; i++) {
+-      if(picture->output_picture_bus_address == dec_cont->StrmStorage.data[i].bus_address
+-          && (addr_t)picture->output_picture
+-          == (addr_t)dec_cont->StrmStorage.data[i].virtual_address) {
++      if(picture->output_picture_bus_address == dec_cont->StrmStorage.data[i].bus_address) {
+         BqueuePictureRelease(&dec_cont->StrmStorage.bq, i);
+         return (MP4DEC_OK);
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue,(u32 *)picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+     return (MP4DEC_OK);
+   }
+   return (MP4DEC_PARAM_ERROR);
+@@ -4473,6 +4471,7 @@ MP4DecRet MP4DecGetBufferInfo(MP4DecInst dec_inst, MP4DecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -4481,7 +4480,7 @@ MP4DecRet MP4DecGetBufferInfo(MP4DecInst dec_inst, MP4DecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return MP4DEC_OK;;
+ }
+@@ -4491,7 +4490,6 @@ MP4DecRet MP4DecAddBuffer(MP4DecInst dec_inst, struct DWLLinearMem *info) {
+   MP4DecRet dec_ret = MP4DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return MP4DEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/mpeg4/mp4decapi_internal.c b/decoder_sw/software/source/mpeg4/mp4decapi_internal.c
+index 73dcd97..2f95b61 100755
+--- a/decoder_sw/software/source/mpeg4/mp4decapi_internal.c
++++ b/decoder_sw/software/source/mpeg4/mp4decapi_internal.c
+@@ -327,7 +327,7 @@ MP4DecRet MP4AllocateBuffers(DecContainer * dec_cont) {
+ 
+   /* initialize first picture buffer grey, may be used as reference
+    * in certain error cases */
+-#ifndef USE_EXTERNAL_BUFFER
++#if 0
+   (void) DWLmemset(dec_cont->StrmStorage.data[0].virtual_address,
+                    128, 384 * DEC_VOPD.total_mb_in_vop);
+ #endif
+@@ -386,14 +386,15 @@ void MP4FreeBuffers(DecContainer * dec_cont) {
+   }
+ #ifndef USE_EXTERNAL_BUFFER
+   for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-    if(dec_cont->StrmStorage.data[i].virtual_address != NULL) {
++    if(dec_cont->StrmStorage.data[i].bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl, &dec_cont->StrmStorage.data[i]);
+       dec_cont->StrmStorage.data[i].virtual_address = NULL;
++      dec_cont->StrmStorage.data[i].bus_address = 0;
+     }
+   }
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.pp_buffer[i].virtual_address != NULL) {
++      if(dec_cont->StrmStorage.pp_buffer[i].bus_address != 0) {
+         DWLFreeLinear(dec_cont->dwl,
+                       &dec_cont->StrmStorage.pp_buffer[i]);
+         dec_cont->StrmStorage.pp_buffer[i].virtual_address = NULL;
+@@ -408,9 +409,10 @@ void MP4FreeBuffers(DecContainer * dec_cont) {
+   }
+ #else
+   if (dec_cont->pp_enabled) {
+-    if(dec_cont->StrmStorage.data[i].virtual_address != NULL) {
++    if(dec_cont->StrmStorage.data[i].bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl, &dec_cont->StrmStorage.data[i]);
+       dec_cont->StrmStorage.data[i].virtual_address = NULL;
++      dec_cont->StrmStorage.data[i].bus_address = 0;
+     }
+   }
+ #endif
+diff --git a/decoder_sw/software/source/rv/on2rvdecapi.c b/decoder_sw/software/source/rv/on2rvdecapi.c
+index ac12910..a032960 100755
+--- a/decoder_sw/software/source/rv/on2rvdecapi.c
++++ b/decoder_sw/software/source/rv/on2rvdecapi.c
+@@ -500,7 +500,7 @@ On2RvDecRet On2RvDecPictureConsumed(void *p_output_params, void *global) {
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[i].pp_data->virtual_address);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[i].pp_data->bus_address);
+     return (ON2RVDEC_OK);
+   }
+   return (ON2RVDEC_FAIL);
+diff --git a/decoder_sw/software/source/rv/rvdecapi.c b/decoder_sw/software/source/rv/rvdecapi.c
+index f1568da..1b0d89b 100755
+--- a/decoder_sw/software/source/rv/rvdecapi.c
++++ b/decoder_sw/software/source/rv/rvdecapi.c
+@@ -620,6 +620,7 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+         return RVDEC_ABORTED;
+       dec_cont->StrmStorage.p_rpr_buf = dec_cont->StrmStorage.p_pic_buf[rpr_buf_idx];
+ 
++#ifndef DISABLE_CPU_ACCESS
+       rvRpr( p_ref_pic,
+              &dec_cont->StrmStorage.p_rpr_buf,
+              &dec_cont->StrmStorage.rpr_work_buffer,
+@@ -627,6 +628,7 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+              new_width,
+              new_height,
+              dec_cont->tiled_reference_enable);
++#endif
+ 
+       p_ref_pic->coded_width = new_width;
+       p_ref_pic->frame_width = ( 15 + new_width ) & ~15;
+@@ -986,7 +988,7 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+               RVFLUSH;
+             }
+             if (dec_cont->pp_enabled) {
+-              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->virtual_address);
++              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->StrmStorage.p_pic_buf[dec_cont->StrmStorage.work_out].pp_data->bus_address);
+             }
+             ret = rvHandleVlcModeError(dec_cont, input->pic_id);
+             error_concealment = HANTRO_TRUE;
+@@ -1332,11 +1334,12 @@ u32 rvHandleVlcModeError(DecContainer * dec_cont, u32 pic_num) {
+ 
+   /* error in first picture -> set reference to grey */
+   if(!dec_cont->FrameDesc.frame_number) {
++#if 0
+     (void) DWLmemset(dec_cont->StrmStorage.
+                      p_pic_buf[dec_cont->StrmStorage.work_out].data.
+                      virtual_address, 128,
+                      384 * dec_cont->FrameDesc.total_mb_in_frame);
+-
++#endif
+     rvDecPreparePicReturn(dec_cont);
+ 
+     /* no pictures finished -> return STRM_PROCESSED */
+@@ -1918,7 +1921,7 @@ RvDecRet RvDecNextPicture_INTERNAL(RvDecInst dec_inst,
+         return RVDEC_ABORTED;
+ 
+       if(dec_cont->pp_enabled) {
+-        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++        InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+       }
+ #endif
+ 
+@@ -1928,7 +1931,7 @@ RvDecRet RvDecNextPicture_INTERNAL(RvDecInst dec_inst,
+       BqueueSetBufferAsUsed(&dec_cont->StrmStorage.bq, pic_index);
+ 
+       if(dec_cont->pp_enabled)
+-        InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->virtual_address);
++        InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->StrmStorage.p_pic_buf[pic_index].pp_data->bus_address);
+ 
+       dec_cont->StrmStorage.picture_info[dec_cont->fifo_index] = *picture;
+       FifoPush(dec_cont->fifo_display, dec_cont->fifo_index, FIFO_EXCEPTION_DISABLE);
+@@ -1994,7 +1997,7 @@ RvDecRet RvDecPictureConsumed(RvDecInst dec_inst, RvDecPicture * picture) {
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue,(u32 *)picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+     return (RVDEC_OK);
+   }
+   return (RVDEC_PARAM_ERROR);
+@@ -2949,6 +2952,7 @@ RvDecRet RvDecGetBufferInfo(RvDecInst dec_inst, RvDecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -2957,7 +2961,7 @@ RvDecRet RvDecGetBufferInfo(RvDecInst dec_inst, RvDecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return RVDEC_WAITING_FOR_BUFFER;
+ }
+@@ -2967,7 +2971,6 @@ RvDecRet RvDecAddBuffer(RvDecInst dec_inst, struct DWLLinearMem *info) {
+   RvDecRet dec_ret = RVDEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return RVDEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/rv/rvdecapi_internal.c b/decoder_sw/software/source/rv/rvdecapi_internal.c
+index 50c023a..b21f13d 100755
+--- a/decoder_sw/software/source/rv/rvdecapi_internal.c
++++ b/decoder_sw/software/source/rv/rvdecapi_internal.c
+@@ -151,10 +151,12 @@ RvDecRet rvAllocateBuffers(DecContainer * dec_cont) {
+         InputQueueAddBuffer(dec_cont->pp_buffer_queue, &pp_buffer);
+       }
+     }
++#if 0
+     /* initialize first picture buffer (work_out is 1 for the first picture)
+      * grey, may be used as reference in certain error cases */
+     (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                      128, 384 * dec_cont->FrameDesc.total_mb_in_frame);
++#endif
+ #else
+     if (dec_cont->pp_enabled) {
+       for(i = 0; i < dec_cont->StrmStorage.num_buffers; i++) {
+@@ -171,10 +173,12 @@ RvDecRet rvAllocateBuffers(DecContainer * dec_cont) {
+           return (RVDEC_MEMFAIL);
+         }
+       }
++#if 0
+       /* initialize first picture buffer (work_out is 1 for the first picture)
+        * grey, may be used as reference in certain error cases */
+       (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf[1].data.virtual_address,
+                        128, 384 * dec_cont->FrameDesc.total_mb_in_frame);
++#endif
+       ret = DWLMallocRefFrm(dec_cont->dwl, size_tmp,
+                             &dec_cont->StrmStorage.p_rpr_buf.data);
+ 
+@@ -394,14 +398,14 @@ void rvDecBufferPicture(DecContainer * dec_cont, u32 pic_id, u32 buffer_b,
+ ------------------------------------------------------------------------------*/
+ void rvFreeRprBuffer(DecContainer * dec_cont) {
+ #ifndef USE_EXTERNAL_BUFFER
+-  if(dec_cont->StrmStorage.p_rpr_buf.data.virtual_address != NULL) {
++  if(dec_cont->StrmStorage.p_rpr_buf.data.bus_address != 0) {
+     DWLFreeRefFrm(dec_cont->dwl,
+                   &dec_cont->StrmStorage.p_rpr_buf.data);
+     dec_cont->StrmStorage.p_rpr_buf.data.virtual_address = NULL;
+     dec_cont->StrmStorage.p_rpr_buf.data.bus_address = 0;
+   }
+ #endif
+-  if(dec_cont->StrmStorage.rpr_work_buffer.virtual_address != NULL ) {
++  if(dec_cont->StrmStorage.rpr_work_buffer.bus_address != 0 ) {
+     DWLFreeLinear( dec_cont->dwl, &dec_cont->StrmStorage.rpr_work_buffer );
+     dec_cont->StrmStorage.rpr_work_buffer.virtual_address = NULL;
+     dec_cont->StrmStorage.rpr_work_buffer.bus_address = 0;
+@@ -430,7 +434,7 @@ void rvFreeBuffers(DecContainer * dec_cont) {
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+   for(i = 0; i < 16; i++) {
+-    if(dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++    if(dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl,
+                     &dec_cont->StrmStorage.p_pic_buf[i].data);
+       dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+@@ -439,7 +443,7 @@ void rvFreeBuffers(DecContainer * dec_cont) {
+   }
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.pp_buffer[i].virtual_address != NULL) {
++      if(dec_cont->StrmStorage.pp_buffer[i].bus_address != 0) {
+         DWLFreeLinear(dec_cont->dwl,
+                       &dec_cont->StrmStorage.pp_buffer[i]);
+         dec_cont->StrmStorage.pp_buffer[i].virtual_address = NULL;
+@@ -455,14 +459,14 @@ void rvFreeBuffers(DecContainer * dec_cont) {
+ #else
+   if (dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->StrmStorage.num_buffers ; i++) {
+-      if(dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address != NULL) {
++      if(dec_cont->StrmStorage.p_pic_buf[i].data.bus_address != 0) {
+         DWLFreeRefFrm(dec_cont->dwl,
+                       &dec_cont->StrmStorage.p_pic_buf[i].data);
+         dec_cont->StrmStorage.p_pic_buf[i].data.virtual_address = NULL;
+         dec_cont->StrmStorage.p_pic_buf[i].data.bus_address = 0;
+       }
+     }
+-    if(dec_cont->StrmStorage.p_rpr_buf.data.virtual_address != NULL) {
++    if(dec_cont->StrmStorage.p_rpr_buf.data.bus_address != 0) {
+       DWLFreeRefFrm(dec_cont->dwl,
+                     &dec_cont->StrmStorage.p_rpr_buf.data);
+       dec_cont->StrmStorage.p_rpr_buf.data.virtual_address = NULL;
+@@ -499,10 +503,10 @@ RvDecRet rvAllocateRprBuffer(DecContainer * dec_cont) {
+ 
+   ASSERT(dec_cont->StrmStorage.max_mbs_per_frame != 0);
+ #ifndef USE_EXTERNAL_BUFFER
+-  if(dec_cont->StrmStorage.p_rpr_buf.data.virtual_address != NULL)
++  if(dec_cont->StrmStorage.p_rpr_buf.data.bus_address != 0)
+     return RVDEC_OK; /* already allocated */
+ #else
+-  if(dec_cont->StrmStorage.rpr_work_buffer.virtual_address != NULL)
++  if(dec_cont->StrmStorage.rpr_work_buffer.bus_address != 0)
+     return RVDEC_OK; /* already allocated */
+ #endif
+ 
+diff --git a/decoder_sw/software/source/vc1/vc1decapi.c b/decoder_sw/software/source/vc1/vc1decapi.c
+index 941587b..1f37d66 100755
+--- a/decoder_sw/software/source/vc1/vc1decapi.c
++++ b/decoder_sw/software/source/vc1/vc1decapi.c
+@@ -811,7 +811,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+     if (first_frame || (is_bpic && !dec_cont->storage.intra_freeze) || dec_cont->storage.missing_field) {
+       (void)vc1hwdSeekFrameStart(&dec_cont->storage, &stream_data);
+       if (dec_cont->pp_enabled && first_frame) {
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+       }
+       return_value = VC1DEC_STRM_PROCESSED;
+     } else
+@@ -1070,7 +1070,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+     if (asic_status == X170_DEC_TIMEOUT) {
+       error_concealment = HANTRO_TRUE;
+       if (dec_cont->pp_enabled) {
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+       }
+       vc1hwdErrorConcealment(0, &dec_cont->storage);
+       DEC_API_TRC("VC1DecDecode# VC1DEC_HW_TIMEOUT");
+@@ -1078,7 +1078,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+     } else if (asic_status == X170_DEC_SYSTEM_ERROR) {
+       error_concealment = HANTRO_TRUE;
+       if (dec_cont->pp_enabled) {
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+       }
+       vc1hwdErrorConcealment(0, &dec_cont->storage);
+       DEC_API_TRC("VC1DecDecode# VC1DEC_SYSTEM_ERROR");
+@@ -1086,7 +1086,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+     } else if (asic_status == X170_DEC_HW_RESERVED) {
+       error_concealment = HANTRO_TRUE;
+       if (dec_cont->pp_enabled) {
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+       }
+       vc1hwdErrorConcealment(0, &dec_cont->storage);
+       DEC_API_TRC("VC1DecDecode# VC1DEC_HW_RESERVED");
+@@ -1098,7 +1098,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+     if (asic_status & DEC_X170_IRQ_BUS_ERROR) {
+       error_concealment = HANTRO_TRUE;
+       if (dec_cont->pp_enabled) {
+-        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++        InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+       }
+       vc1hwdErrorConcealment(0, &dec_cont->storage);
+       DEC_API_TRC("VC1DecDecode# VC1DEC_HW_BUS_ERROR");
+@@ -1137,7 +1137,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+           error_concealment = HANTRO_TRUE;
+           if (!first_frame) {
+             if (dec_cont->pp_enabled) {
+-              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+             }
+           }
+           vc1hwdErrorConcealment( first_frame, &dec_cont->storage );
+@@ -1146,7 +1146,7 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+               || dec_cont->storage.slice) {
+             (void)vc1hwdSeekFrameStart(&dec_cont->storage, &stream_data);
+             if (dec_cont->pp_enabled && first_frame) {
+-              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++              InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+             }
+             return_value = VC1DEC_STRM_PROCESSED;
+           } else
+@@ -2262,7 +2262,7 @@ VC1DecRet VC1DecNextPicture_INTERNAL( VC1DecInst     dec_inst,
+         if (BqueueWaitBufNotInUse( &dec_cont->storage.bq, pic_index) != HANTRO_OK)
+           return VC1DEC_ABORTED;
+         if(dec_cont->pp_enabled) {
+-          InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[pic_index].pp_data->virtual_address);
++          InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[pic_index].pp_data->bus_address);
+         }
+ #endif
+ 
+@@ -2272,7 +2272,7 @@ VC1DecRet VC1DecNextPicture_INTERNAL( VC1DecInst     dec_inst,
+           BqueueSetBufferAsUsed(&dec_cont->storage.bq, pic_index);
+           dec_cont->storage.p_pic_buf[pic_index].first_show = 0;
+           if(dec_cont->pp_enabled) {
+-            InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[pic_index].pp_data->virtual_address);
++            InputQueueSetBufAsUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[pic_index].pp_data->bus_address);
+             BqueuePictureRelease(&dec_cont->storage.bq, pic_index);
+           }
+         }
+@@ -2329,9 +2329,7 @@ VC1DecRet VC1DecPictureConsumed(VC1DecInst dec_inst, VC1DecPicture * picture) {
+ 
+   if (!dec_cont->pp_enabled) {
+     for(i = 0; i < dec_cont->storage.work_buf_amount; i++) {
+-      if(picture->output_picture_bus_address == dec_cont->storage.p_pic_buf[i].data.bus_address
+-          && (addr_t)picture->output_picture
+-          == (addr_t)dec_cont->storage.p_pic_buf[i].data.virtual_address) {
++      if(picture->output_picture_bus_address == dec_cont->storage.p_pic_buf[i].data.bus_address) {
+         if(dec_cont->pp_instance == NULL) {
+           BqueuePictureRelease(&dec_cont->storage.bq, i);
+         }
+@@ -2339,7 +2337,7 @@ VC1DecRet VC1DecPictureConsumed(VC1DecInst dec_inst, VC1DecPicture * picture) {
+       }
+     }
+   } else {
+-    InputQueueReturnBuffer(dec_cont->pp_buffer_queue,(u32 *)picture->output_picture);
++    InputQueueReturnBuffer(dec_cont->pp_buffer_queue, picture->output_picture_bus_address);
+     return (VC1DEC_OK);
+   }
+   return (VC1DEC_PARAM_ERROR);
+@@ -2654,6 +2652,7 @@ VC1DecRet VC1DecGetBufferInfo(VC1DecInst dec_inst, VC1DecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -2662,7 +2661,7 @@ VC1DecRet VC1DecGetBufferInfo(VC1DecInst dec_inst, VC1DecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return VC1DEC_WAITING_FOR_BUFFER;
+ }
+@@ -2672,7 +2671,6 @@ VC1DecRet VC1DecAddBuffer(VC1DecInst dec_inst, struct DWLLinearMem *info) {
+   VC1DecRet dec_ret = VC1DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return VC1DEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/vc1/vc1hwd_decoder.c b/decoder_sw/software/source/vc1/vc1hwd_decoder.c
+index 1f5b64f..c54ca7f 100755
+--- a/decoder_sw/software/source/vc1/vc1hwd_decoder.c
++++ b/decoder_sw/software/source/vc1/vc1hwd_decoder.c
+@@ -270,7 +270,7 @@ u16x AllocateMemories( decContainer_t *dec_cont,
+       dec_cont->storage.pp_buffer[i] = pp_buffer;
+       InputQueueAddBuffer(dec_cont->pp_buffer_queue, &pp_buffer);
+     }
+-    (void)DWLmemset(p_pic[i].data.virtual_address, 0 , size);
++    //(void)DWLmemset(p_pic[i].data.virtual_address, 0 , size);
+     /* init coded image size to max coded image size */
+     p_pic[i].coded_width = storage->max_coded_width;
+     p_pic[i].coded_height = storage->max_coded_height;
+@@ -282,7 +282,7 @@ u16x AllocateMemories( decContainer_t *dec_cont,
+         (void)vc1hwdRelease(dwl, storage);
+         return (VC1HWD_MEMORY_FAIL);
+       }
+-      (void)DWLmemset(p_pic[i].data.virtual_address, 0 , size);
++      //(void)DWLmemset(p_pic[i].data.virtual_address, 0 , size);
+       /* init coded image size to max coded image size */
+       p_pic[i].coded_width = storage->max_coded_width;
+       p_pic[i].coded_height = storage->max_coded_height;
+@@ -725,7 +725,7 @@ u16x vc1hwdDecode( decContainer_t *dec_cont,
+         BqueueWaitBufNotInUse( &dec_cont->storage.bq, dec_cont->storage.work_out);
+ #endif
+         if(dec_cont->pp_enabled) {
+-          InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++          InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+         }
+         EPRINT(("Skipped picture with MAXBFRAMES>0!"));
+         return(VC1HWD_ERROR);
+@@ -1091,10 +1091,12 @@ void vc1hwdErrorConcealment( const u16x flush,
+ 
+   tmp_out = storage->work_out;
+   if(flush) {
++#if 0
+     (void)DWLmemset(
+       storage->p_pic_buf[ storage->work_out ].data.virtual_address,
+       128,
+       storage->num_of_mbs * 384 );
++#endif
+     /* if other buffer contains non-paired field -> throw away */
+     if (storage->p_pic_buf[1-(i32)storage->work_out].fcm == FIELD_INTERLACE &&
+         storage->p_pic_buf[1-(i32)storage->work_out].is_first_field == HANTRO_TRUE) {
+@@ -1634,7 +1636,7 @@ void vc1hwdUpdateWorkBufferIndexes( decContainer_t *dec_cont, u32 is_bpic ) {
+               (dec_cont->storage.p_pic_buf[dec_cont->storage.outp_buf[i]].pp_data ==
+                dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data)) {
+             flag = 1;
+-            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->virtual_address);
++            InputQueueReturnBuffer(dec_cont->pp_buffer_queue, dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+           }
+         }
+       } while (flag == 1);
+diff --git a/decoder_sw/software/source/vp6/vp6hwd_api.c b/decoder_sw/software/source/vp6/vp6hwd_api.c
+index b245568..d394a9f 100755
+--- a/decoder_sw/software/source/vp6/vp6hwd_api.c
++++ b/decoder_sw/software/source/vp6/vp6hwd_api.c
+@@ -85,7 +85,7 @@ static u32 vp6hwdCheckSupport(VP6DecContainer_t *dec_cont);
+ #ifdef USE_EXTERNAL_BUFFER
+ static void VP6SetExternalBufferInfo(VP6DecInst dec_inst);
+ #endif
+-static i32 FindIndex(VP6DecContainer_t *dec_cont, const u32* address);
++static i32 FindIndex(VP6DecContainer_t *dec_cont, addr_t address);
+ 
+ #ifdef USE_OUTPUT_RELEASE
+ VP6DecRet VP6DecNextPicture_INTERNAL(VP6DecInst dec_inst,
+@@ -867,10 +867,12 @@ request_decoding_buffer:
+     dec_cont->ref_to_out = 1;
+     dec_cont->picture_broken = 1;
+     BqueueDiscard(&dec_cont->bq, p_asic_buff->out_buffer_i);
++#if 0
+     if (!dec_cont->pic_number) {
+       (void) DWLmemset( p_asic_buff->refBuffer->virtual_address, 128,
+                         p_asic_buff->width * p_asic_buff->height * 3 / 2);
+     }
++#endif
+   }
+ 
+   dec_cont->pic_number++;
+@@ -1011,7 +1013,7 @@ VP6DecRet VP6DecNextPicture(VP6DecInst dec_inst,
+     output->p_output_frame = out_pic->virtual_address;
+     output->output_frame_bus_address = out_pic->bus_address;
+     output->pic_id = 0;
+-    buffer_id = FindIndex(dec_cont, output->p_output_frame);
++    buffer_id = FindIndex(dec_cont, output->output_frame_bus_address);
+     output->decode_id = dec_cont->asic_buff->decode_id[buffer_id];
+     if(dec_cont->pb.FrameType == BASE_FRAME)
+       output->pic_coding_type = DEC_PIC_TYPE_I;
+@@ -1096,7 +1098,7 @@ VP6DecRet VP6DecNextPicture_INTERNAL(VP6DecInst dec_inst,
+     output->frame_width = dec_cont->width;
+     output->frame_height = dec_cont->height;
+ #endif
+-    buffer_id = FindIndex(dec_cont, output->p_output_frame);
++    buffer_id = FindIndex(dec_cont, output->output_frame_bus_address);
+ 
+     output->frame_width = dec_cont->asic_buff->frame_width[buffer_id];
+     output->frame_height = dec_cont->asic_buff->frame_height[buffer_id];
+@@ -1158,7 +1160,7 @@ VP6DecRet VP6DecPictureConsumed(VP6DecInst dec_inst, VP6DecPicture * output) {
+     return (VP6DEC_NOT_INITIALIZED);
+   }
+ 
+-  buffer_id = FindIndex(dec_cont, output->p_output_frame);
++  buffer_id = FindIndex(dec_cont, output->output_frame_bus_address);
+ 
+   /* Remove the reference to the buffer. */
+   BqueuePictureRelease(&dec_cont->bq, buffer_id);
+@@ -1238,11 +1240,11 @@ static VP6DecRet VP6PushOutput(VP6DecContainer_t* dec_cont) {
+ 
+ #endif
+ 
+-static i32 FindIndex(VP6DecContainer_t* dec_cont, const u32* address) {
++static i32 FindIndex(VP6DecContainer_t* dec_cont, addr_t address) {
+   i32 i;
+ 
+   for (i = 0; i < (i32)dec_cont->num_buffers; i++) {
+-    if (dec_cont->asic_buff->pictures[i].virtual_address == address)
++    if (dec_cont->asic_buff->pictures[i].bus_address == address)
+       break;
+   }
+   ASSERT((u32)i < dec_cont->num_buffers);
+@@ -1349,6 +1351,7 @@ VP6DecRet VP6DecGetBufferInfo(VP6DecInst dec_inst, VP6DecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -1357,7 +1360,7 @@ VP6DecRet VP6DecGetBufferInfo(VP6DecInst dec_inst, VP6DecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return VP6DEC_WAITING_FOR_BUFFER;
+ }
+@@ -1368,7 +1371,6 @@ VP6DecRet VP6DecAddBuffer(VP6DecInst dec_inst, struct DWLLinearMem *info) {
+   VP6DecRet dec_ret = VP6DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return VP6DEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/source/vp6/vp6hwd_asic.c b/decoder_sw/software/source/vp6/vp6hwd_asic.c
+index d3a4535..f6b74c9 100755
+--- a/decoder_sw/software/source/vp6/vp6hwd_asic.c
++++ b/decoder_sw/software/source/vp6/vp6hwd_asic.c
+@@ -268,7 +268,7 @@ void VP6HwdAsicReleasePictures(VP6DecContainer_t * dec_cont) {
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+   for( i = 0 ; i < dec_cont->num_buffers ; ++i ) {
+-    if(p_asic_buff->pictures[i].virtual_address != NULL) {
++    if(p_asic_buff->pictures[i].bus_address != 0) {
+       DWLFreeRefFrm(dwl, &p_asic_buff->pictures[i]);
+     }
+   }
+diff --git a/decoder_sw/software/source/vp8/vp8decapi.c b/decoder_sw/software/source/vp8/vp8decapi.c
+index 049d83f..59ee534 100755
+--- a/decoder_sw/software/source/vp8/vp8decapi.c
++++ b/decoder_sw/software/source/vp8/vp8decapi.c
+@@ -99,7 +99,7 @@ void vp8hwdErrorConceal(VP8DecContainer_t *dec_cont, addr_t bus_address,
+ static struct DWLLinearMem* GetPrevRef(VP8DecContainer_t *dec_cont);
+ void ConcealRefAvailability(u32 * output, u32 height, u32 width);
+ 
+-static i32 FindIndex(VP8DecContainer_t* dec_cont, const u32* address);
++static i32 FindIndex(VP8DecContainer_t* dec_cont, addr_t address);
+ #ifdef USE_OUTPUT_RELEASE
+ static VP8DecRet VP8DecNextPicture_INTERNAL(VP8DecInst dec_inst,
+     VP8DecPicture * output, u32 end_of_stream);
+@@ -1303,10 +1303,12 @@ VP8DecRet VP8DecDecode(VP8DecInst dec_inst,
+   } else {
+     dec_cont->ref_to_out = 1;
+     dec_cont->picture_broken = 1;
++#if 0
+     if (!dec_cont->pic_number) {
+       (void) DWLmemset( GetPrevRef(dec_cont)->virtual_address, 128,
+                         p_asic_buff->width * p_asic_buff->height * 3 / 2);
+     }
++#endif
+   }
+ 
+   dec_cont->pic_number++;
+@@ -1573,7 +1575,7 @@ VP8DecRet VP8DecNextPicture(VP8DecInst dec_inst,
+       }
+     }
+     output->pic_id = 0;
+-    buff_id = FindIndex(dec_cont, output->p_output_frame);
++    buff_id = FindIndex(dec_cont, output->output_frame_bus_address);
+     output->decode_id = p_asic_buff->decode_id[buff_id];
+     output->is_intra_frame = dec_cont->decoder.key_frame;
+     output->is_golden_frame = 0;
+@@ -1764,7 +1766,7 @@ VP8DecRet VP8DecNextPicture_INTERNAL(VP8DecInst dec_inst,
+     output->coded_height = dec_cont->height;
+ #endif
+ 
+-    buff_id = FindIndex(dec_cont, output->p_output_frame);
++    buff_id = FindIndex(dec_cont, output->output_frame_bus_address);
+     output->frame_width = dec_cont->asic_buff->frame_width[buff_id];
+     output->frame_height = dec_cont->asic_buff->frame_height[buff_id];
+     output->coded_width = dec_cont->asic_buff->coded_width[buff_id];
+@@ -1816,7 +1818,7 @@ VP8DecRet VP8DecPictureConsumed(VP8DecInst dec_inst,
+   }
+ 
+   VP8DecContainer_t *dec_cont = (VP8DecContainer_t *)dec_inst;
+-  buffer_id = FindIndex(dec_cont, picture->p_output_frame);
++  buffer_id = FindIndex(dec_cont, picture->output_frame_bus_address);
+ 
+   /* Remove the reference to the buffer. */
+   if(dec_cont->asic_buff->not_displayed[buffer_id]) {
+@@ -1955,7 +1957,7 @@ VP8DecRet VP8DecPeek(VP8DecInst dec_inst, VP8DecPicture * output) {
+   }
+ 
+   output->pic_id = 0;
+-  buff_id = FindIndex(dec_cont, output->p_output_frame);
++  buff_id = FindIndex(dec_cont, output->output_frame_bus_address);
+   output->decode_id = p_asic_buff->decode_id[buff_id];
+   output->is_intra_frame = dec_cont->decoder.key_frame;
+   output->is_golden_frame = 0;
+@@ -2277,18 +2279,18 @@ static struct DWLLinearMem* GetPrevRef(VP8DecContainer_t *dec_cont) {
+          VP8HwdBufferQueueGetPrevRef(dec_cont->bq);
+ }
+ 
+-static i32 FindIndex(VP8DecContainer_t* dec_cont, const u32* address) {
++static i32 FindIndex(VP8DecContainer_t* dec_cont, addr_t address) {
+   i32 i;
+ 
+   if(dec_cont->user_mem) {
+     for (i = 0; i < (i32)dec_cont->num_buffers; i++) {
+-      if(dec_cont->asic_buff->user_mem.p_pic_buffer_y[i] == address)
++      if(dec_cont->asic_buff->user_mem.pic_buffer_bus_addr_y[i] == address)
+         break;
+     }
+     ASSERT((u32)i < dec_cont->num_buffers);
+   } else {
+     for (i = 0; i < (i32)dec_cont->num_buffers; i++) {
+-      if (dec_cont->asic_buff->pictures[i].virtual_address == address)
++      if (dec_cont->asic_buff->pictures[i].bus_address == address)
+         break;
+     }
+     ASSERT((u32)i < dec_cont->num_buffers);
+@@ -2384,6 +2386,7 @@ VP8DecRet VP8DecGetBufferInfo(VP8DecInst dec_inst, VP8DecBufferInfo *mem_info) {
+   if(dec_cont->buf_to_free) {
+     mem_info->buf_to_free = *dec_cont->buf_to_free;
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+   } else
+     mem_info->buf_to_free = empty;
+@@ -2392,7 +2395,7 @@ VP8DecRet VP8DecGetBufferInfo(VP8DecInst dec_inst, VP8DecBufferInfo *mem_info) {
+   mem_info->buf_num = dec_cont->buf_num;
+ 
+   ASSERT((mem_info->buf_num && mem_info->next_buf_size) ||
+-         (mem_info->buf_to_free.virtual_address != NULL));
++         (mem_info->buf_to_free.bus_address != 0));
+ 
+   return VP8DEC_WAITING_FOR_BUFFER;
+ }
+@@ -2403,7 +2406,6 @@ VP8DecRet VP8DecAddBuffer(VP8DecInst dec_inst, struct DWLLinearMem *info) {
+   VP8DecRet dec_ret = VP8DEC_OK;
+ 
+   if(dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->size < dec_cont->next_buf_size) {
+     return VP8DEC_PARAM_ERROR;
+@@ -2422,6 +2424,7 @@ VP8DecRet VP8DecAddBuffer(VP8DecInst dec_inst, struct DWLLinearMem *info) {
+       p_asic_buff->pictures[i].bus_address +
+       p_asic_buff->chroma_buf_offset;
+ 
++    if (dec_cont->num_cores > 1)
+     {
+       void *base = (char*)p_asic_buff->pictures[i].virtual_address
+                    + p_asic_buff->sync_mc_offset;
+@@ -2446,6 +2449,7 @@ VP8DecRet VP8DecAddBuffer(VP8DecInst dec_inst, struct DWLLinearMem *info) {
+       p_asic_buff->pictures[i].bus_address +
+       p_asic_buff->chroma_buf_offset;
+ 
++    if (dec_cont->num_cores > 1)
+     {
+       void *base = (char*)p_asic_buff->pictures[i].virtual_address
+                    + p_asic_buff->sync_mc_offset;
+diff --git a/decoder_sw/software/source/vp8/vp8decmcapi.c b/decoder_sw/software/source/vp8/vp8decmcapi.c
+index d969c1f..17d916d 100755
+--- a/decoder_sw/software/source/vp8/vp8decmcapi.c
++++ b/decoder_sw/software/source/vp8/vp8decmcapi.c
+@@ -63,7 +63,7 @@
+ 
+ #define EOS_MARKER (-1)
+ 
+-static i32 FindIndex(VP8DecContainer_t* dec_cont, const u32* address);
++static i32 FindIndex(VP8DecContainer_t* dec_cont, addr_t address);
+ static i32 NextOutput(VP8DecContainer_t *dec_cont);
+ 
+ /*------------------------------------------------------------------------------
+@@ -213,7 +213,7 @@ VP8DecRet VP8DecMCPictureConsumed(VP8DecInst dec_inst,
+   /* Remove the reference to the buffer. */
+   VP8DecContainer_t *dec_cont = (VP8DecContainer_t *)dec_inst;
+   VP8HwdBufferQueueRemoveRef(dec_cont->bq,
+-                             FindIndex(dec_cont, picture->p_output_frame));
++                             FindIndex(dec_cont, picture->output_frame_bus_address));
+   DEC_API_TRC("VP8DecMCPictureConsumed# VP8DEC_OK
+");
+   return VP8DEC_OK;
+ }
+@@ -428,10 +428,10 @@ void VP8MCSetHwRdyCallback(VP8DecContainer_t  *dec_cont) {
+ }
+ 
+ 
+-static i32 FindIndex(VP8DecContainer_t* dec_cont, const u32* address) {
++static i32 FindIndex(VP8DecContainer_t* dec_cont, addr_t address) {
+   i32 i;
+   for (i = 0; i < (i32)dec_cont->num_buffers; i++)
+-    if (dec_cont->asic_buff->pictures[i].virtual_address == address)
++    if (dec_cont->asic_buff->pictures[i].bus_address == address)
+       break;
+   ASSERT((u32)i < dec_cont->num_buffers);
+   return i;
+diff --git a/decoder_sw/software/source/vp8/vp8hwd_asic.c b/decoder_sw/software/source/vp8/vp8hwd_asic.c
+index 72dfd25..ca1d9f2 100755
+--- a/decoder_sw/software/source/vp8/vp8hwd_asic.c
++++ b/decoder_sw/software/source/vp8/vp8hwd_asic.c
+@@ -478,6 +478,7 @@ i32 VP8HwdAsicAllocatePictures(VP8DecContainer_t * dec_cont) {
+           p_asic_buff->pictures[i].bus_address +
+           p_asic_buff->chroma_buf_offset;
+ 
++        if (dec_cont->num_cores > 1)
+         {
+           void *base = (char*)p_asic_buff->pictures[i].virtual_address
+                        + p_asic_buff->sync_mc_offset;
+@@ -509,7 +510,7 @@ i32 VP8HwdAsicAllocatePictures(VP8DecContainer_t * dec_cont) {
+       VP8HwdAsicReleasePictures(dec_cont);
+       return -1;
+     }
+-    DWLmemset(p_asic_buff->pictures[1].virtual_address, 0, memory_size);
++    //DWLmemset(p_asic_buff->pictures[1].virtual_address, 0, memory_size);
+     SET_ADDR_REG(dec_cont->vp8_regs, HWIF_REFER6_BASE,
+                  p_asic_buff->pictures[1].bus_address);
+     SET_ADDR_REG(dec_cont->vp8_regs, HWIF_REFER2_BASE,
+@@ -608,7 +609,7 @@ void VP8HwdAsicReleasePictures(VP8DecContainer_t * dec_cont) {
+ #ifndef USE_EXTERNAL_BUFFER
+     count = dec_cont->num_buffers;
+     for (i = 0; i < count; i++) {
+-      if(p_asic_buff->pictures[i].virtual_address != NULL) {
++      if(p_asic_buff->pictures[i].bus_address != 0) {
+         DWLFreeRefFrm(dwl, &p_asic_buff->pictures[i]);
+       }
+     }
+@@ -616,7 +617,7 @@ void VP8HwdAsicReleasePictures(VP8DecContainer_t * dec_cont) {
+   }
+ #ifndef USE_EXTERNAL_BUFFER
+   if (dec_cont->intra_only) {
+-    if(p_asic_buff->pictures[1].virtual_address != NULL) {
++    if(p_asic_buff->pictures[1].bus_address != 0) {
+       DWLFreeLinear(dwl, &p_asic_buff->pictures[1]);
+     }
+   }
+diff --git a/decoder_sw/software/source/vp9/vp9decapi.c b/decoder_sw/software/source/vp9/vp9decapi.c
+index 5eaba59..367c743 100755
+--- a/decoder_sw/software/source/vp9/vp9decapi.c
++++ b/decoder_sw/software/source/vp9/vp9decapi.c
+@@ -794,6 +794,7 @@ i32 Vp9DecodeHeaders(struct Vp9DecContainer *dec_cont,
+   i32 ret;
+   struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
+   struct Vp9Decoder *dec = &dec_cont->decoder;
++  i32 out_index, discard_picture = 0;
+ 
+   dec_cont->prev_is_key = dec->key_frame;
+   dec->prev_is_key_frame = dec->key_frame;
+@@ -827,18 +828,39 @@ i32 Vp9DecodeHeaders(struct Vp9DecContainer *dec_cont,
+     if(asic_buff->picture_info[asic_buff->out_buffer_i].nbr_of_err_mbs)
+       return DEC_PIC_CONSUMED;
+ #endif
++
++    if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
++      out_index = asic_buff->out_buffer_i;
++    else
++      out_index = dec_cont->asic_buff->pp_buffer_map[asic_buff->out_buffer_i];
++
++    pthread_mutex_lock(&dec_cont->sync_out);
++    if (dec_cont->asic_buff->display_index[out_index])
++      discard_picture = 1;
++    pthread_mutex_unlock(&dec_cont->sync_out);
++
++    /* If in secure mode and buffer is not returned yet, discard it */
++    if (dec_cont->secure_mode && discard_picture == 1)
++      return DEC_PIC_CONSUMED;
++
++    /* If USE_PICTURE_DISCARD enabled, discard it instead of memcpy */
++#ifdef USE_PICTURE_DISCARD
++    if (discard_picture == 1)
++      return DEC_PIC_CONSUMED;
++#endif
++
++    i32 tmp_ret = Vp9GetBuffer4ShowExisting(dec_cont);
++    if (tmp_ret != DEC_OK)
++      return tmp_ret;
++
+     Vp9BufferQueueAddRef(dec_cont->bq, asic_buff->out_buffer_i);
+ #ifdef USE_EXTERNAL_BUFFER
+     Vp9BufferQueueAddRef(dec_cont->pp_bq, asic_buff->pp_buffer_map[asic_buff->out_buffer_i]);
+ #endif
+     Vp9SetupPicToOutput(dec_cont, input->pic_id);
+-    asic_buff->out_buffer_i = -1;
++    asic_buff->out_buffer_i = VP9_UNDEFINED_BUFFER;
+     Vp9PicToOutput(dec_cont);
+-#ifdef USE_PICTURE_DISCARD
+-    return DEC_PIC_CONSUMED;
+-#else
+     return DEC_PIC_DECODED;
+-#endif
+   }
+   /* Decode frame header (now starts bool coder as well) */
+   ret = Vp9DecodeFrameHeader(input->stream + dec->frame_tag_size,
+@@ -994,7 +1016,6 @@ enum DecRet Vp9DecAddBuffer(Vp9DecInst dec_inst,
+   static struct DWLLinearMem old_segment_map;
+ 
+   if (dec_inst == NULL || info == NULL ||
+-      X170_CHECK_VIRTUAL_ADDRESS(info->virtual_address) ||
+       X170_CHECK_BUS_ADDRESS_AGLINED(info->bus_address) ||
+       info->logical_size < dec_cont->next_buf_size) {
+     return DEC_PARAM_ERROR;
+@@ -1228,6 +1249,7 @@ enum DecRet Vp9DecGetBufferInfo(Vp9DecInst dec_inst, struct Vp9DecBufferInfo *me
+ 
+     // TODO(min): here we assume that the buffer should be freed externally.
+     dec_cont->buf_to_free->virtual_address = NULL;
++    dec_cont->buf_to_free->bus_address = 0;
+     dec_cont->buf_to_free = NULL;
+     dec_cont->buf_not_added = 1;
+   } else
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_asic.c b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+index a02a7b6..70ecadc 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_asic.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+@@ -346,15 +346,15 @@ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+ i32 Vp9FreeRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+   struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
+ 
+-  if (asic_buff->pictures[index].virtual_address != NULL)
++  if (asic_buff->pictures[index].bus_address != 0)
+     DWLFreeRefFrm(dec_cont->dwl, &asic_buff->pictures[index]);
+-  if (asic_buff->pictures_c[index].virtual_address != NULL)
++  if (asic_buff->pictures_c[index].bus_address != 0)
+     DWLFreeRefFrm(dec_cont->dwl, &asic_buff->pictures_c[index]);
+   if (asic_buff->dir_mvs[index].virtual_address != NULL)
+     DWLFreeRefFrm(dec_cont->dwl, &asic_buff->dir_mvs[index]);
+-  if (asic_buff->pp_luma[index].virtual_address != NULL)
++  if (asic_buff->pp_luma[index].bus_address != 0)
+     DWLFreeLinear(dec_cont->dwl, &asic_buff->pp_luma[index]);
+-  if (asic_buff->pp_chroma[index].virtual_address != NULL)
++  if (asic_buff->pp_chroma[index].bus_address != 0)
+     DWLFreeLinear(dec_cont->dwl, &asic_buff->pp_chroma[index]);
+ 
+   if (dec_cont->use_video_compressor) {
+@@ -709,7 +709,8 @@ i32 Vp9AsicAllocatePictures(struct Vp9DecContainer *dec_cont) {
+   SetDecRegister(dec_cont->vp9_regs, HWIF_MAX_CB_SIZE, 6); /* 64x64 */
+   SetDecRegister(dec_cont->vp9_regs, HWIF_MIN_CB_SIZE, 3); /* 8x8 */
+ 
+-  asic_buff->out_buffer_i = -1;
++  asic_buff->out_buffer_i = VP9_UNDEFINED_BUFFER;
++  asic_buff->show_existing_buffer_i = VP9_UNDEFINED_BUFFER;
+ 
+   return HANTRO_OK;
+ 
+@@ -722,7 +723,7 @@ void Vp9AsicReleasePictures(struct Vp9DecContainer *dec_cont) {
+   //for (i = 0; i < dec_cont->num_buffers; i++) {
+   for (i = 0; i < VP9DEC_MAX_PIC_BUFFERS; i++) {
+     if (!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER) &&
+-        asic_buff->pictures[i].virtual_address != NULL)
++        asic_buff->pictures[i].bus_address != 0)
+       DWLFreeRefFrm(dec_cont->dwl, &asic_buff->pictures[i]);
+   }
+ 
+@@ -761,24 +762,13 @@ i32 Vp9AllocateFrame(struct Vp9DecContainer *dec_cont, u32 index) {
+ i32 Vp9ReallocateFrame(struct Vp9DecContainer *dec_cont, u32 index) {
+   i32 ret = HANTRO_OK;
+   struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
+-  u32 out_index = index;
+-
+-  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
+-    out_index = index;
+-  else if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
+-           IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER))
+-    out_index = dec_cont->asic_buff->pp_buffer_map[index];
+ 
+   pthread_mutex_lock(&dec_cont->sync_out);
+-#ifndef USE_PICTURE_DISCARD
+-  while (dec_cont->asic_buff->display_index[out_index])
+-    pthread_cond_wait(&dec_cont->sync_out_cv, &dec_cont->sync_out);
+-#endif
+ 
+   /* Reallocate larger picture buffer into current index */
+   if (!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER) &&
+       asic_buff->pictures[asic_buff->out_buffer_i].logical_size < asic_buff->picture_size) {
+-    if (asic_buff->pictures[index].virtual_address != NULL)
++    if (asic_buff->pictures[index].bus_address != 0)
+       DWLFreeRefFrm(dec_cont->dwl, &asic_buff->pictures[index]);
+     asic_buff->pictures[index].mem_type = DWL_MEM_TYPE_DPB;
+     ret |= DWLMallocRefFrm(dec_cont->dwl, asic_buff->picture_size, &asic_buff->pictures[index]);
+@@ -885,7 +875,7 @@ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+   asic_buff->picture_size = luma_size + chroma_size + dir_mvs_size + luma_table_size + chroma_table_size;
+   asic_buff->pp_size = pp_luma_size + pp_chroma_size;
+ 
+-  if (asic_buff->pictures[index].virtual_address == NULL) {
++  if (asic_buff->pictures[index].bus_address == 0) {
+     if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
+       dec_cont->next_buf_size = asic_buff->picture_size;
+       dec_cont->buf_type = REFERENCE_BUFFER;
+@@ -905,7 +895,7 @@ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+   }
+ 
+   if (index < dec_cont->min_buffer_num) {
+-    if (asic_buff->pp_pictures[index].virtual_address == NULL
++    if (asic_buff->pp_pictures[index].bus_address == 0
+         && dec_cont->output_format == DEC_OUT_FRM_RASTER_SCAN) {
+       if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER)) {
+         dec_cont->next_buf_size = asic_buff->pp_size;
+@@ -920,7 +910,7 @@ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+       }
+     }
+ 
+-    if (asic_buff->pp_pictures[index].virtual_address == NULL && dec_cont->down_scale_enabled) {
++    if (asic_buff->pp_pictures[index].bus_address == 0 && dec_cont->down_scale_enabled) {
+       if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
+         dec_cont->next_buf_size = asic_buff->pp_size;
+         dec_cont->buf_type = DOWNSCALE_OUT_BUFFER;
+@@ -1106,7 +1096,8 @@ i32 Vp9GetRefFrm(struct Vp9DecContainer *dec_cont, u32 id) {
+   if (!asic_buff->realloc_out_buffer && !asic_buff->realloc_seg_map_buffer) {
+     if (!dec_cont->no_decoding_buffer || asic_buff->out_buffer_i == EMPTY_MARKER) {
+       asic_buff->out_buffer_i = Vp9BufferQueueGetBuffer(dec_cont->bq, limit);
+-      if (asic_buff->out_buffer_i >= 0 && asic_buff->out_buffer_i < VP9DEC_MAX_PIC_BUFFERS)
++      if (asic_buff->out_buffer_i >= 0 && asic_buff->out_buffer_i < VP9DEC_MAX_PIC_BUFFERS &&
++          IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
+         asic_buff->first_show[asic_buff->out_buffer_i] = 0;
+       if (asic_buff->out_buffer_i == ABORT_MARKER) {
+         return DEC_ABORTED;
+@@ -1156,6 +1147,7 @@ i32 Vp9GetRefFrm(struct Vp9DecContainer *dec_cont, u32 id) {
+         }
+       }
+       asic_buff->pp_buffer_map[asic_buff->out_buffer_i] = asic_buff->out_pp_buffer_i;
++      asic_buff->first_show[asic_buff->out_pp_buffer_i] = 0;
+     }
+   }
+ 
+@@ -2209,6 +2201,7 @@ void Vp9AsicReset(struct Vp9DecContainer *dec_cont) {
+   asic_buff->out_buffer_i = VP9_UNDEFINED_BUFFER;
+   asic_buff->prev_out_buffer_i = VP9_UNDEFINED_BUFFER;
+   asic_buff->out_pp_buffer_i = VP9_UNDEFINED_BUFFER;
++  asic_buff->show_existing_buffer_i = VP9_UNDEFINED_BUFFER;
+   asic_buff->realloc_seg_map_buffer = 0;
+   asic_buff->realloc_tile_edge_mem = 0;
+ #ifdef USE_OMXIL_BUFFER
+@@ -2300,3 +2293,61 @@ void Vp9FixChromaRFCTable(struct Vp9DecContainer *dec_cont) {
+   }
+ }
+ 
++i32 Vp9GetBuffer4ShowExisting(struct Vp9DecContainer *dec_cont) {
++  struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
++  u32 limit = dec_cont->dynamic_buffer_limit;
++  if (RequiredBufferCount(dec_cont) < limit)
++    limit = RequiredBufferCount(dec_cont);
++
++  if (!asic_buff->realloc_out_buffer) {
++
++    if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
++      asic_buff->show_existing_buffer_i =
++          Vp9BufferQueueGetBuffer(dec_cont->bq, limit);
++    else
++      asic_buff->show_existing_buffer_i =
++          Vp9BufferQueueGetBuffer(dec_cont->pp_bq, 0);
++
++    if (asic_buff->show_existing_buffer_i == ABORT_MARKER)
++      return DEC_ABORTED;
++#ifdef GET_FREE_BUFFER_NON_BLOCK
++    else if (asic_buff->show_existing_buffer_i == EMPTY_MARKER)
++      return DEC_NO_DECODING_BUFFER;
++#endif
++  }
++
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++    if (asic_buff->pictures[asic_buff->show_existing_buffer_i].logical_size <
++        asic_buff->pictures[asic_buff->out_buffer_i].logical_size) {
++      dec_cont->buf_to_free =
++          &asic_buff->pictures[asic_buff->show_existing_buffer_i];
++      dec_cont->next_buf_size =
++          asic_buff->pictures[asic_buff->out_buffer_i].logical_size;
++      dec_cont->buf_type = REFERENCE_BUFFER;
++      dec_cont->buffer_index = asic_buff->show_existing_buffer_i;
++      asic_buff->realloc_out_buffer = 1;
++      dec_cont->buf_num = 1;
++      return DEC_WAITING_FOR_BUFFER;
++    }
++  } else {
++    if (asic_buff->pp_pictures[asic_buff->
++        show_existing_buffer_i].logical_size <
++        asic_buff->pp_pictures[asic_buff->
++        pp_buffer_map[asic_buff->out_buffer_i]].logical_size) {
++      dec_cont->buf_to_free =
++          &asic_buff->pp_pictures[asic_buff->show_existing_buffer_i];
++      dec_cont->next_buf_size =
++          asic_buff->pp_pictures[asic_buff->
++          pp_buffer_map[asic_buff->out_buffer_i]].logical_size;
++      dec_cont->buf_type = RASTERSCAN_OUT_BUFFER;
++      dec_cont->buffer_index = asic_buff->show_existing_buffer_i;
++      asic_buff->realloc_out_buffer = 1;
++      dec_cont->buf_num = 1;
++      return DEC_WAITING_FOR_BUFFER;
++    }
++  }
++
++  asic_buff->realloc_out_buffer = 0;
++  asic_buff->first_show[asic_buff->show_existing_buffer_i] = 0;
++  return DEC_OK;
++}
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_asic.h b/decoder_sw/software/source/vp9/vp9hwd_asic.h
+index 4526596..c5f807f 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_asic.h
++++ b/decoder_sw/software/source/vp9/vp9hwd_asic.h
+@@ -84,4 +84,5 @@ void Vp9AsicReset(struct Vp9DecContainer *dec_cont);
+ 
+ void Vp9FixChromaRFCTable(struct Vp9DecContainer *dec_cont);
+ void Vp9CalculateBufSize(struct Vp9DecContainer *dec_cont, i32 index);
++i32 Vp9GetBuffer4ShowExisting(struct Vp9DecContainer *dec_cont);
+ #endif /* __VP9_ASIC_H__ */
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_container.h b/decoder_sw/software/source/vp9/vp9hwd_container.h
+index fb8d502..329b3d3 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_container.h
++++ b/decoder_sw/software/source/vp9/vp9hwd_container.h
+@@ -182,6 +182,9 @@ struct DecAsicBuffers {
+   i32 out_buffer_i;
+   i32 prev_out_buffer_i;
+ 
++  /* Buffer index which is used to store existing frame */
++  i32 show_existing_buffer_i;
++
+ #ifdef USE_EXTERNAL_BUFFER
+   /* Indexes for picture buffers in raster[]/dscale[] array */
+   i32 out_pp_buffer_i;
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_output.c b/decoder_sw/software/source/vp9/vp9hwd_output.c
+index 3cfa4e4..6ee0866 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_output.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_output.c
+@@ -56,9 +56,9 @@
+ static u32 CycleCount(struct Vp9DecContainer *dec_cont);
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+-static i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address);
++static i32 FindIndex(struct Vp9DecContainer *dec_cont, addr_t address);
+ #else
+-static i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address, u32 buffer_type);
++static i32 FindIndex(struct Vp9DecContainer *dec_cont, addr_t address, u32 buffer_type);
+ #endif
+ 
+ static i32 NextOutput(struct Vp9DecContainer *dec_cont);
+@@ -78,7 +78,7 @@ u32 CycleCount(struct Vp9DecContainer *dec_cont) {
+ }
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+-i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address) {
++i32 FindIndex(struct Vp9DecContainer *dec_cont, addr_t address) {
+   i32 i;
+   struct DWLLinearMem *pictures;
+ 
+@@ -88,12 +88,12 @@ i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address) {
+     pictures = dec_cont->asic_buff->pictures;
+ 
+   for (i = 0; i < (i32)dec_cont->num_buffers; i++)
+-    if ((*(pictures + i)).virtual_address == address) break;
++    if ((*(pictures + i)).bus_address == address) break;
+   ASSERT((u32)i < dec_cont->num_buffers);
+   return i;
+ }
+ #else
+-i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address, u32 buffer_type) {
++i32 FindIndex(struct Vp9DecContainer *dec_cont, addr_t address, u32 buffer_type) {
+   i32 i;
+   struct DWLLinearMem *pictures = dec_cont->asic_buff->pictures;
+   i32 num_buffers = dec_cont->num_buffers;
+@@ -107,7 +107,7 @@ i32 FindIndex(struct Vp9DecContainer *dec_cont, const u32 *address, u32 buffer_t
+   }
+ 
+   for (i = 0; i < (i32)num_buffers; i++)
+-    if ((*(pictures + i)).virtual_address == address) break;
++    if ((*(pictures + i)).bus_address == address) break;
+   //ASSERT((u32)i < num_buffers);
+   return i;
+ }
+@@ -198,12 +198,12 @@ enum DecRet Vp9DecPictureConsumed(Vp9DecInst dec_inst,
+ 
+   /* Remove the reference to the buffer. */
+   Vp9BufferQueueRemoveRef(dec_cont->bq,
+-                          FindIndex(dec_cont, pic.output_luma_base));
++                          FindIndex(dec_cont, pic.output_luma_bus_address));
+ 
+   pthread_mutex_lock(&dec_cont->sync_out);
+   // Release buffer for use as an output (i.e. "show existing frame"). A buffer can
+   // be in the output queue once at a time.
+-  dec_cont->asic_buff->display_index[FindIndex(dec_cont, pic.output_luma_base)] = 0;
++  dec_cont->asic_buff->display_index[FindIndex(dec_cont, pic.output_luma_bus_address)] = 0;
+ 
+   pthread_cond_signal(&dec_cont->sync_out_cv);
+   pthread_mutex_unlock(&dec_cont->sync_out);
+@@ -237,15 +237,13 @@ enum DecRet Vp9DecPictureConsumed(Vp9DecInst dec_inst,
+   if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
+       IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
+     if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER))
+-      buffer = FindIndex(dec_cont, pic.output_luma_base, RASTERSCAN_OUT_BUFFER);
++      buffer = FindIndex(dec_cont, pic.output_luma_bus_address, RASTERSCAN_OUT_BUFFER);
+     else
+-      buffer = FindIndex(dec_cont, pic.output_luma_base, DOWNSCALE_OUT_BUFFER);
++      buffer = FindIndex(dec_cont, pic.output_luma_bus_address, DOWNSCALE_OUT_BUFFER);
+ 
+     if (buffer >= dec_cont->num_pp_buffers)
+       return DEC_PARAM_ERROR;
+ 
+-    Vp9BufferQueueRemoveRef(dec_cont->pp_bq, buffer);
+-
+     pthread_mutex_lock(&dec_cont->sync_out);
+     // Release buffer for use as an output (i.e. "show existing frame"). A buffer can
+     // be in the output queue once at a time.
+@@ -253,18 +251,17 @@ enum DecRet Vp9DecPictureConsumed(Vp9DecInst dec_inst,
+ 
+     pthread_cond_signal(&dec_cont->sync_out_cv);
+     pthread_mutex_unlock(&dec_cont->sync_out);
++
++    Vp9BufferQueueRemoveRef(dec_cont->pp_bq, buffer);
+   }
+ 
+   /* FIXME: here only external buffer will be consumed, since only external buffer
+    * bases addresses will be set when Vp9DecPictureConsumed() is called. */
+   if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
+-    u32 buffer = FindIndex(dec_cont, pic.output_luma_base, REFERENCE_BUFFER);
++    u32 buffer = FindIndex(dec_cont, pic.output_luma_bus_address, REFERENCE_BUFFER);
+     if (buffer >= dec_cont->num_buffers)
+       return DEC_PARAM_ERROR;
+ 
+-    /* Remove the reference to the buffer. */
+-    Vp9BufferQueueRemoveRef(dec_cont->bq, buffer);
+-
+     pthread_mutex_lock(&dec_cont->sync_out);
+     // Release buffer for use as an output (i.e. "show existing frame"). A buffer can
+     // be in the output queue once at a time.
+@@ -272,6 +269,9 @@ enum DecRet Vp9DecPictureConsumed(Vp9DecInst dec_inst,
+ 
+     pthread_cond_signal(&dec_cont->sync_out_cv);
+     pthread_mutex_unlock(&dec_cont->sync_out);
++
++    /* Remove the reference to the buffer. */
++    Vp9BufferQueueRemoveRef(dec_cont->bq, buffer);
+   }
+ 
+   return DEC_OK;
+@@ -321,7 +321,7 @@ enum DecRet Vp9DecNextPicture(Vp9DecInst dec_inst,
+ #if 0
+   if (!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER) &&
+       dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
+-    u32 buffer = FindIndex(dec_cont, output->output_luma_base, REFERENCE_BUFFER);
++    u32 buffer = FindIndex(dec_cont, output->output_luma_bus_address, REFERENCE_BUFFER);
+ 
+     /* Remove the reference to the buffer. */
+     Vp9BufferQueueRemoveRef(dec_cont->bq, buffer);
+@@ -398,16 +398,78 @@ void Vp9PicToOutput(struct Vp9DecContainer *dec_cont) {
+       IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER))
+     info.index = dec_cont->asic_buff->pp_buffer_map[info.index];
+ #endif
++  u32 org_index = info.index;
+ 
+-#ifdef USE_PICTURE_DISCARD
+-  if (dec_cont->asic_buff->first_show[ref_index] == 0)
+-#endif
+-  {
+-    pthread_mutex_lock(&dec_cont->sync_out);
+-    while (dec_cont->asic_buff->display_index[info.index])
+-      pthread_cond_wait(&dec_cont->sync_out_cv, &dec_cont->sync_out);
+-    pthread_mutex_unlock(&dec_cont->sync_out);
++  pthread_mutex_lock(&dec_cont->sync_out);
++  if (dec_cont->asic_buff->display_index[info.index]) {
++    /* Memcpy show existing frame to another buffer here */
++    ASSERT(dec_cont->asic_buff->show_existing_buffer_i >= 0);
++    ASSERT(dec_cont->asic_buff->first_show[info.index]);
++    info.index = dec_cont->asic_buff->show_existing_buffer_i;
++
++    if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++      info.pic.output_luma_base =
++        dec_cont->asic_buff->pictures[info.index].virtual_address;
++      info.pic.output_luma_bus_address =
++        dec_cont->asic_buff->pictures[info.index].bus_address;
++      info.pic.output_chroma_base =
++        dec_cont->asic_buff->pictures[info.index].virtual_address +
++        dec_cont->asic_buff->pictures_c_offset[ref_index] / 4;
++      info.pic.output_chroma_bus_address =
++        dec_cont->asic_buff->pictures[info.index].bus_address +
++        dec_cont->asic_buff->pictures_c_offset[ref_index];
++
++      if (dec_cont->use_video_compressor) {
++        /* Compression table info. */
++        info.pic.output_rfc_luma_base =
++          dec_cont->asic_buff->pictures[info.index].virtual_address +
++          dec_cont->asic_buff->cbs_y_tbl_offset[ref_index] / 4;
++        info.pic.output_rfc_luma_bus_address =
++          dec_cont->asic_buff->pictures[info.index].bus_address +
++          dec_cont->asic_buff->cbs_y_tbl_offset[ref_index];
++        info.pic.output_rfc_chroma_base =
++          dec_cont->asic_buff->pictures[info.index].virtual_address +
++          dec_cont->asic_buff->cbs_c_tbl_offset[ref_index] / 4;
++        info.pic.output_rfc_chroma_bus_address =
++          dec_cont->asic_buff->pictures[info.index].bus_address +
++          dec_cont->asic_buff->cbs_c_tbl_offset[ref_index];
++      }
++
++      DWLmemcpy(dec_cont->asic_buff->pictures[info.index].virtual_address,
++             dec_cont->asic_buff->pictures[org_index].virtual_address,
++             dec_cont->asic_buff->pictures[org_index].logical_size);
++
++      Vp9BufferQueueRemoveRef(dec_cont->bq, org_index);
++    } else {
++      info.pic.output_luma_base =
++        dec_cont->asic_buff->pp_pictures[info.index].virtual_address;
++      info.pic.output_luma_bus_address =
++        dec_cont->asic_buff->pp_pictures[info.index].bus_address;
++      info.pic.output_chroma_base =
++        dec_cont->asic_buff->pp_pictures[info.index].virtual_address +
++        dec_cont->asic_buff->pp_c_offset[ref_index] / 4;
++      info.pic.output_chroma_bus_address =
++        dec_cont->asic_buff->pp_pictures[info.index].bus_address +
++        dec_cont->asic_buff->pp_c_offset[ref_index];
++
++      DWLmemcpy(dec_cont->asic_buff->pp_pictures[info.index].virtual_address,
++             dec_cont->asic_buff->pp_pictures[org_index].virtual_address,
++             dec_cont->asic_buff->pp_pictures[org_index].logical_size);
++
++      Vp9BufferQueueRemoveRef(dec_cont->pp_bq, org_index);
++    }
++  } else {
++    if (dec_cont->asic_buff->show_existing_buffer_i != VP9_UNDEFINED_BUFFER) {
++      if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
++        Vp9BufferQueueRemoveRef(dec_cont->bq,
++            dec_cont->asic_buff->show_existing_buffer_i);
++      else
++        Vp9BufferQueueRemoveRef(dec_cont->pp_bq,
++            dec_cont->asic_buff->show_existing_buffer_i);
++    }
+   }
++  dec_cont->asic_buff->show_existing_buffer_i = VP9_UNDEFINED_BUFFER;
++  pthread_mutex_unlock(&dec_cont->sync_out);
+ 
+   info.pic.cycles_per_mb = CycleCount(dec_cont);
+ #ifdef USE_VP9_EC
+@@ -415,48 +477,17 @@ void Vp9PicToOutput(struct Vp9DecContainer *dec_cont) {
+ #endif
+   dec_cont->asic_buff->picture_info[info.index] = info.pic;
+   if (info.show_frame) {
+-//#ifndef USE_EXTERNAL_BUFFER
+-#ifdef USE_PICTURE_DISCARD
+-    if (dec_cont->asic_buff->first_show[ref_index] == 0)
+-#endif
+-    {
+-      dec_cont->asic_buff->display_index[info.index] = dec_cont->display_number++;
+-      tmp = (FifoObject)(addr_t)info.index;
+-      FifoPush(dec_cont->fifo_out, tmp, FIFO_EXCEPTION_DISABLE);
+-      dec_cont->asic_buff->first_show[ref_index] = 1;
+-    }
+-#ifdef USE_PICTURE_DISCARD
+-    else {
+-      /* Remove the reference to the buffer. */
+-
+-      if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
+-          IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER))
+-        Vp9BufferQueueRemoveRef(dec_cont->pp_bq, info.index);
+-
+-      if (dec_cont->output_format == DEC_OUT_FRM_TILED_4X4)
+-        Vp9BufferQueueRemoveRef(dec_cont->bq, ref_index);
+-
+-      //dec_cont->asic_buff->display_index[info.index] = 0;
+-    }
+-#endif
++    dec_cont->asic_buff->display_index[info.index] = dec_cont->display_number++;
++    tmp = (FifoObject)(addr_t)info.index;
++    FifoPush(dec_cont->fifo_out, tmp, FIFO_EXCEPTION_DISABLE);
++    dec_cont->asic_buff->first_show[info.index] = 1;
+ 
+ #ifdef USE_EXTERNAL_BUFFER
+-    if (/*dec_cont->output_format != DEC_OUT_FRM_TILED_4X4*/!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++    if (!IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
+       Vp9BufferQueueRemoveRef(dec_cont->bq, ref_index);
+-
+-#if 0
+-      pthread_mutex_lock(&dec_cont->sync_out);
+-      // Release buffer for use as an output (i.e. "show existing frame"). A buffer can
+-      // be in the output queue once at a time.
+-      //dec_cont->asic_buff->display_index[info.index] = 0;
+-
+-      pthread_cond_signal(&dec_cont->sync_out_cv);
+-      pthread_mutex_unlock(&dec_cont->sync_out);
+-#endif
+     }
+ #endif
+   }
+-
+ }
+ 
+ #ifndef USE_EXTERNAL_BUFFER
+@@ -906,8 +937,9 @@ void Vp9ResetDecState(struct Vp9DecContainer *dec_cont) {
+     }
+   }
+ 
+-  dec_cont->asic_buff->out_buffer_i = EMPTY_MARKER;
+-  dec_cont->asic_buff->out_pp_buffer_i = EMPTY_MARKER;
++  dec_cont->asic_buff->out_buffer_i = VP9_UNDEFINED_BUFFER;
++  dec_cont->asic_buff->out_pp_buffer_i = VP9_UNDEFINED_BUFFER;
++  dec_cont->asic_buff->show_existing_buffer_i = VP9_UNDEFINED_BUFFER;
+   dec_cont->no_decoding_buffer = 0;
+ }
+ 
+diff --git a/decoder_sw/software/test/common/dectestbench.c b/decoder_sw/software/test/common/dectestbench.c
+index e204c71..aa7fb35 100755
+--- a/decoder_sw/software/test/common/dectestbench.c
++++ b/decoder_sw/software/test/common/dectestbench.c
+@@ -528,8 +528,6 @@ static void BufferRequestCb(ClientInst inst) {
+       break;
+     if (info.buf_to_free.virtual_address != NULL) {
+ #ifndef ASIC_TRACE_SUPPORT
+-      DWLFreeLinear(client->dwl, &info.buf_to_free);
+-
+       for (i = 0; i < client->max_buffers; i++) {
+         if (client->ext_buffers[i].virtual_address == info.buf_to_free.virtual_address) {
+           DWLmemset(&client->ext_buffers[i], 0, sizeof(client->ext_buffers[i]));
+@@ -538,10 +536,10 @@ static void BufferRequestCb(ClientInst inst) {
+       }
+       ASSERT(i < client->max_buffers);
+       if (i == client->max_buffers - 1) client->max_buffers--;
++
++      DWLFreeLinear(client->dwl, &info.buf_to_free);
+ #else
+       if (info.is_frame_buffer) {
+-        DWLFreeRefFrm(client->dwl, &info.buf_to_free);
+-
+         for (i = 0; i < client->max_frm_buffers; i++) {
+           if (client->ext_frm_buffers[i].virtual_address == info.buf_to_free.virtual_address) {
+             DWLmemset(&client->ext_frm_buffers[i], 0, sizeof(client->ext_frm_buffers[i]));
+@@ -549,10 +547,10 @@ static void BufferRequestCb(ClientInst inst) {
+           }
+         }
+         ASSERT(i < client->max_frm_buffers);
++
++        DWLFreeRefFrm(client->dwl, &info.buf_to_free);
+         if (i == client->max_frm_buffers - 1) client->max_frm_buffers--;
+       } else {
+-        DWLFreeLinear(client->dwl, &info.buf_to_free);
+-
+         for (i = 0; i < client->max_buffers; i++) {
+           if (client->ext_buffers[i].virtual_address == info.buf_to_free.virtual_address) {
+             DWLmemset(&client->ext_buffers[i], 0, sizeof(client->ext_buffers[i]));
+@@ -561,6 +559,8 @@ static void BufferRequestCb(ClientInst inst) {
+         }
+         ASSERT(i < client->max_buffers);
+         if (i == client->max_buffers - 1) client->max_buffers--;
++
++        DWLFreeLinear(client->dwl, &info.buf_to_free);
+       }
+ #endif
+     }
+diff --git a/h1_encoder/software/inc/h264encapi.h b/h1_encoder/software/inc/h264encapi.h
+index 334ce02..a98f721 100755
+--- a/h1_encoder/software/inc/h264encapi.h
++++ b/h1_encoder/software/inc/h264encapi.h
+@@ -493,6 +493,18 @@ extern "C"
+         u32 hwBuild;         /* Hardware build ID */
+     } H264EncBuild;
+ 
++/**
++* color description in the vui which coded in the sps(sequence parameter sets).
++* only valid when video signal type present flag in the vui is set.
++*/
++    typedef struct
++    {
++        u8 vuiColorDescripPresentFlag;                        /* color description present in the vui.0- not present, 1- present */
++        u8 vuiColorPrimaries;                                 /* Color's Primaries */
++        u8 vuiTransferCharacteristics;                        /* Transfer Characteristics */
++        u8 vuiMatrixCoefficients;                             /* Matrix Coefficients */
++    }VuiColorDescription;
++
+ /*------------------------------------------------------------------------------
+     4. Encoder API function prototypes
+ ------------------------------------------------------------------------------*/
+@@ -569,6 +581,10 @@ extern "C"
+     H264EncRet H264EncGetMbInfo(H264EncInst inst, H264EncOut * pEncOut,
+                                 u32 mbNum);
+ 
++/* Set color description. */
++i32 H264EncSetVuiColorDescription(H264EncInst inst, u32 vuiVideoSignalTypePresentFlag, u32 vuiVideoFormat,
++        u32 vuiColorDescripPresentFlag, u32 vuiColorPrimaries, u32 vuiTransferCharacteristics, u32 vuiMatrixCoefficients);
++
+ /*------------------------------------------------------------------------------
+     5. Encoder API tracing callback function
+ ------------------------------------------------------------------------------*/
+diff --git a/h1_encoder/software/linux_reference/test/h264/H264TestBench.c b/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
+index 9c6583a..93b6b58 100755
+--- a/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
++++ b/h1_encoder/software/linux_reference/test/h264/H264TestBench.c
+@@ -222,6 +222,10 @@ static option_s option[] = {
+     {"noiseLow", '0', 1},
+     {"noiseLevel", '0', 1},
+ 
++    {"vuiColordescription", '0', 1},
++    {"vuiVideoFormat", '0', 1},  /* videoformat, 0--component, 1--PAL, 2--NTSC, 3--SECAM, 4--MAC, 5--UNDEF */
++    {"vuiVideosignalPresent", '0', 1}, /* video signal type Present in vui, 0--NOT present, 1--present */
++
+     {"input", 'i', 1},              /* "input" must be after "inputFormat" */
+     {0, 0, 0}                       /* End of options */
+ };
+@@ -1399,6 +1403,11 @@ int OpenEncoder(commandLine_s * cml, H264EncInst * pEnc)
+         CloseEncoder(encoder);
+         return (int)ret;
+     }
++
++    H264EncSetVuiColorDescription(encoder, cml->vuiVideoSignalTypePresentFlag, cml->vuiVideoFormat, 
++                              cml->vuiColorDescripPresentFlag, cml->vuiColorPrimaries, 
++                              cml->vuiTransferCharacteristics, cml->vuiMatrixCoefficients);
++
+     return 0;
+ }
+ 
+@@ -1534,6 +1543,13 @@ int Parameter(i32 argc, char **argv, commandLine_s * cml)
+     cml->noiseLow = 5;
+     cml->noiseLevel = 10;
+ 
++    cml->vuiColorDescripPresentFlag    = 0;
++    cml->vuiColorPrimaries             = 9;
++    cml->vuiTransferCharacteristics    = 0;
++    cml->vuiMatrixCoefficients         = 9;
++    cml->vuiVideoFormat                = 5;
++    cml->vuiVideoSignalTypePresentFlag = 0;
++
+     argument.optCnt = 1;
+     while((ret = EncGetOption(argc, argv, option, &argument)) != -1)
+     {
+@@ -1900,6 +1916,29 @@ int Parameter(i32 argc, char **argv, commandLine_s * cml)
+               cml->noiseLow = atoi(optArg);
+             if (strcmp(argument.longOpt, "noiseLevel") == 0)
+               cml->noiseLevel = atoi(optArg);
++
++            if (strcmp(argument.longOpt, "vuiColordescription") == 0)
++            {
++              cml->vuiColorDescripPresentFlag = ENCHW_YES;
++        
++              /* Argument must be "xx:yy:zz".*/
++              if ((i = ParseDelim(optArg, ':')) == -1) break;
++              cml->vuiColorPrimaries = atoi(optArg);
++        
++              optArg += i + 1;
++              if ((i = ParseDelim(optArg, ':')) == -1) break;
++              cml->vuiTransferCharacteristics = atoi(optArg);
++        
++              optArg += i + 1;
++              cml->vuiMatrixCoefficients = atoi(optArg);
++            }
++        
++            if (strcmp(argument.longOpt, "vuiVideoFormat") == 0)
++              cml->vuiVideoFormat = atoi(optArg);
++        
++            if (strcmp(argument.longOpt, "vuiVideosignalPresent") == 0)
++              cml->vuiVideoSignalTypePresentFlag = atoi(optArg);
++
+             break;
+ 
+         default:
+@@ -2452,6 +2491,26 @@ void Help(void)
+             "        --noiseLow                 minimum noise value[5]. 
+"
+             "        --noiseLevel               noise estimation for start frames[10].
+");
+ 
++    fprintf(stdout,
++            "
+Color parameters in VUI:
+" 
++            "        --vuiColordescription=primary:transfer:matrix    Color description in the vui.
+"
++            "                       primary : 0..9 Index of chromaticity coordinates in Table E.3 in HEVC spec [9]
+"
++            "                       transfer: 0..2 The reference opto-electronic transfer characteristic
+"
++            "                                  function of the source picture in Table E.4 in HEVC spec [0]
+"
++            "                                  0 = ITU-R BT.2020, 1 = SMPTE ST 2084, 2 = ARIB STD-B67
+"
++            "                       matrix  : 0..9 Index of matrix coefficients used in deriving luma and chroma signals 
+"
++            "                                from the green, blue, and red or Y, Z, and X primaries in Table E.5 in HEVC spec [9]
+"
++            "        --vuiVideoFormat           0..5 video_format in the vui.[5]
+"
++            "                        0--component
+"
++            "                        1--PAL
+"
++            "                        2--NTSC
+"
++            "                        3--SECAM
+"
++            "                        4--MAC
+"
++            "                        5--UNDEF
+"
++            "        --vuiVideosignalPresent    0..1 video signal type Present in the vui.[0]
+"
++            "                        0-- video signal type NOT Present in the vui
+"
++            "                        1-- video signal type Present in the vui
+");
++
+     fprintf(stdout,
+             "
+Testing parameters that are not supported for end-user:
+"
+             "  -Q[n] --chromaQpOffset    -12..12 Chroma QP offset. [2]
+"
+diff --git a/h1_encoder/software/linux_reference/test/h264/H264TestBench.h b/h1_encoder/software/linux_reference/test/h264/H264TestBench.h
+index 44d963d..8638898 100755
+--- a/h1_encoder/software/linux_reference/test/h264/H264TestBench.h
++++ b/h1_encoder/software/linux_reference/test/h264/H264TestBench.h
+@@ -160,6 +160,14 @@ typedef struct
+     i32 noiseLevel;
+     i32 inputLineBufMode;
+     i32 inputLineBufDepth;
++
++    u32 vuiColorDescripPresentFlag;
++    u32 vuiColorPrimaries;
++    u32 vuiTransferCharacteristics;
++    u32 vuiMatrixCoefficients;
++    u32 vuiVideoFormat;
++    u32 vuiVideoSignalTypePresentFlag;
++    u32 videoFullRange;
+ } commandLine_s;
+ 
+ void TestNaluSizes(i32 * pNaluSizes, u8 * stream, u32 strmSize, u32 picBytes);
+diff --git a/h1_encoder/software/source/Android.bp b/h1_encoder/software/source/Android.bp
+index d1f0e05..fb2cdbc 100644
+--- a/h1_encoder/software/source/Android.bp
++++ b/h1_encoder/software/source/Android.bp
+@@ -33,7 +33,6 @@ cc_library_static {
+     defaults: [
+         "IMX_VPU_ENC_DEFAULTS",
+         "IMX_VPU_G1_CFLAGS",
+-        "IMX_VPU_ENC_INCLUDES",
+     ],
+ 
+     cflags: [
+@@ -82,7 +81,6 @@ cc_library_static {
+     defaults: [
+         "IMX_VPU_ENC_DEFAULTS",
+         "IMX_VPU_G1_CFLAGS",
+-        "IMX_VPU_ENC_INCLUDES",
+     ],
+ 
+     cflags: [
+diff --git a/h1_encoder/software/source/h264/H264EncApi.c b/h1_encoder/software/source/h264/H264EncApi.c
+index e3622d4..c463e00 100755
+--- a/h1_encoder/software/source/h264/H264EncApi.c
++++ b/h1_encoder/software/source/h264/H264EncApi.c
+@@ -1415,6 +1415,23 @@ H264EncRet H264EncSetSeiUserData(H264EncInst inst, const u8 * pUserData,
+     return H264ENC_OK;
+ }
+ 
++
++static void H264EncSpsSetVuiSignalType(sps_s *sps, u32 VideoSignalTypePresentFlag, u32 video_format,
++                                               u32 ColorDescripPresentFlag, u32 ColorPrimaries, u32 TransferCharacteristics, u32 MatrixCoefficients)
++{
++    ASSERT(sps);
++    
++    sps->vui.vuiVideoSignalTypePresentFlag = VideoSignalTypePresentFlag;
++    sps->vui.vuiVideoFormat   = video_format;
++
++    sps->vui.vuiColorDescripPresentFlag = ColorDescripPresentFlag;
++    sps->vui.vuiColorPrimaries = ColorPrimaries;
++    sps->vui.vuiTransferCharacteristics = TransferCharacteristics;
++    sps->vui.vuiMatrixCoefficients = MatrixCoefficients;
++
++    sps->vui_parameters_present_flag    = VideoSignalTypePresentFlag;
++}
++
+ /*------------------------------------------------------------------------------
+ 
+     Function name : H264EncStrmStart
+@@ -1527,6 +1544,11 @@ H264EncRet H264EncStrmStart(H264EncInst inst, const H264EncIn * pEncIn,
+                                 rc->virtualBuffer.bufferSize);
+     }
+ 
++    if(pEncInst->vuiVideoSignalTypePresentFlag)
++        H264EncSpsSetVuiSignalType(&pEncInst->seqParameterSet, pEncInst->vuiVideoSignalTypePresentFlag, pEncInst->vuiVideoFormat, 
++                                   pEncInst->vuiColorDescription.vuiColorDescripPresentFlag, pEncInst->vuiColorDescription.vuiColorPrimaries,
++                                   pEncInst->vuiColorDescription.vuiTransferCharacteristics, pEncInst->vuiColorDescription.vuiMatrixCoefficients);
++
+     /* Initialize cabac context tables for HW */
+     if (pEncInst->picParameterSet.enableCabac >= 1)
+     {
+@@ -2810,3 +2832,33 @@ H264EncRet H264EncSetInputMbLines(H264EncInst inst, u32 lines)
+     return H264ENC_OK;
+ }
+ 
++
++/*------------------------------------------------------------------------------
++    Function name : VCEncSetVuiColorDescription
++    Description   : Set vui color description parameter.
++    Return type   : i32.
++    Argument      : inst - encoder instance
++                    u32 - vuiVideoSignalTypePresentFlag
++                    u32 - vuiColorDescripPresentFlag,
++                    u32 - vuiColorPrimaries,
++                    u32 - vuiTransferCharacteristics,
++                    u32 - vuiMatrixCoefficients
++    Note          : This function should be called 
++                    after VCEncInit and before VCEncStrmStart.
++------------------------------------------------------------------------------*/
++i32 H264EncSetVuiColorDescription(H264EncInst inst, u32 vuiVideoSignalTypePresentFlag, u32 vuiVideoFormat,
++        u32 vuiColorDescripPresentFlag, u32 vuiColorPrimaries, u32 vuiTransferCharacteristics, u32 vuiMatrixCoefficients)
++{
++    ASSERT(inst);
++
++    h264Instance_s *pEncInst = (h264Instance_s *)inst;
++    pEncInst->vuiVideoSignalTypePresentFlag  = vuiVideoSignalTypePresentFlag;
++    pEncInst->vuiVideoFormat  = vuiVideoFormat;
++    
++    pEncInst->vuiColorDescription.vuiColorDescripPresentFlag  = vuiColorDescripPresentFlag;
++    pEncInst->vuiColorDescription.vuiColorPrimaries           = vuiColorPrimaries;
++    pEncInst->vuiColorDescription.vuiMatrixCoefficients       = vuiMatrixCoefficients;
++    pEncInst->vuiColorDescription.vuiTransferCharacteristics  = vuiTransferCharacteristics;
++
++    return 0;
++}
+diff --git a/h1_encoder/software/source/h264/H264Instance.h b/h1_encoder/software/source/h264/H264Instance.h
+index 92b871c..d4990a0 100755
+--- a/h1_encoder/software/source/h264/H264Instance.h
++++ b/h1_encoder/software/source/h264/H264Instance.h
+@@ -137,6 +137,10 @@ typedef struct
+     int dnfNoiseMaxPrev;
+     int dnfQpPrev;
+     u32 dnfFrameNum;
++
++    u32 vuiVideoSignalTypePresentFlag;
++    u32 vuiVideoFormat;
++    VuiColorDescription vuiColorDescription;
+ } h264Instance_s;
+ 
+ #endif
+diff --git a/h1_encoder/software/source/h264/H264SequenceParameterSet.c b/h1_encoder/software/source/h264/H264SequenceParameterSet.c
+index af2a00a..31d1288 100755
+--- a/h1_encoder/software/source/h264/H264SequenceParameterSet.c
++++ b/h1_encoder/software/source/h264/H264SequenceParameterSet.c
+@@ -405,21 +405,27 @@ static void WriteVui(stream_s * strm, vui_t * vui, i32 numRefFrames)
+     H264NalBits(strm, 0, 1);
+     COMMENT("overscan_info_present_flag");
+ 
+-    if(vui->videoFullRange != 0)
++    H264NalBits(strm, vui->vuiVideoSignalTypePresentFlag, 1);
++    COMMENT("video_signal_type_present_flag");
++    if(vui->vuiVideoSignalTypePresentFlag != 0)
+     {
+-        H264NalBits(strm, 1, 1);
+-        COMMENT("video_signal_type_present_flag");
+-        H264NalBits(strm, 5, 3);
++        H264NalBits(strm, vui->vuiVideoFormat, 3);
+         COMMENT("unspecified video_format");
+-        H264NalBits(strm, 1, 1);
++        H264NalBits(strm, vui->videoFullRange, 1);
+         COMMENT("video_full_range_flag");
+-        H264NalBits(strm, 0, 1);
++        H264NalBits(strm, vui->vuiColorDescripPresentFlag, 1);
+         COMMENT("colour_description_present_flag");
+-    }
+-    else
+-    {
+-        H264NalBits(strm, 0, 1);
+-        COMMENT("video_signal_type_present_flag");
++        if (vui->vuiColorDescripPresentFlag == ENCHW_YES)
++        {
++            H264NalBits(strm, vui->vuiColorPrimaries, 8);
++            COMMENT("Color Primaries");
++          
++            H264NalBits(strm, vui->vuiTransferCharacteristics, 8);
++            COMMENT("Transfer Characteristics");
++          
++            H264NalBits(strm, vui->vuiMatrixCoefficients, 8);
++            COMMENT("Matrix Coefficients");
++        }
+     }
+ 
+     H264NalBits(strm, 0, 1);
+diff --git a/h1_encoder/software/source/h264/H264SequenceParameterSet.h b/h1_encoder/software/source/h264/H264SequenceParameterSet.h
+index 6375fc9..667b974 100755
+--- a/h1_encoder/software/source/h264/H264SequenceParameterSet.h
++++ b/h1_encoder/software/source/h264/H264SequenceParameterSet.h
+@@ -74,6 +74,12 @@ typedef struct
+     u32 timeOffsetLength;
+     u32 bitRate;
+     u32 cpbSize;
++    u32 vuiVideoSignalTypePresentFlag;
++    u32 vuiVideoFormat;
++    u32 vuiColorDescripPresentFlag;
++    u32 vuiColorPrimaries;
++    u32 vuiTransferCharacteristics;
++    u32 vuiMatrixCoefficients;
+ } vui_t;
+ 
+ typedef struct
+@@ -102,6 +108,7 @@ typedef struct
+     u32 frameCropRightOffset;
+     u32 frameCropTopOffset;
+     u32 frameCropBottomOffset;
++    u32 vui_parameters_present_flag;
+ } sps_s;
+ 
+ extern const u32 H264LevelIdc[];
+diff --git a/imx_vpu_hantro.go b/imx_vpu_hantro.go
+index d915c2d..84f50df 100755
+--- a/imx_vpu_hantro.go
++++ b/imx_vpu_hantro.go
+@@ -34,11 +34,13 @@ func IMX_VPU_DEC_DefaultsFactory() (android.Module) {
+ 
+ func IMX_VPU_DEC_Defaults(ctx android.LoadHookContext) {
+     var Cflags []string
++    var Include_dirs []string
+     type props struct {
+         Target struct {
+                 Android struct {
+                         Enabled *bool
+                         Cflags []string
++                        Include_dirs []string
+                 }
+         }
+     }
+@@ -46,6 +48,18 @@ func IMX_VPU_DEC_Defaults(ctx android.LoadHookContext) {
+     var vpu_type string = ctx.Config().VendorConfig("IMXPLUGIN").String("BOARD_VPU_TYPE")
+     if strings.Contains(vpu_type, "hantro") {
+         p.Target.Android.Enabled = proptools.BoolPtr(true)
++
++        if ctx.AConfig().PlatformVersionName() == "10" {
++            Include_dirs = append(Include_dirs, "system/core/libion/kernel-headers")
++            Include_dirs = append(Include_dirs, "system/core/libion")
++            Include_dirs = append(Include_dirs, "device/fsl/common/kernel-headers")
++        } else {
++            // from android 11, some include dir is changed.
++            Include_dirs = append(Include_dirs, "system/memory/libion/kernel-headers/linux")
++            Include_dirs = append(Include_dirs, "system/memory/libion/kernel-headers")
++            Include_dirs = append(Include_dirs, "system/memory/libion")
++            Include_dirs = append(Include_dirs, "device/nxp/common/kernel-headers")
++        }
+     } else {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+     }
+@@ -53,6 +67,7 @@ func IMX_VPU_DEC_Defaults(ctx android.LoadHookContext) {
+         Cflags = append(Cflags, "-DCFG_SECURE_DATA_PATH")
+     }
+     p.Target.Android.Cflags = Cflags
++    p.Target.Android.Include_dirs = Include_dirs
+     ctx.AppendProperties(p)
+ }
+ 
+@@ -64,11 +79,13 @@ func IMX_VPU_ENC_DefaultsFactory() (android.Module) {
+ 
+ func IMX_VPU_ENC_Defaults(ctx android.LoadHookContext) {
+     var Cflags []string
++    var Include_dirs []string
+     type props struct {
+         Target struct {
+                 Android struct {
+                         Enabled *bool
+                         Cflags []string
++                        Include_dirs []string
+                 }
+         }
+     }
+@@ -78,6 +95,18 @@ func IMX_VPU_ENC_Defaults(ctx android.LoadHookContext) {
+         p.Target.Android.Enabled = proptools.BoolPtr(true)
+         Cflags = append(Cflags, "-DENC_MODULE_PATH=\"/dev/mxc_hantro_h1\"")
+         Cflags = append(Cflags, "-DMEMALLOC_MODULE_PATH=\"/dev/ion\"")
++
++        if ctx.AConfig().PlatformVersionName() == "10" {
++            Include_dirs = append(Include_dirs, "system/core/libion/kernel-headers")
++            Include_dirs = append(Include_dirs, "system/core/libion")
++            Include_dirs = append(Include_dirs, "device/fsl/common/kernel-headers")
++        } else {
++            // from android 11, some include dir is changed.
++            Include_dirs = append(Include_dirs, "system/memory/libion/kernel-headers/linux")
++            Include_dirs = append(Include_dirs, "system/memory/libion/kernel-headers")
++            Include_dirs = append(Include_dirs, "system/memory/libion")
++            Include_dirs = append(Include_dirs, "device/nxp/common/kernel-headers")
++        }
+     } else {
+         p.Target.Android.Enabled = proptools.BoolPtr(false)
+     }
+@@ -85,6 +114,7 @@ func IMX_VPU_ENC_Defaults(ctx android.LoadHookContext) {
+         Cflags = append(Cflags, "-DCFG_SECURE_DATA_PATH")
+     }
+     p.Target.Android.Cflags = Cflags
++    p.Target.Android.Include_dirs = Include_dirs
+     ctx.AppendProperties(p)
+ }
+ 
+diff --git a/openmax_il/source/Android.bp b/openmax_il/source/Android.bp
+index 657ea72..b470677 100644
+--- a/openmax_il/source/Android.bp
++++ b/openmax_il/source/Android.bp
+@@ -4,7 +4,6 @@ cc_library_shared {
+     defaults: [
+         "IMX_VPU_ENC_DEFAULTS",
+         "IMX_VPU_G1_CFLAGS",
+-        "IMX_VPU_ENC_INCLUDES",
+     ],
+ 
+     cflags: [
+@@ -60,7 +59,6 @@ cc_library_shared {
+ 
+     defaults: [
+         "IMX_VPU_DEC_DEFAULTS",
+-        "IMX_VPU_INCLUDES",
+     ],
+ 
+     cflags: [
+diff --git a/openmax_il/source/decoder/codec_mpeg2.c b/openmax_il/source/decoder/codec_mpeg2.c
+index d29280c..bc3085a 100755
+--- a/openmax_il/source/decoder/codec_mpeg2.c
++++ b/openmax_il/source/decoder/codec_mpeg2.c
+@@ -864,8 +864,9 @@ CODEC_STATE decoder_setframebuffer_mpeg2(CODEC_PROTOTYPE * arg, BUFFER *buff, OM
+     mem.virtual_address = (u32*)buff->bus_data;
+     mem.bus_address = buff->bus_address;
+     mem.size = buff->allocsize;
+-    DBGT_PDEBUG("virtual_address %p, bus_address %lu, size %d",
+-    mem.virtual_address, mem.bus_address, mem.size);
++    mem.ion_fd = buff->ion_fd;
++    DBGT_PDEBUG("virtual_address %p, bus_address %lu, size %d, ion fd %d",
++    mem.virtual_address, mem.bus_address, mem.size, mem.ion_fd);
+ 
+     ret = Mpeg2DecAddBuffer(this->instance, &mem);
+     DBGT_PDEBUG("Mpeg2DecAddBuffer ret (%d)", ret);
+diff --git a/openmax_il/source/encoder/encoder.c b/openmax_il/source/encoder/encoder.c
+index fcc7a26..849c0a3 100755
+--- a/openmax_il/source/encoder/encoder.c
++++ b/openmax_il/source/encoder/encoder.c
+@@ -1563,6 +1563,26 @@ OMX_ERRORTYPE encoder_set_parameter(OMX_IN OMX_HANDLETYPE hComponent,
+                 DBGT_PDEBUG("API: pEnc->encConfig.prependSPSPPSToIDRFrames %d", pEnc->encConfig.prependSPSPPSToIDRFrames);
+             }
+             break;
++
++        case (OMX_INDEXTYPE)OMX_google_android_index_colorDescriptionInVUI:
++            {
++                struct ColorDescriptionInVuiParams *param = (struct ColorDescriptionInVuiParams *) pParam;
++                pEnc->encConfig.colorDescription = param->colorDescription;
++                pEnc->encConfig.primaries = param->primaries;
++                pEnc->encConfig.transfer = param->transfer;
++                pEnc->encConfig.matrixCoeffs = param->matrixCoeffs;
++                pEnc->encConfig.fullRange = param->fullRange;
++                pEnc->encConfig.videoFormat = param->videoFormat;
++                pEnc->encConfig.videoSignalTypePresent = param->videoSignalTypePresent;
++                DBGT_PDEBUG("API: pEnc->encConfig.colorDescription %d", pEnc->encConfig.colorDescription);
++                DBGT_PDEBUG("API: pEnc->encConfig.primaries %d", pEnc->encConfig.primaries);
++                DBGT_PDEBUG("API: pEnc->encConfig.transfer %d", pEnc->encConfig.transfer);
++                DBGT_PDEBUG("API: pEnc->encConfig.matrixCoeffs %d", pEnc->encConfig.matrixCoeffs);
++                DBGT_PDEBUG("API: pEnc->encConfig.fullRange %d", pEnc->encConfig.fullRange);
++                DBGT_PDEBUG("API: pEnc->encConfig.videoFormat %d", pEnc->encConfig.videoFormat);
++                DBGT_PDEBUG("API: pEnc->encConfig.videoSignalTypePresent %d", pEnc->encConfig.videoSignalTypePresent);
++            }
++            break;
+ #endif
+         default:
+             DBGT_CRITICAL("API: unsupported settings index");
+@@ -4445,6 +4465,14 @@ OMX_ERRORTYPE transition_to_idle_from_loaded(OMX_ENCODER* pEnc)
+             }
+             config.bSeiMessages = OMX_FALSE;
+ 
++            config.colorDescription = pEnc->encConfig.colorDescription;
++            config.primaries = pEnc->encConfig.primaries;
++            config.transfer = pEnc->encConfig.transfer;
++            config.matrixCoeffs = pEnc->encConfig.matrixCoeffs;
++            config.fullRange = pEnc->encConfig.fullRange;
++            config.videoFormat = pEnc->encConfig.videoFormat;
++            config.videoSignalTypePresent = pEnc->encConfig.videoSignalTypePresent;
++
+             pEnc->codec = HantroHwEncOmx_encoder_create_h264(&config);
+         }
+         break;
+@@ -4968,6 +4996,14 @@ OMX_ERRORTYPE transition_to_idle_from_loaded(OMX_ENCODER* pEnc)
+         memcpy(&config.roi2Area, &pEnc->encConfig.roi2Area, pEnc->encConfig.roi2Area.nSize);
+         config.roi2DeltaQP = pEnc->encConfig.roi2DeltaQP;
+ 
++        config.colorDescription = pEnc->encConfig.colorDescription;
++        config.primaries = pEnc->encConfig.primaries;
++        config.transfer = pEnc->encConfig.transfer;
++        config.matrixCoeffs = pEnc->encConfig.matrixCoeffs;
++        config.fullRange = pEnc->encConfig.fullRange;
++        config.videoFormat = pEnc->encConfig.videoFormat;
++        config.videoSignalTypePresent = pEnc->encConfig.videoSignalTypePresent;
++
+         pEnc->codec = HantroHwEncOmx_encoder_create_hevc(&config);
+     }
+     break;
+diff --git a/openmax_il/source/encoder/encoder.h b/openmax_il/source/encoder/encoder.h
+index f635d1e..60cc071 100755
+--- a/openmax_il/source/encoder/encoder.h
++++ b/openmax_il/source/encoder/encoder.h
+@@ -108,6 +108,13 @@ typedef struct VIDEO_ENCODER_CONFIG
+ #ifdef ENCH2
+     OMX_VIDEO_PARAM_HEVCTYPE             hevc;
+ #endif
++    OMX_U32 colorDescription;
++    OMX_U32 primaries;
++    OMX_U32 transfer;
++    OMX_U32 matrixCoeffs;
++    OMX_U32 fullRange;
++    OMX_U32 videoFormat;
++    OMX_U32 videoSignalTypePresent;
+ }VIDEO_ENCODER_CONFIG;
+ //#endif //OMX_ENCODER_VIDEO_DOMAIN
+ 
+diff --git a/openmax_il/source/encoder/encoder_h264.c b/openmax_il/source/encoder/encoder_h264.c
+index 8577a0d..b697f9f 100755
+--- a/openmax_il/source/encoder/encoder_h264.c
++++ b/openmax_il/source/encoder/encoder_h264.c
+@@ -730,7 +730,7 @@ ENCODER_PROTOTYPE* HantroHwEncOmx_encoder_create_h264(const H264_CONFIG* params)
+             coding_ctrl.seiMessages = params->bSeiMessages;
+ 
+             //videoFullRange
+-            coding_ctrl.videoFullRange = params->nVideoFullRange;
++            coding_ctrl.videoFullRange = params->fullRange;
+ 
+             DBGT_PDEBUG("coding_ctrl.sliceSize %d", coding_ctrl.sliceSize);
+             DBGT_PDEBUG("coding_ctrl.seiMessages %d", coding_ctrl.seiMessages);
+@@ -1053,7 +1053,22 @@ ENCODER_PROTOTYPE* HantroHwEncOmx_encoder_create_h264(const H264_CONFIG* params)
+         DBGT_EPILOG("");
+         return NULL;
+     }
++    else
++    {
++        ret = H264EncSetVuiColorDescription(this->instance, params->videoSignalTypePresent, params->videoFormat,
++                                      params->colorDescription, params->primaries, params->transfer, params->matrixCoeffs);
++    }
++
++    if (ret != H264ENC_OK)
++    {
++        DBGT_CRITICAL("H264EncSetVuiColorDescription failed! (%d)", ret);
++        OSAL_Free(this);
++        DBGT_EPILOG("");
++        return NULL;
++    }
++
+     DBGT_EPILOG("");
++
+     return (ENCODER_PROTOTYPE*) this;
+ }
+ 
+diff --git a/openmax_il/source/encoder/encoder_h264.h b/openmax_il/source/encoder/encoder_h264.h
+index 34cca22..7cbd69d 100755
+--- a/openmax_il/source/encoder/encoder_h264.h
++++ b/openmax_il/source/encoder/encoder_h264.h
+@@ -71,6 +71,14 @@ typedef struct H264_CONFIG
+     ENCODER_COMMON_CONFIG common_config;
+     RATE_CONTROL_CONFIG rate_config;
+     PRE_PROCESSOR_CONFIG pp_config;
++
++    OMX_U32 colorDescription;
++    OMX_U32 primaries;
++    OMX_U32 transfer;
++    OMX_U32 matrixCoeffs;
++    OMX_U32 fullRange;
++    OMX_U32 videoFormat;
++    OMX_U32 videoSignalTypePresent;
+ } H264_CONFIG;
+ 
+ // create codec instance
+diff --git a/openmax_il/source/port.h b/openmax_il/source/port.h
+index d7c7d68..18abc52 100755
+--- a/openmax_il/source/port.h
++++ b/openmax_il/source/port.h
+@@ -60,6 +60,7 @@ typedef struct BUFFER
+     OMX_U32               allocsize;
+     OSAL_BUS_WIDTH        bus_address;
+     OMX_U8*               bus_data;
++    OMX_S32               ion_fd;
+ #ifdef USE_ANDROID_NATIVE_BUFFER
+     void*                 native_buffer_hdl;
+ #endif

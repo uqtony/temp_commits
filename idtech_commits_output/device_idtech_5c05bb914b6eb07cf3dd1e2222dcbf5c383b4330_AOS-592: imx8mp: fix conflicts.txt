@@ -1,0 +1,835 @@
+5c05bb91 George.Huang 2021-05-14
+
+AOS-592: imx8mp: fix conflicts
+
+Change-Id: Ie2780a828d5eb1967526d56d15a89814e7bdf5ba
+
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
+index 48a7999f..89d60ffc 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_pci.mk
+@@ -8,3 +8,5 @@ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mp_common.mk)
+ 
+ # Overrides
+ PRODUCT_NAME := bigcypress_8mp_pci
++
++SOONG_CONFIG_IDT_PCI_RM_ADBD = true
+diff --git a/imx8m/bigcypress_8mp/init.imx8mp.rc b/imx8m/bigcypress_8mp/init.imx8mp.rc
+index d46e3bf0..aebbee4a 100755
+--- a/imx8m/bigcypress_8mp/init.imx8mp.rc
++++ b/imx8m/bigcypress_8mp/init.imx8mp.rc
+@@ -57,3 +57,10 @@ on early-boot
+ service isp_media_server /vendor/bin/isp_media_server /vendor/etc/configs/isp/daA3840_30mc_1080P.json
+     group camera
+     oneshot
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk2boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk2boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk2boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk2boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/vp6820_8mp/fstab.nxp b/imx8m/vp6820_8mp/fstab.nxp
+index 194480fa..bdab2b2d 100644
+--- a/imx8m/vp6820_8mp/fstab.nxp
++++ b/imx8m/vp6820_8mp/fstab.nxp
+@@ -3,12 +3,12 @@
+ # The filesystem that contains the filesystem checker binary (typically /system) cannot
+ # specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+ 
+-/devices/platform/32f10108.usb/38200000.dwc3/* auto auto defaults voldmanaged=usb:auto
+-/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block,metadata_csum
++/devices/platform/soc@0/32f10108.usb/38200000.dwc3/* auto auto defaults voldmanaged=usb:auto
++/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block
+ /dev/block/by-name/metadata    /metadata    ext4    noatime,nosuid,nodev,discard,sync                                                wait,formattable,first_stage_mount,check
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+ /dev/block/by-name/idtechdata  /mnt/vendor/idtechdata  ext4    nosuid,nodev,noatime,barrier=1                       wait,formattable
+ /dev/block/zram0 none swap defaults zramsize=629145600
+ 
+ /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
+-/devices/platform/32f10100.usb/38100000.dwc3/* auto auto defaults voldmanaged=usb:auto
++/devices/platform/soc@0/32f10100.usb/38100000.dwc3/* auto auto defaults voldmanaged=usb:auto
+diff --git a/imx8m/vp6820_8mp/fstab.nxp~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mp/fstab.nxp~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index bc5e8ac7..00000000
+--- a/imx8m/vp6820_8mp/fstab.nxp~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,11 +0,0 @@
+-# Android fstab file.
+-#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
+-# The filesystem that contains the filesystem checker binary (typically /system) cannot
+-# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+-
+-/devices/platform/soc@0/32f10108.usb/38200000.dwc3/* auto auto defaults voldmanaged=usb:auto
+-/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block
+-/dev/block/by-name/metadata    /metadata    ext4    noatime,nosuid,nodev,discard,sync                                                wait,formattable,first_stage_mount,check
+-/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+-/dev/block/zram0 none swap defaults zramsize=629145600
+-
+diff --git a/imx8m/vp6820_8mp/manifest.xml b/imx8m/vp6820_8mp/manifest.xml
+index 0627068d..1210dbbb 100644
+--- a/imx8m/vp6820_8mp/manifest.xml
++++ b/imx8m/vp6820_8mp/manifest.xml
+@@ -1,10 +1,10 @@
+-<manifest version="1.0" type="device" target-level="4">
++<manifest version="1.0" type="device" target-level="5">
+     <kernel  target-level="5" />
+     <hal format="hidl">
+ 	<name>android.hardware.graphics.allocator</name>
+         <transport>hwbinder</transport>
+ 	<impl level="generic"></impl>
+-	<version>2.0</version>
++	<version>4.0</version>
+ 	<interface>
+ 	    <name>IAllocator</name>
+ 	    <instance>default</instance>
+@@ -31,14 +31,12 @@
+     <hal format="hidl">
+         <name>android.hardware.drm</name>
+         <transport>hwbinder</transport>
+-        <version>1.0</version>
++        <version>1.3</version>
+         <interface>
+             <name>ICryptoFactory</name>
+-            <instance>default</instance>
+         </interface>
+         <interface>
+             <name>IDrmFactory</name>
+-            <instance>default</instance>
+         </interface>
+         <fqname>@1.3::ICryptoFactory/clearkey</fqname>
+         <fqname>@1.3::IDrmFactory/clearkey</fqname>
+@@ -56,7 +54,7 @@
+         <name>android.hardware.graphics.mapper</name>
+         <transport arch="32+64">passthrough</transport>
+         <impl level="generic"></impl>
+-        <version>2.1</version>
++        <version>4.0</version>
+         <interface>
+             <name>IMapper</name>
+             <instance>default</instance>
+@@ -80,15 +78,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.configstore</name>
+-        <transport>hwbinder</transport>
+-        <version>1.1</version>
+-        <interface>
+-            <name>ISurfaceFlingerConfigs</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.media.c2</name>
+         <transport>hwbinder</transport>
+@@ -111,15 +100,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.light</name>
+-        <transport>hwbinder</transport>
+-        <version>2.0</version>
+-        <interface>
+-            <name>ILight</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mp/manifest.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mp/manifest.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index aba9b68e..00000000
+--- a/imx8m/vp6820_8mp/manifest.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,153 +0,0 @@
+-<manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
+-    <hal format="hidl">
+-	<name>android.hardware.graphics.allocator</name>
+-        <transport>hwbinder</transport>
+-	<impl level="generic"></impl>
+-	<version>4.0</version>
+-	<interface>
+-	    <name>IAllocator</name>
+-	    <instance>default</instance>
+-	</interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.composer</name>
+-        <transport>hwbinder</transport>
+-        <version>2.4</version>
+-        <interface>
+-            <name>IComposer</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.keymaster</name>
+-        <transport>hwbinder</transport>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IKeymasterDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.drm</name>
+-        <transport>hwbinder</transport>
+-        <version>1.3</version>
+-        <interface>
+-            <name>ICryptoFactory</name>
+-        </interface>
+-        <interface>
+-            <name>IDrmFactory</name>
+-        </interface>
+-        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
+-        <fqname>@1.3::IDrmFactory/clearkey</fqname>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.gatekeeper</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IGatekeeper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.mapper</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <impl level="generic"></impl>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IMapper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.renderscript</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.c2</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IComponentStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.omx</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IOmx</name>
+-            <instance>default</instance>
+-        </interface>
+-        <interface>
+-            <name>IOmxStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio</name>
+-        <transport>hwbinder</transport>
+-        <version>6.0</version>
+-        <interface>
+-            <name>IDevicesFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio.effect</name>
+-        <transport>hwbinder</transport>
+-		<version>6.0</version>
+-        <interface>
+-            <name>IEffectsFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.bluetooth</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IBluetoothHci</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.dumpstate</name>
+-        <transport>hwbinder</transport>
+-        <version>1.1</version>
+-        <interface>
+-            <name>IDumpstateDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>nxp.hardware.display</name>
+-            <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDisplay</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-       <name>android.hardware.camera.provider</name>
+-       <transport>hwbinder</transport>
+-       <fqname>@2.4::ICameraProvider/external/0</fqname>
+-    </hal>
+-</manifest>
+diff --git a/imx8m/vp6820_8mp/overlay/frameworks/base/core/res/res/values/config.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mp/overlay/frameworks/base/core/res/res/values/config.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index be3cd041..00000000
+--- a/imx8m/vp6820_8mp/overlay/frameworks/base/core/res/res/values/config.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,193 +0,0 @@
+-<?xml version="1.0" encoding="utf-8"?>
+-<!--
+-/*
+-** Copyright 2011, The Android Open Source Project
+-**
+-** Licensed under the Apache License, Version 2.0 (the "License");
+-** you may not use this file except in compliance with the License.
+-** You may obtain a copy of the License at
+-**
+-**     http://www.apache.org/licenses/LICENSE-2.0
+-**
+-** Unless required by applicable law or agreed to in writing, software
+-** distributed under the License is distributed on an "AS IS" BASIS,
+-** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-** See the License for the specific language governing permissions and
+-** limitations under the License.
+-*/
+--->
+-
+-<!-- These resources are around just to allow their values to be customized
+-     for different hardware and product builds. -->
+-<resources>
+-
+-    <!--For Android we support eth0 now -->
+-    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
+-
+-    <!-- List of regexpressions describing the interface (if any) that represent tetherable
+-         USB interfaces.  If the device doesn't want to support tething over USB this should
+-         be empty.  An example would be "usb.*" -->
+-     <string-array translatable="false" name="config_tether_usb_regexs">
+-       <item>usb0</item>
+-     </string-array>
+-
+-    <!-- List of regexpressions describing the interface (if any) that represent tetherable
+-         Wifi interfaces.  If the device doesn't want to support tethering over Wifi this
+-         should be empty.  An example would be "softap.*" -->
+-    <string-array translatable="false" name="config_tether_wifi_regexs">
+-      <item>"wlan0"</item>
+-    </string-array>
+-
+-    <!-- List of regexpressions describing the interface (if any) that represent tetherable
+-         bluetooth interfaces.  If the device doesn't want to support tethering over bluetooth this
+-         should be empty. -->
+-    <string-array translatable="false" name="config_tether_bluetooth_regexs">
+-        <item>"bt-pan"</item>
+-        </string-array>
+-
+-    <!-- Array of ConnectivityManager.TYPE_xxxx values allowable for tethering -->
+-    <!-- Common options are [1, 4] for TYPE_WIFI and TYPE_MOBILE_DUN or
+-    <!== [0,1,5,7,9] for TYPE_MOBILE, TYPE_WIFI, TYPE_MOBILE_HIPRI, TYPE_BLUETOOTH and TYPE_ETHERNET -->
+-    <integer-array translatable="false" name="config_tether_upstream_types">
+-        <item>0</item>
+-        <item>1</item>
+-        <item>5</item>
+-        <item>9</item>
+-    </integer-array>
+-
+-    <!-- Flag indicating whether we should enable the automatic brightness in Settings.
+-         config_hardware_automatic_brightness_available is not set, so we will use software implementation -->
+-    <bool name="config_automatic_brightness_available">true</bool>
+-
+-    <!-- An Array of "[ConnectivityManager connectionType],
+-                      [# simultaneous connection types]"  -->
+-    <string-array translatable="false" name="radioAttributes">
+-        <item>"1,1"</item>
+-        <item>"9,1"</item>
+-    </string-array>
+-
+-    <!-- An Array of "[Connection name],[ConnectivityManager.TYPE_xxxx],
+-         [associated radio-type],[priority],[restoral-timer(ms)],[dependencyMet]  -->
+-    <!-- the 5th element "resore-time" indicates the number of milliseconds to delay
+-         before automatically restore the default connection.  Set -1 if the connection
+-         does not require auto-restore. -->
+-    <!-- the 6th element indicates boot-time dependency-met value. -->
+-    <string-array translatable="false" name="networkAttributes">
+-        <item>"wifi,1,1,1,-1,true"</item>
+-        <item>"bluetooth,7,7,2,-1,true"</item>
+-        <item>"ethernet,9,9,2,-1,true"</item>
+-    </string-array>
+-
+-    <!-- Array of light sensor LUX values to define our levels for auto backlight brightness support.
+-         The N entries of this array define N + 1 zones as follows:
+-
+-         Zone 0:        0 <= LUX < array[0]
+-         Zone 1:        array[0] <= LUX < array[1]
+-         ...
+-         Zone N:        array[N - 1] <= LUX < array[N]
+-         Zone N + 1:    array[N] <= LUX < infinity
+-
+-         Must be overridden in platform specific overlays -->
+-    <integer-array name="config_autoBrightnessLevels">
+-        <item>5</item>
+-        <item>15</item>
+-        <item>50</item>
+-        <item>100</item>
+-        <item>200</item>
+-        <item>400</item>
+-        <item>1000</item>
+-        <item>2000</item>
+-        <item>3000</item>
+-        <item>5000</item>
+-        <item>10000</item>
+-        <item>30000</item>
+-    </integer-array>
+-
+-    <!-- Array of output values for LCD backlight corresponding to the LUX values
+-         in the config_autoBrightnessLevels array.  This array should have size one greater
+-         than the size of the config_autoBrightnessLevels array.
+-         This must be overridden in platform specific overlays -->
+-    <integer-array name="config_autoBrightnessLcdBacklightValues">
+-        <item>5</item>    <!-- 0-5 -->
+-        <item>20</item>   <!-- 5-15 -->
+-        <item>30</item>   <!-- 15-50 -->
+-        <item>40</item>   <!-- 50-100 -->
+-        <item>50</item>   <!-- 100-200 -->
+-        <item>60</item>   <!-- 200-400 -->
+-        <item>70</item>   <!-- 400-1000 -->
+-        <item>80</item>   <!-- 1000-2000 -->
+-        <item>130</item>  <!-- 2000-3000 -->
+-        <item>180</item>  <!-- 3000-5000 -->
+-        <item>255</item>  <!-- 5000-10000 -->
+-        <item>255</item>  <!-- 10000-30000 -->
+-        <item>255</item>  <!-- 30000+ -->
+-    </integer-array>
+-
+-    <!-- Array of output values for button backlight corresponding to the LUX values
+-         in the config_autoBrightnessLevels array.  This array should have size one greater
+-         than the size of the config_autoBrightnessLevels array.
+-         This must be overridden in platform specific overlays -->
+-    <integer-array name="config_autoBrightnessButtonBacklightValues">
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-    </integer-array>
+-
+-    <!-- Array of output values for keyboard backlight corresponding to the LUX values
+-         in the config_autoBrightnessLevels array.  This array should have size one greater
+-         than the size of the config_autoBrightnessLevels array.
+-         This must be overridden in platform specific overlays -->
+-    <integer-array name="config_autoBrightnessKeyboardBacklightValues">
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-        <item>0</item>
+-    </integer-array>
+-
+-    <integer name="config_screenBrightnessDim">5</integer>
+-
+-    <!--  Maximum number of supported users -->
+-    <integer name="config_multiuserMaximumUsers">8</integer>
+-    <!--  Whether Multiuser UI should be shown -->
+-    <bool name="config_enableMultiUserUI">true</bool>
+-
+-    <!-- Whether a software navigation bar should be shown. NOTE: in the future this may be
+-         autodetected from the Configuration. -->
+-    <bool name="config_showNavigationBar">true</bool>
+-
+-    <!-- This device is not "voice capable"; it's data-only. -->
+-    <bool name="config_voice_capable">false</bool>
+-
+-    <!-- Boolean indicating whether system support sustained performance mode. -->
+-    <bool name="config_sustainedPerformanceModeSupported">true</bool>
+-
+-    <!-- If the system has the input method for each display - enable per-display focus. -->
+-    <bool name="config_perDisplayFocusEnabled">true</bool>
+-</resources>
+diff --git a/imx8m/vp6820_8mp/powerhint_imx8mp.json b/imx8m/vp6820_8mp/powerhint_imx8mp.json
+index d926e59a..572c8140 100644
+--- a/imx8m/vp6820_8mp/powerhint_imx8mp.json
++++ b/imx8m/vp6820_8mp/powerhint_imx8mp.json
+@@ -45,7 +45,7 @@
+       "Name": "PowerHALMainState",
+       "Path": "vendor.powerhal.camera",
+       "Values": [
+-        "CAMERA_STREAMING",
++        "CAMERA_STREAMING_MID",
+         ""
+       ],
+       "Type": "Property"
+@@ -54,7 +54,7 @@
+       "Name": "PowerHALAudioState",
+       "Path": "vendor.powerhal.audio",
+       "Values": [
+-        "AUDIO_LOW_LATENCY",
++        "AUDIO_STREAMING_LOW_LATENCY",
+         ""
+       ],
+       "Type": "Property"
+@@ -131,13 +131,13 @@
+       "Value": "0"
+     },
+     {
+-      "PowerHint": "CAMERA_STREAMING",
++      "PowerHint": "CAMERA_STREAMING_MID",
+       "Node": "PowerHALMainState",
+       "Duration": 0,
+-      "Value": "CAMERA_STREAMING"
++      "Value": "CAMERA_STREAMING_MID"
+     },
+     {
+-      "PowerHint": "CAMERA_STREAMING",
++      "PowerHint": "CAMERA_STREAMING_MID",
+       "Node": "CPULittleClusterMaxFreq",
+       "Duration": 0,
+       "Value": "1600000"
+@@ -173,28 +173,28 @@
+       "Value": "1600000"
+     },
+     {
+-      "PowerHint": "AUDIO_STREAMING",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 2000,
+-      "Value": "0"
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PowerHALAudioState",
++      "Duration": 0,
++      "Value": "AUDIO_STREAMING_LOW_LATENCY"
+     },
+     {
+-      "PowerHint": "AUDIO_STREAMING",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 2000,
+-      "Value": "1600000"
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 0,
++      "Value": "0"
+     },
+     {
+-      "PowerHint": "AUDIO_LOW_LATENCY",
+-      "Node": "PowerHALAudioState",
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMaxFreq",
+       "Duration": 0,
+-      "Value": "AUDIO_LOW_LATENCY"
++      "Value": "1600000"
+     },
+     {
+-      "PowerHint": "AUDIO_LOW_LATENCY",
+-      "Node": "PMQoSCpuDmaLatency",
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMinFreq",
+       "Duration": 0,
+-      "Value": "0"
++      "Value": "1600000"
+     }
+   ]
+ }
+diff --git a/imx8m/vp6820_8mp/powerhint_imx8mp.json~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mp/powerhint_imx8mp.json~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 572c8140..00000000
+--- a/imx8m/vp6820_8mp/powerhint_imx8mp.json~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,200 +0,0 @@
+-{
+-  "Nodes": [
+-    {
+-      "Name": "CPULittleClusterMaxFreq",
+-      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+-      "Values": [
+-        "1800000",
+-        "1600000",
+-        "1200000"
+-      ],
+-      "DefaultIndex": 0,
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "CPULittleClusterMinFreq",
+-      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
+-      "Values": [
+-        "1800000",
+-        "1600000",
+-        "1200000"
+-      ],
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "TASchedtuneBoost",
+-      "Path": "/dev/stune/top-app/schedtune.boost",
+-      "Values": [
+-        "60",
+-        "10"
+-      ],
+-      "DefaultIndex": 1,
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "PMQoSCpuDmaLatency",
+-      "Path": "/dev/cpu_dma_latency",
+-      "Values": [
+-        "0",
+-        "3000"
+-      ],
+-      "DefaultIndex": 1,
+-      "HoldFd": true
+-    },
+-    {
+-      "Name": "PowerHALMainState",
+-      "Path": "vendor.powerhal.camera",
+-      "Values": [
+-        "CAMERA_STREAMING_MID",
+-        ""
+-      ],
+-      "Type": "Property"
+-    },
+-    {
+-      "Name": "PowerHALAudioState",
+-      "Path": "vendor.powerhal.audio",
+-      "Values": [
+-        "AUDIO_STREAMING_LOW_LATENCY",
+-        ""
+-      ],
+-      "Type": "Property"
+-    },
+-    {
+-      "Name": "PowerHALRenderingState",
+-      "Path": "vendor.powerhal.rendering",
+-      "Values": [
+-        "EXPENSIVE_RENDERING",
+-        ""
+-      ],
+-      "Type": "Property"
+-    }
+-  ],
+-  "Actions": [
+-    {
+-      "PowerHint": "SUSTAINED_PERFORMANCE",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1600000"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "TASchedtuneBoost",
+-      "Duration": 0,
+-      "Value": "60"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 500,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 5000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 1000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "CAMERA_STREAMING_MID",
+-      "Node": "PowerHALMainState",
+-      "Duration": 0,
+-      "Value": "CAMERA_STREAMING_MID"
+-    },
+-    {
+-      "PowerHint": "CAMERA_STREAMING_MID",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1600000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1800000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 1000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "LOW_POWER",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1200000"
+-    },
+-    {
+-      "PowerHint": "LOW_POWER",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1600000"
+-    },
+-    {
+-      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
+-      "Node": "PowerHALAudioState",
+-      "Duration": 0,
+-      "Value": "AUDIO_STREAMING_LOW_LATENCY"
+-    },
+-    {
+-      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 0,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "FIXED_PERFORMANCE",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1600000"
+-    },
+-    {
+-      "PowerHint": "FIXED_PERFORMANCE",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1600000"
+-    }
+-  ]
+-}
+diff --git a/imx8m/vp6820_8mp/ueventd.nxp.rc b/imx8m/vp6820_8mp/ueventd.nxp.rc
+index e76f89b2..8776373b 100644
+--- a/imx8m/vp6820_8mp/ueventd.nxp.rc
++++ b/imx8m/vp6820_8mp/ueventd.nxp.rc
+@@ -1,11 +1,11 @@
+-/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/presistdata 0600   system     system
+-/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/presistdata 0600   system     system
++/dev/block/by-name/presistdata 0600   system     system
+ /dev/ttymxc0              0660   bluetooth  bluetooth
+ /dev/snd/*                0660   system     audio
+ /dev/video*               0660   system     camera
+ /dev/mxc_hifi4            0660   media      drmrpc
+-/dev/mxc_hantro           0660   media      drmrpc
+-/dev/mxc_hantro_vc8000e   0660   media      drmrpc
++/dev/mxc_hantro           0666   media      drmrpc
++/dev/mxc_hantro_vc8000e   0666   media      drmrpc
++/dev/vsi_daemon_ctrl      0666   media      drmrpc
+ /dev/ion                  0666   media      drmrpc
+ /dev/galcore	          0666 	 system     graphics
+ /dev/graphics/fb0         0660   system     graphics
+diff --git a/imx8m/vp6820_8mp/ueventd.nxp.rc~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mp/ueventd.nxp.rc~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 8776373b..00000000
+--- a/imx8m/vp6820_8mp/ueventd.nxp.rc~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,21 +0,0 @@
+-/dev/block/by-name/presistdata 0600   system     system
+-/dev/ttymxc0              0660   bluetooth  bluetooth
+-/dev/snd/*                0660   system     audio
+-/dev/video*               0660   system     camera
+-/dev/mxc_hifi4            0660   media      drmrpc
+-/dev/mxc_hantro           0666   media      drmrpc
+-/dev/mxc_hantro_vc8000e   0666   media      drmrpc
+-/dev/vsi_daemon_ctrl      0666   media      drmrpc
+-/dev/ion                  0666   media      drmrpc
+-/dev/galcore	          0666 	 system     graphics
+-/dev/graphics/fb0         0660   system     graphics
+-/dev/watchdog             0660   system     root
+-/dev/mmcblk2rpmb    0600   system     system
+-/dev/trusty-ipc-dev0      0660   system     drmrpc
+-/dev/block/pmem0          0660   system     system
+-
+-/sys/devices/virtual/thermal/thermal_zone* trip_point_0_temp 0660 system system
+-/sys/devices/virtual/thermal/thermal_zone* trip_point_1_temp 0660 system system
+-
+-/sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+-/sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system

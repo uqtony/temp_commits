@@ -1,0 +1,1243 @@
+154ff81 Arthur Chen 2019-10-24
+
+AOS-5: idg_spi_tool: Add idg_spi_tool source
+
+Change-Id: Idf2a7b76587fb4502b79c11f6db0e59318de453c
+Reviewed-on: https://gerrit.idtechproducts.com/c/android-imx/idg_spi_tool/+/346
+Reviewed-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Reviewed-by: Arthur Chen <Arthur.Chen@idtechproducts.com>
+Reviewed-by: George Huang <George.Huang@idtechproducts.com>
+Reviewed-by: Max Yang <Max.Yang@idtechproducts.com>
+Reviewed-by: Owen Wen <Owen.Wen@idtechproducts.com>
+Tested-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Tested-by: Arthur Chen <Arthur.Chen@idtechproducts.com>
+Tested-by: Owen Wen <Owen.Wen@idtechproducts.com>
+
+diff --git a/Android.mk b/Android.mk
+new file mode 100644
+index 0000000..34f1faa
+--- /dev/null
++++ b/Android.mk
+@@ -0,0 +1,10 @@
++LOCAL_PATH:=$(call my-dir)
++include $(CLEAR_VARS)
++
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES:=\
++os_idg_spi.c \
++main.c
++
++LOCAL_MODULE := idg_spi_tool
++include $(BUILD_EXECUTABLE)
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..323d97a
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,16 @@
++
++SRC    = $(wildcard *.c)
++OBJS   = $(SRC:.c=.o)
++
++TARGET = idg_spi_tool
++
++%.o: %.c
++	$(CC) $(CFLAGS) $(LDFLAGS) $(INCLUDES) $^ -c -o $@
++
++.PHONY: all clean
++
++all: $(OBJS)
++	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
++
++clean:
++	rm -f $(OBJS) $(TARGET)
+diff --git a/main.c b/main.c
+new file mode 100644
+index 0000000..980a66c
+--- /dev/null
++++ b/main.c
+@@ -0,0 +1,264 @@
++/*
++ * SPI testing utility (using spidev driver)
++ *
++ * Copyright (c) 2019 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ */
++
++#include "./os_idg_spi.h"
++
++static const char *device = "/dev/spidev1.0";
++static uint8_t mode;
++static uint8_t bits = 8;
++static uint32_t speed = 50000;
++static uint32_t wait = 100000;
++static uint16_t delay;
++static int read_times = 1;
++
++static void print_usage(const char *prog)
++{
++	printf("Usage: %s [-DsdhbrlvIHOLC3]
+", prog);
++	puts("  -D --device   device to use (default /dev/spidev1.0)
+"
++	     "  -I --idgcmd   send neoii idg command
+"
++	     "  -s --speed    max speed (Hz) (default 50000Hz 50 KHz)
+"
++	     "  -w --wait     waiting time for read response (usec) "
++	     "(default 100000us 100ms)
+"
++	     "  -d --delay    delay (usec)  (default 0 usec)
+"
++	     "  -h --help     print usage info
+"
++	     "  -b --bpw      bits per word (default 8 bits)
+"
++	     "  -r --raw      raw data for sending
+"
++	     "  -l --loop     loopback
+"
++	     "  -v --version  print version & author
+"
++	     "  -H --cpha     clock phase
+"
++	     "  -O --cpol     clock polarity
+"
++	     "  -L --lsb      least significant bit first
+"
++	     "  -C --cs-high  chip select active high
+"
++	     "  -3 --3wire    SI/SO signals shared
+");
++}
++
++static void print_version(const char *prog)
++{
++	printf("Application: %s
+", prog);
++	puts("	Version: 1.0
+	Author: "
++	     "Arthur Chen <arthur.chen@idtechproducts.com>
+");
++}
++
++static int parse_opts(int argc, char *argv[], uint8_t *buf)
++{
++	char *parameter;
++	int i, pos, num;
++	int data_size = 0;
++	while (1) {
++		static const struct option lopts[] = {
++			{ "device",  1, 0, 'D' },
++			{ "idgcmd",  1, 0, 'I' },
++			{ "speed",   1, 0, 's' },
++			{ "wait",    1, 0, 'w' },
++			{ "delay",   1, 0, 'd' },
++			{ "help",    0, 0, 'h' },
++			{ "bpw",     1, 0, 'b' },
++			{ "raw",     1, 0, 'r' },
++			{ "loop",    0, 0, 'l' },
++			{ "version", 0, 0, 'v' },
++			{ "cpha",    0, 0, 'H' },
++			{ "cpol",    0, 0, 'O' },
++			{ "lsb",     0, 0, 'L' },
++			{ "cs-high", 0, 0, 'C' },
++			{ "3wire",   0, 0, '3' },
++			{ "no-cs",   0, 0, 'N' },
++			{ "ready",   0, 0, 'R' },
++			{ NULL, 0, 0, 0 },
++		};
++		int c;
++
++		c = getopt_long(argc, argv, "D:I:s:w:d:h:b:r:l:vHOLC3NR",
++				lopts, NULL);
++
++		if (c == -1)
++			break;
++
++		switch (c) {
++		case 'D':
++			device = optarg;
++			break;
++		case 'I':
++			data_size = atoi(optarg);
++			data_size += MAX_BUFFER_SIZE + 1;
++			break;
++		case 's':
++			speed = atoi(optarg);
++			break;
++		case 'w':
++			wait = atoi(optarg);
++			break;
++		case 'd':
++			delay = atoi(optarg);
++			break;
++		case 'b':
++			bits = atoi(optarg);
++			break;
++		case 'r':
++			data_size = atoi(optarg);
++			if (data_size > MAX_BUFFER_SIZE) {
++				printf("Over the IDG max package size, "
++				       "size = %d should be lower "
++				       "than %d
+", data_size,
++				       MAX_BUFFER_SIZE);
++				break;
++			}
++			if (data_size <= 0) {
++				printf("Please assign the count of "
++				       "raw data
+");
++				break;
++			}
++			for (i = 0; i < argc; i++) {
++				if (strncmp("-r", argv[i] , 2) == 0)
++				pos = i;
++			}
++			parameter = argv[pos++];
++			i = data_size;
++			while (i > 0) {
++				parameter = argv[pos++];
++				num = (int)strtol(parameter, NULL, 16);
++				buf[data_size - i] = (uint8_t)num;
++				i--;
++			}
++			break;
++		case 'l':
++			mode |= SPI_LOOP;
++			break;
++		case 'v':
++			print_version(argv[0]);
++			break;
++		case 'H':
++			mode |= SPI_CPHA;
++			break;
++		case 'O':
++			mode |= SPI_CPOL;
++			break;
++		case 'L':
++			mode |= SPI_LSB_FIRST;
++			break;
++		case 'C':
++			mode |= SPI_CS_HIGH;
++			break;
++		case '3':
++			mode |= SPI_3WIRE;
++			break;
++		case 'N':
++			mode |= SPI_NO_CS;
++			break;
++		case 'R':
++			mode |= SPI_READY;
++			break;
++		case 'h':
++		default:
++			print_usage(argv[0]);
++			data_size = -1;
++			break;
++		}
++	}
++	return data_size;
++}
++
++int main(int argc, char *argv[])
++{
++	uint8_t *buffer;
++	int ret = 0;
++	int size;
++	int fd;
++
++	buffer = malloc(sizeof(uint8_t) * MAX_BUFFER_SIZE);
++	size = parse_opts(argc, argv, buffer);
++	if (size == -1)
++		goto Outofsize;
++
++	if (size > MAX_BUFFER_SIZE) {
++		size -= (MAX_BUFFER_SIZE + 1);
++		size = os_idg4send(size, buffer);
++	}
++	printf("size: %d
+", size);
++	fd = open(device, O_RDWR);
++	if (fd < 0) {
++		perror("can't open device");
++		goto IOerror;
++	}
++	/*
++	 * spi mode
++	 */
++	ret = ioctl(fd, SPI_IOC_WR_MODE, &mode);
++	if (ret == -1) {
++		perror("can't set spi mode");
++		goto IOerror;
++	}
++	ret = ioctl(fd, SPI_IOC_RD_MODE, &mode);
++	if (ret == -1) {
++		perror("can't get spi mode");
++		goto IOerror;
++	}
++	/*
++	 * bits per word
++	 */
++	ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
++	if (ret == -1) {
++		perror("can't set bits per word");
++		goto IOerror;
++	}
++	ret = ioctl(fd, SPI_IOC_RD_BITS_PER_WORD, &bits);
++	if (ret == -1) {
++		perror("can't get bits per word");
++		goto IOerror;
++	}
++	/*
++	 * max speed hz
++	 */
++	ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
++	if (ret == -1) {
++		perror("can't set max speed hz");
++		goto IOerror;
++	}
++	ret = ioctl(fd, SPI_IOC_RD_MAX_SPEED_HZ, &speed);
++	if (ret == -1) {
++		perror("can't get max speed hz");
++		goto IOerror;
++	}
++	printf("SPI mode: %d
+"
++	       "bits per word: %d
+"
++	       "Working max speed: %d Hz (%d KHz)
+
+",
++	       mode, bits, (int)speed, (int)speed/1000);
++	if (size <= 0)
++		goto IOerror;
++
++	if (os_idg_spi_send(fd, buffer, size, speed, delay, bits) < 1)
++		goto IOerror;
++
++	printf("============================================
+"
++	       "wait for %d us (%d ms)...
+",
++	       (int)wait, (int)wait/1000);
++	usleep(wait);
++	puts("============================================");
++	while (read_times) {
++		ret = os_idg_spi_poll(fd, READ_POLL_TIME);
++		if (ret) {
++			if (os_idg_spi_receive(fd, MAX_BUFFER_SIZE,
++					       speed, delay, bits) < 1)
++				goto IOerror;
++
++			read_times--;
++		} else {
++			break;
++		}
++	}
++
++IOerror:
++	close(fd);
++Outofsize:
++	free(buffer);
++
++	return ret;
++}
+diff --git a/neoii_idg.h b/neoii_idg.h
+new file mode 100644
+index 0000000..2716a8f
+--- /dev/null
++++ b/neoii_idg.h
+@@ -0,0 +1,222 @@
++/*
++ * Copyright (c) 2019 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ */
++
++#ifndef _NEOII_IDG_H_
++#define _NEOII_IDG_H_
++
++/* vivopay neo2 header: ViVOtech2/0  */
++#define NEOII_Header							"\x56\x69\x56\x4F\x74\x65\x63\x68\x32\x00"
++#define Set_Poll_Mode							"\x01\x01"
++#define Control_User_Interface						"\x01\x02"
++#define Set_Get_Source_or_RTC_LCD_Buzzer_LED				"\x01\x05"
++#define Set_Switches_Notifications_Configuration			"\x01\x07"
++#define Get_Switches_Notifications_Conifiguration			"\x01\x08"
++#define Activate_Transaction_Command_a					"\x02\x01"
++#define Data_Exchange_Response						"\x02\x09"
++#define Activate_Transaction_Command_b					"\x02\x40"
++#define Data_Exchange_Request						"\x02\x58"
++#define Get_Transaction_Result_a					"\x03\x00"
++#define Get_Transaction_Result_b					"\x03\x40"
++#define Get_Configuration						"\x03\x02"
++#define Update_Balance_Command						"\x03\x03"
++#define Get_Configurable_AID						"\x03\x04"
++#define Get_All_AIDs							"\x03\x05"
++#define Get_Configurable_Group						"\x03\x06"
++#define Get_All_Groups							"\x03\x07"
++#define Get_Cash_Transaction_Reader_Risk_Parameters			"\x03\x0C"
++#define Get_Cashback_Transaction_Reader_Risk_Parameters			"\x03\x0D"
++#define Get_DRL_Reader_Risk_Parameters					"\x03\x0E"
++#define Get_Merchant_Record						"\x03\x11"
++#define Get_Transaction_Result						"\x03\x40"
++#define Set_Configuration						"\x04\x00"
++#define Set_Configurable_AID						"\x04\x02"
++#define Set_Configurable_Group						"\x04\x03"
++#define Delete_Configurable_AID						"\x04\x04"
++#define Delete_Configurable_Group					"\x04\x05"
++#define Set_Parameter_Defaults						"\x04\x09"
++#define Set_Configuration_Defaults_and_Keep_Encryption_Key		"\x04\x0A"
++#define Set_Merchant_Record						"\x04\x11"
++#define Cancel_Transaction_Command					"\x05\x01"
++#define Stop_Transaction						"\x05\x02"
++#define Get_ALL_Reader_Variables					"\x09\x00"
++#define Get_Product_Type						"\x09\x01"
++#define Get_Processor_Type						"\x09\x02"
++#define Get_Main_Firmware_Version					"\x09\x03"
++#define Get_Hardware_Information					"\x09\x14"
++#define Get_Module_Version_Information					"\x09\x20"
++#define LED_Control							"\x0A\x02"
++#define Buzzer_Control_Short						"\x0B\x01"
++#define Buzzer_Control_Long						"\x0B\x02"
++#define Get_Serial_Number						"\x12\x01"
++#define Set_Serial_Number						"\x12\x02"
++#define Boot_up_Notification						"\x14\x01"
++#define Flush_Track_Data						"\x17\x02"
++#define Set_RF_Error_Reporting						"\x17\x03"
++#define Get_Full_Track_Data						"\x17\xCD"
++#define Ping								"\x18\x01"
++#define Set_CA_Public_Key						"\x24\x01"
++#define Delete_CA_Public_Key_a						"\x24\x02"
++#define Delete_All_CA_Public_Keys_a					"\x24\x03"
++#define RTC_Set_Time							"\x25\x01"
++#define RTC_Get_Time							"\x25\x02"
++#define RTC_Set_Date							"\x25\x03"
++#define RTC_Get_Date							"\x25\x04"
++#define Get_RTC_Date_and_Time						"\x25\x06"
++#define Get_Set_one_day_hr_Self_Check_Time				"\x25\x07"
++#define Antenna_Control							"\x28\x01"
++#define Get_Version_Protocol_II						"\x29\x00"
++#define Get_Firmware_Full_Version					"\x29\x00"
++#define Get_product_full_information					"\x29\x01"
++#define Get_USB_Boot_Loader_Version					"\x29\x04"
++#define Get_Contact_EMV_L2_Kernel_Version				"\x29\x06"
++#define Get_Contact_EMV_L2_Kernel_Version_Detail			"\x29\x07"
++#define Get_Contact_EMV_L2_Kernel_Checksum				"\x29\x08"
++#define Get_Contact_EMV_L2_Terminal_Configuration_Checksum		"\x29\x09"
++#define Get_UID_of_MCU							"\x29\x17"
++#define Get_TMS								"\x29\x20"
++#define Get_Cable_Type							"\x32\x01"
++#define Set_Cable_Type							"\x32\x02"
++#define Pass_Through_Mode_Start_Stop					"\x2C\x01"
++#define Poll_for_Token							"\x2C\x02"
++#define Exchange_Contactless_Data					"\x2C\x03"
++#define PCD_Single_Command_Exchange					"\x2C\x04"
++#define Get_PCD_and_PICC_Parameters					"\x2C\x05"
++#define Mifare_Authenticate_Block					"\x2C\x06"
++#define Mifare_Read_Blocks						"\x2C\x07"
++#define Mifare_Write_Blocks						"\x2C\x08"
++#define High_level_Halt_Command						"\x2C\x09"
++#define Mifare_ePurse_Command						"\x2C\x0A"
++#define Enhanced_Pass_Through_Command					"\x2C\x0B"
++#define Enhanced_Poll_for_Token						"\x2C\x0C"
++#define Poll_for_Token_with_ATS						"\x2C\x0E"
++#define Get_ATR								"\x2C\x12"
++#define Exchange_APDU_Data						"\x2C\x13"
++#define Contact_Transaction_Power_Off					"\x2C\x18"
++#define NFC_Commands							"\x2C\x40"
++#define Felica_Commands							"\x2C\x41"
++#define Felica_Lite_Lite_S_Authentication				"\x2C\x42"
++#define Felica_Lite_Lite_S_Read_Write_Blocks_with_MAC			"\x2C\x43"
++#define Get_White_List							"\x2C\x51"
++#define Get_Discretionary_Data_White_List				"\x2C\x53"
++#define Set_Baud_Rate							"\x30\x01"
++#define Set_Temporary_Baud_Rate						"\x30\x02"
++#define Initialize_De_initialize_Logger					"\x4C\x01"
++#define Set_Logger_Level						"\x4C\x02"
++#define Get_Set_Logger_Size						"\x4C\x03"
++#define Enable_Disable_Logger						"\x4C\x04"
++#define Save_Delete_Log							"\x4C\x05"
++#define Retrieve_Log							"\x4C\x06"
++#define Contact_Retrieve_Application_Data				"\x60\x01"
++#define Contact_Remove_Application_Data					"\x60\x02"
++#define Contact_Set_Application_Data					"\x60\x03"
++#define Contact_Retrieve_Terminal_Data					"\x60\x04"
++#define Contact_Remove_Terminal_Data					"\x60\x05"
++#define Contact_Set_Terminal_Data					"\x60\x06"
++#define Contact_Retrieve_AID_List					"\x60\x07"
++#define Contact_Retrieve_CA_Public_Key					"\x60\x08"
++#define Contact_Remove_CA_Public_Key					"\x60\x09"
++#define Contact_Set_CA_Public_Key					"\x60\x0A"
++#define Contact_Retrieve_CA_Public_Key_List				"\x60\x0B"
++#define Contact_Retrieve_Certification_Revocation_List			"\x60\x0C"
++#define Contact_Remove_Certification_Revocation_List			"\x60\x0D"
++#define Contact_Set_Certification_Revocation_List			"\x60\x0E"
++#define Contact_Remove_Transaction_Amount_Log				"\x60\x0F"
++#define Contact_Start_Transaction					"\x60\x10"
++#define Contact_Authenticate_Transaction				"\x60\x11"
++#define Contact_Apply_Host_Response					"\x60\x12"
++#define Contact_Retrieve_Transaction_Result				"\x60\x13"
++#define Get_Contact_Reader_Status					"\x60\x14"
++#define Contact_Get_ICS_Identification					"\x60\x15"
++#define Contact_Set_ICS_Identification					"\x60\x16"
++#define Contact_LCD_Display_Control_(Reader_send_to_Host)		"\x61\x01"
++#define Contact_Get_PIN_Control_(Reader_send_to_Host)			"\x61\x02"
++#define Contact_Get_MSR_Data_Control_(Reader_send_to_Host)		"\x61\x03"
++#define Stop_Audio							"\x61\x30"
++#define Play_Audio							"\x61\x31"
++#define QR_Code_Scan_Start						"\x61\x41"
++#define QR_Code_Scan_Stop						"\x61\x42"
++#define Camera_Take_Photo_Start						"\x61\x43"
++#define Camera_Take_Photo_Stop						"\x61\x44"
++#define Cancel_PIN_or_Key_Entry_					"\x62\x00"
++#define Display_Message_and_Get_Encrypted_PIN_Host_send_to_Reader	"\x62\x01"
++#define Get_Function_Key_Host_send_to_Reader				"\x62\x02"
++#define Display_Message_and_Get_Numeric_Key_Host_send_to_Reader		"\x62\x03"
++#define Display_Message_and_Get_Amount_Host_send_to_Reader		"\x62\x04"
++#define Set_Bluetooth_Parameters					"\x77\x81"
++#define Check_DUKPT_Keys						"\x81\x02"
++#define Check_DUKPT_Key							"\x81\x04"
++#define Get_DUKPT_Key_Serial_Number_KSN					"\x81\x0A"
++#define Get_DUKPT_Key_Serial_Number_Extended				"\x81\x0B"
++#define Get_and_Set_MAC_Verification_Option_for_data_output		"\x81\x40"
++#define Get_EMV_Revocation_Log_Status					"\x84\x03"
++#define Add_Entry_to_EMV_Revocation_List				"\x84\x04"
++#define Delete_All_Entries_for_Single_Index_in_EMV_Revocation_List	"\x84\x05"
++#define Delete_All_Entries_from_EMV_Revocation_List			"\x84\x06"
++#define Get_EMV_Revocation_List						"\x84\x07"
++#define Get_EMV_Exception_Log_Status					"\x84\x08"
++#define Add_Entry_to_EMV_Exception_List					"\x84\x09"
++#define Delete_Entry_from_EMV_Exception_List				"\x84\x0A"
++#define Delete_All_Entries_from_EMV_Exception_List			"\x84\x0B"
++#define Get_EMV_Exception_List						"\x84\x0C"
++#define Delete_an_Entry_from_EMV_Revocation_List			"\x84\x0D"
++#define Reset_Torn_Transaction_Log					"\x84\x0E"
++#define Clean_Torn_Transaction_Log					"\x84\x0F"
++#define Set_Model_Number						"\x90\x15"
++#define Set_Data_Encryption_Key_Variant_Type				"\xC7\x2F"
++#define Get_Data_Encryption_Key_Variant_Type				"\xC7\x30"
++#define Set_Data_encryption_Key_Encryption_Type				"\xC7\x32"
++#define Get_Data_encryption_Key_Encryption_Type				"\xC7\x33"
++#define Set_Data_Encryption_Enable_Flag					"\xC7\x36"
++#define Get_Data_Encryption_Enable_Flag					"\xC7\x37"
++#define Set_MSR_Secure_Parameters					"\xC7\x38"
++#define Get_MSR_Secure_Parameters					"\xC7\x39"
++#define Read_Log							"\xC7\x3D"
++#define Peer_To_Peer_Send_A_Message					"\xC7\x9A"
++#define Peer_To_Peer_Receive_A_Message					"\xC7\x9B"
++#define Get_CA_Public_Key						"\xD0\x01"
++#define Get_CA_Public_Key_Hash_						"\xD0\x02"
++#define Set_CA_Public_Key_						"\xD0\x03"
++#define Delete_CA_Public_Key_b						"\xD0\x04"
++#define Delete_All_CA_Public_Keys_b					"\xD0\x05"
++#define Get_All_CA_Public_RIDs						"\xD0\x06"
++#define List_CA_Public_Key_IDs_or_RID_Protocol_II			"\xD0\x07"
++#define Set_System_Language						"\xD1\x27"
++#define Set_PMC_Status							"\xF0\x00"
++#define Get_PMC_Status							"\xF0\x01"
++#define Get_Battery_Level						"\xF0\x02"
++#define VM6800_Wake_Up							"\xF0\x03"
++#define Set_USB_Power_Mode_Suspend_Configuration			"\xF0\x08"
++#define Get_USB_Power_Mode_Suspend_Configuration			"\xF0\x09"
++#define Shut_Off_the_Power						"\xF0\x0F"
++#define Configure_Buttons_Command					"\xF0\xF4"
++#define Get_Button_Configuration_Command				"\xF0\xF5"
++#define Disable_Blue_LED_Sequence					"\xF0\xF6"
++#define Enable_Blue_LED_Sequence_Command				"\xF0\xF7"
++#define LCD_Display_Clear_Command					"\xF0\xF9"
++#define Turn_Off_Yellow_LED_Command					"\xF0\xFA"
++#define Turn_On_Yellow_LED_Command					"\xF0\xFB"
++#define LCD_Display_Line_1_Message_Command				"\xF0\xFC"
++#define LCD_Display_Line_2_Message_Command				"\xF0\xFD"
++#define Buzzer_On_Off_Command						"\xF0\xFE"
++#define Wake_Up_Notification						"\xF1\x00"
++#define Switches_Notification						"\xF2\x00"
++
++
++#define LEN_Get_Version_Protocol_II					16
++#define LEN_Get_Firmware_Full_Version					16
++#define LEN_VM6800_Wake_Up						17
++#define LEN_Get_Contact_Reader_Status					17
++#define LEN_Pass_Through_Mode_Start_Stop				17
++#define LEN_Get_ATR							17
++#define LEN_Get_Serial_Number						16
++#define LEN_Ping							16
++
++#endif /* _NEOII_IDG_H_ */
++
+diff --git a/os_idg_spi.c b/os_idg_spi.c
+new file mode 100644
+index 0000000..fffa56c
+--- /dev/null
++++ b/os_idg_spi.c
+@@ -0,0 +1,592 @@
++/*
++ * Copyright (c) 2019 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ */
++
++#include "./os_idg_spi.h"
++#include "./neoii_idg.h"
++
++int os_idg_spi_send(int fd, uint8_t *buf, int data_size, int speed,
++		     int delay, int bits)
++{
++	int ret = 0;
++	uint8_t rx[MAX_BUFFER_SIZE] = { };
++	struct spi_ioc_transfer tr = {
++		.tx_buf = (unsigned long)buf,
++		.rx_buf = (unsigned long)rx,
++		.len = (size_t)data_size,
++		.delay_usecs = delay,
++		.speed_hz = speed,
++		.bits_per_word = bits,
++	};
++
++	printf("SPI send:");
++	for (ret = 0; ret < data_size; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("0x%.2X ", buf[ret]);
++	}
++	puts("
+
+decoded by ASCII:");
++	for (ret = 0; ret < data_size; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("%4c ", buf[ret]);
++	}
++	puts("");
++	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
++	if (ret < 1) {
++		perror("can't send spi message");
++		goto os_send_out;
++	}
++	printf("SPI echo : ");
++	for (ret = 0; ret < data_size; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("0x%.2X ", rx[ret]);
++	}
++	puts("
+
+decoded by ASCII:");
++	for (ret = 0; ret < data_size; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("%4c ", rx[ret]);
++	}
++	puts("");
++
++os_send_out:
++	return ret;
++}
++
++int os_idg_spi_receive(int fd, int data_size, int speed,
++			int delay, int bits)
++{
++	int ret = 0;
++	uint8_t dummy[MAX_BUFFER_SIZE] = { };
++	uint8_t rx[MAX_BUFFER_SIZE] = { };
++	struct spi_ioc_transfer tr = {
++		.tx_buf = (unsigned long)dummy,
++		.rx_buf = (unsigned long)rx,
++		.len = (size_t)data_size,
++		.delay_usecs = delay,
++		.speed_hz = speed,
++		.bits_per_word = bits,
++	};
++
++	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
++	if (ret < 1) {
++		perror("can't receive spi message");
++		goto os_receive_out;
++	}
++	printf("
+SPI receive : ");
++	for (ret = 0; ret < MAX_BUFFER_SIZE; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("0x%.2X ", rx[ret]);
++	}
++	puts("
+
+decoded by ASCII:");
++	for (ret = 0; ret < MAX_BUFFER_SIZE; ret++) {
++		if (!(ret % 6))
++			puts("");
++
++		printf("%4c ", rx[ret]);
++	}
++	puts("");
++
++os_receive_out:
++	return ret;
++}
++
++int os_idg_spi_poll(int fd, int timeout) /* time unit 1 ms */
++{
++	int ret = 0;
++	struct pollfd fds = {0, 0, 0};
++
++	if (fd < 0) {
++		perror("SPI poll fd");
++		ret = -1;
++		goto os_poll_out;
++	}
++	fds.fd = fd;
++	fds.events = POLLIN;
++	ret = poll(&fds, 1, timeout);
++	if (ret == POLLERR) {
++		perror("SPI poll");
++		ret = -1;
++		goto os_poll_out;
++	}
++
++os_poll_out:
++	return ret; /* 0: timeout, 1: event happen */
++}
++
++int os_idg4send(int index, uint8_t *buf)
++{
++	int i, cmd_size = 0;
++	char *command = NULL;
++	printf("IDG index = %d
+", index);
++	switch (index) {
++	case 1:
++		puts("IDG command: Get_Firmware_Full_Version");
++		asprintf(&command, "%s%c%s%c%c%c%s",
++			 NEOII_Header, ' ', Get_Firmware_Full_Version,
++			 ' ', ' ', ' ', "\xA0\xDE");
++		cmd_size = LEN_Get_Firmware_Full_Version;
++		break;
++	case 2:
++		puts("IDG command: Get_Contact_Reader_Status");
++		asprintf(&command, "%s%c%s%c%c%c%s",
++			 NEOII_Header, ' ', Get_Contact_Reader_Status,
++			 ' ', '\x01', '\x20', "\xFB\x14");
++		cmd_size = LEN_Get_Contact_Reader_Status;
++		break;
++	case 3:
++		puts("IDG command: Pass_Through_Mode_Start_Stop");
++		asprintf(&command, "%s%c%s%c%c%c%s",
++			 NEOII_Header, ' ', Pass_Through_Mode_Start_Stop,
++			 ' ', '\x01', '\x01', "\x1D\x19");
++		cmd_size = LEN_Pass_Through_Mode_Start_Stop;
++		break;
++	case 4:
++		puts("IDG command: Get_ATR");
++		asprintf(&command, "%s%c%s%c%c%c%s",
++			 NEOII_Header, ' ', Get_ATR,
++			 ' ', '\x01', '\x20', "\x21\xA9");
++		cmd_size = LEN_Get_ATR;
++		break;
++	case 5:
++		puts("IDG command: Get_Serial_Number");
++		asprintf(&command, "%s%c%s%c%c%s",
++			 NEOII_Header, ' ', Get_Serial_Number,
++			 ' ', '\x0', "\x18\xA5");
++		cmd_size = LEN_Get_Serial_Number;
++		break;
++	case 6:
++		puts("IDG command: Ping");
++		asprintf(&command, "%s%c%s%c%c%s",
++			 NEOII_Header, ' ', Ping,
++			 ' ', '\x0', "\xB3\xCD");
++		cmd_size = LEN_Ping;
++		break;
++	case 7:
++		break;
++	case 8:
++		break;
++	case 9:
++		break;
++	case 10:
++		break;
++	case 11:
++		break;
++	case 12:
++		break;
++	case 13:
++		break;
++	case 14:
++		break;
++	case 15:
++		break;
++	case 16:
++		break;
++	case 17:
++		break;
++	case 18:
++		break;
++	case 19:
++		break;
++	case 20:
++		break;
++	case 21:
++		break;
++	case 22:
++		break;
++	case 23:
++		break;
++	case 24:
++		break;
++	case 25:
++		break;
++	case 26:
++		break;
++	case 27:
++		break;
++	case 28:
++		break;
++	case 29:
++		break;
++	case 30:
++		break;
++	case 31:
++		break;
++	case 32:
++		break;
++	case 33:
++		break;
++	case 34:
++		break;
++	case 35:
++		break;
++	case 36:
++		break;
++	case 37:
++		break;
++	case 38:
++		break;
++	case 39:
++		break;
++	case 40:
++		break;
++	case 41:
++		break;
++	case 42:
++		break;
++	case 43:
++		break;
++	case 44:
++		break;
++	case 45:
++		break;
++	case 46:
++		break;
++	case 47:
++		break;
++	case 48:
++		break;
++	case 49:
++		break;
++	case 50:
++		break;
++	case 51:
++		break;
++	case 52:
++		break;
++	case 53:
++		break;
++	case 54:
++		break;
++	case 55:
++		break;
++	case 56:
++		break;
++	case 57:
++		break;
++	case 58:
++		break;
++	case 59:
++		break;
++	case 60:
++		break;
++	case 61:
++		break;
++	case 62:
++		break;
++	case 63:
++		break;
++	case 64:
++		break;
++	case 65:
++		break;
++	case 66:
++		break;
++	case 67:
++		break;
++	case 68:
++		break;
++	case 69:
++		break;
++	case 70:
++		break;
++	case 71:
++		break;
++	case 72:
++		break;
++	case 73:
++		break;
++	case 74:
++		break;
++	case 75:
++		break;
++	case 76:
++		break;
++	case 77:
++		break;
++	case 78:
++		break;
++	case 79:
++		break;
++	case 80:
++		break;
++	case 81:
++		break;
++	case 82:
++		break;
++	case 83:
++		break;
++	case 84:
++		break;
++	case 85:
++		break;
++	case 86:
++		break;
++	case 87:
++		break;
++	case 88:
++		break;
++	case 89:
++		break;
++	case 90:
++		break;
++	case 91:
++		break;
++	case 92:
++		break;
++	case 93:
++		break;
++	case 94:
++		break;
++	case 95:
++		break;
++	case 96:
++		break;
++	case 97:
++		break;
++	case 98:
++		break;
++	case 99:
++		break;
++	case 100:
++		break;
++	case 101:
++		break;
++	case 102:
++		break;
++	case 103:
++		break;
++	case 104:
++		break;
++	case 105:
++		break;
++	case 106:
++		break;
++	case 107:
++		break;
++	case 108:
++		break;
++	case 109:
++		break;
++	case 110:
++		break;
++	case 111:
++		break;
++	case 112:
++		break;
++	case 113:
++		break;
++	case 114:
++		break;
++	case 115:
++		break;
++	case 116:
++		break;
++	case 117:
++		break;
++	case 118:
++		break;
++	case 119:
++		break;
++	case 120:
++		break;
++	case 121:
++		break;
++	case 122:
++		break;
++	case 123:
++		break;
++	case 124:
++		break;
++	case 125:
++		break;
++	case 126:
++		break;
++	case 127:
++		break;
++	case 128:
++		break;
++	case 129:
++		break;
++	case 130:
++		break;
++	case 131:
++		break;
++	case 132:
++		break;
++	case 133:
++		break;
++	case 134:
++		break;
++	case 135:
++		break;
++	case 136:
++		break;
++	case 137:
++		break;
++	case 138:
++		break;
++	case 139:
++		break;
++	case 140:
++		break;
++	case 141:
++		break;
++	case 142:
++		break;
++	case 143:
++		break;
++	case 144:
++		break;
++	case 145:
++		break;
++	case 146:
++		break;
++	case 147:
++		break;
++	case 148:
++		break;
++	case 149:
++		break;
++	case 150:
++		break;
++	case 151:
++		break;
++	case 152:
++		break;
++	case 153:
++		break;
++	case 154:
++		break;
++	case 155:
++		break;
++	case 156:
++		break;
++	case 157:
++		break;
++	case 158:
++		break;
++	case 159:
++		break;
++	case 160:
++		break;
++	case 161:
++		break;
++	case 162:
++		break;
++	case 163:
++		break;
++	case 164:
++		break;
++	case 165:
++		break;
++	case 166:
++		break;
++	case 167:
++		break;
++	case 168:
++		break;
++	case 169:
++		break;
++	case 170:
++		break;
++	case 171:
++		break;
++	case 172:
++		break;
++	case 173:
++		break;
++	case 174:
++		break;
++	case 175:
++		break;
++	case 176:
++		break;
++	case 177:
++		break;
++	case 178:
++		break;
++	case 179:
++		break;
++	case 180:
++		break;
++	case 181:
++		break;
++	case 182:
++		break;
++	case 183:
++		break;
++	case 184:
++		break;
++	case 185:
++		break;
++	case 186:
++		break;
++	case 187:
++		break;
++	case 188:
++		break;
++	case 189:
++		break;
++	case 190:
++		break;
++	case 191:
++		break;
++	case 192:
++		break;
++	case 193:
++		break;
++	case 194:
++		break;
++	case 195:
++		break;
++	case 196:
++		break;
++	case 197:
++		break;
++	case 198:
++		break;
++	case 199:
++		break;
++	case 200:
++		break;
++	case 0:
++	default:
++		print_idg_support();
++		cmd_size = 0;
++		break;
++	}
++	for (i = 0; i < cmd_size; i++)
++		buf[i] = (uint8_t)command[i];
++
++	free(command);
++
++	return cmd_size;
++}
++
++void print_idg_support()
++{
++	puts("  Supported IDG commands table:
+"
++	     "  	Index		Command
+"
++	     "  	  1			Get_Firmware_Full_Version
+"
++	     "  	  2			Get_Contact_Reader_Status
+"
++	     "  	  3			Pass_Through_Mode_Start_Stop
+"
++	     "  	  4			Get_ATR
+"
++	     "  	  5			Get_Serial_Number
+"
++	     "  	  6			Ping
+"
++	     "  	  TBD			TBD
+");
++}
+diff --git a/os_idg_spi.h b/os_idg_spi.h
+new file mode 100644
+index 0000000..0d3aa49
+--- /dev/null
++++ b/os_idg_spi.h
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (c) 2019 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ */
++
++#ifndef _OS_IDG_SPI_H_
++#define _OS_IDG_SPI_H_
++
++#include <stdint.h>
++#include <unistd.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <getopt.h>
++#include <fcntl.h>
++#include <sys/ioctl.h>
++#include <sys/poll.h>
++#include <linux/types.h>
++#include <linux/spi/spidev.h>
++
++#define MAX_BUFFER_SIZE		256 /* as RT1050 */
++#define READ_POLL_TIME		500 /* poll for 500 ms */
++#define POLL_GOT		1
++
++/* costumized pull function */
++int os_idg_spi_poll(int fd, int timeout);
++/* spi receive hex raw data */
++int os_idg_spi_receive(int fd, int data_size, int speed, int delay,
++		       int bits);
++/* spi send hex raw data */
++int os_idg_spi_send(int fd, uint8_t *buf, int data_size, int speed,
++		    int delay, int bits);
++/* prepare idg command by index number */
++int os_idg4send(int index, uint8_t *buf);
++/* print idg commands embedded in this program */
++void print_idg_support();
++
++#endif /* _OS_IDG_SPI_H_ */

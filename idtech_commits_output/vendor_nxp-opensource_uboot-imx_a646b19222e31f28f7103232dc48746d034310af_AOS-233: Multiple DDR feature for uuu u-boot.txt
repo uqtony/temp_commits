@@ -1,0 +1,106 @@
+a646b19222 max.yang 2020-06-29
+
+AOS-233: Multiple DDR feature for uuu u-boot
+
+  1. If we need to use multiple ddr for uuu, we can not put in emmc because u-boot
+     will be loaded before flashing mem_info.img. So we extract memory object from
+     mem_info.img and write to sram before boot uuu u-boot.
+  2. We should put memory object into SRAM 0x81a000 in uuu flashing script
+
+Change-Id: I39730e9c04650281f4a1717eaedacd0b0d81f58a
+
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index 2a2ec20ff8..d1dd952777 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -44,6 +44,8 @@ struct idt_mem_root {
+ 	unsigned int total;
+ 	struct idt_mem_obj mem_obj_ary[];
+ };
++
++#define UUU_MEM_OBJ_ADDR 0x81a000  // find a large-enough space on sram
+ #define BLOCK_SIZE  512
+ #define BDINFO_BLOCK_BASE 16384
+ #define ROOT_HDR_BLOCK_BASE 20480
+@@ -125,20 +127,39 @@ unsigned int read_mem_root_block(struct blk_desc * dev_desc) {
+ void idt_spl_dram_init(void)
+ {
+ 	struct dram_timing_info t_data;
+-	struct blk_desc *dev_desc = init_mmc_blk();
+ 	struct idt_dram_hdr hdr[HDR_SIZE] = {};
+ 	struct dram_fsp_msg fsp_ary[4] = {};
+ 	unsigned int* idx = NULL;
++
++	// uuu version, we put mem object before loading SPL; Normal boot should read from emmc
++#ifdef CONFIG_FASTBOOT_UUU_SUPPORT
++	printf("IDT: uuu get mem object...
+");
++	memcpy((void*)hdr, (void*)UUU_MEM_OBJ_ADDR, BLOCK_SIZE);
++#else
++	struct blk_desc *dev_desc = init_mmc_blk();
+ 	unsigned dram_data_offset = read_mem_root_block(dev_desc);
+ 	unsigned int hdr_offset = ROOT_HDR_BLOCK_BASE + dram_data_offset;
+-
+ 	blk_dread(dev_desc, hdr_offset, 1, (void*) hdr);
++#endif
++
+ #if _DEBUG
+         for (int i=0; i<10; i++) {
+ 	        printf("IDTech: got data %d %d %d %d
+", hdr[i].drate, hdr[i].type, hdr[i].offset, hdr[i].ary_size);
+         }
+ #endif
+ 
++	// Handling mem object data, uuu read from sram, normal boot read from emmc
++#ifdef CONFIG_FASTBOOT_UUU_SUPPORT
++	t_data.ddrc_cfg           = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[0].offset * BLOCK_SIZE);
++	t_data.ddrphy_cfg         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[1].offset * BLOCK_SIZE);
++	t_data.ddrphy_trained_csr = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[7].offset * BLOCK_SIZE);
++	t_data.ddrphy_pie         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[8].offset * BLOCK_SIZE);
++
++	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[3].offset * BLOCK_SIZE);
++	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[4].offset * BLOCK_SIZE);
++	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[5].offset * BLOCK_SIZE);
++	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[6].offset * BLOCK_SIZE);
++#else   // !CONFIG_FASTBOOT_UUU_SUPPORT
+ 	idt_read_block(dev_desc, hdr_offset, &hdr[0], buf_ddrc_cfg);
+ 	idt_read_block(dev_desc, hdr_offset, &hdr[1], buf_ddrphy_cfg);
+ 	idt_read_block(dev_desc, hdr_offset, &hdr[7], buf_ddrphy_trained_csr);
+@@ -154,6 +175,14 @@ void idt_spl_dram_init(void)
+ 	t_data.ddrphy_cfg         = (struct dram_cfg_param *)buf_ddrphy_cfg;
+ 	t_data.ddrphy_trained_csr = (struct dram_cfg_param *)buf_ddrphy_trained_csr;
+ 	t_data.ddrphy_pie         = (struct dram_cfg_param *)buf_ddrphy_pie;
++
++	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg0;
++	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg1;
++	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg2;
++	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg3;
++#endif  // CONFIG_FASTBOOT_UUU_SUPPORT
++
++	// handle array size
+ 	t_data.ddrc_cfg_num           = hdr[0].ary_size;
+ 	t_data.ddrphy_cfg_num         = hdr[1].ary_size;
+ 	t_data.ddrphy_trained_csr_num = hdr[7].ary_size;
+@@ -165,22 +194,18 @@ void idt_spl_dram_init(void)
+ 	// fsp_msg element
+ 	fsp_ary[0].drate       = hdr[3].drate;
+ 	fsp_ary[0].fw_type     = hdr[3].type;
+-	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg0;
+ 	fsp_ary[0].fsp_cfg_num = hdr[3].ary_size;
+ 
+ 	fsp_ary[1].drate       = hdr[4].drate;
+ 	fsp_ary[1].fw_type     = hdr[4].type;
+-	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg1;
+ 	fsp_ary[1].fsp_cfg_num = hdr[4].ary_size;
+ 
+ 	fsp_ary[2].drate       = hdr[5].drate;
+ 	fsp_ary[2].fw_type     = hdr[5].type;
+-	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg2;
+ 	fsp_ary[2].fsp_cfg_num = hdr[5].ary_size;
+ 
+ 	fsp_ary[3].drate       = hdr[6].drate;
+ 	fsp_ary[3].fw_type     = hdr[6].type;
+-	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg3;
+ 	fsp_ary[3].fsp_cfg_num = hdr[6].ary_size;
+ 
+ 	// fsp_table

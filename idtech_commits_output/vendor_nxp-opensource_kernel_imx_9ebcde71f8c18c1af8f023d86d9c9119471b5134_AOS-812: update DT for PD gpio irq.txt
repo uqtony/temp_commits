@@ -1,0 +1,41 @@
+9ebcde71f8c1 AndrewS 2021-12-29
+
+AOS-812: update DT for PD gpio irq
+
+Change-Id: I9d5ab5ae525d83cd969be1109fcfdb9a195d081f
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+index ff37aeecb1bb..64b512aa8a51 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+@@ -31,14 +31,28 @@ reg_lte_vbuson_1v8_vdd: fixed-regulator-lte-vbuson-1v8-vdd {
+ 
+ &i2c1 {
+ 	typec_tps65994: usb-pd@20 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_typec>;
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
+-	};
++		interrupts = <23 IRQ_TYPE_EDGE_FALLING>;
+ 
++		port {
++			typec_dr_sw: endpoint {
++				remote-endpoint = <&usb3_drd_sw>;
++			};
++		};
++	};
+ };
+ 
+ &usb_dwc3_0 {
++	usb-role-switch;
+ 	/delete-property/ extcon;
++
++	port {
++		usb3_drd_sw: endpoint {
++			remote-endpoint = <&typec_dr_sw>;
++		};
++	};
+ };
+ 
+ &iomuxc {

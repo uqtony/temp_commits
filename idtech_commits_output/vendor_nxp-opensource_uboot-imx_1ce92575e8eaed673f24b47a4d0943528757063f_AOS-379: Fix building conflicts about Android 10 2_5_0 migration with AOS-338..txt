@@ -1,0 +1,79 @@
+1ce92575e8 Arthur Chen 2020-11-09
+
+AOS-379: Fix building conflicts about Android 10 2_5_0 migration with AOS-338.
+
+    - with correction about NXP patch,
+    "MLK-24437-1 video: nw_dsi_imx: Fix initialization sequence"
+    in previous migration work.
+
+Change-Id: I854cfde915c27865e762ebec6b3b65512e37de62
+
+diff --git a/drivers/video/imx/mipi_dsi_northwest.c b/drivers/video/imx/mipi_dsi_northwest.c
+index 7cb0ea255c..0c0e0aed7f 100644
+--- a/drivers/video/imx/mipi_dsi_northwest.c
++++ b/drivers/video/imx/mipi_dsi_northwest.c
+@@ -24,7 +24,6 @@
+ #include <dm/device-internal.h>
+ #include <regmap.h>
+ #include <syscon.h>
+-#include <asm/arch/clock.h>
+ 
+ #define CN_BUF	0xcb7a89c0
+ #define CO_BUF	0x63
+@@ -736,9 +735,9 @@ static void mipi_dsi_shutdown(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
+ 
++#ifndef CONFIG_IMX8MQ
+ 	enable_mipi_dsi_clk(false);
+ 
+-#ifndef CONFIG_IMX8MQ
+ 	reset_dsi_domains(mipi_dsi, true);
+ #endif /* !CONFIG_IMX8MQ */
+ }
+@@ -1074,15 +1073,14 @@ static int mipi_dsi_northwest_host_attach(struct mipi_dsi_host *host,
+ #ifdef CONFIG_IMX8MQ
+ 	ret = imx8mq_mipi_dsi_northwest_host_attach(host, device);
+ 	return ret;
+-#endif /* CONFIG_IMX8MQ */
+ 
+-#ifndef CONFIG_IMX8MQ
++#else /* !CONFIG_IMX8MQ */
+ 	/* Assert resets */
+ 	reset_dsi_domains(mipi_dsi, true);
+-#endif /* !CONFIG_IMX8MQ */
+ 
+ 	/* Enable mipi relevant clocks */
+ 	enable_mipi_dsi_clk(true);
++#endif /* CONFIG_IMX8MQ */
+ 
+ 	ret = mipi_dsi_dphy_init(mipi_dsi);
+ 	if (ret < 0)
+diff --git a/drivers/video/imx/nw_dsi_imx.c b/drivers/video/imx/nw_dsi_imx.c
+index b7f2cc49c9..446c8633e3 100644
+--- a/drivers/video/imx/nw_dsi_imx.c
++++ b/drivers/video/imx/nw_dsi_imx.c
+@@ -105,11 +105,8 @@ static int nw_dsi_imx_probe(struct udevice *dev)
+ 		printf("fail to get data lanes property %d
+", ret);
+ 		return -EINVAL;
+ 	}
+-
+ #ifdef CONFIG_IMX8MQ
+ 	init_mipi_clk();
+-#else /* !CONFIG_IMX8MQ */
+-	enable_mipi_dsi_clk(true);
+ #endif /* CONFIG_IMX8MQ */
+ 
+ 	return ret;
+@@ -129,10 +126,6 @@ static int nw_dsi_imx_remove(struct udevice *dev)
+ 		return ret;
+ 	}
+ 
+-#ifndef CONFIG_IMX8MQ
+-	enable_mipi_dsi_clk(false);
+-#endif /* !CONFIG_IMX8MQ */
+-
+ 	return 0;
+ }
+ 

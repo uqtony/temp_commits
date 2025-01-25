@@ -1,0 +1,109 @@
+d3915e1a8dfd Sergii Postulga 2020-02-25
+
+arm64: dts: a300 devboard: Configure Tianma TM050JDHC02 panel
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: I859d440f498f580fdcc381291902170c31b360ea
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index f67bdc7b36a7..f3866bfe0eb8 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@ -1080,8 +1080,96 @@ &A53_0 {
+ 
+ &dcss {
+ 	status = "okay";
++	disp-dev = "mipi_disp";
++	clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>,
++		 <&clk IMX8MQ_CLK_DISP_AXI_ROOT>,
++		 <&clk IMX8MQ_CLK_DISP_RTRM_ROOT>,
++		 <&clk IMX8MQ_CLK_DC_PIXEL>,
++		 <&clk IMX8MQ_CLK_DISP_DTRC>,
++		 <&clk IMX8MQ_VIDEO_PLL1>,
++		 <&clk IMX8MQ_CLK_27M>,
++		 <&clk IMX8MQ_CLK_25M>;
++	clock-names = "apb", "axi", "rtrm", "pix", "dtrc", "pll",
++		      "pll_src1", "pll_src2";
++
++	assigned-clocks = <&clk IMX8MQ_CLK_DC_PIXEL>,
++			  <&clk IMX8MQ_CLK_DISP_AXI>,
++			  <&clk IMX8MQ_CLK_DISP_RTRM>;
++	assigned-clock-parents = <&clk IMX8MQ_VIDEO_PLL1_OUT>,
++				 <&clk IMX8MQ_SYS1_PLL_800M>,
++				 <&clk IMX8MQ_SYS1_PLL_800M>;
++	assigned-clock-rates = <600000000>,
++			       <800000000>,
++			       <400000000>;
++
++	dcss_disp0: port@0 {
++		reg = <0>;
++
++		dcss_disp0_mipi_dsi: mipi_dsi {
++			remote-endpoint = <&mipi_dsi_in>;
++		};
++	};
++};
++
++&mipi_dsi_phy {
++	status = "okay";
++};
++
++&mipi_dsi {
++	status = "okay";
++
++	port@1 {
++		mipi_dsi_in: endpoint {
++			remote-endpoint = <&dcss_disp0_mipi_dsi>;
++		};
++	};
++
++};
++
++&mipi_dsi_bridge {
++	status = "okay";
++
++	panel@0 {
++		compatible = "ilitek,ili9881cc";
++		reg = <0>;
++		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		tpreset-gpio = <&gpio3 18 GPIO_ACTIVE_HIGH>;
++		dsi-lanes = <4>;
++		panel-width-mm = <67>;
++		panel-height-mm = <119>;
++
++		display-timings {
++			timing {
++				clock-frequency = <132000000>;
++				// clock-frequency = <82000000>;
++				hactive = <720>;
++				vactive = <1280>;
++				hfront-porch = <150>;
++				hsync-len = <10>;
++				hback-porch = <150>;
++				vfront-porch = <20>;
++				vsync-len = <2>;
++				vback-porch = <19>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <0>;
++				pixelclk-active = <0>;
++			};
++		};
+ 
+-	disp-dev = "hdmi_disp";
++		port {
++			panel1_in: endpoint {
++				remote-endpoint = <&mipi_dsi_bridge_out>;
++			};
++		};
++	};
++
++	port@2 {
++		mipi_dsi_bridge_out: endpoint {
++			remote-endpoint = <&panel1_in>;
++		};
++	};
+ };
+ 
+ &hdmi {

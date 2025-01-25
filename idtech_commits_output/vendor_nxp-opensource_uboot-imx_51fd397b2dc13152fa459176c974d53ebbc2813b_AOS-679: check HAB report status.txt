@@ -1,0 +1,82 @@
+51fd397b2d AndrewS 2021-09-03
+
+AOS-679: check HAB report status
+
+The origin patch will crash imx8mn spl, revert origin patch and
+create a new function, which is light version of get_hab_status.
+
+Change-Id: I6f51dd82bb9f64f33a72f6cbf0bcc689ad2f644a
+
+diff --git a/arch/arm/include/asm/mach-imx/hab.h b/arch/arm/include/asm/mach-imx/hab.h
+index e00dbcfe95..19ca6d4ec5 100644
+--- a/arch/arm/include/asm/mach-imx/hab.h
++++ b/arch/arm/include/asm/mach-imx/hab.h
+@@ -230,6 +230,8 @@ typedef void hapi_clock_init_t(void);
+ 
+ /* ----------- end of HAB API updates ------------*/
+ 
++void check_hab_status(void);
++
+ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
+ 			       uint32_t ivt_offset);
+ bool imx_hab_is_enabled(void);
+diff --git a/arch/arm/mach-imx/hab.c b/arch/arm/mach-imx/hab.c
+index 37f29b8c87..f6f51dffcd 100644
+--- a/arch/arm/mach-imx/hab.c
++++ b/arch/arm/mach-imx/hab.c
+@@ -246,6 +246,30 @@ void *hab_rvt_authenticate_image(uint8_t cid, ptrdiff_t ivt_offset,
+ 	return ret;
+ }
+ 
++void check_hab_status(void)
++{
++	enum hab_config config = 0;
++	enum hab_state state = 0;
++
++	if (imx_hab_is_enabled())
++		puts("
+Secure boot enabled
+");
++	else
++		puts("
+Secure boot disabled
+");
++
++	/* Check HAB status */
++	if (hab_rvt_report_status(&config, &state) != HAB_SUCCESS) {
++		printf("
+HAB Configuration: 0x%02x, HAB State: 0x%02x
+",
++		       config, state);
++		puts("HAB Events Found, but not polling HAB Events here
+
+");
++	}
++	/* Display message if no HAB events are found */
++	else {
++		printf("
+HAB Configuration: 0x%02x, HAB State: 0x%02x
+",
++		       config, state);
++		puts("No HAB Events Found!
+
+");
++	}
++}
++
+ #if !defined(CONFIG_SPL_BUILD)
+ 
+ #define MAX_RECORD_BYTES     (8*1024) /* 4 kbytes */
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index bfc2de5bfc..15c4629d75 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -680,6 +680,8 @@ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+ 	char *env_value;
+ #endif /* CONFIG_IDT_LINUX_DTB */
+ 
++	check_hab_status();
++
+ 	if (!is_bdinfo_som_set()) {
+ 		goto fail;
+ 	}

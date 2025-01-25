@@ -1,0 +1,50 @@
+f6c47b62 max.yang 2020-07-29
+
+AOS-263: [imx8mn][Secure] Secure boot fail with hab_status fail event
+
+  hab_status have fail event output. The signed image's csf file has wrong
+  content because hab_info.txt record imx8mq's data.
+  Solution:
+    1. Add condition check for imx8mq and imx8mn product
+    2. only imx8mn evk board uses ddr4, others use lpddr4, add condition
+       to handle this situation
+
+Change-Id: Iad047c4295b3e972abc0bb6b576c407aa667f5f4
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index eb51fa65..b54e9b0f 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -132,9 +132,22 @@ CST_PATH := ./vendor/idtech/cst
+ 
+ define sign_imx_uboot
+         echo IDTech sign uboot process $(1) with feature $(2)...; \
++        PLATFORM=`echo $(1) | cut -d'-' -f1`; \
++        MBOARD=`echo $(1) | cut -d'-' -f2`; \
++        PRINT_HAB=`echo print_fit_hab`; \
++        if [ "$$PLATFORM" = "imx8mq" ]; then \
++            TGT_SOC=`echo iMX8MQ`; \
++        elif [ "$$PLATFORM" = "imx8mn" ]; then \
++            TGT_SOC=`echo iMX8MN`; \
++            if [ "$$MBOARD" = "evk" ]; then \
++                PRINT_HAB=`echo print_fit_hab_ddr4`; \
++            fi; \
++        else \
++            echo $$PLATFORM not supported; \
++	fi; \
+         cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
+         if [ $(2) = "dual" ]; then \
+-            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
++            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=$$TGT_SOC PRINT_FIT_HAB_OFFSET=0x0 $$PRINT_HAB > $(UBOOT_OUT)/hab_info.txt 2>&1; \
+             cp $(UBOOT_COLLECTION)/spl-$(strip $(1)).bin $(CST_PATH)/flash.bin; \
+             $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH) $(UBOOT_COLLECTION)/spl-$(strip $(1)).bin; \
+             mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/spl-$(strip $(1))-signed.bin; \
+@@ -144,7 +157,7 @@ define sign_imx_uboot
+             mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/bootloader-$(strip $(1))-signed.img; \
+             rm $(CST_PATH)/flash.bin; \
+         else \
+-            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
++            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=$$TGT_SOC $$PRINT_HAB > $(UBOOT_OUT)/hab_info.txt 2>&1; \
+             cp $(UBOOT_COLLECTION)/u-boot-$(strip $(1)).imx $(CST_PATH)/flash.bin; \
+             $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH) $(UBOOT_COLLECTION)/u-boot-$(strip $(1)).imx; \
+             mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/u-boot-$(strip $(1))-signed.imx; \

@@ -1,0 +1,182 @@
+cb2e01a max.yang 2020-03-23
+
+AOS-108: [Sign][Dual] Script supports to sign spl and bootloader separately
+
+*** Normal u-boot log ***
+  Loader IMAGE:
+   header_image_off       0x1a000
+   dcd_off                0x0
+   image_off              0x1a040
+   csf_off                0x4e800
+   spl hab block:         0x7e0fc0 0x1a000 0x34800
+
+  Second Loader IMAGE:
+   sld_header_off         0x57c00
+   sld_csf_off            0x58c20
+   sld hab block:         0x401fcdc0 0x57c00 0x1020
+
+*** Dual bootloader log ***
+  Loader IMAGE:
+   header_image_off       0x1a000
+   dcd_off                0x0
+   image_off              0x1a040
+   csf_off                0x48a00
+   spl hab block:         0x7e0fc0 0x1a000 0x2ea00
+
+  Second Loader IMAGE:
+   sld_header_off         0x0
+   sld_csf_off            0x0
+   sld hab block:         0x0 0x0 0x0
+  ./mkimage_imx8 -fit_ivt u-boot.itb 0x40200000 0x0 -out u-boot-ivt.itb
+  Platform:       i.MX8M (mScale)
+  FIT IMAGE:      u-boot.itb start addr: 0x40200000 offset: 0x00000000
+  Output:         u-boot-ivt.itb
+
+  FIT IVT IMAGE:
+   fit_csf_off            0x1020
+   fit hab block:         0x401fcdc0 0x0 0x1020
+
+Change-Id: I6855107ec00a0db453b6dd706573deb3a2e17862
+
+diff --git a/sign_uboot.py b/sign_uboot.py
+index 8f68762..cbd6aed 100755
+--- a/sign_uboot.py
++++ b/sign_uboot.py
+@@ -17,8 +17,10 @@ import subprocess
+ 
+ sig_info = {}
+ hab_info = []
+-image = "u-boot.imx"
++orig_image = ""
+ image_out = "signed_uboot.imx"
++spl_only = 0
++bootloader_only = 0
+ 
+ def GetImageSigInfo(filename):
+   f = open(filename)
+@@ -26,7 +28,9 @@ def GetImageSigInfo(filename):
+     if line and (line.lstrip().startswith("csf_off")
+             or line.lstrip().startswith("spl hab block:")
+             or line.lstrip().startswith("sld_csf_off")
+-            or line.lstrip().startswith("sld hab block:")):
++            or line.lstrip().startswith("sld hab block:")
++            or line.lstrip().startswith("fit_csf_off")
++            or line.lstrip().startswith("fit hab block:")):
+       k, v = line.lstrip().split("	", 1)
+       sig_info[k.rstrip()] = v.strip('	').strip('
+')
+   print sig_info
+@@ -48,57 +52,78 @@ def UpdateCsfSpl(filename):
+ 
+ def UpdateCsfFit(filename):
+   f = open(filename, "a")
+-  f.write("    Blocks = " + sig_info["sld hab block:"] + " \"flash.bin\", " + "\
+")
++  if bootloader_only:
++    f.write("    Blocks = " + sig_info["fit hab block:"] + " \"flash.bin\", " + "\
+")
++  else:
++    f.write("    Blocks = " + sig_info["sld hab block:"] + " \"flash.bin\", " + "\
+")
+   for item in hab_info[0:-1]:
+     f.write("             " + item + " \"flash.bin\", \
+")
+   f.write("             " + hab_info[-1] + " \"flash.bin\"")
+   f.close
+ 
+ def GenerateCsfBin(dirpath, tool_path):
+-  cmd = ["./release/linux64/bin/cst",
+-            "-i", os.path.join(dirpath, "csf_spl.txt"),
+-            "-o", os.path.join(dirpath, "csf_spl.bin")]
+-  print(cmd)
+-  p = subprocess.Popen(cmd, cwd=tool_path)
+-  p.wait()
+-
+-  cmd = ["./release/linux64/bin/cst",
+-            "-i", os.path.join(dirpath, "csf_fit.txt"),
+-            "-o", os.path.join(dirpath, "csf_fit.bin")]
+-  print(cmd)
+-  p = subprocess.Popen(cmd, cwd=tool_path)
+-  p.wait()
++  if not bootloader_only:
++    cmd = ["./release/linux64/bin/cst",
++              "-i", os.path.join(dirpath, "csf_spl.txt"),
++              "-o", os.path.join(dirpath, "csf_spl.bin")]
++    print(cmd)
++    p = subprocess.Popen(cmd, cwd=tool_path)
++    p.wait()
++
++  if not spl_only:
++    cmd = ["./release/linux64/bin/cst",
++              "-i", os.path.join(dirpath, "csf_fit.txt"),
++              "-o", os.path.join(dirpath, "csf_fit.bin")]
++    print(cmd)
++    p = subprocess.Popen(cmd, cwd=tool_path)
++    p.wait()
+ 
+ def WriteSignedImage(uboot_obj_dir, product_out_dir, tool_path):
+-  cmd = ["cp", os.path.join(product_out_dir, image), os.path.join(product_out_dir, image_out)]
+-  print(cmd)
+-  p = subprocess.Popen(cmd)
+-
+-  cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_spl.bin"),
+-               "of="+ os.path.join(product_out_dir, image_out),
+-               "seek="+str(int(sig_info["csf_off"], 0)),
+-               "bs=1", "conv=notrunc"]
++  cmd = ["cp", orig_image, os.path.join(product_out_dir, image_out)]
+   print(cmd)
+   p = subprocess.Popen(cmd)
+-  p.wait()
+ 
+-  cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_fit.bin"),
+-               "of="+ os.path.join(product_out_dir, image_out),
+-               "seek="+str(int(sig_info["sld_csf_off"], 0)),
+-               "bs=1", "conv=notrunc"]
+-  print(cmd)
+-  p = subprocess.Popen(cmd)
+-  p.wait()
++  if not bootloader_only:
++    cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_spl.bin"),
++                 "of="+ os.path.join(product_out_dir, image_out),
++                 "seek="+str(int(sig_info["csf_off"], 0)),
++                 "bs=1", "conv=notrunc"]
++    print(cmd)
++    p = subprocess.Popen(cmd)
++    p.wait()
++
++  if not spl_only:
++    if bootloader_only:
++      to_seek = int(sig_info["fit_csf_off"], 0)
++    else:
++      to_seek = int(sig_info["sld_csf_off"], 0)
++    cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_fit.bin"),
++                 "of="+ os.path.join(product_out_dir, image_out),
++                 "seek="+str(to_seek),
++                 "bs=1", "conv=notrunc"]
++    print(cmd)
++    p = subprocess.Popen(cmd)
++    p.wait()
+ 
+ 
+ def main(argv):
+-  if len(argv) != 3:
++  if len(argv) != 4:
+     print(__doc__)
+     sys.exit(1)
+ 
++  global orig_image
++  global spl_only
++  global bootloader_only
++
+   path_uboot_obj   = os.path.abspath(argv[0])
+   path_product_out = os.path.abspath(argv[1])
+   path_cst_tool    = os.path.abspath(argv[2])
++  orig_image       = os.path.abspath(argv[3])
++
++  if os.path.basename(orig_image).startswith("spl"):
++    spl_only = 1
++  if os.path.basename(orig_image).startswith("bootloader"):
++    bootloader_only = 1
+ 
+   sig_info_file = os.path.join(path_uboot_obj, "sig_info.txt")
+   hab_info_file = os.path.join(path_uboot_obj, "hab_info.txt")

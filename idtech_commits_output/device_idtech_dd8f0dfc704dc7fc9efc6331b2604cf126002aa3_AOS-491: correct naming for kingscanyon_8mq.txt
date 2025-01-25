@@ -1,0 +1,324 @@
+dd8f0dfc George.Huang 2021-01-25
+
+AOS-491: correct naming for kingscanyon_8mq
+
+Change-Id: If9a9d0ee830115639c0244d6431f0059869314cf
+
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index 5bda8a6b..94dac986 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -33,6 +33,7 @@ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/evk_a100/evk_a100.mk \
+   $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq.mk \
+   $(LOCAL_DIR)/bigcypress_8mp/bigcypress_8mp.mk \
++  $(LOCAL_DIR)/kingscanyon_8mq/kingscanyon_8mq.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_drm.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_pci.mk \
+@@ -58,6 +59,8 @@ COMMON_LUNCH_CHOICES := \
+   bigcypress_8mq-userdebug \
+   bigcypress_8mp-user \
+   bigcypress_8mp-userdebug \
++  kingscanyon_8mq-user \
++  kingscanyon_8mq-userdebug \
+   vp6820_8mq-user \
+   vp6820_8mq-userdebug \
+   vp6820_8mq_pci-user \
+diff --git a/imx8m/kingscanyon_8mq/AndroidBoard.mk b/imx8m/kingscanyon_8mq/AndroidBoard.mk
+index 9a04fbe1..cb6595f6 100644
+--- a/imx8m/kingscanyon_8mq/AndroidBoard.mk
++++ b/imx8m/kingscanyon_8mq/AndroidBoard.mk
+@@ -1,8 +1,8 @@
+ LOCAL_PATH := $(call my-dir)
+ 
+-include device/nxp/common/build/dtbo.mk
+-include device/nxp/common/build/imx-recovery.mk
+-include device/nxp/common/build/gpt.mk
++include device/idtech/common/build/dtbo.mk
++include device/idtech/common/build/imx-recovery.mk
++include device/idtech/common/build/gpt.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+ -include $(IMX_MEDIA_CODEC_XML_PATH)/mediacodec-profile/mediacodec-profile.mk
+diff --git a/imx8m/kingscanyon_8mq/AndroidTee.mk b/imx8m/kingscanyon_8mq/AndroidTee.mk
+index 21ba9b56..c6f1f737 100644
+--- a/imx8m/kingscanyon_8mq/AndroidTee.mk
++++ b/imx8m/kingscanyon_8mq/AndroidTee.mk
+@@ -4,7 +4,7 @@ MAKE += SHELL=/bin/bash
+ define build_uboot_w_tee
+ 	$(MAKE) -C bootable/bootloader/arm-trusted-firmware/ -B CROSS_COMPILE=aarch64-linux-android- PLAT=imx8mq V=1 SPD=opteed DECRYPTED_BUFFER_START=$(DECRYPTED_BUFFER_START) DECRYPTED_BUFFER_LEN=$(DECRYPTED_BUFFER_LEN) DECODED_BUFFER_START=$(DECODED_BUFFER_START) DECODED_BUFFER_LEN=$(DECODED_BUFFER_LEN) bl31; \
+ 	cp bootable/bootloader/arm-trusted-firmware/build/imx8mq/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.;\
+-	aarch64-linux-android-objcopy -O binary out/target/product/evk_8mq/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++	aarch64-linux-android-objcopy -O binary out/target/product/kingscanyon_8mq/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M  flash_hdmi_spl_uboot; \
+ 	cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(PRODUCT_OUT)/u-boot-$(strip $(2)).imx;
+diff --git a/imx8m/kingscanyon_8mq/BoardConfig.mk b/imx8m/kingscanyon_8mq/BoardConfig.mk
+index 60cf0567..6c4378ab 100644
+--- a/imx8m/kingscanyon_8mq/BoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/BoardConfig.mk
+@@ -32,9 +32,9 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ # Product-specific compile-time definitions.
+ #
+ 
+-IMX_DEVICE_PATH := device/nxp/imx8m/evk_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/kingscanyon_8mq
+ 
+-include device/nxp/imx8m/BoardConfigCommon.mk
++include device/idtech/imx8m/BoardConfigCommon.mk
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -43,21 +43,21 @@ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.nxp
+ 
+ # Support gpt
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += device/nxp/common/partition/device-partitions-13GB-ab_super.bpt
+-  ADDITION_BPT_PARTITION = partition-table-28GB:device/nxp/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:device/nxp/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
+-                           partition-table-28GB-dual:device/nxp/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    BOARD_BPT_INPUT_FILES += device/nxp/common/partition/device-partitions-13GB-ab-no-product.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/nxp/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                             partition-table-dual:device/nxp/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                             partition-table-28GB-dual:device/nxp/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += device/nxp/common/partition/device-partitions-13GB-ab.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/nxp/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:device/nxp/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                             partition-table-28GB-dual:device/nxp/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+ endif
+ 
+@@ -100,7 +100,7 @@ BOARD_AVB_ENABLE := true
+ TARGET_USES_MKE2FS := true
+ BOARD_AVB_ALGORITHM := SHA256_RSA4096
+ # The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/nxp/common/security/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
+ 
+ BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+@@ -140,7 +140,7 @@ $(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open
+ endif
+ endif
+ 
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_8mq/dtbo-imx8mq.img
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/kingscanyon_8mq/dtbo-imx8mq.img
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
+@@ -163,7 +163,7 @@ else # no dynamic parition feature
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+-       device/nxp/imx8m/sepolicy \
++       device/idtech/imx8m/sepolicy \
+        $(IMX_DEVICE_PATH)/sepolicy
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+@@ -171,7 +171,7 @@ BOARD_SEPOLICY_DIRS += \
+        $(IMX_DEVICE_PATH)/sepolicy_drm
+ endif
+ 
+-TARGET_BOARD_KERNEL_HEADERS := device/nxp/common/kernel-headers
++TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
+diff --git a/imx8m/kingscanyon_8mq/init.rc b/imx8m/kingscanyon_8mq/init.rc
+index f66469fc..4cc05421 100644
+--- a/imx8m/kingscanyon_8mq/init.rc
++++ b/imx8m/kingscanyon_8mq/init.rc
+@@ -21,7 +21,7 @@ on early-init
+ on early-init
+     start early_init_sh
+     # Set the host name which used in console
+-    export HOSTNAME evk_8mq
++    export HOSTNAME kingscanyon_8mq
+ 
+     # Due keymaster start very early so set prop here
+     # Also gatekeeper share same role for keymaster
+@@ -88,7 +88,7 @@ on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charg
+     start vendor.oemlock-1-0
+ 
+ on early-boot && property:vendor.skip.charger_not_need=0
+-    # For evk_8mq, when swap used about 400M, upgrade the level.
++    # For kingscanyon_8mq, when swap used about 400M, upgrade the level.
+     setprop ro.lmk.upgrade_pressure 87
+     setprop ro.lmk.downgrade_pressure 95
+     setprop ro.lmk.critical_upgrade true
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index 65c84865..89f74773 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -1,13 +1,13 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/nxp/imx8m/evk_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/kingscanyon_8mq
+ 
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+--include device/nxp/common/imx_path/ImxPathConfig.mk
+-include device/nxp/imx8m/ProductConfigCommon.mk
++-include device/idtech/common/imx_path/ImxPathConfig.mk
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab_nand.nxp),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab_nand.nxp)
+@@ -18,9 +18,9 @@ $(shell touch $(IMX_DEVICE_PATH)/fstab.nxp)
+ endif
+ 
+ # Overrides
+-PRODUCT_NAME := evk_8mq
+-PRODUCT_DEVICE := evk_8mq
+-PRODUCT_MODEL := EVK_8MQ
++PRODUCT_NAME := kingscanyon_8mq
++PRODUCT_DEVICE := kingscanyon_8mq
++PRODUCT_MODEL := KINSCANYON_8MQ
+ 
+ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/power
+@@ -79,9 +79,9 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+     $(IMX_DEVICE_PATH)/ueventd.nxp.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+-    device/nxp/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+-    device/nxp/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/nxp/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+ # boot ramdisk so far, we need this step to generate the vendor-ramdisk folder or build process would fail. This
+@@ -94,18 +94,18 @@ endif
+ 
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    device/nxp/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+-    device/nxp/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+-    device/nxp/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+-    device/nxp/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+-    device/nxp/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+-    device/nxp/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
+-    device/nxp/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
++    device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
++    device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++    device/idtech/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+-    device/nxp/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+-    device/nxp/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++    device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    device/idtech/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
+ endif
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
+@@ -145,19 +145,19 @@ PRODUCT_COPY_FILES += \
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediacodec-seccomp.policy:vendor/etc/seccomp_policy/mediacodec.policy \
+     $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy \
+-    device/nxp/common/seccomp_policy/codec2.vendor.base.policy:vendor/etc/seccomp_policy/codec2.vendor.base.policy \
+-    device/nxp/common/seccomp_policy/codec2.vendor.ext.policy:vendor/etc/seccomp_policy/codec2.vendor.ext.policy
++    device/idtech/common/seccomp_policy/codec2.vendor.base.policy:vendor/etc/seccomp_policy/codec2.vendor.base.policy \
++    device/idtech/common/seccomp_policy/codec2.vendor.ext.policy:vendor/etc/seccomp_policy/codec2.vendor.ext.policy
+ 
+ PRODUCT_COPY_FILES += \
+-    device/nxp/imx8m/evk_8mq/powerhint_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mq.json
++    device/idtech/imx8m/kingscanyon_8mq/powerhint_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mq.json
+ 
+ # fastboot_imx_flashall scripts, fsl-sdcard-partition script and uuu_imx_android_flash scripts
+ PRODUCT_COPY_FILES += \
+-    device/nxp/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
+-    device/nxp/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
+-    device/nxp/common/tools/imx-sdcard-partition.sh:imx-sdcard-partition.sh \
+-    device/nxp/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
+-    device/nxp/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++    device/idtech/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    device/idtech/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    device/idtech/common/tools/imx-sdcard-partition.sh:imx-sdcard-partition.sh \
++    device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
+ 
+ USE_XML_AUDIO_POLICY_CONF := 1
+ 
+@@ -248,7 +248,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.thermal@2.0-service.imx
+ PRODUCT_COPY_FILES += \
+-    device/nxp/imx8m/evk_8mq/thermal_info_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mq.json
++    device/idtech/imx8m/kingscanyon_8mq/thermal_info_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mq.json
+ 
+ # Neural Network HAL and lib
+ PRODUCT_PACKAGES += \
+@@ -301,8 +301,8 @@ PRODUCT_PACKAGES += \
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    device/nxp/imx8m/evk_8mq/camera_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mq.json \
+-    device/nxp/imx8m/evk_8mq/external_camera_config.xml:$(TARGET_COPY_OUT_VENDOR)/etc/external_camera_config.xml
++    device/idtech/imx8m/kingscanyon_8mq/camera_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mq.json \
++    device/idtech/imx8m/kingscanyon_8mq/external_camera_config.xml:$(TARGET_COPY_OUT_VENDOR)/etc/external_camera_config.xml
+ 
+ # Keymaster HAL
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq_drm.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq_drm.mk
+index fe4b31ad..2af7f217 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq_drm.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq_drm.mk
+@@ -1,26 +1,26 @@
+ # This is a FSL Android Reference Design platform based on i.MX8MQ board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/nxp/imx8m/evk_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/kingscanyon_8mq
+ 
+ PRODUCT_IMX_DRM := true
+ 
+-# copy drm specific files before inherit evk_8mq.mk, otherwise copy is ignored
++# copy drm specific files before inherit kingscanyon_8mq.mk, otherwise copy is ignored
+ PRODUCT_COPY_FILES += \
+ 	$(IMX_DEVICE_PATH)/audio_policy_configuration_drm.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+ 	$(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.main.rc \
+ 	$(IMX_DEVICE_PATH)/init.imx8mq.drm.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
+-	$(TOPDIR)device/nxp/imx8m/tee-supplicant.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/tee-supplicant.rc \
++	$(TOPDIR)device/idtech/imx8m/tee-supplicant.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/tee-supplicant.rc \
+ 
+ 
+-$(call inherit-product, $(TOPDIR)device/nxp/imx8m/optee-packages.mk)
+-$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/evk_8mq.mk)
++$(call inherit-product, $(TOPDIR)device/idtech/imx8m/optee-packages.mk)
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/kingscanyon_8mq.mk)
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ 
+ # Overrides
+-PRODUCT_NAME := evk_8mq_drm
++PRODUCT_NAME := kingscanyon_8mq_drm
+ 
+ CFG_DRM_SECURE_DATA_PATH ?= y
+ CFG_RDC_SECURE_DATA_PATH ?= y

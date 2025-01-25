@@ -1,0 +1,156 @@
+9eadd0c68c Jay 2022-01-05
+
+AOS-780: enhance display-timing support
+
+Try to get display-timing from below node
+IMX8MQ:
+    /soc@0/bus@30800000/mipi-dsi@30a00000/panel
+    /soc@0/bus@30800000/spi@30830000/panel
+IMX8MN:
+    /soc@0/bus@32c00000/dsi_controller@32e10000/panel
+    /soc@0/bus@30800000/spi@30820000/panel
+    /soc@0/bus@30800000/spi@30830000/panel
+    /soc@0/bus@30800000/spi@30840000/panel
+
+Change-Id: Id2f3607e597bec3c07dbdfa915d9a0186ddbc8c2
+
+diff --git a/drivers/idt/bdinfo_parser/linux_dtb.c b/drivers/idt/bdinfo_parser/linux_dtb.c
+index f139c8eca3..552bc8f83f 100644
+--- a/drivers/idt/bdinfo_parser/linux_dtb.c
++++ b/drivers/idt/bdinfo_parser/linux_dtb.c
+@@ -32,9 +32,17 @@
+ #define PANEL_PATH "/soc@0/bus@32c00000/dsi_controller@32e10000/panel@0/display-timings/timing"
+ #endif
+ #if defined(CONFIG_IMX8MQ)
+-#define PANEL_NODE "/soc@0/bus@30800000/mipi-dsi@30a00000/panel@"
++#define PANEL_NODE_MAX	2
++static const char *panel_node[PANEL_NODE_MAX] = {
++	"/soc@0/bus@30800000/mipi-dsi@30a00000/panel@",
++	"/soc@0/bus@30800000/spi@30830000/panel@"};
+ #elif defined(CONFIG_IMX8MN)
+-#define PANEL_NODE "/soc@0/bus@32c00000/dsi_controller@32e10000/panel@"
++#define PANEL_NODE_MAX	4
++static const char *panel_node[PANEL_NODE_MAX] = {
++	"/soc@0/bus@32c00000/dsi_controller@32e10000/panel@",
++	"/soc@0/bus@30800000/spi@30820000/panel@",
++	"/soc@0/bus@30800000/spi@30830000/panel@",
++	"/soc@0/bus@30800000/spi@30840000/panel@"};
+ #endif
+ #define DISPLAY_TIMING	"/display-timings/timing"
+ 
+@@ -253,6 +261,54 @@ int set_timing(void *blob, int offset, const char *name,
+ 	return 0;
+ }
+ 
++int set_display_flag(void *blob, int offset, u32 *flags)
++{
++	const u32 *value;
++	u32 pinfo;
++	int len = 0;
++
++	value = fdt_getprop(blob, offset, "vsync-active", &len);
++	pinfo = fdt32_to_cpu(*value);
++	if (len > 0)
++		*flags |= pinfo ? DISPLAY_FLAGS_VSYNC_HIGH : DISPLAY_FLAGS_VSYNC_LOW;
++
++	value = fdt_getprop(blob, offset, "hsync-active", &len);
++	pinfo = fdt32_to_cpu(*value);
++	if (len > 0)
++		*flags |= pinfo ? DISPLAY_FLAGS_HSYNC_HIGH : DISPLAY_FLAGS_HSYNC_LOW;
++
++	value = fdt_getprop(blob, offset, "de-active", &len);
++	pinfo = fdt32_to_cpu(*value);
++	if (len > 0)
++		*flags |= pinfo ? DISPLAY_FLAGS_DE_HIGH : DISPLAY_FLAGS_DE_LOW;
++
++	value = fdt_getprop(blob, offset, "pixelclk-active", &len);
++	pinfo = fdt32_to_cpu(*value);
++	if (len > 0)
++		*flags |= pinfo ? DISPLAY_FLAGS_PIXDATA_POSEDGE : DISPLAY_FLAGS_PIXDATA_NEGEDGE;
++
++	value = fdt_getprop(blob, offset, "syncclk-active", &len);
++	pinfo = fdt32_to_cpu(*value);
++	if (len > 0)
++		*flags |= pinfo ? DISPLAY_FLAGS_SYNC_POSEDGE : DISPLAY_FLAGS_SYNC_NEGEDGE;
++	else if (*flags & (DISPLAY_FLAGS_PIXDATA_POSEDGE | DISPLAY_FLAGS_PIXDATA_NEGEDGE))
++		*flags |= *flags  & DISPLAY_FLAGS_PIXDATA_POSEDGE ?
++				DISPLAY_FLAGS_SYNC_POSEDGE :
++				DISPLAY_FLAGS_SYNC_NEGEDGE;
++
++	value = fdt_getprop(blob, offset, "interlaced", &len);
++	if (len > 0)
++		*flags |= DISPLAY_FLAGS_INTERLACED;
++
++	value = fdt_getprop(blob, offset, "doublescan", &len);
++	if (len > 0)
++		*flags |= DISPLAY_FLAGS_DOUBLESCAN;
++
++	value = fdt_getprop(blob, offset, "doubleclk", &len);
++	if (len > 0)
++		*flags |= DISPLAY_FLAGS_DOUBLECLK;
++}
++
+ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ {
+ 	AvbIOResult readret;
+@@ -265,7 +321,7 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	size_t num_bytes;
+ 	size_t dtbo_size;
+ 	int nodeoff;
+-	int ret = -1, i = 0;
++	int ret = -1, i = 0, path_idx = 0;
+ 	char idt_display_id[BDINFO_DATA_SIZE] = "";
+ 	char panel_path[256] = "";
+ 
+@@ -312,11 +368,12 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	if (!idt_get_board_display_id(idt_display_id, BDINFO_DATA_SIZE))
+ 		goto timing_out;
+ 
++try_next:
+ 	do {
+ 		int len;
+ 		const char *displayId;
+ 
+-		snprintf(panel_path, sizeof(panel_path), "%s%d", PANEL_NODE, i);
++		snprintf(panel_path, sizeof(panel_path), "%s%d", panel_node[path_idx], i);
+ 		nodeoff = fdt_path_offset(blob, panel_path);
+ 		if (nodeoff < 0 || !fdtdec_get_is_enabled(blob, nodeoff))
+ 			break;
+@@ -335,6 +392,11 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 		i++;
+ 	} while (nodeoff >= 0);
+ 
++	if (nodeoff < 0 && path_idx < PANEL_NODE_MAX) {
++		path_idx++;
++		goto try_next;
++	}
++
+ 	nodeoff = fdt_path_offset(blob, panel_path);
+ 	if (nodeoff < 0 ||
+ 	    !fdtdec_get_is_enabled(blob, nodeoff)) {
+@@ -371,6 +433,8 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	if (set_timing(blob, nodeoff, "vsync-len", &dt->vsync_len))
+ 		goto timing_out;
+ 
++	set_display_flag(blob, nodeoff, &dt->flags);
++
+ #if DEBUG_INFO
+ 	printf("Parse %s panel timing finish
+
+", dtbo_slot[slot]);
+ #endif /* DEBUG_INFO */
+diff --git a/include/fdtdec.h b/include/fdtdec.h
+index 62d1660973..b661f2c7c6 100644
+--- a/include/fdtdec.h
++++ b/include/fdtdec.h
+@@ -859,6 +859,10 @@ enum display_flags {
+ 	DISPLAY_FLAGS_INTERLACED	= 1 << 8,
+ 	DISPLAY_FLAGS_DOUBLESCAN	= 1 << 9,
+ 	DISPLAY_FLAGS_DOUBLECLK		= 1 << 10,
++	/* drive sync on pos. edge */
++	DISPLAY_FLAGS_SYNC_POSEDGE	= 1 << 11,
++	/* drive sync on neg. edge */
++	DISPLAY_FLAGS_SYNC_NEGEDGE	= 1 << 12,
+ };
+ 
+ /*

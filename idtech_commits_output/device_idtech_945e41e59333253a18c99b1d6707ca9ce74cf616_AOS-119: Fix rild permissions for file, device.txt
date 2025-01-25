@@ -1,0 +1,158 @@
+945e41e5 George.Huang 2020-03-12
+
+AOS-119: Fix rild permissions for file, device
+
+1. re-define lte device node with new type rild_device
+   /dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+
+2. add new typeattribute to allow rild to execute system binary
+   typeattribute rild vendor_executes_system_violators
+   ppp_exec:file { read execute open execute_no_trans map getattr };
+
+2. remove unused permissions
+   self:capability { dac_override dac_read_search mknod };
+   system_data_file:dir { add_name create getattr read write };
+   system_data_file:file { create open write read };
+
+Change-Id: Ifd8096d50aaef77b8321471687e9bb47d307c902
+
+diff --git a/imx8m/evk_a300/sepolicy/device.te b/imx8m/evk_a300/sepolicy/device.te
+new file mode 100644
+index 00000000..91ac6479
+--- /dev/null
++++ b/imx8m/evk_a300/sepolicy/device.te
+@@ -0,0 +1 @@
++type rild_device, dev_type;
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+index 0dda8491..dd14203b 100644
+--- a/imx8m/evk_a300/sepolicy/file_contexts
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -44,3 +44,4 @@
+ /vendor/bin/hw/rild              u:object_r:rild_exec:s0
+ #/system/socket/rild              u:object_r:rild_socket:s0
+ #/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
++/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/evk_a300/sepolicy/rild.te b/imx8m/evk_a300/sepolicy/rild.te
+index c98c4c22..66a44c52 100644
+--- a/imx8m/evk_a300/sepolicy/rild.te
++++ b/imx8m/evk_a300/sepolicy/rild.te
+@@ -1,12 +1,13 @@
+ # rild - radio interface layer daemon
+-# type rild, domain;
+-hal_server_domain(rild, hal_telephony)
+-net_domain(rild)
++#type rild, domain;
++#hal_server_domain(rild, hal_telephony)
++#net_domain(rild)
+ 
+ # type_transition must be private policy the domain_trans rules could stay
+ # public, but conceptually should go with this
+-# type rild_exec, exec_type, vendor_file_type, file_type;
+-init_daemon_domain(rild)
++#type rild_exec, exec_type, vendor_file_type, file_type;
++#init_daemon_domain(rild)
++typeattribute rild vendor_executes_system_violators;
+ 
+ allow rild init:dir { search read open };
+ allow rild init:lnk_file read;
+@@ -15,20 +16,18 @@ allow rild kernel:dir search;
+ allow rild kernel:system module_request;
+ allow rild kernel:lnk_file read;
+ allow rild kernel:file read;
+-allow rild device:chr_file { read write ioctl open getattr create };
++allow rild rild_device:chr_file { read write ioctl open getattr create };
+ #allow rild net_radio_prop:property_service set;
+ allow rild ppp_device:chr_file { read write ioctl open };
+ allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+ allow rild radio_prop:property_service set;
+-allow rild self:capability { net_admin setuid dac_override dac_read_search mknod };   #sys_ptrace  removed
++allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+ allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+ allow rild sysfs_wake_lock:file { open read write };
+-allow rild system_file:file execute_no_trans;
++allow rild system_file:file { read open getattr execute_no_trans };
+ allow rild system_prop:property_service set;
+ allow rild sysfs:file write;
+ allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild system_data_file:dir { add_name create getattr read write };
+-allow rild system_data_file:file { create open write read };
+ allow rild default_prop:property_service set;
+ allow rild default_prop:file { read open };
+ allow rild device:dir { write add_name };
+@@ -77,4 +76,4 @@ allow rild self:netlink_kobject_uevent_socket create_socket_perms;
+ # Access to wake locks
+ wakelock_use(rild)
+ 
+-allow rild self:socket create_socket_perms;
+\ No newline at end of file
++allow rild self:socket create_socket_perms;
+diff --git a/imx8m/vp6820_8mq/sepolicy/device.te b/imx8m/vp6820_8mq/sepolicy/device.te
+new file mode 100644
+index 00000000..91ac6479
+--- /dev/null
++++ b/imx8m/vp6820_8mq/sepolicy/device.te
+@@ -0,0 +1 @@
++type rild_device, dev_type;
+diff --git a/imx8m/vp6820_8mq/sepolicy/file_contexts b/imx8m/vp6820_8mq/sepolicy/file_contexts
+index 0dda8491..dd14203b 100644
+--- a/imx8m/vp6820_8mq/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/file_contexts
+@@ -44,3 +44,4 @@
+ /vendor/bin/hw/rild              u:object_r:rild_exec:s0
+ #/system/socket/rild              u:object_r:rild_socket:s0
+ #/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
++/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/rild.te b/imx8m/vp6820_8mq/sepolicy/rild.te
+index c98c4c22..66a44c52 100644
+--- a/imx8m/vp6820_8mq/sepolicy/rild.te
++++ b/imx8m/vp6820_8mq/sepolicy/rild.te
+@@ -1,12 +1,13 @@
+ # rild - radio interface layer daemon
+-# type rild, domain;
+-hal_server_domain(rild, hal_telephony)
+-net_domain(rild)
++#type rild, domain;
++#hal_server_domain(rild, hal_telephony)
++#net_domain(rild)
+ 
+ # type_transition must be private policy the domain_trans rules could stay
+ # public, but conceptually should go with this
+-# type rild_exec, exec_type, vendor_file_type, file_type;
+-init_daemon_domain(rild)
++#type rild_exec, exec_type, vendor_file_type, file_type;
++#init_daemon_domain(rild)
++typeattribute rild vendor_executes_system_violators;
+ 
+ allow rild init:dir { search read open };
+ allow rild init:lnk_file read;
+@@ -15,20 +16,18 @@ allow rild kernel:dir search;
+ allow rild kernel:system module_request;
+ allow rild kernel:lnk_file read;
+ allow rild kernel:file read;
+-allow rild device:chr_file { read write ioctl open getattr create };
++allow rild rild_device:chr_file { read write ioctl open getattr create };
+ #allow rild net_radio_prop:property_service set;
+ allow rild ppp_device:chr_file { read write ioctl open };
+ allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+ allow rild radio_prop:property_service set;
+-allow rild self:capability { net_admin setuid dac_override dac_read_search mknod };   #sys_ptrace  removed
++allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+ allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+ allow rild sysfs_wake_lock:file { open read write };
+-allow rild system_file:file execute_no_trans;
++allow rild system_file:file { read open getattr execute_no_trans };
+ allow rild system_prop:property_service set;
+ allow rild sysfs:file write;
+ allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild system_data_file:dir { add_name create getattr read write };
+-allow rild system_data_file:file { create open write read };
+ allow rild default_prop:property_service set;
+ allow rild default_prop:file { read open };
+ allow rild device:dir { write add_name };
+@@ -77,4 +76,4 @@ allow rild self:netlink_kobject_uevent_socket create_socket_perms;
+ # Access to wake locks
+ wakelock_use(rild)
+ 
+-allow rild self:socket create_socket_perms;
+\ No newline at end of file
++allow rild self:socket create_socket_perms;

@@ -1,0 +1,658 @@
+a8fbc82a8d Sergii Postulga 2020-02-25
+
+A300 devboard: various fixes
+
+- Adjust board related settings
+- Fix typos
+- Add missed configuration files
+
+Change-Id: I0a8f0b92d329b19579c27a5fcdfd7b4ff57c291a
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+
+diff --git a/arch/arm/mach-imx/imx8m/Kconfig b/arch/arm/mach-imx/imx8m/Kconfig
+index 4c0d8cb041..509016b7ef 100644
+--- a/arch/arm/mach-imx/imx8m/Kconfig
++++ b/arch/arm/mach-imx/imx8m/Kconfig
+@@ -56,6 +56,12 @@ config TARGET_IMX8MQ_AIY
+ 	select SUPPORT_SPL
+ 	select IMX8M_LPDDR4
+ 
++config TARGET_IMX8MQ_A300
++	bool "imx8mq_a300"
++	select IMX8MQ
++	select SUPPORT_SPL
++	select IMX8M_LPDDR4
++
+ config TARGET_IMX8MM_DDR4_VAL
+ 	bool "imx8mm DDR4 validation board"
+ 	select IMX8MM
+@@ -89,6 +95,7 @@ endchoice
+ source "board/freescale/imx8mq_evk/Kconfig"
+ source "board/freescale/imx8mq_arm2/Kconfig"
+ source "board/freescale/imx8mq_aiy/Kconfig"
++source "board/freescale/imx8mq_a300/Kconfig"
+ source "board/freescale/imx8mm_evk/Kconfig"
+ source "board/freescale/imx8mm_val/Kconfig"
+ source "board/freescale/imx8mn_evk/Kconfig"
+diff --git a/board/freescale/imx8mq_a300/Kconfig b/board/freescale/imx8mq_a300/Kconfig
+index 85ce3e4906..cebb3c7e1f 100644
+--- a/board/freescale/imx8mq_a300/Kconfig
++++ b/board/freescale/imx8mq_a300/Kconfig
+@@ -1,16 +1,16 @@
+ if TARGET_IMX8MQ_A300
+ 
+ config SYS_BOARD
+-	default "imx8mq_evk"
++	default "imx8mq_a300"
+ 
+ config SYS_VENDOR
+ 	default "freescale"
+ 
+ config SYS_CONFIG_NAME
+-	default "imx8mq_evk"
++	default "imx8mq_a300"
+ 
+-config IDT_RAM_1GB
+-	bool "Enable 1 GB size of system ram setting"
++config IDT_RAM_2GB
++	bool "2GB RAM configuration for A300"
+ 
+ source "board/freescale/common/Kconfig"
+ 
+diff --git a/board/freescale/imx8mq_a300/Makefile b/board/freescale/imx8mq_a300/Makefile
+index 00e40fe20a..23728fbc14 100644
+--- a/board/freescale/imx8mq_a300/Makefile
++++ b/board/freescale/imx8mq_a300/Makefile
+@@ -4,12 +4,12 @@
+ # SPDX-License-Identifier:      GPL-2.0+
+ #
+ 
+-obj-y += imx8mq_evk.o
++obj-y += imx8mq_a300.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+ ifdef CONFIG_IDT_RAM_2GB
+-obj-$(CONFIG_IMX8M_LPDDR4) += ddr/lpddr4_timing_2G.o
++obj-$(CONFIG_IMX8M_LPDDR4) += ddr/lpddr4_timing_2g.o
+ else
+ obj-$(CONFIG_IMX8M_LPDDR4) += ddr/lpddr4_timing.o
+ endif
+diff --git a/board/freescale/imx8mq_a300/README b/board/freescale/imx8mq_a300/README
+deleted file mode 100644
+index c1d400bcf9..0000000000
+--- a/board/freescale/imx8mq_a300/README
++++ /dev/null
+@@ -1,37 +0,0 @@
+-U-Boot for the NXP i.MX8MQ EVK board
+-
+-Quick Start
+-===========
+-- Build the ARM Trusted firmware binary
+-- Get ddr and hdmi fimware
+-- Build U-Boot
+-- Boot
+-
+-Get and Build the ARM Trusted firmware
+-======================================
+-Note: srctree is U-Boot source directory
+-Get ATF from: https://source.codeaurora.org/external/imx/imx-atf
+-branch: imx_4.14.62_1.0.0_beta
+-$ make PLAT=imx8mq bl31
+-$ cp build/imx8mq/release/bl31.bin $(srctree)
+-
+-Get the ddr and hdmi firmware
+-=============================
+-$ wget https://www.nxp.com/lgfiles/NMG/MAD/YOCTO/firmware-imx-7.9.bin
+-$ chmod +x firmware-imx-7.9.bin
+-$ ./firmware-imx-7.9.bin
+-$ cp firmware-imx-7.9/firmware/hdmi/cadence/signed_hdmi_imx8m.bin $(srctree)
+-$ cp firmware-imx-7.9/firmware/ddr/synopsys/lpddr4*.bin $(srctree)
+-
+-Build U-Boot
+-============
+-$ export CROSS_COMPILE=aarch64-poky-linux-
+-$ make imx8mq_evk_defconfig
+-$ make flash.bin
+-
+-Burn the flash.bin to MicroSD card offset 33KB
+-$sudo dd if=flash.bin of=/dev/sd[x] bs=1024 seek=33
+-
+-Boot
+-====
+-Set Boot switch SW801: 1100 and Bmode: 10 to boot from Micro SD.
+diff --git a/board/freescale/imx8mq_a300/ddr/lpddr4_timing_2g.c b/board/freescale/imx8mq_a300/ddr/lpddr4_timing_2g.c
+index 34baf24ed5..63e0fe1d24 100644
+--- a/board/freescale/imx8mq_a300/ddr/lpddr4_timing_2g.c
++++ b/board/freescale/imx8mq_a300/ddr/lpddr4_timing_2g.c
+@@ -9,7 +9,8 @@
+  */
+ 
+ #include <linux/kernel.h>
+-#include <asm/arch/imx8m_ddr.h>
++#include <asm/arch/ddr.h>
++#include <asm/arch/lpddr4_define.h>
+ 
+ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	/** Initialize DDRC registers **/
+diff --git a/board/freescale/imx8mq_a300/imx8mq_evk.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+similarity index 100%
+rename from board/freescale/imx8mq_a300/imx8mq_evk.c
+rename to board/freescale/imx8mq_a300/imx8mq_a300.c
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+index 3bacc3e637..81323969ea 100644
+--- a/configs/imx8mq_a300_devboard_android_defconfig
++++ b/configs/imx8mq_a300_devboard_android_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -85,5 +85,4 @@ CONFIG_LIBAVB=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_REGEX=n
+ 
+-CONFIG_IDT_RAM_2GB
+-
++CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+index 6249bf7ca9..dae8a521d9 100644
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -89,4 +89,4 @@ CONFIG_SPL_MMC_WRITE=y
+ CONFIG_REGEX=n
+ CONFIG_SPL_DOS_PARTITION=n
+ 
+-CONFIG_IDT_RAM_2GB
++CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_defconfig b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+index 44e30739df..9eb08ad82c 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -87,4 +87,4 @@ CONFIG_IMX_TRUSTY_OS=y
+ CONFIG_REGEX=n
+ CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ 
+-CONFIG_IDT_RAM_2GB
++CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+index 545dcc556a..0cdcc5b565 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -91,4 +91,4 @@ CONFIG_REGEX=n
+ CONFIG_SPL_DOS_PARTITION=n
+ CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ 
+-CONFIG_IDT_RAM_2GB
++CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+index b36f3e860c..1d19fddebb 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -88,4 +88,4 @@ CONFIG_SECURE_UNLOCK=y
+ CONFIG_REGEX=n
+ CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ 
+-CONFIG_IDT_RAM_2GB
++CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_uuu_defconfig b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+index 627482bf14..1ded571df4 100644
+--- a/configs/imx8mq_a300_devboard_android_uuu_defconfig
++++ b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+@@ -2,7 +2,7 @@ CONFIG_ARM=y
+ CONFIG_ARCH_IMX8M=y
+ CONFIG_SYS_TEXT_BASE=0x40200000
+ CONFIG_SYS_MALLOC_F_LEN=0x2000
+-CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_TARGET_IMX8MQ_A300=y
+ CONFIG_SPL_SERIAL_SUPPORT=y
+ CONFIG_ARCH_MISC_INIT=y
+ CONFIG_SPL=y
+@@ -85,5 +85,5 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_LIBAVB=y
+ 
+-CONFIG_IDT_RAM_2GB
++CONFIG_IDT_RAM_2GB=y
+ 
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+new file mode 100644
+index 0000000000..8dabaecab9
+--- /dev/null
++++ b/include/configs/imx8mq_a300.h
+@@ -0,0 +1,299 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright 2018 NXP
++ */
++
++#ifndef __IMX8M_A300_H
++#define __IMX8M_A300_H
++
++#include <linux/sizes.h>
++#include <asm/arch/imx-regs.h>
++#include "imx_env.h"
++
++#ifdef CONFIG_SECURE_BOOT
++#define CONFIG_CSF_SIZE			0x2000 /* 8K region */
++#endif
++
++#define CONFIG_SPL_TEXT_BASE		0x7E1000
++#define CONFIG_SPL_MAX_SIZE		(148 * 1024)
++#define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
++#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
++#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300
++#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
++
++#ifdef CONFIG_SPL_BUILD
++/*#define CONFIG_ENABLE_DDR_TRAINING_DEBUG*/
++#define CONFIG_SPL_WATCHDOG_SUPPORT
++#define CONFIG_SPL_DRIVERS_MISC_SUPPORT
++#define CONFIG_SPL_POWER_SUPPORT
++#define CONFIG_SPL_I2C_SUPPORT
++#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv8/u-boot-spl.lds"
++#define CONFIG_SPL_STACK		0x187FF0
++#define CONFIG_SPL_LIBCOMMON_SUPPORT
++#define CONFIG_SPL_LIBGENERIC_SUPPORT
++#define CONFIG_SPL_GPIO_SUPPORT
++#define CONFIG_SPL_MMC_SUPPORT
++#define CONFIG_SPL_BSS_START_ADDR      0x00180000
++#define CONFIG_SPL_BSS_MAX_SIZE        0x2000	/* 8 KB */
++#define CONFIG_SYS_SPL_MALLOC_START    0x42200000
++#define CONFIG_SYS_SPL_MALLOC_SIZE    0x80000	/* 512 KB */
++#define CONFIG_SYS_SPL_PTE_RAM_BASE    0x41580000
++#define CONFIG_SYS_ICACHE_OFF
++#define CONFIG_SYS_DCACHE_OFF
++
++/* malloc f used before GD_FLG_FULL_MALLOC_INIT set */
++#define CONFIG_MALLOC_F_ADDR		0x182000
++/* For RAW image gives a error info not panic */
++#define CONFIG_SPL_ABORT_ON_RAW_IMAGE
++
++#undef CONFIG_DM_MMC
++#undef CONFIG_DM_PMIC
++#undef CONFIG_DM_PMIC_PFUZE100
++
++#define CONFIG_SYS_I2C
++#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
++#define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
++#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
++
++#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++
++#define CONFIG_POWER
++#define CONFIG_POWER_I2C
++#define CONFIG_POWER_PFUZE100
++#define CONFIG_POWER_PFUZE100_I2C_ADDR 0x08
++#endif
++
++#define CONFIG_REMAKE_ELF
++
++#define CONFIG_BOARD_EARLY_INIT_F
++#define CONFIG_BOARD_LATE_INIT
++
++#undef CONFIG_CMD_EXPORTENV
++#undef CONFIG_CMD_IMPORTENV
++#undef CONFIG_CMD_IMLS
++
++#undef CONFIG_CMD_CRC32
++#undef CONFIG_BOOTM_NETBSD
++
++/* ENET Config */
++/* ENET1 */
++#if defined(CONFIG_CMD_NET)
++#define CONFIG_CMD_PING
++#define CONFIG_CMD_DHCP
++#define CONFIG_CMD_MII
++#define CONFIG_MII
++#define CONFIG_ETHPRIME                 "FEC"
++
++#define CONFIG_FEC_MXC
++#define CONFIG_FEC_XCV_TYPE             RGMII
++#define CONFIG_FEC_MXC_PHYADDR          0
++#define FEC_QUIRK_ENET_MAC
++
++#define CONFIG_PHY_GIGE
++#define IMX_FEC_BASE			0x30BE0000
++
++#define CONFIG_PHYLIB
++#define CONFIG_PHY_ATHEROS
++#endif
++
++/*
++ * Another approach is add the clocks for inmates into clks_init_on
++ * in clk-imx8mq.c, then clk_ingore_unused could be removed.
++ */
++#define JAILHOUSE_ENV \
++	"jh_clk=   " \
++	"jh_mmcboot=setenv fdt_file fsl-imx8mq-evk-root.dtb; " \
++		"setenv jh_clk clk_ignore_unused; " \
++			   "if run loadimage; then " \
++				   "run mmcboot; " \
++			   "else run jh_netboot; fi;  " \
++	"jh_netboot=setenv fdt_file fsl-imx8mq-evk-root.dtb; setenv jh_clk clk_ignore_unused; run netboot;   "
++
++#define CONFIG_MFG_ENV_SETTINGS \
++	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
++	"initrd_addr=0x43800000 " \
++	"initrd_high=0xffffffffffffffff " \
++	"emmc_dev=0 "\
++	"sd_dev=1 " \
++
++/* Initial environment variables */
++#define CONFIG_EXTRA_ENV_SETTINGS		\
++	CONFIG_MFG_ENV_SETTINGS \
++	JAILHOUSE_ENV \
++	"script=boot.scr " \
++	"image=Image " \
++	"console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200 " \
++	"fdt_addr=0x43000000 "			\
++	"fdt_high=0xffffffffffffffff "		\
++	"boot_fdt=try " \
++	"fdt_file=fsl-imx8mq-evk.dtb " \
++	"initrd_addr=0x43800000 "		\
++	"initrd_high=0xffffffffffffffff " \
++	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)" " \
++	"mmcpart=" __stringify(CONFIG_SYS_MMC_IMG_LOAD_PART) " " \
++	"mmcroot=" CONFIG_MMCROOT " rootwait rw " \
++	"mmcautodetect=yes " \
++	"mmcargs=setenv bootargs ${jh_clk} console=${console} root=${mmcroot}  " \
++	"loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script}; " \
++	"bootscript=echo Running bootscript from mmc ...; " \
++		"source " \
++	"loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image} " \
++	"loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file} " \
++	"mmcboot=echo Booting from mmc ...; " \
++		"run mmcargs; " \
++		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
++			"if run loadfdt; then " \
++				"booti ${loadaddr} - ${fdt_addr}; " \
++			"else " \
++				"echo WARN: Cannot load the DT; " \
++			"fi; " \
++		"else " \
++			"echo wait for boot; " \
++		"fi; " \
++	"netargs=setenv bootargs ${jh_clk} console=${console} " \
++		"root=/dev/nfs " \
++		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp " \
++	"netboot=echo Booting from net ...; " \
++		"run netargs;  " \
++		"if test ${ip_dyn} = yes; then " \
++			"setenv get_cmd dhcp; " \
++		"else " \
++			"setenv get_cmd tftp; " \
++		"fi; " \
++		"${get_cmd} ${loadaddr} ${image}; " \
++		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
++			"if ${get_cmd} ${fdt_addr} ${fdt_file}; then " \
++				"booti ${loadaddr} - ${fdt_addr}; " \
++			"else " \
++				"echo WARN: Cannot load the DT; " \
++			"fi; " \
++		"else " \
++			"booti; " \
++		"fi; "
++
++#define CONFIG_BOOTCOMMAND \
++	   "mmc dev ${mmcdev}; if mmc rescan; then " \
++		   "if run loadbootscript; then " \
++			   "run bootscript; " \
++		   "else " \
++			   "if run loadimage; then " \
++				   "run mmcboot; " \
++			   "else run netboot; " \
++			   "fi; " \
++		   "fi; " \
++	   "else booti ${loadaddr} - ${fdt_addr}; fi"
++
++/* Link Definitions */
++#define CONFIG_LOADADDR			0x40480000
++
++#define CONFIG_SYS_LOAD_ADDR           CONFIG_LOADADDR
++
++#define CONFIG_SYS_INIT_RAM_ADDR        0x40000000
++#define CONFIG_SYS_INIT_RAM_SIZE        0x80000
++#define CONFIG_SYS_INIT_SP_OFFSET \
++	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
++#define CONFIG_SYS_INIT_SP_ADDR \
++	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
++
++#define CONFIG_ENV_OVERWRITE
++#define CONFIG_ENV_OFFSET               (64 * SZ_64K)
++#define CONFIG_ENV_SIZE			0x1000
++#define CONFIG_SYS_MMC_ENV_DEV		1   /* USDHC2 */
++#define CONFIG_MMCROOT			"/dev/mmcblk1p2"  /* USDHC2 */
++
++/* Size of malloc() pool */
++#define CONFIG_SYS_MALLOC_LEN		((CONFIG_ENV_SIZE + (2 * 1024)) * 1024)
++
++#define CONFIG_SYS_SDRAM_BASE           0x40000000
++#define PHYS_SDRAM                      0x40000000
++#define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
++
++#define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
++#define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
++					(PHYS_SDRAM_SIZE >> 1))
++
++#define CONFIG_BAUDRATE			115200
++
++#define CONFIG_MXC_UART
++#define CONFIG_MXC_UART_BASE		UART1_BASE_ADDR
++
++/* Monitor Command Prompt */
++#undef CONFIG_SYS_PROMPT
++#define CONFIG_SYS_PROMPT		"u-boot=> "
++#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
++#define CONFIG_SYS_CBSIZE		1024
++#define CONFIG_SYS_MAXARGS		64
++#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
++					sizeof(CONFIG_SYS_PROMPT) + 16)
++
++#define CONFIG_IMX_BOOTAUX
++
++#define CONFIG_CMD_MMC
++#define CONFIG_FSL_ESDHC
++#define CONFIG_FSL_USDHC
++
++#define CONFIG_SYS_FSL_USDHC_NUM	2
++#define CONFIG_SYS_FSL_ESDHC_ADDR       0
++
++#define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
++#define CONFIG_SYS_MMC_IMG_LOAD_PART	1
++
++#ifdef CONFIG_FSL_QSPI
++#define FSL_QSPI_FLASH_SIZE		(SZ_32M)
++#define FSL_QSPI_FLASH_NUM		1
++#endif
++
++#define CONFIG_MXC_GPIO
++
++#define CONFIG_MXC_OCOTP
++#define CONFIG_CMD_FUSE
++
++/* I2C Configs */
++#define CONFIG_SYS_I2C_SPEED		  100000
++
++/* USB configs */
++#ifndef CONFIG_SPL_BUILD
++#define CONFIG_CMD_USB
++#define CONFIG_USB_STORAGE
++
++#define CONFIG_CMD_USB_MASS_STORAGE
++#define CONFIG_USB_GADGET_MASS_STORAGE
++#define CONFIG_USB_FUNCTION_MASS_STORAGE
++
++#define CONFIG_CMD_READ
++
++#endif
++
++#define CONFIG_SERIAL_TAG
++#define CONFIG_FASTBOOT_USB_DEV 0
++
++
++#define CONFIG_USB_MAX_CONTROLLER_COUNT         2
++
++#define CONFIG_USBD_HS
++#define CONFIG_USB_GADGET_VBUS_DRAW 2
++
++#define CONFIG_OF_SYSTEM_SETUP
++
++#ifndef CONFIG_SPL_BUILD
++#define CONFIG_DM_PMIC
++#endif
++
++/* Framebuffer */
++#ifdef CONFIG_VIDEO
++#define CONFIG_VIDEO_IMXDCSS
++#define CONFIG_VIDEO_BMP_RLE8
++#define CONFIG_SPLASH_SCREEN
++#define CONFIG_SPLASH_SCREEN_ALIGN
++#define CONFIG_BMP_16BPP
++#define CONFIG_VIDEO_LOGO
++#define CONFIG_VIDEO_BMP_LOGO
++#define CONFIG_IMX_VIDEO_SKIP
++#endif
++
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "imx8mq_a300_android.h"
++#endif
++#endif
++#define IDT_DUAL_BOOTLOADER
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+new file mode 100644
+index 0000000000..1a0ee6bd3b
+--- /dev/null
++++ b/include/configs/imx8mq_a300_android.h
+@@ -0,0 +1,90 @@
++/*
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef IMX8MQ_A300_ANDROID_H
++#define IMX8MQ_A300_ANDROID_H
++
++#define CONFIG_CMD_READ
++
++#define CONFIG_ANDROID_AB_SUPPORT
++#define CONFIG_AVB_SUPPORT
++#define CONFIG_SUPPORT_EMMC_RPMB
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++#define CONFIG_SYSTEM_RAMDISK_SUPPORT
++#endif
++#define CONFIG_AVB_FUSE_BANK_SIZEW 0
++#define CONFIG_AVB_FUSE_BANK_START 0
++#define CONFIG_AVB_FUSE_BANK_END 0
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (64 * SZ_1M)
++#endif
++
++#define CONFIG_ANDROID_RECOVERY
++
++#define CONFIG_CMD_BOOTA
++#define CONFIG_CMD_MMC_RPMB 1
++#define CONFIG_SUPPORT_RAW_INITRD
++#define CONFIG_SERIAL_TAG
++
++#undef CONFIG_EXTRA_ENV_SETTINGS
++#undef CONFIG_BOOTCOMMAND
++
++#define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashpos=m,m "			\
++	"fdt_high=0xffffffffffffffff "		\
++	"initrd_high=0xffffffffffffffff "	\
++	"idt,prod-id=idt_imx8mq_evt-1_evk_dvt-1"\
++
++/* Enable mcu firmware flash */
++#ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
++#define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_MMC
++#define ANDROID_MCU_FIRMWARE_START 0x500000
++#define ANDROID_MCU_FIRMWARE_SIZE  0x40000
++#define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
++#endif
++
++#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER)
++#undef CONFIG_FSL_CAAM_KB
++#endif
++
++#ifdef CONFIG_DUAL_BOOTLOADER
++#define CONFIG_SPL_MMC_WRITE 1
++
++#ifdef CONFIG_IMX_TRUSTY_OS
++#define BOOTLOADER_RBIDX_OFFSET  0x1E000
++#define BOOTLOADER_RBIDX_START   0x1F000
++#define BOOTLOADER_RBIDX_LEN     0x08
++#define BOOTLOADER_RBIDX_INITVAL 0
++#endif
++
++#endif
++
++#ifdef CONFIG_IMX_TRUSTY_OS
++#define AVB_RPMB
++#define KEYSLOT_HWPARTITION_ID 2
++#define KEYSLOT_BLKS             0x1FFF
++#define NS_ARCH_ARM64 1
++#endif
++
++#ifdef CONFIG_SPL_BUILD
++#define CONFIG_ENV_IS_NOWHERE
++#undef CONFIG_ANDROID_BOOT_IMAGE
++#undef CONFIG_ANDROID_RECOVERY
++#undef CONFIG_ENV_IS_IN_MMC
++#undef CONFIG_LIB_UUID
++#undef CONFIG_CMD_UUID
++#undef CONFIG_LIB_RAND
++#undef CONFIG_SHA1
++#undef CONFIG_SHA256
++#endif
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif /* IMX8MQ_A300_ANDROID_H */

@@ -1,0 +1,54 @@
+ec6d4e8a owen.wen 2020-07-29
+
+AOS-261: setup adb for mdns
+
+1. listen on 5555
+2. grant the permission to start mdnsd
+3. copy ro.serialno to ro.idt.serialno. since mdnsd is neverallow to read ro.serialno
+4. create ro.idt.serialno for mdnsd broadcasting and adb connecting
+
+Change-Id: Id8a2fe328b7b5d54a0dbaea08ee680b8f538fd20
+
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 1f51dab1..f67499c4 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -11,6 +11,10 @@ on early-boot
+     setprop ro.idt.extend_boot_anim 1
+     # allow mobile data during provisioning
+     setprop ro.com.android.prov_mobiledata true
++    # setup default adb listen on 5555
++    setprop service.adb.tcp.port 5555
++    # serial number for mdnsd broadcast adb connecting
++    setprop ro.idt.serialno ${ro.serialno}
+ 
+ service check_modem /system/bin/sh /product/etc/init/hw/check_modem.sh "check_modem"
+     class core
+diff --git a/imx8m/sepolicy/adbd.te b/imx8m/sepolicy/adbd.te
+index 096df3de..fe9029dd 100644
+--- a/imx8m/sepolicy/adbd.te
++++ b/imx8m/sepolicy/adbd.te
+@@ -1,2 +1,3 @@
+ allow adbd vendor_configs_file:file { map };
++allow adbd ctl_start_prop:property_service set;
+ get_prop(adbd, vendor_usb_config_prop);
+diff --git a/imx8m/sepolicy/mdnsd.te b/imx8m/sepolicy/mdnsd.te
+new file mode 100644
+index 00000000..8f91cdd2
+--- /dev/null
++++ b/imx8m/sepolicy/mdnsd.te
+@@ -0,0 +1 @@
++allow mdnsd vendor_default_prop:file { read getattr map open };
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 1ac2cd8e..03d97f53 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -238,6 +238,8 @@ CL_NOPREPROCESS                     u:object_r:vendor_default_prop:s0
+ ro.camera.req.fmq.size              u:object_r:vendor_default_prop:s0
+ ro.camera.res.fmq.size              u:object_r:vendor_default_prop:s0
+ ro.rfkilldisabled                   u:object_r:vendor_default_prop:s0
++# serial number for mdnsd broadcast
++ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+ 
+ # vendor_bluetooth_prop
+ persist.bluetooth.a4wp              u:object_r:vendor_bluetooth_prop:s0

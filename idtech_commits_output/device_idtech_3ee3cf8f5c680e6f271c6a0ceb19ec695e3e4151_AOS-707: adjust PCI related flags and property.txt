@@ -1,0 +1,70 @@
+3ee3cf8f AndrewS 2022-03-15
+
+AOS-707: adjust PCI related flags and property
+
+Change-Id: Ib539b3693d8f2607714abfbf133d3061989f0f5c
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index d4f1166c..94e4a92c 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -53,11 +53,6 @@ endif
+ BOARD_SOC_CLASS := IMX8
+ SOONG_CONFIG_IMXPLUGIN_PRODUCT_MANUFACTURER = nxp
+ 
+-# -------@block_secure-------
+-ifeq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+-  BOARD_PCI_SECURE := secure
+-endif
+-
+ # -------@block_kernel_bootimg-------
+ TARGET_NO_BOOTLOADER := true
+ TARGET_NO_KERNEL := false
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 03eb96e0..ba74abf5 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -305,6 +305,10 @@ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/watermark/setup.conf:/system/etc/setup.conf
+ endif
+ 
++ifeq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++  BOARD_PCI_SECURE := secure
++endif
++
+ # -------@block_audio-------
+ PRODUCT_PACKAGES += \
+     android.hardware.audio@7.0-impl:32 \
+diff --git a/imx8m/redwood_8mq/BoardConfig.mk b/imx8m/redwood_8mq/BoardConfig.mk
+index 735624e1..eb9d0cb7 100644
+--- a/imx8m/redwood_8mq/BoardConfig.mk
++++ b/imx8m/redwood_8mq/BoardConfig.mk
+@@ -147,11 +147,6 @@ BOARD_KERNEL_CMDLINE += video=DP-1:1920x1080@60
+ BOARD_BOOTCONFIG += androidboot.wificountrycode=CN
+ BOARD_KERNEL_CMDLINE += moal.mod_para=wifi_mod_para.conf pci=nomsi
+ 
+-# PCI config
+-ifneq ($(BOARD_PCI_SECURE),)
+-BOARD_KERNEL_CMDLINE += androidboot.min_rsa_size_bits=2048
+-endif
+-
+ ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+ BOARD_BOOTCONFIG += androidboot.vendor.sysrq=1
+ endif
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index 89d000ef..ee7760ed 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -211,6 +211,12 @@ PRODUCT_PACKAGES += \
+ 
+ $(call inherit-product-if-exists, vendor/nxp-private/widevine/nxp_widevine_tee_8mq.mk)
+ 
++# PCI config
++ifneq ($(BOARD_PCI_SECURE),)
++PRODUCT_PRODUCT_PROPERTIES += \
++    ro.idt.min_rsa_size_bits=2048
++endif
++
+ # -------@block_audio-------
+ # Audio card json
+ PRODUCT_COPY_FILES += \

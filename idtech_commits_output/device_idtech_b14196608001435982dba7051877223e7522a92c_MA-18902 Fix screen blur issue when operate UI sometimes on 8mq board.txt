@@ -1,0 +1,81 @@
+b1419660 Sergii Postulga 2021-04-21
+
+MA-18902 Fix screen blur issue when operate UI sometimes on 8mq board
+
+DRM display fence will be signaled when the buffer start to display
+on the screen instead of finish display, there is risk of the buffer
+be overwrite by SurfaceFlinger composition when only 3 framebuffer.
+For indirect rendering GPU will allocate one internal temp buffer
+so totally have four buffers, but on 8qm/8qxp and 8mq with direct
+rendering enable GPU render to framebuffer directly so framebuffer
+count need enlarge to 4.
+
+Signed-off-by: Richard Liu <xuegang.liu@nxp.com>
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: I353245e4058be16439907ee50bf3f3b1c29ae4c6
+
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index f0877f70..ad5754fc 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -111,7 +111,7 @@ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ #BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 4
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+diff --git a/imx8m/evk_8mq/BoardConfig.mk b/imx8m/evk_8mq/BoardConfig.mk
+index 60cf0567..9cba4e43 100644
+--- a/imx8m/evk_8mq/BoardConfig.mk
++++ b/imx8m/evk_8mq/BoardConfig.mk
+@@ -107,7 +107,7 @@ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 4
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index fa761cf1..54c52d0f 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -108,7 +108,7 @@ BOARD_AVB_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+ # define frame buffer count
+-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 4
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+diff --git a/imx8m/kingscanyon_8mq/BoardConfig.mk b/imx8m/kingscanyon_8mq/BoardConfig.mk
+index 2815408e..34a2d7fb 100644
+--- a/imx8m/kingscanyon_8mq/BoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/BoardConfig.mk
+@@ -111,7 +111,7 @@ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+ BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 4
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index dd1c1cb1..aedf4f6e 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -111,7 +111,7 @@ BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ #BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
+ 
+ # define frame buffer count
+-NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
++NUM_FRAMEBUFFER_SURFACE_BUFFERS := 4
+ 
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M

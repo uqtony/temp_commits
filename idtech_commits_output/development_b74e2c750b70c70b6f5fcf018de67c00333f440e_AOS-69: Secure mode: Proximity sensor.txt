@@ -1,0 +1,192 @@
+b74e2c750 owen.wen 2020-04-28
+
+AOS-69: Secure mode: Proximity sensor
+
+get SystemService SensorPrivacyService and call setSensorPrivacy
+which will disable all sensor including camera, proximity, magnetometer
+
+Change-Id: I0d797c2b9f75471721af62e6d2212a630ce302a9
+
+diff --git a/samples/IdtechSensorDisableDemo/Android.mk b/samples/IdtechSensorDisableDemo/Android.mk
+index 9c879b13a..f60985d38 100644
+--- a/samples/IdtechSensorDisableDemo/Android.mk
++++ b/samples/IdtechSensorDisableDemo/Android.mk
+@@ -6,7 +6,7 @@ LOCAL_MODULE_TAGS := samples
+ # Only compile source java files in this apk.
+ LOCAL_SRC_FILES := $(call all-java-files-under, src)
+ 
+-LOCAL_PACKAGE_NAME := IdtechInputSuspendDemo
++LOCAL_PACKAGE_NAME := IdtechSensorDisableDemo
+ 
+ LOCAL_SDK_VERSION := current
+ 
+diff --git a/samples/IdtechSensorDisableDemo/AndroidManifest.xml b/samples/IdtechSensorDisableDemo/AndroidManifest.xml
+index 2b624e94b..3ef8fc479 100644
+--- a/samples/IdtechSensorDisableDemo/AndroidManifest.xml
++++ b/samples/IdtechSensorDisableDemo/AndroidManifest.xml
+@@ -20,8 +20,10 @@
+      own application, the package name must be changed from "com.example.*"
+      to come from a domain that you own or have control over. -->
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.idtech.InputSuspendDemo">
+-    <application android:label="InputSuspend">
++    package="com.idtech.SensorDisableDemo">
++    <uses-permission android:name="android.permission.MANAGE_SENSOR_PRIVACY" />
++
++    <application android:label="SensorDisable">
+         <activity android:name="HelloActivity">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN"/>
+diff --git a/samples/IdtechSensorDisableDemo/res/layout/hello_activity.xml b/samples/IdtechSensorDisableDemo/res/layout/hello_activity.xml
+index ab7e2bfd2..13801f0af 100644
+--- a/samples/IdtechSensorDisableDemo/res/layout/hello_activity.xml
++++ b/samples/IdtechSensorDisableDemo/res/layout/hello_activity.xml
+@@ -34,18 +34,13 @@
+     android:id="@+id/Button"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+-    android:text = "Button"
+-    android:onClick="buttonOnClick" />
++    android:text = "Button" />
+ 
+-<TextView
+-    android:id="@+id/textView1"
++<Button
++    android:id="@+id/Button2"
+     android:layout_width="wrap_content"
+     android:layout_height="wrap_content"
+-    android:layout_alignParentLeft="true"
+-    android:layout_alignParentTop="true"
+-    android:layout_marginLeft="34dp"
+-    android:layout_marginTop="58dp"
+-    android:text="Large Text"
+-    android:textAppearance="?android:attr/textAppearanceMedium" />
++    android:text = "Button2"
++    android:layout_below="@+id/Button" />
+ 
+ </RelativeLayout>
+diff --git a/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/HelloActivity.java b/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/HelloActivity.java
+index 4bfd8579a..eb18f6457 100644
+--- a/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/HelloActivity.java
++++ b/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/HelloActivity.java
+@@ -14,31 +14,26 @@
+  * limitations under the License.
+  */
+ 
+-package com.idtech.InputSuspendDemo;
++package com.idtech.SensorDisableDemo;
+ 
+ import android.app.Activity;
+ import android.os.Bundle;
+ import android.view.View;
+-import android.view.WindowManager;
+-import android.os.IBinder;
+-import android.os.Parcel;
+-import android.os.RemoteException;
+-import android.os.ServiceManager;
+ import android.util.Log;
+-import android.os.CountDownTimer;
+-import android.widget.TextView;
+ import android.widget.Button;
++import android.hardware.SensorPrivacyManager;
+ 
+ /**
+  * A minimal "Hello, World!" application.
+  */
+ public class HelloActivity extends Activity {
+     private static final String TAG = "(Idtech)";
+-    private static final java.lang.String DESCRIPTOR = "com.idtech.pinpad";
++    private static final java.lang.String DESCRIPTOR = "sensor_privacy";
+     private static final int FUNC_SUSPEND = 1;
+     private static final int FUNC_RESUME = 2;
+-    TextView mTextField;
+     Button mButton;
++    Button mButton2;
++    private SensorPrivacyManager mSensorPrivacyManager;
+     /**
+      * Called with the activity is first created.
+      */
+@@ -50,45 +45,22 @@ public class HelloActivity extends Activity {
+         // in res/layout/hello_activity.xml
+         View view = getLayoutInflater().inflate(R.layout.hello_activity, null);
+         setContentView(view);
+-        mTextField = (TextView)findViewById(R.id.textView1);
+         mButton = (Button)findViewById(R.id.Button);
++        mButton2 = (Button)findViewById(R.id.Button2);
+ 
+         Log.i(TAG, "Client oncreate ");
+-        Parcel _data = Parcel.obtain();
+-        Parcel _reply = Parcel.obtain();
+-        getSystemService(NOTIFICATION_SERVICE);
+-        IBinder b = ServiceManager.getService(DESCRIPTOR);
++        // Get an instance of Sensor Privacy Service.
++        mSensorPrivacyManager = (SensorPrivacyManager)getSystemService(DESCRIPTOR);
+         mButton.setOnClickListener(new Button.OnClickListener(){
+             @Override
+-            public void onClick(View v)
+-            {
+-                try {
+-                    _data.writeInterfaceToken(DESCRIPTOR);
+-                    b.transact(FUNC_SUSPEND, _data, _reply, 0);
+-                    _reply.readException();
+-                    _reply.readInt();
+-                } catch (RemoteException e) {
+-                     // TODO Auto-generated catch block
+-                    e.printStackTrace();
+-
+-                } finally {
+-                    _reply.recycle();
+-                    _data.recycle();
+-                }
+-                new CountDownTimer(10000, 1000) {
+-                    public void onTick(long millisUntilFinished) {
+-                        mTextField.setText("seconds remaining: " + millisUntilFinished / 1000);
+-                       //here you can have your logic to set text to edittext
+-                    }
+-                    public void onFinish() {
+-                        mTextField.setText("done!");
+-                        try {
+-                            b.transact(FUNC_RESUME, _data, _reply, 0);
+-                        } catch (RemoteException e) {
+-                            e.printStackTrace();
+-                        }
+-                    }
+-                }.start();
++            public void onClick(View v) {
++                mSensorPrivacyManager.setSensorPrivacy(true);
++            }
++        });
++        mButton2.setOnClickListener(new Button.OnClickListener(){
++            @Override
++            public void onClick(View v) {
++                mSensorPrivacyManager.setSensorPrivacy(false);
+             }
+         });
+     }
+diff --git a/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/SensorPrivacyManager.java b/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/SensorPrivacyManager.java
+new file mode 100644
+index 000000000..b9ad2527b
+--- /dev/null
++++ b/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/SensorPrivacyManager.java
+@@ -0,0 +1,7 @@
++package android.hardware;
++
++public class SensorPrivacyManager {
++    public void setSensorPrivacy(boolean enable) {
++    }
++}
++
+diff --git a/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/ServiceManager.java b/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/ServiceManager.java
+deleted file mode 100644
+index f5325abd9..000000000
+--- a/samples/IdtechSensorDisableDemo/src/com/idtech/SensorDisableDemo/ServiceManager.java
++++ /dev/null
+@@ -1,8 +0,0 @@
+-package android.os;
+-
+-public class ServiceManager {
+-    public static IBinder getService(String name) {
+-        return null;
+-    }
+-}
+-

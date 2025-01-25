@@ -1,0 +1,28 @@
+6a5aaffee7 owen.wen 2021-05-05
+
+AOS-455: fix settings crash when data_only
+
+Symptom: settings crash
+RootCause: Settings didn't handle PhoneConstants.PHONE_TYPE_NONE
+Solution: set ENABLED_NETWORKS_CHOICES as default
+log:
+05-03 14:41:31.241  1188  1188 E AndroidRuntime: FATAL EXCEPTION: main
+05-03 14:41:31.241  1188  1188 E AndroidRuntime: Process: com.android.settings, PID: 1188
+05-03 14:41:31.241  1188  1188 E AndroidRuntime: java.lang.RuntimeException: Unable to resume activity {com.android.settings/com.android.settings.network.telephony.MobileNetworkActivity}: java.lang.IllegalArgumentException: Not supported enabled network types.
+PS: device set config_voice_capable to false, which means data only
+
+Change-Id: I3633f005234a574bdf2a04832f0bda37b91f5855
+
+diff --git a/src/com/android/settings/network/telephony/EnabledNetworkModePreferenceController.java b/src/com/android/settings/network/telephony/EnabledNetworkModePreferenceController.java
+index fd585a151d..725c863ff0 100644
+--- a/src/com/android/settings/network/telephony/EnabledNetworkModePreferenceController.java
++++ b/src/com/android/settings/network/telephony/EnabledNetworkModePreferenceController.java
+@@ -432,6 +432,8 @@ public class EnabledNetworkModePreferenceController extends
+                     enabledNetworkType = mShow4gForLTE ? EnabledNetworks.ENABLED_NETWORKS_4G_CHOICES
+                             : EnabledNetworks.ENABLED_NETWORKS_CHOICES;
+                 }
++            } else if (phoneType == TelephonyManager.PHONE_TYPE_NONE) {
++                enabledNetworkType = EnabledNetworks.ENABLED_NETWORKS_EXCEPT_GSM_CHOICES;
+             }
+             //TODO(b/117881708): figure out what world mode is, then we can optimize code. Otherwise
+             // I prefer to keep this old code

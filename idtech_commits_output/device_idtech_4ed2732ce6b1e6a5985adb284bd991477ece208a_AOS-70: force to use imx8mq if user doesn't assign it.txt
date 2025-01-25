@@ -1,0 +1,114 @@
+4ed2732c George.Huang 2020-02-18
+
+AOS-70: force to use imx8mq if user doesn't assign it
+
+Change-Id: I2726a1b7180bbf8028b669f5562ea2dc98e41430
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index e12388c2..a8a605d3 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -116,6 +116,10 @@ echo %1 is an illegal option
+ call :help & goto :eof
+ :parse_end
+ 
++:: force to use imx8mq if user doesn't assign it
++if [%soc_name%] == [] set soc_name=imx8mq
++set som_model=%soc_name%
++
+ :: check whether the soc_name is legal or not
+ if not [%soc_name%] == [] (
+     setlocal enabledelayedexpansion
+@@ -169,10 +173,6 @@ if not [%image_directory%] == [] if not %image_directory:~-1% == \ (
+ 
+ if not [%ser_num%] == [] set fastboot_tool=fastboot -s %ser_num%
+ 
+-:: force to use imx8mq if user doesn't assign it
+-if [%soc_name%] == [] set soc_name=imx8mq
+-set som_model=%soc_name%
+-
+ :: check whether provided spl/bootloader/uboot feature is legal
+ set uboot_feature_no_pre_hyphen=%uboot_feature:~1%
+ if not [%uboot_feature%] == [] (
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index b2b3dde7..8010b96b 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -411,6 +411,10 @@ while [ $# -gt 0 ]; do
+     shift
+ done
+ 
++# force to use imx8mq if user doesn't assign it
++[ -z "$soc_name" ] && soc_name="imx8mq"
++som_model="${soc_name}"
++
+ # check whether the soc_name is legal or not
+ if [ -n "${soc_name}" ]; then
+     whether_in_array soc_name supported_soc_names
+@@ -464,10 +468,6 @@ if [ ${ramsizetest} -eq 1 ] ; then
+     ramsize="-ram1GB"
+ fi
+ 
+-# force to use imx8mq if user doesn't assign it
+-[ -z "$soc_name" ] && soc_name="imx8mq"
+-som_model="${soc_name}"
+-
+ # check whether provided spl/bootloader/uboot feature is legal
+ if [ -n "${uboot_feature}" ]; then
+     uboot_feature_no_pre_hyphen=${uboot_feature#-}
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 0ff84345..aeb901a4 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -123,10 +123,14 @@ if %1 == -y set yocto_image=%2&shift &shift & goto :parse_loop
+ if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
++if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ echo unknown option "%1", please check it.
+ call :help & set /A error_level=1 && goto :exit
+ :parse_end
+ 
++:: force to use imx8mq if user doesn't assign it
++if [%soc_name%] == [] set soc_name=imx8mq
++set som_model=%soc_name%
+ 
+ :: avoid substring judgement error
+ set uboot_feature_test=A%uboot_feature%
+@@ -178,10 +182,6 @@ if [%support_dual_bootloader%] equ [1] (
+     if %card_size% gtr 0 set partition_file=partition-table-%card_size%GB.img
+ )
+ 
+-:: force to use imx8mq if user doesn't assign it
+-if [%soc_name%] == [] set soc_name=imx8mq
+-set som_model=%soc_name%
+-
+ :: dump the partition table image file into text file and check whether some partition names are in it
+ if exist partition-table_1.txt (
+     del partition-table_1.txt
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index d4648ad1..ad90b708 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -472,6 +472,10 @@ while [ $# -gt 0 ]; do
+     shift
+ done
+ 
++# force to use imx8mq if user doesn't assign it
++[ -z "$soc_name" ] && soc_name="imx8mq"
++som_model="${soc_name}"
++
+ # Process of the uboot_feature parameter
+ if [[ "${uboot_feature}" = *"trusty"* ]] || [[ "${uboot_feature}" = *"secure"* ]]; then
+     support_trusty=1;
+@@ -497,10 +501,6 @@ if [ ${ramsizetest} -eq 1 ] ; then
+     ramsize="-ram1GB"
+ fi
+ 
+-# force to use imx8mq if user doesn't assign it
+-[ -z "$soc_name" ] && soc_name="imx8mq"
+-som_model="${soc_name}"
+-
+ # for specified directory, make sure there is a slash at the end
+ if [[ "${image_directory}" != "" ]]; then
+      image_directory="${image_directory%/}/";

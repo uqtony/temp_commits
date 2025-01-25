@@ -1,0 +1,2594 @@
+3ceacad3 George.Huang 2020-06-02
+
+Fix conflicts of android-10.0.0_2.0.0
+
+Change-Id: I52a2ee2de18bdbd826edb0bf79d5312dcd48b7fe
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index e8c88a71..8153e645 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -49,24 +49,11 @@ TARGET_DTB :=
+ $(foreach dts_config,$(TARGET_BOARD_DTS_CONFIG), \
+ 	$(eval TARGET_DTB += $(addprefix $(DTB_OUT_PATH),$(shell echo ${dts_config} | cut -d':' -f2))))
+ 
+-<<<<<<< HEAD
+-$(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(TARGET_DTB) | $(MKDTIMG) $(AVBTOOL)
+-	$(hide) echo "Building $(KERNEL_ARCH) dtbo ..."
+-	for dtsplat in $(TARGET_BOARD_DTS_CONFIG); do \
+-		DTS_PLATFORM=`echo $$dtsplat | cut -d':' -f1`; \
+-		DTB_NAME=`echo $$dtsplat | cut -d':' -f2`; \
+-		DTB=`echo $(KERNEL_OUT)/arch/$(TARGET_KERNEL_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/$${DTB_NAME}`; \
+-		DTBO_IMG=`echo $(PRODUCT_OUT)/dtbo-$${DTS_PLATFORM}.img`; \
+-		$(MKDTIMG) create $$DTBO_IMG $$DTB; \
+-		$(AVBTOOL) add_hash_footer --image $$DTBO_IMG  \
+-			--partition_name dtbo \
+-			--partition_size $(BOARD_DTBOIMG_PARTITION_SIZE); \
+-=======
+ define clean_cfg
+ 	rm -f $(TARGET_MTDTBOIMAGE_CONFIG_PATH)*.cfg
+ endef
+ 
+-$(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(DTS_SRC) | $(MKDTIMG) $(AVBTOOL)
++$(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(TARGET_DTB) | $(MKDTIMG) $(AVBTOOL)
+ 	$(hide) echo "Building $(KERNEL_ARCH) dtbo ..."
+ 	$(call clean_cfg, $(TARGET_MTDTBOIMAGE_CONFIG_PATH)); \
+ 	for dtsplat in $(shell ls $(TARGET_MTDTBOIMAGE_CONFIG_PATH)| grep "idt_"); do \
+@@ -74,7 +61,6 @@ $(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(DTS_SRC) | $(MKDTIMG) $(AVBTOOL)
+ 		DTB=`echo $(PRODUCT_OUT)/obj/KERNEL_OBJ/arch/$(TARGET_KERNEL_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/$${DTB_NAME}`; \
+ 		echo $$DTB >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \
+ 		echo "" >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \
+->>>>>>> android_10_idt_dev_200527-2
+ 	done
+ 	$(MKDTIMG) cfg_create $(PRODUCT_OUT)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg; \
+ 	$(AVBTOOL) add_hash_footer --image $(PRODUCT_OUT)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img  \
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 485b6921..c13a9c15 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -34,25 +34,19 @@ set systemimage_file=system.img
+ set vendor_file=vendor.img
+ set product_file=product.img
+ set partition_file=partition-table.img
+-<<<<<<< HEAD
+ set super_file=super.img
+-=======
+ set spl_table_file=spl_tab.img
+->>>>>>> android_10_idt_dev_200527-2
+ set /A support_dtbo=0
+ set /A support_recovery=0
+ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_dual_bootloader=0
+-<<<<<<< HEAD
+ set /A support_dynamic_partition=0
+-=======
+ set /A support_board_info=0
+ set /A write_bdinfo_serial=0
+ set /A support_idt_dual_spl=0
+ set /A support_idt_backup_spl=0
+ set /A support_idt_spl_table=0
+->>>>>>> android_10_idt_dev_200527-2
+ set dual_bootloader_partition=
+ set bootloader_flashed_to_board=
+ set uboot_proper_to_be_flashed=
+@@ -65,11 +59,8 @@ set product_partition=product
+ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
+-<<<<<<< HEAD
+ set super_partition=super
+-=======
+ set board_info_partition=board_info
+->>>>>>> android_10_idt_dev_200527-2
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A lock=0
+@@ -79,7 +70,6 @@ set ser_num=
+ set fastboot_tool=fastboot
+ set /A error_level=0
+ set /A flag=1
+-<<<<<<< HEAD
+ set lpmake_system_image_a=
+ set lpmake_system_image_b=
+ set lpmake_vendor_image_a=
+@@ -87,24 +77,16 @@ set lpmake_vendor_image_b=
+ set lpmake_product_image_a=
+ set lpmake_product_image_b=
+ set /A dont_generate_super=0
+-
+-=======
+ set board_type=
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+ :: images when flash another set of images can not be detect early with this scenario.
+ set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+ set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+-<<<<<<< HEAD
+ set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+-set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu
+-set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+-=======
+ set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed
+-set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock
+->>>>>>> android_10_idt_dev_200527-2
++set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+ set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md
+ set imx7ulp_uboot_feature=evk-uuu
+ 
+@@ -145,13 +127,10 @@ if %1 == -l set /A lock=1 & shift & goto :parse_loop
+ if %1 == -e set /A erase=1 & shift & goto :parse_loop
+ if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+ if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+-<<<<<<< HEAD
+ if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+-=======
+ if %1 == -tos set /A support_trusty=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+->>>>>>> android_10_idt_dev_200527-2
+ echo %1 is an illegal option
+ call :help & goto :eof
+ :parse_end
+@@ -273,13 +252,8 @@ goto :eof
+ ::----------------------------------------------------------------------------------
+ 
+ :help
+-<<<<<<< HEAD
+-echo Version: 1.5
++echo Version: 1.7
+ echo Last change: generate super.img when flash images with dynamic partition feature
+-=======
+-echo Version: 1.6
+-echo Last change: add "-u" option to specify which uboot or spl&bootloader image to flash
+->>>>>>> android_10_idt_dev_200527-2
+ echo.
+ echo eg: fastboot_imx_flashall.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+ echo eg: fastboot_imx_flashall.bat -f imx7ulp -D C:\Users\user_01ndroid10vk_7ulp
+@@ -311,13 +285,9 @@ echo                           
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+-<<<<<<< HEAD
+ echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+-echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu                                        ©¦
+-=======
+ echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed                     ©¦
+->>>>>>> android_10_idt_dev_200527-2
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ echo                           ©¦   imx8qxp      ©¦  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                           ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+@@ -353,16 +323,13 @@ echo  -D directory      the directory of of images
+ echo                        No need to use this option if images are in current working directory
+ echo  -s ser_num        the serial number of board
+ echo                        If only one board connected to computer, no need to use this option
+-<<<<<<< HEAD
+ echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ echo                        Under the condition that dynamic partition feature are enabled:
+ echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+ echo                          if this option is used, make sure super.img already exists together with other images.
+-=======
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo                               If not set, use naming from current board_info partition
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+->>>>>>> android_10_idt_dev_200527-2
+ goto :eof
+ 
+ :: this function checks whether the value of first parameter is in the array value of second parameter.
+@@ -685,14 +652,11 @@ if %support_dualslot% == 0 (
+     call :flash_partition_name %slot% || set /A error_level=1 && goto :exit
+     call :flash_userpartitions || set /A error_level=1 && goto :exit
+ )
+-<<<<<<< HEAD
+ ::super partition does not have a/b slot, handle it individually
+ if %support_dynamic_partition% == 1 (
+     call :flash_partition %super_partition% || set /A error_level=1 && goto :exit
+-=======
+ if %write_bdinfo_serial% == 1 (
+     %fastboot_tool% oem setvar dev-serial %serialno_str%
+->>>>>>> android_10_idt_dev_200527-2
+ )
+ 
+ del fastboot_var.log
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index dbdd8d63..37b2577d 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -5,13 +5,8 @@ help() {
+ bn=`basename $0`
+ cat << EOF
+ 
+-<<<<<<< HEAD
+-Version: 1.5
++Version: 1.7
+ Last change: generate super.img when flash images with dynamic partition feature
+-=======
+-Version: 1.6
+-Last change: add "-u" option to specify which uboot or spl&bootloader image to flash
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ eg: sudo ./fastboot_imx_flashall.sh -f imx8mm -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+ eg: sudo ./fastboot_imx_flashall.sh -f imx7ulp -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+@@ -43,13 +38,9 @@ options:
+                            â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                            â”‚   imx8mn       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                â”‚
+                            â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+-<<<<<<< HEAD
+                            â”‚   imx8mp       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                â”‚
+                            â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+-                           â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu                                        â”‚
+-=======
+                            â”‚   imx8mq       â”‚  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed                     â”‚
+->>>>>>> android_10_idt_dev_200527-2
+                            â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+                            â”‚   imx8qxp      â”‚  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                           â”‚
+                            â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+@@ -85,17 +76,14 @@ options:
+                         No need to use this option if images are in current working directory
+   -s ser_num        the serial number of board
+                         If only one board connected to computer, no need to use this option
+-<<<<<<< HEAD
+   -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+                         Under the condition that dynamic partition feature are enabled:
+                           if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+                           if this option is used, make sure super.img already exists together with other images.
+-=======
+   -R                with this option used, choose the u-boot about 1GB RAM setting.
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+->>>>>>> android_10_idt_dev_200527-2
+ EOF
+ 
+ }
+@@ -373,6 +361,10 @@ function flash_android
+     if [ ${support_dynamic_partition} -eq 1 ]; then
+         flash_partition ${super_partition}
+     fi
++
++    if [ ${write_bdinfo_serial} -eq 1 ]; then
++        ${fastboot_tool} oem setvar dev-serial ${serialno_str}
++    fi
+ }
+ 
+ # this function will invoke lpmake to create super.img, the super.img will
+@@ -400,7 +392,6 @@ function make_super_image
+         fi
+     fi
+ 
+-<<<<<<< HEAD
+     ${image_directory}lpmake --metadata-size 65536 --super-name super --metadata-slots 3 --device super:7516192768 \
+         --group nxp_dynamic_partitions_a:3747610624 --group nxp_dynamic_partitions_b:3747610624 \
+         --partition system_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_system_image_a} \
+@@ -410,11 +401,6 @@ function make_super_image
+         --partition product_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_product_image_a} \
+         --partition product_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_product_image_b} \
+         --sparse --output /tmp/${super_file}
+-=======
+-    if [ ${write_bdinfo_serial} -eq 1 ]; then
+-        ${fastboot_tool} oem setvar dev-serial ${serialno_str}
+-    fi
+->>>>>>> android_10_idt_dev_200527-2
+ }
+ 
+ 
+@@ -437,25 +423,19 @@ systemimage_file="system.img"
+ vendor_file="vendor.img"
+ product_file="product.img"
+ partition_file="partition-table.img"
+-<<<<<<< HEAD
+ super_file="super.img"
+-=======
+ spl_table_file="spl_tab.img"
+->>>>>>> android_10_idt_dev_200527-2
+ support_dtbo=0
+ support_recovery=0
+ support_dualslot=0
+ support_mcu_os=0
+ support_dual_bootloader=0
+-<<<<<<< HEAD
+ support_dynamic_partition=0
+-=======
+ support_board_info=0
+ write_bdinfo_serial=0
+ support_idt_dual_spl=0
+ support_idt_backup_spl=0
+ support_idt_spl_table=0
+->>>>>>> android_10_idt_dev_200527-2
+ dual_bootloader_partition=""
+ bootloader_flashed_to_board=""
+ uboot_proper_to_be_flashed=""
+@@ -467,11 +447,8 @@ product_partition="product"
+ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
+-<<<<<<< HEAD
+ super_partition="super"
+-=======
+ board_info_partition="board_info"
+->>>>>>> android_10_idt_dev_200527-2
+ flash_mcu=0
+ lock=0
+ erase=0
+@@ -481,7 +458,6 @@ fastboot_tool="fastboot"
+ RED='[0;31m'
+ STD='[0;0m'
+ GREEN='[0;32m'
+-<<<<<<< HEAD
+ lpmake_system_image_a=""
+ lpmake_system_image_b=""
+ lpmake_vendor_image_a=""
+@@ -490,27 +466,19 @@ lpmake_product_image_a=""
+ lpmake_product_image_b=""
+ result_value=0
+ dont_generate_super=0
+-
+-=======
+ YELLOW='[0;33m'
+ ramsize=""
+ ramsizetest=0
+ board_type=""
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+ # images when flash another set of images can not be detect early with this scenario.
+ imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+ imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+-<<<<<<< HEAD
+-imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu)
++imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed)
+ imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+-=======
+-imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed)
+-imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock)
+->>>>>>> android_10_idt_dev_200527-2
+ imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md)
+ imx7ulp_uboot_feature=(evk-uuu)
+ 
+@@ -543,13 +511,10 @@ while [ $# -gt 0 ]; do
+         -l) lock=1 ;;
+         -D) image_directory=$2; shift;;
+         -s) ser_num=$2; shift;;
+-<<<<<<< HEAD
+         -super) dont_generate_super=1 ;;
+-=======
+         -R) ramsizetest=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+->>>>>>> android_10_idt_dev_200527-2
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+             help; exit;;
+     esac
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 591e1127..d49504c2 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -37,25 +37,19 @@ set systemimage_file=system.img
+ set vendor_file=vendor.img
+ set product_file=product.img
+ set partition_file=partition-table.img
+-<<<<<<< HEAD
+ set super_file=super.img
+-=======
+ set spl_table_file=spl_tab.img
+->>>>>>> android_10_idt_dev_200527-2
+ set /A support_dtbo=0
+ set /A support_recovery=0
+ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_trusty=0
+-<<<<<<< HEAD
+ set /A support_dynamic_partition=0
+-=======
+ set /A support_board_info=0
+ set /A write_bdinfo_serial=0
+ set /A support_idt_dual_spl=1
+ set /A support_idt_backup_spl=1
+ set /A support_idt_spl_table=1
+->>>>>>> android_10_idt_dev_200527-2
+ set boot_partition=boot
+ set recovery_partition=recovery
+ set system_partition=system
+@@ -64,11 +58,8 @@ set product_partition=product
+ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
+-<<<<<<< HEAD
+ set super_partition=super
+-=======
+ set board_info_partition=board_info
+->>>>>>> android_10_idt_dev_200527-2
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A erase=0
+@@ -94,7 +85,6 @@ set dual_bootloader_partition=
+ set /A daemon_mode=0
+ set /A flag=1
+ set /A dryrun=0
+-<<<<<<< HEAD
+ set lpmake_system_image_a=
+ set lpmake_system_image_b=
+ set lpmake_vendor_image_a=
+@@ -102,24 +92,16 @@ set lpmake_vendor_image_b=
+ set lpmake_product_image_a=
+ set lpmake_product_image_b=
+ set /A dont_generate_super=0
+-
+-=======
+ set board_type=
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+ :: images when flash another set of images can not be detect early with this scenario.
+ set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+ set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+-<<<<<<< HEAD
+ set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+-set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu
+-set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+-=======
+ set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed
+-set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock
+->>>>>>> android_10_idt_dev_200527-2
++set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+ set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md
+ set imx7ulp_uboot_feature=evk-uuu
+ 
+@@ -160,12 +142,9 @@ if %1 == -y set yocto_image=%2&shift &shift & goto :parse_loop
+ if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+-<<<<<<< HEAD
+ if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+-=======
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+->>>>>>> android_10_idt_dev_200527-2
+ echo unknown option "%1", please check it.
+ call :help & set /A error_level=1 && goto :exit
+ :parse_end
+@@ -572,13 +551,9 @@ echo                           
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ echo                           ©¦   imx8mn       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+-<<<<<<< HEAD
+ echo                           ©¦   imx8mp       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty                                                ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+-echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu                                        ©¦
+-=======
+ echo                           ©¦   imx8mq       ©¦  dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed                     ©¦
+->>>>>>> android_10_idt_dev_200527-2
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+ echo                           ©¦   imx8qxp      ©¦  mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu                          ©¦
+ echo                           ©À©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©à©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©È
+@@ -622,15 +597,12 @@ echo  -i                with this option used, after uboot for uuu loaded and ex
+ echo                        This option is for users to manually flash the images to partitions they want to
+ echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-<<<<<<< HEAD
+ echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ echo                        Under the condition that dynamic partition feature are enabled:
+ echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+ echo                          if this option is used, make sure super.img already exists together with other images.
+-=======
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+->>>>>>> android_10_idt_dev_200527-2
+ goto :eof
+ 
+ 
+@@ -789,7 +761,6 @@ if not [%partition_to_be_flashed:bootloader=%] == [%partition_to_be_flashed%] (
+     set img_name=%bootloader_flashed_to_board%
+     goto :start_to_flash
+ )
+-<<<<<<< HEAD
+ if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+     if %dont_generate_super% == 0 (
+         call :make_super_image
+@@ -798,7 +769,6 @@ if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+     goto :start_to_flash
+ )
+ 
+-=======
+ if not [%partition_to_be_flashed:spl_bak_=%] == [%partition_to_be_flashed%] (
+     set img_name=%bootloader_flashed_to_board%
+     goto :start_to_flash
+@@ -807,7 +777,6 @@ if not [%partition_to_be_flashed:spl_tab_=%] == [%partition_to_be_flashed%] (
+     set img_name=%spl_table_file%
+     goto :start_to_flash
+ )
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ if %support_dtbo% == 1 (
+     if not [%partition_to_be_flashed:boot=%] == [%partition_to_be_flashed%] (
+@@ -1013,14 +982,12 @@ if not [%slot%] == [] (
+     call :flash_userpartitions || set /A error_level=1 && goto :exit
+ )
+ 
+-<<<<<<< HEAD
+ ::super partition does not have a/b slot, handle it individually
+ if %support_dynamic_partition% == 1 (
+     call :flash_partition %super_partition%
+-=======
++
+ if %write_bdinfo_serial% == 1 (
+     echo FB: oem setvar dev-serial %serialno_str% >> uuu.lst
+->>>>>>> android_10_idt_dev_200527-2
+ )
+ 
+ goto :eof
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 13db67b7..8caac3e4 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -86,16 +86,13 @@ options:
+   -R                with this option used, choose the u-boot about 1GB RAM setting.
+   -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-<<<<<<< HEAD
+   -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+                        Under the condition that dynamic partition feature are enabled:
+                          if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+                          if this option is used, make sure super.img already exists together with other images.
+-=======
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+->>>>>>> android_10_idt_dev_200527-2
+ EOF
+ 
+ }
+@@ -388,15 +385,12 @@ function flash_android
+         flash_partition_name ${slot}
+         flash_userpartitions
+     fi
+-<<<<<<< HEAD
+     # super partition does not have a/b slot, handle it individually
+     if [ ${support_dynamic_partition} -eq 1 ]; then
+         flash_partition ${super_partition}
+-=======
+ 
+     if [ ${write_bdinfo_serial} -eq 1 ]; then
+         echo FB: oem setvar dev-serial ${serialno_str} >> /tmp/uuu.lst
+->>>>>>> android_10_idt_dev_200527-2
+     fi
+ }
+ 
+@@ -455,25 +449,19 @@ systemimage_file="system.img"
+ vendor_file="vendor.img"
+ product_file="product.img"
+ partition_file="partition-table.img"
+-<<<<<<< HEAD
+ super_file="super.img"
+-=======
+ spl_table_file="spl_tab.img"
+->>>>>>> android_10_idt_dev_200527-2
+ support_dtbo=0
+ support_recovery=0
+ support_dualslot=0
+ support_mcu_os=0
+ support_trusty=0
+-<<<<<<< HEAD
+ support_dynamic_partition=0
+-=======
+ support_board_info=0
+ write_bdinfo_serial=0
+ support_idt_dual_spl=1
+ support_idt_backup_spl=1
+ support_idt_spl_table=1
+->>>>>>> android_10_idt_dev_200527-2
+ boot_partition="boot"
+ recovery_partition="recovery"
+ system_partition="system"
+@@ -482,11 +470,8 @@ product_partition="product"
+ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
+-<<<<<<< HEAD
+ super_partition="super"
+-=======
+ board_info_partition="board_info"
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ flash_mcu=0
+ erase=0
+@@ -516,7 +501,6 @@ sym_link_directory=""
+ yocto_image_sym_link=""
+ daemon_mode=0
+ dryrun=0
+-<<<<<<< HEAD
+ lpmake_system_image_a=""
+ lpmake_system_image_b=""
+ lpmake_vendor_image_a=""
+@@ -525,25 +509,18 @@ lpmake_product_image_a=""
+ lpmake_product_image_b=""
+ result_value=0
+ dont_generate_super=0
+-=======
+ ramsize=""
+ ramsizetest=0
+ board_type=""
+->>>>>>> android_10_idt_dev_200527-2
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+ # images when flash another set of images can not be detect early with this scenario.
+ imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+ imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+-<<<<<<< HEAD
+-imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu)
++imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed)
+ imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+-=======
+-imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty aiy-uuu signed dual-signed)
+-imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock)
+->>>>>>> android_10_idt_dev_200527-2
+ imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md)
+ imx7ulp_uboot_feature=(evk-uuu)
+ 
+@@ -583,12 +560,9 @@ while [ $# -gt 0 ]; do
+         -R) ramsizetest=1 ;;
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
+-<<<<<<< HEAD
+         -super) dont_generate_super=1 ;;
+-=======
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+->>>>>>> android_10_idt_dev_200527-2
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+             help; exit;;
+     esac
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index fd3d8c35..f6c0fba7 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -27,31 +27,6 @@
+ # Copied from build/target/product/AndroidProducts.mk
+ 
+ PRODUCT_MAKEFILES := \
+-<<<<<<< HEAD
+-  $(LOCAL_DIR)/evk_8mq/evk_8mq.mk \
+-  $(LOCAL_DIR)/evk_8mq/evk_8mq_drm.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm_ddr4.mk \
+-  $(LOCAL_DIR)/evk_8mm/evk_8mm_drm.mk \
+-  $(LOCAL_DIR)/evk_8mn/evk_8mn.mk \
+-  $(LOCAL_DIR)/evk_8mp/evk_8mp.mk
+-
+-COMMON_LUNCH_CHOICES := \
+-  evk_8mq-user \
+-  evk_8mq-userdebug \
+-  evk_8mq_drm-user \
+-  evk_8mq_drm-userdebug \
+-  evk_8mm-user \
+-  evk_8mm-userdebug \
+-  evk_8mm_ddr4-user \
+-  evk_8mm_ddr4-userdebug \
+-  evk_8mm_drm-user \
+-  evk_8mm_drm-userdebug \
+-  evk_8mn-user \
+-  evk_8mn-userdebug \
+-  evk_8mp-user \
+-  evk_8mp-userdebug
+-=======
+   $(LOCAL_DIR)/evk_a300/evk_a300.mk \
+   $(LOCAL_DIR)/evk_a300/evk_a300_drm.mk \
+   $(LOCAL_DIR)/evk_a100/evk_a100.mk \
+@@ -77,4 +52,3 @@ COMMON_LUNCH_CHOICES := \
+   vp6820_8mq_go-userdebug \
+   vp6820_8mn-user \
+   vp6820_8mn-userdebug
+->>>>>>> android_10_idt_dev_200527-2
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 1d939699..712aacab 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -103,15 +103,9 @@ BOARD_GPU_LIBDRM := libdrm_imx
+ 
+ AB_OTA_UPDATER := true
+ ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-<<<<<<< HEAD
+-AB_OTA_PARTITIONS += dtbo boot system vendor vbmeta
+-else
+-AB_OTA_PARTITIONS += dtbo boot system vendor vbmeta product
+-=======
+ AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl spl_bak
+ else
+ AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl spl_bak
+->>>>>>> android_10_idt_dev_200527-2
+ endif
+ TARGET_NO_RECOVERY := true
+ BOARD_USES_RECOVERY_AS_BOOT := true
+diff --git a/imx8m/evk_8mq/sepolicy/file_contexts b/imx8m/evk_8mq/sepolicy/file_contexts
+index 7e752367..bf7cde83 100644
+--- a/imx8m/evk_8mq/sepolicy/file_contexts
++++ b/imx8m/evk_8mq/sepolicy/file_contexts
+@@ -40,13 +40,4 @@
+ #Thermal HAL service
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+-<<<<<<< HEAD
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+-=======
+-#quectel port
+-/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+-/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+-/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+-#/system/socket/rild              u:object_r:rild_socket:s0
+-#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+->>>>>>> android_10_idt_dev_200527-2
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+index 738b8b04..56707196 100644
+--- a/imx8m/evk_a100/BoardConfig.mk
++++ b/imx8m/evk_a100/BoardConfig.mk
+@@ -5,15 +5,8 @@
+ BOARD_SOC_TYPE := IMX8MN
+ BOARD_SOM_TYPE := a100
+ BOARD_TYPE := EVK
+-<<<<<<< HEAD:imx8m/evk_8mm/BoardConfig.mk
+-BOARD_HAVE_VPU := true
+-BOARD_VPU_TYPE := hantro
+-FSL_VPU_OMX_ONLY := true
+-HAVE_FSL_IMX_GPU2D := true
+-=======
+ BOARD_HAVE_VPU := false
+ HAVE_FSL_IMX_GPU2D := false
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/BoardConfig.mk
+ HAVE_FSL_IMX_GPU3D := true
+ HAVE_FSL_IMX_IPU := false
+ HAVE_FSL_IMX_PXP := false
+@@ -38,14 +31,7 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = false
+ 
+ IMX_DEVICE_PATH := device/idtech/imx8m/evk_a100
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/BoardConfig.mk
+-include device/fsl/imx8m/BoardConfigCommon.mk
+-=======
+ include device/idtech/imx8m/BoardConfigCommon.mk
+-ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+--include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+-endif
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/BoardConfig.mk
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -53,36 +39,23 @@ TARGET_USERIMAGES_USE_EXT4 := true
+ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+-<<<<<<< HEAD:imx8m/evk_8mm/BoardConfig.mk
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab_super.bpt
+-  ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
+-                           partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab-no-product.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+-=======
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+-else
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/BoardConfig.mk
+ endif
+ 
+ # Vendor Interface manifest and compatibility
+@@ -158,55 +131,23 @@ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a100/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/BoardConfig.mk
+-ifeq ($(PRODUCT_8MM_DDR4), true)
+-  ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-    # dts target for imx8mm_evk with DDR4 on board
+-    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-      # dts without product partition
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-ddr4-evk-no-product.dtb
+-    else
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-ddr4-evk.dtb
+-    endif
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product.dtb
+   else
+-    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-ddr4-evk-no-product-no-dynamic_partition.dtb
+-    else
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-ddr4-evk-no-dynamic_partition.dtb
+-    endif
++    # imx8mn with MIPI-HDMI display, BCM wifi and support trusty
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk.dtb
++    # imx8mn with MIPI panel display and BCM wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
++    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
+   endif
+ else
+-  ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-    # dts target for imx8mm_evk with LPDDR4 on board
+-    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-      # dts without product partition
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-product.dtb
+-    else
+-      # imx8mm with MIPI-HDMI display and QCA wifi
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk.dtb
+-      # imx8mm with MIPI panel display and QCA wifi
+-      TARGET_BOARD_DTS_CONFIG += imx8mm-mipi-panel:imx8mm-evk-rm67191.dtb
+-      # imx8mm with MIPI-HDMI display, QCA wifi and m4 image to support LPA
+-      TARGET_BOARD_DTS_CONFIG += imx8mm-m4:imx8mm-evk-rpmsg.dtb
+-    endif
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
+   else
+-    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-product-no-dynamic_partition.dtb
+-    else
+-      TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-dynamic_partition.dtb
+-    endif
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-dynamic_partition.dtb
+   endif
+-=======
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk-no-product.dtb
+-else
+-# imx8mn with MIPI-HDMI display, BCM wifi and support trusty
+-TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk.dtb
+-# imx8mn with MIPI panel display and BCM wifi
+-TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:fsl-imx8mn-ddr4-evk-rm67191.dtb
+-# imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+-TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:fsl-imx8mn-ddr4-evk-rpmsg.dtb
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/BoardConfig.mk
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+diff --git a/imx8m/evk_a100/evk_a100.mk b/imx8m/evk_a100/evk_a100.mk
+index bdffe8f3..c1aa1f71 100644
+--- a/imx8m/evk_a100/evk_a100.mk
++++ b/imx8m/evk_a100/evk_a100.mk
+@@ -6,13 +6,8 @@ IMX_DEVICE_PATH := device/idtech/imx8m/evk_a100
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm.mk
+--include device/fsl/common/imx_path/ImxPathConfig.mk
+-include device/fsl/imx8m/ProductConfigCommon.mk
+-=======
+ -include device/idtech/common/imx_path/ImxPathConfig.mk
+-$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/evk_a100.mk
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+@@ -28,7 +23,6 @@ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ #Enable this to choose 32 bit user space build
+ #IMX8_BUILD_32BIT_ROOTFS := true
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm.mk
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ #If the device is retrofit to have dynamic partition feature, set this variable to true to build
+@@ -54,10 +48,9 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+     endif
+   endif
+ endif
+-=======
++
+ #Enable this to config 1GB ddr on evk_a100
+ #LOW_MEMORY := true
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/evk_a100.mk
+ 
+ # Include keystore attestation keys and certificates.
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+@@ -84,9 +77,9 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+     $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm.mk
+-    device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -96,29 +89,10 @@ endif
+ 
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+-    device/fsl/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+-    device/fsl/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
+-    device/fsl/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+-    device/fsl/common/audio-json/ak4497_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4497_config.json \
+-    device/fsl/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+-
+-ifeq ($(PRODUCT_8MM_DDR4), true)
+-#DDR4 board, bcm wifi supplicant overlay
+-PRODUCT_COPY_FILES += \
+-    $(IMX_DEVICE_PATH)/init.imx8mm.ddr4.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.additional.rc \
+-    device/fsl/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+-else
+-#LPDDR4 board, qcom wifi supplicant overlay
+-PRODUCT_COPY_FILES += \
+-    $(IMX_DEVICE_PATH)/init.imx8mm.lpddr4.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.additional.rc \
+-    device/fsl/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+-endif
+-=======
+-    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+-    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/evk_a100.mk
++    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    device/idtech/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+@@ -215,19 +189,33 @@ PRODUCT_PACKAGES += \
+     libGLSLC \
+     libVSC \
+     libgpuhelper \
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm.mk
+-    gatekeeper.imx
+-=======
+     libSPIRV_viv \
+     libvulkan_VIVANTE \
+-    vulkan.imx8 \
++    vulkan.imx \
+     libCLC \
+     libLLVM_viv \
+     libOpenCL \
+     libg2d-opencl \
+     libg2d-viv \
+-    gatekeeper.imx8
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/evk_a100.mk
++    libOpenVX \
++    libOpenVXU \
++    libNNVXCBinary-evis \
++    libNNVXCBinary-evis2 \
++    libNNVXCBinary-lite \
++    libOvx12VXCBinary-evis \
++    libOvx12VXCBinary-evis2 \
++    libOvx12VXCBinary-lite \
++    libNNGPUBinary-evis \
++    libNNGPUBinary-evis2 \
++    libNNGPUBinary-lite \
++    libNNGPUBinary-ulite \
++    gatekeeper.imx
++
++# Neural Network HAL and Lib
++PRODUCT_PACKAGES += \
++    libovxlib \
++    libnnrt \
++    android.hardware.neuralnetworks@1.2-service-vsi-npu-server
+ 
+ PRODUCT_PACKAGES += \
+     android.hardware.audio@5.0-impl:32 \
+@@ -305,28 +293,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.product.first_api_level=28
+ 
+ PRODUCT_PACKAGES += \
+-    libg1 \
+-    libhantro \
+-    libcodec \
+-    libhantro_h1 \
+-    libcodec_enc \
+     DirectAudioPlayer
+ 
+-# imx c2 codec binary
++# Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+-    lib_vpu_wrapper \
+-    lib_imx_c2_videodec \
+-    lib_imx_c2_vpuwrapper_dec \
+-    lib_imx_c2_videodec_common \
+-    lib_imx_c2_videoenc_common \
+-    lib_imx_c2_vpuwrapper_enc \
+-    lib_imx_c2_videoenc \
+-    lib_imx_c2_process \
+-    lib_imx_c2_process_dummy_post \
+-    lib_imx_c2_process_g2d_pre \
+-    c2_component_register \
+-    c2_component_register_ms \
+-    c2_component_register_ra
++                    tflitecamerademo
+ 
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+@@ -362,8 +333,7 @@ PRODUCT_PACKAGES += \
+     adb_debug.prop
+ endif
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm.mk
+-IMX-DEFAULT-G2D-LIB := libg2d-viv
++IMX-DEFAULT-G2D-LIB := libg2d-opencl
+ 
+ ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+ ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
+@@ -371,6 +341,10 @@ INSTALL_64BIT_LIBRARY := true
+ endif
+ -include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+ endif
+-=======
+-IMX-DEFAULT-G2D-LIB := libg2d-opencl
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a100/evk_a100.mk
++
++# imx c2 codec binary
++PRODUCT_PACKAGES += \
++    c2_component_register \
++    c2_component_register_ms \
++    c2_component_register_ra
++
+diff --git a/imx8m/evk_a100/init.rc b/imx8m/evk_a100/init.rc
+index 6e1fb11b..4ce838ad 100644
+--- a/imx8m/evk_a100/init.rc
++++ b/imx8m/evk_a100/init.rc
+@@ -120,10 +120,10 @@ on early-boot
+     chmod 0664 /sys/kernel/debug/sync/sw_sync
+ 
+     # Default backlight device
+-    setprop hw.backlight.dev "32e10000.mipi_dsi.0"
++    setprop hw.backlight.dev "32e10000.dsi_controller.0"
+     # Chmod/chown FSL specific sys entry
+-    chown system system /sys/class/backlight/32e10000.mipi_dsi.0/brightness
+-    chmod 0660 /sys/class/backlight/32e10000.mipi_dsi.0/brightness
++    chown system system /sys/class/backlight/32e10000.dsi_controller.0/brightness
++    chmod 0660 /sys/class/backlight/32e10000.dsi_controller.0/brightness
+ 
+     # Set light sensor sysfs path and light sensor threshold lux value
+     setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index 834365ec..8394d091 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -35,9 +35,6 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
+ IMX_DEVICE_PATH := device/idtech/imx8m/evk_a300
+ 
+ include device/idtech/imx8m/BoardConfigCommon.mk
+-ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+--include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+-endif
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -45,19 +42,25 @@ TARGET_USERIMAGES_USE_EXT4 := true
+ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++  else
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  endif
+ endif
+ 
+-
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+@@ -89,6 +92,7 @@ BOARD_USE_ST_SENSOR_INPUT := true
+ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+ 
+ BOARD_HAVE_USB_CAMERA := true
++BOARD_HAVE_USB_MJPEG_CAMERA := false
+ 
+ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+@@ -107,12 +111,19 @@ else
+ CMASIZE=1280M
+ endif
+ 
+-BOARD_KERNEL_CMDLINE := init=/init androidboot.gui_resolution=1080p androidboot.console=ttymxc0 androidboot.hardware=freescale androidboot.fbTileSupport=enable cma=$(CMASIZE) androidboot.primary_display=mxsfb-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7
++# NXP default config
++BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc0 androidboot.hardware=freescale firmware_class.path=/vendor/firmware loop.max_part=7
++
++# framebuffer config
++BOARD_KERNEL_CMDLINE += androidboot.fbTileSupport=enable
+ 
+-# Set the density to 213 tvdpi to match CDD.
+-BOARD_KERNEL_CMDLINE += androidboot.lcd_density=213
++# memory config
++BOARD_KERNEL_CMDLINE += transparent_hugepage=never cma=$(CMASIZE)
+ 
+-# Default wificountrycode
++# display config
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=mxsfb-drm androidboot.gui_resolution=1080p
++
++# wifi config
+ BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+ 
+ ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
+@@ -124,17 +135,25 @@ endif
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a300/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk-no-product.dtb
+-else
+-# imx8mq with HDMI display
+-TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk.dtb
+-# imx8mq with MIPI-HDMI display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb
+-# imx8mq with HDMI and MIPI-HDMI display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
+-# imx8mq with MIPI panel display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-mipi-panel:fsl-imx8mq-evk-dcss-rm67191.dtb
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
++  else
++    # imx8mq with HDMI display
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk.dtb
++    # imx8mq with MIPI-HDMI display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:imx8mq-evk-lcdif-adv7535.dtb
++    # imx8mq with HDMI and MIPI-HDMI display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-dual:imx8mq-evk-dual-display.dtb
++    # imx8mq with MIPI panel display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-mipi-panel:imx8mq-evk-dcss-rm67191.dtb
++  endif
++else # no dynamic parition feature
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product-no-dynamic_partition.dtb
++  else
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-dynamic_partition.dtb
++  endif
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+diff --git a/imx8m/evk_a300/UbootKernelBoardConfig.mk b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+index 13f418a5..1914ad3b 100644
+--- a/imx8m/evk_a300/UbootKernelBoardConfig.mk
++++ b/imx8m/evk_a300/UbootKernelBoardConfig.mk
+@@ -13,7 +13,7 @@ endif
+ # u-boot target used by uuu for imx8mq_evk
+ TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig
+ 
+-TARGET_KERNEL_DEFCONFIG := android_defconfig
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
+ TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+diff --git a/imx8m/evk_a300/camera_config_imx8mq.json b/imx8m/evk_a300/camera_config_imx8mq.json
+index 8ee84edf..dc40c5d3 100644
+--- a/imx8m/evk_a300/camera_config_imx8mq.json
++++ b/imx8m/evk_a300/camera_config_imx8mq.json
+@@ -5,17 +5,12 @@
+ 
+   "hal_version": "3",
+   "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "GPU_3D",
+-  "hw_jpeg_enc": "mxc-jpeg-enc",
++  "cam_blit_csc": "CPU",
+ 
+   "camera_metadata": [
+     {
+       "camera_type": "back",
+-<<<<<<< HEAD:imx8q/mek_8q/camera_config_imx8qxp.json
+-      "camera_name": "mxc-isi-cap",
+-=======
+       "camera_name": "mx6s-csi0",
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a300/camera_config_imx8mq.json
+       "orientation": "0",
+       "buffer_type": "mmap",
+       "ActiveArrayWidth": "2592",
+@@ -25,7 +20,7 @@
+       "PhysicalWidth": "3.6288",
+       "PhysicalHeight": "2.7216",
+       "FocalLength": "3.37",
+-      "MaxJpegSize": "6291456",
++      "MaxJpegSize": "8388608",
+       "MinFrameDuration": "33331760",
+       "MaxFrameDuration": "300000000",
+       "OmitFrame": [
+@@ -43,19 +38,6 @@
+     },
+     {
+       "camera_type": "front",
+-<<<<<<< HEAD:imx8q/mek_8q/camera_config_imx8qxp.json
+-      "camera_name": "mxc-isi-cap",
+-      "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "2592",
+-      "ActiveArrayHeight": "1944",
+-      "PixelArrayWidth": "2592",
+-      "PixelArrayHeight": "1944",
+-      "PhysicalWidth": "3.6288",
+-      "PhysicalHeight": "2.7216",
+-      "FocalLength": "3.37",
+-      "MaxJpegSize": "6291456",
+-=======
+       "camera_name": "mx6s-csi1",
+       "orientation": "0",
+       "buffer_type": "mmap",
+@@ -67,7 +49,6 @@
+       "PhysicalHeight": "1.68",
+       "FocalLength": "2.66",
+       "MaxJpegSize": "2097152",
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a300/camera_config_imx8mq.json
+       "MinFrameDuration": "33331760",
+       "MaxFrameDuration": "300000000",
+       "OmitFrame": [
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+index df37c408..aa92cc33 100644
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -7,7 +7,7 @@ IMX_DEVICE_PATH := device/idtech/imx8m/evk_a300
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+ -include device/idtech/common/imx_path/ImxPathConfig.mk
+-$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab_nand.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab_nand.freescale)
+@@ -27,6 +27,32 @@ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ #Enable this to choose 32 bit user space build
+ #IMX8_BUILD_32BIT_ROOTFS := true
+ 
++#Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
++TARGET_USE_DYNAMIC_PARTITIONS ?= true
++#If the device is retrofit to have dynamic partition feature, set this variable to true to build
++#the images and OTA package. Here is a demo to update 10.0.0_1.0.0 to 10.0.0_2.0.0 or higher
++TARGET_USE_RETROFIT_DYNAMIC_PARTITION ?= false
++
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  PRODUCT_USE_DYNAMIC_PARTITIONS := true
++  BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT := true
++  BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE := true
++  ifeq ($(TARGET_USE_RETROFIT_DYNAMIC_PARTITION),true)
++    PRODUCT_RETROFIT_DYNAMIC_PARTITIONS := true
++    BOARD_SUPER_PARTITION_METADATA_DEVICE := system
++    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++      BOARD_SUPER_PARTITION_BLOCK_DEVICES := system vendor
++      BOARD_SUPER_PARTITION_SYSTEM_DEVICE_SIZE := 2952790016
++      BOARD_SUPER_PARTITION_VENDOR_DEVICE_SIZE := 536870912
++    else
++      BOARD_SUPER_PARTITION_BLOCK_DEVICES := system vendor product
++      BOARD_SUPER_PARTITION_SYSTEM_DEVICE_SIZE := 1610612736
++      BOARD_SUPER_PARTITION_VENDOR_DEVICE_SIZE := 536870912
++      BOARD_SUPER_PARTITION_PRODUCT_DEVICE_SIZE := 1879048192
++    endif
++  endif
++endif
++
+ # Include keystore attestation keys and certificates.
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ -include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
+@@ -51,6 +77,21 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
+     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
+ 
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
++endif
++
++# Audio card json
++PRODUCT_COPY_FILES += \
++    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
++    device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
++    device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+     device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+@@ -108,7 +149,7 @@ DEVICE_PACKAGE_OVERLAYS := $(IMX_DEVICE_PATH)/overlay
+ 
+ PRODUCT_CHARACTERISTICS := tablet
+ 
+-PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi
++PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi xxhdpi
+ 
+ # GPU openCL g2d
+ PRODUCT_COPY_FILES += \
+@@ -141,14 +182,14 @@ PRODUCT_PACKAGES += \
+         libEGL_VIVANTE \
+         libGLESv1_CM_VIVANTE \
+         libGLESv2_VIVANTE \
+-        gralloc_viv.imx8 \
++        gralloc_viv.imx \
+         libGAL \
+         libGLSLC \
+         libVSC \
+         libgpuhelper \
+         libSPIRV_viv \
+         libvulkan_VIVANTE \
+-        vulkan.imx8 \
++        vulkan.imx \
+         libCLC \
+         libLLVM_viv \
+         libOpenCL \
+@@ -157,12 +198,16 @@ PRODUCT_PACKAGES += \
+         libOpenVX \
+         libOpenVXU \
+         libNNVXCBinary-evis \
++        libNNVXCBinary-evis2 \
+         libNNVXCBinary-lite \
+         libOvx12VXCBinary-evis \
++        libOvx12VXCBinary-evis2 \
+         libOvx12VXCBinary-lite \
+         libNNGPUBinary-evis \
++        libNNGPUBinary-evis2 \
+         libNNGPUBinary-lite \
+-        gatekeeper.imx8
++        libNNGPUBinary-ulite \
++        gatekeeper.imx
+ 
+ PRODUCT_PACKAGES += \
+     android.hardware.audio@5.0-impl:32 \
+@@ -262,7 +307,6 @@ endif
+ 
+ ifneq ($(BUILD_TARGET_FS),ubifs)
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    ro.internel.storage_size=/sys/block/mmcblk0/size \
+     ro.frp.pst=/dev/block/by-name/presistdata
+ endif
+ 
+@@ -275,6 +319,20 @@ PRODUCT_PACKAGES += \
+     libhantro \
+     libcodec
+ 
++# imx c2 codec binary
++PRODUCT_PACKAGES += \
++    lib_vpu_wrapper \
++    lib_imx_c2_videodec_common \
++    lib_imx_c2_videodec \
++    lib_imx_c2_vpuwrapper_dec \
++    lib_imx_c2_process \
++    lib_imx_c2_process_dummy_post \
++    c2_component_register \
++    c2_component_register_ms \
++    c2_component_register_wmv9 \
++    c2_component_register_ra \
++    c2_component_register_rv
++
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+@@ -285,6 +343,7 @@ PRODUCT_PACKAGES += \
+ 
+ # Multi-Display launcher
+ PRODUCT_PACKAGES += \
++    MultiClientInputMethod \
+     MultiDisplay
+ 
+ # Specify rollback index for bootloader and for AVB
+@@ -312,6 +371,13 @@ endif
+ 
+ IMX-DEFAULT-G2D-LIB := libg2d-viv
+ 
++ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
++ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
++INSTALL_64BIT_LIBRARY := true
++endif
++-include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
++endif
++
+ # Copy Quectel vendor RIL
+ PRODUCT_COPY_FILES += \
+     vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+diff --git a/imx8m/evk_a300/evk_a300_drm.mk b/imx8m/evk_a300/evk_a300_drm.mk
+index a7898b6b..7ec4aa44 100644
+--- a/imx8m/evk_a300/evk_a300_drm.mk
++++ b/imx8m/evk_a300/evk_a300_drm.mk
+@@ -39,11 +39,7 @@ DECODED_BUFFER_LEN		:= 0x30000000
+ endif
+ endif
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/evk_8mm_drm.mk
+-TARGET_BOARD_DTS_CONFIG := imx8mm:imx8mm-evk-drm.dtb imx8mm-mipi-panel:imx8mm-evk-rm67191.dtb imx8mm-m4:imx8mm-evk-m4.dtb
+-=======
+-TARGET_BOARD_DTS_CONFIG := imx8mq:fsl-imx8mq-evk-drm.dtb imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a300/evk_a300_drm.mk
++TARGET_BOARD_DTS_CONFIG := imx8mq:imx8mq-evk-drm.dtb imx8mq-mipi:imx8mq-evk-lcdif-adv7535.dtb imx8mq-dual:imx8mq-evk-dual-display.dtb
+ 
+ # Exoplayer
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/evk_a300/fstab.freescale b/imx8m/evk_a300/fstab.freescale
+index 85f7ae12..96ae1fc3 100644
+--- a/imx8m/evk_a300/fstab.freescale
++++ b/imx8m/evk_a300/fstab.freescale
+@@ -3,11 +3,11 @@
+ # The filesystem that contains the filesystem checker binary (typically /system) cannot
+ # specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+ 
+-/devices/platform/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
+-/dev/block/by-name/system      /      ext4    ro,barrier=1                                                                           wait,slotselect
++/devices/platform/soc@0/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
+ /dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+ /dev/block/zram0 none swap defaults zramsize=629145600
++/tmp /sdcard none defaults,bind recoveryonly
+ 
+ /devices/platform/30b50000.usdhc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
+ /devices/platform/usb@38100000/38100000.dwc3/* auto auto defaults voldmanaged=usb:auto
+diff --git a/imx8m/evk_a300/init.imx8mq.rc b/imx8m/evk_a300/init.imx8mq.rc
+index c0721d5f..9c1e9eec 100755
+--- a/imx8m/evk_a300/init.imx8mq.rc
++++ b/imx8m/evk_a300/init.imx8mq.rc
+@@ -17,24 +17,6 @@ on early-boot
+     chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/init.imx8qxp.rc
+-on early-boot
+-    # For mek_8qxp, when swap used about 400M, upgrade the level.
+-    setprop ro.lmk.upgrade_pressure 87
+-    setprop ro.lmk.downgrade_pressure 95
+-    setprop ro.lmk.critical_upgrade true
+-
+-    # Set OpenGLES version
+-    setprop ro.opengles.version 196609
+-
+-    # Set GPU 3D minimum clock to 3/64
+-    write /sys/bus/platform/drivers/galcore/gpu3DMinClock 3
+-
+-    # Set light sensor sysfs path
+-    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-15/device/15-0044/"
+-
+-=======
+->>>>>>> android_10_idt_dev_200527-2:imx8m/evk_a300/init.imx8mq.rc
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/evk_a300/init.rc b/imx8m/evk_a300/init.rc
+index e45a9755..b8e2ce2a 100644
+--- a/imx8m/evk_a300/init.rc
++++ b/imx8m/evk_a300/init.rc
+@@ -85,7 +85,6 @@ on early-boot
+     # fsl omx graphic manager media framework property
+     setprop rw.VIDEO_RENDER_NAME video_render.surface
+     setprop media.fsl_codec.flag 7
+-    setprop debug.stagefright.ccodec 0
+ 
+     setprop camera.disable_zsl_mode 1
+     setprop back_camera_name mx6s-csi0
+@@ -130,10 +129,10 @@ on early-boot
+     chmod 0664 /sys/kernel/debug/sync/sw_sync
+ 
+     # Default backlight device
+-    #setprop hw.backlight.dev "30a00000.mipi_dsi_bridge.0"
++    #setprop hw.backlight.dev "30a00000.mipi_dsi.0"
+     # Chmod/chown FSL specific sys entry
+-    #chown system system /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
+-    #chmod 0660 /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
++    #chown system system /sys/class/backlight/30a00000.mipi_dsi.0/brightness
++    #chmod 0660 /sys/class/backlight/30a00000.mipi_dsi.0/brightness
+     setprop hw.backlight.dev "backlight"
+     chown system system /sys/class/backlight/backlight/brightness
+     chmod 0660 /sys/class/backlight/backlight/brightness
+@@ -196,7 +195,7 @@ service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-servi
+ 	capabilities BLOCK_SUSPEND SYS_NICE
+ 
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+-service watchdogd /sbin/watchdogd 10 20
++service watchdogd /system/bin/watchdogd 10 20
+     class core
+     seclabel u:r:watchdogd:s0
+ 
+@@ -271,6 +270,10 @@ on post-fs
+     # Swap in only 1 page at a time
+     write /proc/sys/vm/page-cluster 0
+ 
++    # Grant permission for fetching available_pages info of statsd
++    chown system system /proc/pagetypeinfo
++    chmod 0440 /proc/pagetypeinfo
++
+ on post-fs-data
+     setprop vold.post_fs_data_done 1
+     # create temp node for secure storage proxy
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+index dd14203b..de5b0024 100644
+--- a/imx8m/evk_a300/sepolicy/file_contexts
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -1,26 +1,28 @@
+ #sd boot
+-/dev/block/platform/30b50000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/misc        u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/metadata    u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/presistdata u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/userdata    u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ 
+ #emmc boot
+-/dev/block/platform/30b40000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+@@ -38,6 +40,8 @@
+ #Thermal HAL service
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
++/vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
+ #quectel port
+ /dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+ /dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+diff --git a/imx8m/evk_a300/sepolicy/genfs_contexts b/imx8m/evk_a300/sepolicy/genfs_contexts
+index 103f867c..43a39ca4 100644
+--- a/imx8m/evk_a300/sepolicy/genfs_contexts
++++ b/imx8m/evk_a300/sepolicy/genfs_contexts
+@@ -1,10 +1,13 @@
+-genfscon sysfs /devices/platform/30b40000.usdhc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
+-genfscon sysfs /devices/platform/30b50000.usdhc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
+-genfscon sysfs /devices/platform/30bb0000.qspi/mtd/mtd0/mtdblock0                     u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply u:object_r:sysfs_batteryinfo:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/extcon   u:object_r:sysfs_extcon:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock u:object_r:sysfs_block_devices:s0
+ 
+-genfscon sysfs /devices/platform/30a00000.mipi_dsi_bridge/30a00000.mipi_dsi_bridge.0/backlight u:object_r:sysfs_leds:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a00000.mipi_dsi/30a00000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/30be0000.ethernet/net u:object_r:sysfs_net:s0
+ 
+-#8mq bcm 1CX wifi
+-genfscon sysfs /devices/platform/hsio/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
++#/sys/class/net
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net               u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
+diff --git a/imx8m/evk_a300/ueventd.freescale.rc b/imx8m/evk_a300/ueventd.freescale.rc
+index c58f8503..07b5b317 100644
+--- a/imx8m/evk_a300/ueventd.freescale.rc
++++ b/imx8m/evk_a300/ueventd.freescale.rc
+@@ -1,5 +1,5 @@
+-/dev/block/platform/30b50000\.usdhc/by-name/presistdata 0600   system     system
+-/dev/block/platform/30b40000\.usdhc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/presistdata 0600   system     system
+ /dev/ttymxc1              0660   bluetooth  bluetooth
+ /dev/snd/*                0660   system     audio
+ /dev/video*               0660   system     camera
+diff --git a/imx8m/sepolicy/file.te b/imx8m/sepolicy/file.te
+index 570111b7..2c047f18 100644
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@ -1,8 +1,5 @@
+ type mediadrm_vendor_data_file, file_type, data_file_type;
+ type debugfs_dma, debugfs_type, fs_type;
+ type debugfs_sw_sync, debugfs_type, fs_type;
+-<<<<<<< HEAD
+ type sysfs_soc, sysfs_type, fs_type;
+-=======
+ type sysfs_usb_uevent, sysfs_type, fs_type;
+->>>>>>> android_10_idt_dev_200527-2
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index c4d0e879..7bb50d56 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -32,9 +32,6 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = false
+ IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mn
+ 
+ include device/idtech/imx8m/BoardConfigCommon.mk
+-ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+--include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+-endif
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -42,16 +39,23 @@ TARGET_USERIMAGES_USE_EXT4 := true
+ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++  else
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  endif
+ endif
+ 
+ # Vendor Interface manifest and compatibility
+@@ -82,6 +86,7 @@ BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
+ BOARD_HAVE_BLUETOOTH_BCM := true
+ 
+ BOARD_HAVE_USB_CAMERA := true
++BOARD_HAVE_USB_MJPEG_CAMERA := false
+ 
+ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+@@ -97,18 +102,25 @@ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
+ 
+ CMASIZE=800M
+ 
+-ifeq ($(LOW_MEMORY),true)
+-BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardware=freescale cma=320M@0x400M-0xb80M androidboot.primary_display=imx-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7 androidboot.displaymode=720p galcore.contiguousSize=33554432
+-else
+-BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardware=freescale cma=$(CMASIZE)@0x400M-0xb80M androidboot.primary_display=imx-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7
+-endif
++# NXP default config
++BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardware=freescale firmware_class.path=/vendor/firmware loop.max_part=7
++
++# memory config
++BOARD_KERNEL_CMDLINE += transparent_hugepage=never
+ 
+-# Set the density to 213 tvdpi to match CDD.
+-BOARD_KERNEL_CMDLINE += androidboot.lcd_density=213
++# display config
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
+ 
+-# Default wificountrycode
++# wifi config
+ BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+ 
++# low memory device build config
++ifeq ($(LOW_MEMORY),true)
++BOARD_KERNEL_CMDLINE += cma=320M@0x400M-0xb80M androidboot.displaymode=720p galcore.contiguousSize=33554432
++else
++BOARD_KERNEL_CMDLINE += cma=$(CMASIZE)@0x400M-0xb80M
++endif
++
+ ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
+ ifeq ($(TARGET_USERIMAGES_USE_EXT4),true)
+ $(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open in same time, please only choose one target file system image")
+@@ -119,15 +131,23 @@ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mn/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk-no-product.dtb
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product.dtb
++  else
++    # imx8mn with MIPI-HDMI display, BCM wifi and support trusty
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk.dtb
++    # imx8mn with MIPI panel display and BCM wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
++    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
++  endif
+ else
+-# imx8mn with MIPI-HDMI display, BCM wifi and support trusty
+-TARGET_BOARD_DTS_CONFIG := imx8mn:fsl-imx8mn-ddr4-evk.dtb
+-# imx8mn with MIPI panel display and BCM wifi
+-TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:fsl-imx8mn-ddr4-evk-rm67191.dtb
+-# imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+-TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:fsl-imx8mn-ddr4-evk-rpmsg.dtb
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
++  else
++    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-dynamic_partition.dtb
++  endif
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+diff --git a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+index 941addba..8418848a 100644
+--- a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+@@ -13,7 +13,7 @@ endif
+ # u-boot target used by uuu for imx8mn_evk
+ TARGET_BOOTLOADER_CONFIG += imx8mn-evk-uuu:vp6820_8mn_ddr4_evk_android_uuu_defconfig
+ 
+-TARGET_KERNEL_DEFCONFIG := android_defconfig
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
+ 
+diff --git a/imx8m/vp6820_8mn/init.imx8mn.rc b/imx8m/vp6820_8mn/init.imx8mn.rc
+index 0db2114c..9c1e9eec 100755
+--- a/imx8m/vp6820_8mn/init.imx8mn.rc
++++ b/imx8m/vp6820_8mn/init.imx8mn.rc
+@@ -16,49 +16,14 @@ on early-boot
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+-<<<<<<< HEAD:imx8q/mek_8q/init.imx8qm.rc
+-    # cpu4 is A72 core on imx8qm, it has separate governor
+-    chown root system /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
+-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
+-    chown root system /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
+-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
+-    chown root system /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+-    chown root system /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_cur_freq
+-    chmod 0440 /sys/devices/system/cpu/cpu4/cpufreq/cpuinfo_cur_freq
+-    chown root system /sys/devices/system/cpu/cpu4/cpufreq/scaling_available_frequencies
+-
+-on early-boot
+-
+-    # For mek_8qm, when swap used about 400M, upgrade the level.
+-    setprop ro.lmk.upgrade_pressure 93
+-    setprop ro.lmk.downgrade_pressure 99
+-    setprop ro.lmk.critical_upgrade true
+-
+-    # Set OpenGLES version
+-    setprop ro.opengles.version 196610
+-
+-    # Set GPU 3D minimum clock to 3/64
+-    write /sys/bus/platform/drivers/galcore/gpu3DMinClock 3
+-
+-    # Set light sensor sysfs path
+-    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-2/device/2-0044/"
+-=======
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mn/init.imx8mn.rc
+ 
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+-<<<<<<< HEAD:imx8q/mek_8q/init.imx8qm.rc
+-    write /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor "schedutil"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set both up and down limit us to 200us
+     write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+-=======
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 500
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 2000
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mn/init.imx8mn.rc
+ 
+ on property:sys.boot_completed=1
+     # update cpuset now that processors are up
+diff --git a/imx8m/vp6820_8mn/init.rc b/imx8m/vp6820_8mn/init.rc
+index 2af3d5cb..ed2b6b8a 100644
+--- a/imx8m/vp6820_8mn/init.rc
++++ b/imx8m/vp6820_8mn/init.rc
+@@ -80,11 +80,6 @@ on early-boot
+     # fsl omx graphic manager media framework property
+     setprop rw.VIDEO_RENDER_NAME video_render.surface
+     setprop media.fsl_codec.flag 7
+-<<<<<<< HEAD:imx8q/mek_8q/init.rc
+-    setprop media.amphion_vpu.enable-tile 0
+-=======
+-    setprop debug.stagefright.ccodec 0
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mn/init.rc
+ 
+     setprop camera.disable_zsl_mode 1
+ 
+@@ -126,17 +121,10 @@ on early-boot
+     chmod 0664 /sys/kernel/debug/sync/sw_sync
+ 
+     # Default backlight device
+-<<<<<<< HEAD:imx8q/mek_8q/init.rc
+-    setprop hw.backlight.dev "56228000.dsi_host.0"
++    setprop hw.backlight.dev "32e10000.dsi_controller.0"
+     # Chmod/chown FSL specific sys entry
+-    chown system system /sys/class/backlight/56228000.dsi_host.0/brightness
+-    chmod 0660 /sys/class/backlight/56228000.dsi_host.0/brightness
+-=======
+-    setprop hw.backlight.dev "32e10000.mipi_dsi.0"
+-    # Chmod/chown FSL specific sys entry
+-    chown system system /sys/class/backlight/32e10000.mipi_dsi.0/brightness
+-    chmod 0660 /sys/class/backlight/32e10000.mipi_dsi.0/brightness
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mn/init.rc
++    chown system system /sys/class/backlight/32e10000.dsi_controller.0/brightness
++    chmod 0660 /sys/class/backlight/32e10000.dsi_controller.0/brightness
+ 
+     # Set light sensor sysfs path and light sensor threshold lux value
+     setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
+@@ -156,6 +144,7 @@ on early-boot
+ 
+     start vendor.wifi_hal_legacy
+ 
++
+ service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
+     -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
+     -g@android:wpa_wlan0
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index bade139f..dcaa3779 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -7,7 +7,7 @@ IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mn
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+ -include device/idtech/common/imx_path/ImxPathConfig.mk
+-$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+@@ -26,6 +26,32 @@ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ #Enable this to config 1GB ddr on vp6820_8mn
+ #LOW_MEMORY := true
+ 
++#Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
++TARGET_USE_DYNAMIC_PARTITIONS ?= true
++#If the device is retrofit to have dynamic partition feature, set this variable to true to build
++#the images and OTA package. Here is a demo to update 10.0.0_1.0.0 to 10.0.0_2.0.0 or higher
++TARGET_USE_RETROFIT_DYNAMIC_PARTITION ?= false
++
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  PRODUCT_USE_DYNAMIC_PARTITIONS := true
++  BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT := true
++  BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE := true
++  ifeq ($(TARGET_USE_RETROFIT_DYNAMIC_PARTITION),true)
++    PRODUCT_RETROFIT_DYNAMIC_PARTITIONS := true
++    BOARD_SUPER_PARTITION_METADATA_DEVICE := system
++    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++      BOARD_SUPER_PARTITION_BLOCK_DEVICES := system vendor
++      BOARD_SUPER_PARTITION_SYSTEM_DEVICE_SIZE := 2952790016
++      BOARD_SUPER_PARTITION_VENDOR_DEVICE_SIZE := 536870912
++    else
++      BOARD_SUPER_PARTITION_BLOCK_DEVICES := system vendor product
++      BOARD_SUPER_PARTITION_SYSTEM_DEVICE_SIZE := 1610612736
++      BOARD_SUPER_PARTITION_VENDOR_DEVICE_SIZE := 536870912
++      BOARD_SUPER_PARTITION_PRODUCT_DEVICE_SIZE := 1879048192
++    endif
++  endif
++endif
++
+ # Include keystore attestation keys and certificates.
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ -include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
+@@ -55,6 +81,19 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+     device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
++endif
++
++# Audio card json
++PRODUCT_COPY_FILES += \
++    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    device/idtech/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+     device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+@@ -121,7 +160,7 @@ DEVICE_PACKAGE_OVERLAYS := $(IMX_DEVICE_PATH)/overlay
+ 
+ PRODUCT_CHARACTERISTICS := tablet
+ 
+-PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi
++PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi xxhdpi
+ 
+ # GPU openCL g2d
+ PRODUCT_COPY_FILES += \
+@@ -145,20 +184,38 @@ PRODUCT_PACKAGES += \
+     libEGL_VIVANTE \
+     libGLESv1_CM_VIVANTE \
+     libGLESv2_VIVANTE \
+-    gralloc_viv.imx8 \
++    gralloc_viv.imx \
+     libGAL \
+     libGLSLC \
+     libVSC \
+     libgpuhelper \
+     libSPIRV_viv \
+     libvulkan_VIVANTE \
+-    vulkan.imx8 \
++    vulkan.imx \
+     libCLC \
+     libLLVM_viv \
+     libOpenCL \
+     libg2d-opencl \
+     libg2d-viv \
+-    gatekeeper.imx8
++    libOpenVX \
++    libOpenVXU \
++    libNNVXCBinary-evis \
++    libNNVXCBinary-evis2 \
++    libNNVXCBinary-lite \
++    libOvx12VXCBinary-evis \
++    libOvx12VXCBinary-evis2 \
++    libOvx12VXCBinary-lite \
++    libNNGPUBinary-evis \
++    libNNGPUBinary-evis2 \
++    libNNGPUBinary-lite \
++    libNNGPUBinary-ulite \
++    gatekeeper.imx
++
++# Neural Network HAL and Lib
++PRODUCT_PACKAGES += \
++    libovxlib \
++    libnnrt \
++    android.hardware.neuralnetworks@1.2-service-vsi-npu-server
+ 
+ PRODUCT_PACKAGES += \
+     android.hardware.audio@5.0-impl:32 \
+@@ -228,7 +285,6 @@ PRODUCT_PACKAGES += \
+ 
+ ifneq ($(BUILD_TARGET_FS),ubifs)
+ PRODUCT_PROPERTY_OVERRIDES += \
+-    ro.internel.storage_size=/sys/block/mmcblk2/size \
+     ro.frp.pst=/dev/block/by-name/presistdata
+ endif
+ 
+@@ -237,13 +293,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.product.first_api_level=28
+ 
+ PRODUCT_PACKAGES += \
+-    libg1 \
+-    libhantro \
+-    libcodec \
+-    libhantro_h1 \
+-    libcodec_enc \
+     DirectAudioPlayer
+ 
++# Tensorflow lite camera demo
++PRODUCT_PACKAGES += \
++                    tflitecamerademo
++
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+@@ -279,3 +334,17 @@ PRODUCT_PACKAGES += \
+ endif
+ 
+ IMX-DEFAULT-G2D-LIB := libg2d-opencl
++
++ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
++ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
++INSTALL_64BIT_LIBRARY := true
++endif
++-include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
++endif
++
++# imx c2 codec binary
++PRODUCT_PACKAGES += \
++    c2_component_register \
++    c2_component_register_ms \
++    c2_component_register_ra
++
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index ca469d4d..f145275b 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -35,9 +35,6 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
+ IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
+ 
+ include device/idtech/imx8m/BoardConfigCommon.mk
+-ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+--include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+-endif
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -45,19 +42,25 @@ TARGET_USERIMAGES_USE_EXT4 := true
+ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+-BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+-ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
+-                         partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
+-                         partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++  else
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  endif
+ endif
+ 
+-
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+@@ -89,6 +92,7 @@ BOARD_USE_ST_SENSOR_INPUT := true
+ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+ 
+ BOARD_HAVE_USB_CAMERA := true
++BOARD_HAVE_USB_MJPEG_CAMERA := false
+ 
+ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+@@ -107,12 +111,19 @@ else
+ CMASIZE=800M
+ endif
+ 
+-BOARD_KERNEL_CMDLINE := init=/init androidboot.gui_resolution=1080p androidboot.console=ttymxc0 androidboot.hardware=freescale androidboot.fbTileSupport=enable cma=$(CMASIZE) androidboot.primary_display=mxsfb-drm firmware_class.path=/vendor/firmware transparent_hugepage=never loop.max_part=7
++# NXP default config
++BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc0 androidboot.hardware=freescale firmware_class.path=/vendor/firmware loop.max_part=7
++
++# framebuffer config
++BOARD_KERNEL_CMDLINE += androidboot.fbTileSupport=enable
+ 
+-# Set the density to 213 tvdpi to match CDD.
+-BOARD_KERNEL_CMDLINE += androidboot.lcd_density=213
++# memory config
++BOARD_KERNEL_CMDLINE += transparent_hugepage=never cma=$(CMASIZE)
+ 
+-# Default wificountrycode
++# display config
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=mxsfb-drm androidboot.gui_resolution=1080p
++
++# wifi config
+ BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+ 
+ ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
+@@ -124,19 +135,27 @@ endif
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+ BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mq/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+-ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk-no-product.dtb
+-else
+-# imx8mq with HDMI display
+-TARGET_BOARD_DTS_CONFIG ?= imx8mq:fsl-imx8mq-evk.dtb
+-# imx8mq with MIPI-HDMI display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb
+-# imx8mq with HDMI and MIPI-HDMI display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
+-# imx8mq with MIPI panel display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-mipi-panel:fsl-imx8mq-evk-dcss-rm67191.dtb
+-# imx8mq idtech test evk with SPI & HDMI display
+-TARGET_BOARD_DTS_CONFIG += imx8mq-idtech-spi:fsl-imx8mq-evk-idtech-spi.dtb
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
++  else
++    # imx8mq with HDMI display
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk.dtb
++    # imx8mq with MIPI-HDMI display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:imx8mq-evk-lcdif-adv7535.dtb
++    # imx8mq with HDMI and MIPI-HDMI display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-dual:imx8mq-evk-dual-display.dtb
++    # imx8mq with MIPI panel display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-mipi-panel:imx8mq-evk-dcss-rm67191.dtb
++  endif
++else # no dynamic parition feature
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product-no-dynamic_partition.dtb
++  else
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-dynamic_partition.dtb
++    # imx8mq idtech test evk with SPI & HDMI display
++    TARGET_BOARD_DTS_CONFIG += imx8mq-idtech-spi:imx8mq-evk-idtech-spi.dtb
++  endif
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+diff --git a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+index 564edbfb..7ef63f1f 100644
+--- a/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mq/UbootKernelBoardConfig.mk
+@@ -27,7 +27,7 @@ endif
+ # u-boot target used by uuu for imx8mq_evk
+ TARGET_BOOTLOADER_CONFIG += imx8mq-evk-evk-uuu:vp6820_8mq_evk_android_uuu_defconfig:signed
+ 
+-TARGET_KERNEL_DEFCONFIG := android_defconfig
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
+ TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+diff --git a/imx8m/vp6820_8mq/fstab.freescale b/imx8m/vp6820_8mq/fstab.freescale
+index 3a81b34d..96ae1fc3 100644
+--- a/imx8m/vp6820_8mq/fstab.freescale
++++ b/imx8m/vp6820_8mq/fstab.freescale
+@@ -3,15 +3,11 @@
+ # The filesystem that contains the filesystem checker binary (typically /system) cannot
+ # specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+ 
+-<<<<<<< HEAD:imx8m/evk_8mm/fstab.freescale
+-/devices/platform/soc@0/soc@0:bus@32c00000/32e40000.usb/ci_hdrc.0/* auto auto defaults voldmanaged=usb:auto
+-=======
+-/devices/platform/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
+-/dev/block/by-name/system      /      ext4    ro,barrier=1                                                                           wait,slotselect
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/fstab.freescale
++/devices/platform/soc@0/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
+ /dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+ /dev/block/zram0 none swap defaults zramsize=629145600
++/tmp /sdcard none defaults,bind recoveryonly
+ 
+ /devices/platform/30b50000.usdhc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
+ /devices/platform/usb@38100000/38100000.dwc3/* auto auto defaults voldmanaged=usb:auto
+diff --git a/imx8m/vp6820_8mq/init.imx8mq.rc b/imx8m/vp6820_8mq/init.imx8mq.rc
+index 1b442cad..dc5c3d7b 100755
+--- a/imx8m/vp6820_8mq/init.imx8mq.rc
++++ b/imx8m/vp6820_8mq/init.imx8mq.rc
+@@ -21,8 +21,9 @@ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 500
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 2000
++    # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
++    # Set both up and down limit us to 200us
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+ 
+ on property:sys.boot_completed=1
+     # update cpuset now that processors are up
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index 45d3f006..b11289fe 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -129,17 +129,10 @@ on early-boot
+     chmod 0664 /sys/kernel/debug/sync/sw_sync
+ 
+     # Default backlight device
+-    #setprop hw.backlight.dev "30a00000.mipi_dsi_bridge.0"
++    #setprop hw.backlight.dev "30a00000.mipi_dsi.0"
+     # Chmod/chown FSL specific sys entry
+-<<<<<<< HEAD:imx8q/mek_8q/init_car.rc
+-    setprop hw.backlight.dev "56228000.dsi_host.0"
+-    chown system system /sys/class/backlight/56228000.dsi_host.0/brightness
+-    chmod 0660 /sys/class/backlight/56228000.dsi_host.0/brightness
+-
+-    # Set light sensor threshold lux value
+-=======
+-    #chown system system /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
+-    #chmod 0660 /sys/class/backlight/30a00000.mipi_dsi_bridge.0/brightness
++    #chown system system /sys/class/backlight/30a00000.mipi_dsi.0/brightness
++    #chmod 0660 /sys/class/backlight/30a00000.mipi_dsi.0/brightness
+     setprop hw.backlight.dev "backlight"
+     chown system system /sys/class/backlight/backlight/brightness
+     chmod 0660 /sys/class/backlight/backlight/brightness
+@@ -154,7 +147,6 @@ on early-boot
+ 
+     # Set light sensor sysfs path and light sensor threshold lux value
+     setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/init.rc
+     setprop ro.lightsensor.threshold  20
+ 
+     # Dectect DSF streams when scanning media
+@@ -278,6 +270,10 @@ on post-fs
+     # Swap in only 1 page at a time
+     write /proc/sys/vm/page-cluster 0
+ 
++    # Grant permission for fetching available_pages info of statsd
++    chown system system /proc/pagetypeinfo
++    chmod 0440 /proc/pagetypeinfo
++
+ on post-fs-data
+     setprop vold.post_fs_data_done 1
+     # create temp node for secure storage proxy
+diff --git a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 0bddc2ba..7e398371 100644
+--- a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -21,10 +21,6 @@
+      for different hardware and product builds. -->
+ <resources>
+ 
+-    <!-- Whether the system enables per-display focus. If the system has the input method for each
+-         display, this value should be true. -->
+-    <bool name="config_perDisplayFocusEnabled">true</bool>
+-
+     <!--For Android we support eth0 now -->
+     <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
+ 
+@@ -211,4 +207,6 @@
+     <!-- Boolean indicating whether system support sustained performance mode. -->
+     <bool name="config_sustainedPerformanceModeSupported">true</bool>
+ 
++    <!-- If the system has the input method for each display - enable per-display focus. -->
++    <bool name="config_perDisplayFocusEnabled">true</bool>
+ </resources>
+diff --git a/imx8m/vp6820_8mq/sepolicy/file_contexts b/imx8m/vp6820_8mq/sepolicy/file_contexts
+index d3afb845..f9570e8d 100644
+--- a/imx8m/vp6820_8mq/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/file_contexts
+@@ -1,27 +1,29 @@
+ #sd boot
+-/dev/block/platform/30b50000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
+-/dev/block/platform/30b50000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/misc        u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/metadata    u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/presistdata u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/userdata    u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ 
+ #emmc boot
+-/dev/block/platform/30b40000\.usdhc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/system_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/product_[ab]     u:object_r:system_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/misc        u:object_r:misc_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/metadata    u:object_r:metadata_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/presistdata u:object_r:frp_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/userdata    u:object_r:userdata_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/vbmeta_[ab]    u:object_r:vbmeta_block_device:s0
+-/dev/block/platform/30b40000\.usdhc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/dtbo_[ab]        u:object_r:dtbo_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/boot_[ab]        u:object_r:boot_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/system_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vendor_[ab]      u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/product_[ab]     u:object_r:system_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/misc             u:object_r:misc_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/metadata         u:object_r:metadata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/presistdata      u:object_r:frp_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ # spl
+ /dev/block/mmcblk0boot[01]            u:object_r:spl_block_device:s0
+@@ -43,6 +45,8 @@
+ #Thermal HAL service
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
++/vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
+ #quectel port
+ /dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+ /dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/genfs_contexts b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+index 103f867c..43a39ca4 100644
+--- a/imx8m/vp6820_8mq/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+@@ -1,10 +1,13 @@
+-genfscon sysfs /devices/platform/30b40000.usdhc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
+-genfscon sysfs /devices/platform/30b50000.usdhc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
+-genfscon sysfs /devices/platform/30bb0000.qspi/mtd/mtd0/mtdblock0                     u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply u:object_r:sysfs_batteryinfo:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/extcon   u:object_r:sysfs_extcon:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock u:object_r:sysfs_block_devices:s0
+ 
+-genfscon sysfs /devices/platform/30a00000.mipi_dsi_bridge/30a00000.mipi_dsi_bridge.0/backlight u:object_r:sysfs_leds:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a00000.mipi_dsi/30a00000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/30be0000.ethernet/net u:object_r:sysfs_net:s0
+ 
+-#8mq bcm 1CX wifi
+-genfscon sysfs /devices/platform/hsio/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
++#/sys/class/net
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net               u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/net u:object_r:sysfs_net:s0
+diff --git a/imx8m/vp6820_8mq/ueventd.freescale.rc b/imx8m/vp6820_8mq/ueventd.freescale.rc
+index 7d57f405..07b5b317 100644
+--- a/imx8m/vp6820_8mq/ueventd.freescale.rc
++++ b/imx8m/vp6820_8mq/ueventd.freescale.rc
+@@ -1,12 +1,6 @@
+-<<<<<<< HEAD:imx8m/evk_8mm/ueventd.freescale.rc
+-/dev/block/platform/soc@0/soc@0:bus@30800000/30b50000\.mmc/by-name/presistdata 0600   system     system
+-/dev/block/platform/soc@0/soc@0:bus@30800000/30b60000\.mmc/by-name/presistdata 0600   system     system
+-/dev/ttymxc0              0660   bluetooth  bluetooth
+-=======
+-/dev/block/platform/30b50000\.usdhc/by-name/presistdata 0600   system     system
+-/dev/block/platform/30b40000\.usdhc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b50000\.mmc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/presistdata 0600   system     system
+ /dev/ttymxc1              0660   bluetooth  bluetooth
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/ueventd.freescale.rc
+ /dev/snd/*                0660   system     audio
+ /dev/video*               0660   system     camera
+ /dev/mxc_hantro           0660   media      drmrpc
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 478bf183..12f1eb74 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -6,23 +6,8 @@ IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+--include device/fsl/common/imx_path/ImxPathConfig.mk
+-
+-ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
+-ifeq ($(PRODUCT_IMX_CAR),true)
+-$(call inherit-product, $(IMX_DEVICE_PATH)/core_64_bit_car.mk)
+-else
+-$(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
+-endif # PRODUCT_IMX_CAR
+-endif # IMX8_BUILD_32BIT_ROOTFS
+-$(call inherit-product, device/fsl/imx8q/ProductConfigCommon.mk)
+-=======
+ -include device/idtech/common/imx_path/ImxPathConfig.mk
+-$(call inherit-product, device/idtech/imx8m/ProductConfigCommon.mk)
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
+-
+-include device/fsl/imx8q/ProductConfigCommon.mk
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab_nand.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab_nand.freescale)
+@@ -33,6 +18,7 @@ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+ endif
+ 
+ # Overrides
++PRODUCT_NAME := vp6820_8mq
+ PRODUCT_DEVICE := vp6820_8mq
+ PRODUCT_MODEL := VP6820_8MQ
+ 
+@@ -95,7 +81,6 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
+     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
+@@ -104,15 +89,13 @@ endif
+ 
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/audio-json/wm8960_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8960_config.json \
+-    device/fsl/common/audio-json/cs42888_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cs42888_config.json \
+-    device/fsl/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+-    device/fsl/common/audio-json/xtor_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/xtor_config.json \
+-    device/fsl/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+-
+-# Copy rpmb test key and AVB test public key
+-=======
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
++    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
++    device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
++    device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+     device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+@@ -139,30 +122,15 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
+     frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
+     frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
++    frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
++    frameworks/native/data/etc/android.software.managed_users.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.managed_users.xml \
++    frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml \
+     frameworks/native/data/etc/android.software.sip.voip.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.sip.voip.xml \
+     frameworks/native/data/etc/android.software.verified_boot.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.verified_boot.xml \
+     frameworks/native/data/etc/android.software.voice_recognizers.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.voice_recognizers.xml \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+-ifneq ($(PRODUCT_IMX_CAR),true)
+-PRODUCT_COPY_FILES += \
+-    frameworks/native/data/etc/android.hardware.sensor.accelerometer.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.accelerometer.xml \
+-    frameworks/native/data/etc/android.hardware.sensor.ambient_temperature.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.ambient_temperature.xml \
+-    frameworks/native/data/etc/android.hardware.sensor.barometer.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.barometer.xml \
+-    frameworks/native/data/etc/android.hardware.sensor.compass.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.compass.xml \
+-    frameworks/native/data/etc/android.hardware.sensor.gyroscope.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.gyroscope.xml \
+-    frameworks/native/data/etc/android.hardware.sensor.light.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.light.xml \
+-    frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
+-    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
+-    frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
+-    frameworks/native/data/etc/android.software.managed_users.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.managed_users.xml \
+-    frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml
+-endif
+-
+-=======
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
+ # Vendor seccomp policy files for media components:
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediacodec-seccomp.policy:vendor/etc/seccomp_policy/mediacodec.policy \
+@@ -270,13 +238,6 @@ PRODUCT_PACKAGES += \
+     libnnrt \
+     android.hardware.neuralnetworks@1.2-service-vsi-npu-server
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+-# imx8 sensor HAL libs.
+-PRODUCT_PACKAGES += \
+-        sensors.imx
+-
+-=======
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
+ # Usb HAL
+ PRODUCT_PACKAGES += \
+     android.hardware.usb@1.1-service.imx
+@@ -357,14 +318,25 @@ endif
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.product.first_api_level=28
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+-ifneq ($(PRODUCT_IMX_CAR),true)
+-=======
+ PRODUCT_PACKAGES += \
+     libg1 \
+     libhantro \
+     libcodec
+ 
++# imx c2 codec binary
++PRODUCT_PACKAGES += \
++    lib_vpu_wrapper \
++    lib_imx_c2_videodec_common \
++    lib_imx_c2_videodec \
++    lib_imx_c2_vpuwrapper_dec \
++    lib_imx_c2_process \
++    lib_imx_c2_process_dummy_post \
++    c2_component_register \
++    c2_component_register_ms \
++    c2_component_register_wmv9 \
++    c2_component_register_ra \
++    c2_component_register_rv
++
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+@@ -373,7 +345,6 @@ ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ # Multi-Display launcher
+ PRODUCT_PACKAGES += \
+     MultiDisplay
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+     tflitecamerademo
+@@ -408,17 +379,13 @@ endif
+ 
+ IMX-DEFAULT-G2D-LIB := libg2d-viv
+ 
+-<<<<<<< HEAD:imx8q/mek_8q/mek_8q.mk
+ ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
+ ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
+ INSTALL_64BIT_LIBRARY := true
+ endif
+ -include $(FSL_CODEC_PATH)/fsl-codec/fsl-codec.mk
+--include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/imx_dsp_aacp_dec/imx_dsp_aacp_dec.mk
+--include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/imx_dsp_codec/imx_dsp_codec.mk
+--include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/imx_dsp/imx_dsp_8q.mk
+ endif
+-=======
++
+ # Copy Quectel vendor RIL
+ PRODUCT_COPY_FILES += \
+     vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+@@ -446,4 +413,3 @@ PRODUCT_PACKAGES += \
+     welcomeapp \
+     diagnosis \
+     videoplayer
+->>>>>>> android_10_idt_dev_200527-2:imx8m/vp6820_8mq/vp6820_8mq_common.mk
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_drm.mk b/imx8m/vp6820_8mq/vp6820_8mq_drm.mk
+index 4e975cdb..5921aaef 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_drm.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_drm.mk
+@@ -16,7 +16,7 @@ PRODUCT_COPY_FILES += \
+ $(call inherit-product, $(TOPDIR)device/idtech/imx8m/optee-packages.mk)
+ $(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq.mk)
+ 
+-TARGET_KERNEL_DEFCONFIG := android_defconfig
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ 
+ # Overrides
+@@ -39,7 +39,7 @@ DECODED_BUFFER_LEN		:= 0x30000000
+ endif
+ endif
+ 
+-TARGET_BOARD_DTS_CONFIG := imx8mq:fsl-imx8mq-evk-drm.dtb imx8mq-mipi:fsl-imx8mq-evk-lcdif-adv7535.dtb imx8mq-dual:fsl-imx8mq-evk-dual-display.dtb
++TARGET_BOARD_DTS_CONFIG := imx8mq:imx8mq-evk-drm.dtb imx8mq-mipi:imx8mq-evk-lcdif-adv7535.dtb imx8mq-dual:imx8mq-evk-dual-display.dtb
+ 
+ # Exoplayer
+ PRODUCT_PACKAGES += \

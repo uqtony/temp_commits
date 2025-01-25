@@ -1,0 +1,89 @@
+db479f67 Jay 2021-12-06
+
+AOS-808: add specfic sound card setting for redwood
+
+Add flag SND_CARD_CONFIG for specific sound card
+setting.
+
+If do not setup specific sound card setting path then
+use common sound card setting.
+
+Change-Id: I6308ccadbe5d49b8cdfc40b3fbd0086c53468b2f
+
+diff --git a/imx8m/redwood_8mq/audio-json/tlv320aic3110_config.json b/imx8m/redwood_8mq/audio-json/tlv320aic3110_config.json
+new file mode 100644
+index 00000000..3f0c497c
+--- /dev/null
++++ b/imx8m/redwood_8mq/audio-json/tlv320aic3110_config.json
+@@ -0,0 +1,50 @@
++{
++  "driver_name": "tlv320aic3110-a",
++  "supported_out_devices": ["speaker", "wired_headphone", "wired_headset"],
++  "supported_in_devices": ["builtin_mic", "wired_headset"],
++
++  "init_ctl": [
++    {"name": "DAC Playback Volume", "type": "int", "val": 127},
++    {"name": "Output Left From Left DAC", "type": "int", "val": 1},
++    {"name": "Output Left From MIC1LP", "type": "int", "val": 1},
++    {"name": "Output Right From Right DAC", "type": "int", "val": 1}
++  ],
++
++  "speaker_ctl": [
++    {"name": "Speaker Driver Playback Switch", "type": "int", "val": 1, "type": "int", "val": 1},
++    {"name": "Speaker Driver Playback Volume", "type": "int", "val": 3, "type": "int", "val": 3},
++    {"name": "Speaker Analog Playback Volume", "type": "int", "val": 127, "type": "int", "val": 127},
++    {"name": "Speaker Left Switch", "type": "int", "val": 1},
++    {"name": "Speaker Right Switch", "type": "int", "val": 1}
++  ],
++
++  "headphone_ctl": [
++    {"name": "HP Driver Playback Switch", "type": "int", "val": 1, "type": "int", "val": 1},
++    {"name": "HP Driver Playback Volume", "type": "int", "val": 3, "type": "int", "val": 3},
++    {"name": "HP Analog Playback Volume", "type": "int", "val": 127, "type": "int", "val": 127},
++    {"name": "HP Left Switch", "type": "int", "val": 1},
++    {"name": "HP Right Switch", "type": "int", "val": 1},
++    {"name": "HPL Driver Switch", "type": "int", "val": 1},
++    {"name": "HPR Driver Switch", "type": "int", "val": 1}
++  ],
++
++  "out_volume_ctl": [
++    "DAC Playback Volume"
++  ],
++
++  "headset_mic_ctl": [
++    {"name": "ADC Fine Capture Volume", "type": "int", "val": 4},
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 64},
++    {"name": "Mic PGA Capture Volume", "type": "int", "val": 119},
++    {"name": "MIC1RP P-Terminal", "type": "str", "val": "FFR 20 Ohm"}
++  ],
++
++  "builtin_mic_ctl": [
++    {"name": "ADC Fine Capture Volume", "type": "int", "val": 4},
++    {"name": "ADC Capture Switch", "type": "int", "val": 1},
++    {"name": "ADC Capture Volume", "type": "int", "val": 64},
++    {"name": "Mic PGA Capture Volume", "type": "int", "val": 119},
++    {"name": "MIC1RP P-Terminal", "type": "str", "val": "FFR 20 Ohm"}
++  ]
++}
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index f6f490b5..a779105b 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -197,15 +197,7 @@ PRODUCT_PACKAGES += \
+ # -------@block_audio-------
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    $(CONFIG_REPO_PATH)/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/tlv320aic3110_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/tlv320aic3110_config.json \
+-    $(CONFIG_REPO_PATH)/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++    $(IMX_DEVICE_PATH)/audio-json/tlv320aic3110_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/tlv320aic3110_config.json
+ 
+ PRODUCT_PACKAGES += \
+     android.hardware.audio@6.0-impl:32 \

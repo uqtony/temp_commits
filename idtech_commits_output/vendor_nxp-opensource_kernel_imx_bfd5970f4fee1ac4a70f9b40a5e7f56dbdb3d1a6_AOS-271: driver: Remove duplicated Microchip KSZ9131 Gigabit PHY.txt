@@ -1,0 +1,44 @@
+bfd5970f4fee George.Huang 2020-08-11
+
+AOS-271: driver: Remove duplicated Microchip KSZ9131 Gigabit PHY
+
+Root Cause: loaded duplicated 'Microchip KSZ9131 Gigabit PHY' failed,
+    and then try to use unsuitable 'Generic PHY'
+
+Error Log:
+[    1.934657] libphy: Fixed MDIO Bus: probed
+[    1.939085] Error: Driver 'Microchip KSZ9131 Gigabit PHY' is already registered, aborting...
+[    1.947544] libphy: Microchip KSZ9131 Gigabit PHY: Error -16 in registering driver
+...
+[   38.373306] Generic PHY 30be0000.ethernet-1:00: attached PHY driver [Generic PHY]
+               (mii_bus:phy_addr=30be0000.ethernet-1:00, irq=POLL)
+
+Change-Id: I7e2ddc5a122e576af1afb0bf5e6f8efab93f3b15
+
+diff --git a/drivers/net/phy/micrel.c b/drivers/net/phy/micrel.c
+index 3e20f51ea128..b4a07327014e 100644
+--- a/drivers/net/phy/micrel.c
++++ b/drivers/net/phy/micrel.c
+@@ -1170,22 +1170,6 @@ static struct phy_driver ksphy_driver[] = {
+ 	.get_stats	= kszphy_get_stats,
+ 	.suspend	= genphy_suspend,
+ 	.resume		= kszphy_resume,
+-}, {
+-	.phy_id		= PHY_ID_KSZ9131,
+-	.phy_id_mask	= MICREL_PHY_ID_MASK,
+-	.name		= "Microchip KSZ9131 Gigabit PHY",
+-	.features	= PHY_GBIT_FEATURES,
+-	.driver_data	= &ksz9021_type,
+-	.probe		= kszphy_probe,
+-	.config_init	= ksz9131_config_init,
+-	.read_status	= ksz9031_read_status,
+-	.ack_interrupt	= kszphy_ack_interrupt,
+-	.config_intr	= kszphy_config_intr,
+-	.get_sset_count = kszphy_get_sset_count,
+-	.get_strings	= kszphy_get_strings,
+-	.get_stats	= kszphy_get_stats,
+-	.suspend	= genphy_suspend,
+-	.resume		= kszphy_resume,
+ }, {
+ 	.phy_id		= PHY_ID_KSZ8873MLL,
+ 	.phy_id_mask	= MICREL_PHY_ID_MASK,

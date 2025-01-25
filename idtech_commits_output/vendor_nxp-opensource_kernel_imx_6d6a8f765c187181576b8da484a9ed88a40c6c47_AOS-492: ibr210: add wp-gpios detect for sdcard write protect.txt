@@ -1,0 +1,43 @@
+6d6a8f765c18 jay deng 2021-02-02
+
+AOS-492: ibr210: add wp-gpios detect for sdcard write protect
+
+cherry-pick ibase patch 440858f3b56b
+Setup gpios for sdcard.
+
+Change-Id: I154da9c042c9c4756e9249cd791ae569214914f6
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index 744e71c40f40..e7a2e98147c0 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -758,10 +758,11 @@ &usdhc1 {
+ 
+ &usdhc2 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+-	pinctrl-0 = <&pinctrl_usdhc2>;
+-	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
+-	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
++	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
+ 	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio2 20 GPIO_ACTIVE_HIGH>;
+ 	vmmc-supply = <&reg_usdhc2_vmmc>;
+ 	status = "okay";
+ };
+@@ -1028,6 +1029,14 @@ MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc2_gpio: usdhc2grpgpio {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12		0x41
++			MX8MQ_IOMUXC_SD2_WP_GPIO2_IO20			0x41
++			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19		0x41
++		>;
++	};
++
+ 	pinctrl_usdhc2: usdhc2grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83

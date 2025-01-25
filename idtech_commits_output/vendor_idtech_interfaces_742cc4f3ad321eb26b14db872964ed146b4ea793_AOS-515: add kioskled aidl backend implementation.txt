@@ -1,0 +1,154 @@
+742cc4f George.Huang 2021-03-19
+
+AOS-515: add kioskled aidl backend implementation
+
+Reference:
+  hardware/interfaces/vibrator/aidl/
+  vendor/idtech/kioskLed/
+
+  hardware/interfaces/power/aidl/
+  hardware/google/pixel/power-libperfmgr/
+
+  hardware/interfaces/light/aidl/
+  device/amlogic/yukawa/lights/
+
+Change-Id: Iafe1d0b150b871b3cecba0fcd6ac4f45bfcd4c75
+
+diff --git a/kioskled/Android.bp b/kioskled/Android.bp
+index 9b1056d..e1ce7ca 100644
+--- a/kioskled/Android.bp
++++ b/kioskled/Android.bp
+@@ -10,8 +10,8 @@ cc_binary {
+         "libbase",
+         "libbinder_ndk",
+         "android.hardware.kioskled-ndk_platform",
+-        "libutils",
+         "liblog",
++        "libutils",
+     ],
+     srcs: [
+         "aidl/Kioskled.cpp",
+diff --git a/kioskled/aidl/Kioskled.cpp b/kioskled/aidl/Kioskled.cpp
+index 4b32a18..ef71907 100644
+--- a/kioskled/aidl/Kioskled.cpp
++++ b/kioskled/aidl/Kioskled.cpp
+@@ -3,16 +3,56 @@
+ #include "Kioskled.h"
+ 
+ #include <android-base/logging.h>
++#include <fcntl.h>
+ 
+ namespace aidl {
+ namespace android {
+ namespace hardware {
+ namespace kioskled {
+ 
+-ndk::ScopedAStatus Kioskled::setLed(int8_t idx, int8_t onOff) {
++int Kioskled::write_int(char const* path, int8_t value) {
++  int fd;
++  fd = open(path, O_RDWR);
++  if (fd < 0)
++    return -1;
+ 
+-    LOG(INFO) << "Kioskled setting led: " << idx << " to: " << onOff;
+-    return ndk::ScopedAStatus::ok();
++  char buffer[20];
++  int bytes = snprintf(buffer, sizeof(buffer), "%d
+", value);
++  ssize_t amt = write(fd, buffer, (size_t)bytes);
++  close(fd);
++  if (amt == -1) {
++    LOG(ERROR) << "Failed to write " << path;
++    return -1;
++  }
++  return 0;
++}
++
++ScopedAStatus Kioskled::setLed(int8_t idx, int8_t onOff) {
++  LOG(INFO) << "Kioskled setting led: " << static_cast<int16_t>(idx)
++            << " to: " << static_cast<int16_t>(onOff);
++
++  switch (idx) {
++    case KIOSK_LED_4:
++      write_int(DEF_KIOSK_LED_4, onOff);
++      break;
++
++    case KIOSK_LED_5:
++      write_int(DEF_KIOSK_LED_5, onOff);
++      break;
++
++    case KIOSK_LED_6:
++      write_int(DEF_KIOSK_LED_6, onOff);
++      break;
++
++    case KIOSK_LED_7:
++      write_int(DEF_KIOSK_LED_7, onOff);
++      break;
++
++    default:
++      LOG(ERROR) << "Invalid led index";
++      break;
++  }
++  return ScopedAStatus::ok();
+ }
+ 
+ }  // namespace kioskled
+diff --git a/kioskled/aidl/Kioskled.h b/kioskled/aidl/Kioskled.h
+index c25ba25..0a49397 100644
+--- a/kioskled/aidl/Kioskled.h
++++ b/kioskled/aidl/Kioskled.h
+@@ -4,13 +4,31 @@
+ 
+ #include <aidl/android/hardware/kioskled/BnKioskled.h>
+ 
++#define DEF_KIOSK_LED_4  "/sys/class/leds/LED_KIOSK_4/brightness"
++#define DEF_KIOSK_LED_5  "/sys/class/leds/LED_KIOSK_5/brightness"
++#define DEF_KIOSK_LED_6  "/sys/class/leds/LED_KIOSK_6/brightness"
++#define DEF_KIOSK_LED_7  "/sys/class/leds/LED_KIOSK_7/brightness"
++
++enum {
++  KIOSK_LED_4 = 4,
++  KIOSK_LED_5,
++  KIOSK_LED_6,
++  KIOSK_LED_7,
++};
++
+ namespace aidl {
+ namespace android {
+ namespace hardware {
+ namespace kioskled {
+ 
++using ::aidl::android::hardware::kioskled::BnKioskled;
++using ::ndk::ScopedAStatus;
++
+ class Kioskled : public BnKioskled {
+-    ndk::ScopedAStatus setLed(int8_t idx, int8_t onOff) override;
++  public:
++    ScopedAStatus setLed(int8_t idx, int8_t onOff) override;
++  private:
++    int write_int(char const* path, int8_t value);
+ };
+ 
+ }  // namespace kioskled
+diff --git a/kioskled/aidl/android.hardware.kioskled-service.rc b/kioskled/aidl/android.hardware.kioskled-service.rc
+index 0f50e7a..d89da0e 100644
+--- a/kioskled/aidl/android.hardware.kioskled-service.rc
++++ b/kioskled/aidl/android.hardware.kioskled-service.rc
+@@ -1,4 +1,5 @@
+ service vendor.kioskled-hal-aidl /vendor/bin/hw/android.hardware.kioskled-service
++    interface aidl android.hardware.kioskled.IKioskled/default
+     class hal
+     user system
+     group system
+diff --git a/kioskled/aidl/main.cpp b/kioskled/aidl/main.cpp
+index 760ef43..867c706 100644
+--- a/kioskled/aidl/main.cpp
++++ b/kioskled/aidl/main.cpp
+@@ -12,6 +12,7 @@ int main() {
+ 
+     const std::string instance = std::string() + Kioskled::descriptor + "/default";
+     binder_status_t status = AServiceManager_addService(kioskled->asBinder().get(), instance.c_str());
++    LOG(INFO) << "Kioskled START " << instance.c_str();
+     CHECK(status == STATUS_OK);
+ 
+     ABinderProcess_joinThreadPool();

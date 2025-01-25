@@ -1,0 +1,201 @@
+6c7e251 Arthur Chen 2019-12-12
+
+AOS-31: idg_spi_tool: improve recieve with IDG form & retry method.
+
+    remove the poll function, because it's not support in SPI.
+    discripted from "Documentation/spi/spidev".
+
+Change-Id: Id56797eefd9071021caacea76c35d2684d37d547
+
+diff --git a/main.c b/main.c
+index a11198d..2b2b57b 100644
+--- a/main.c
++++ b/main.c
+@@ -15,8 +15,8 @@
+ static const char *device = "/dev/spidev1.0";
+ static uint8_t mode = 0;
+ static uint8_t bits = 8;
+-static uint32_t speed = 50000;
+-static uint32_t wait = 50000;
++static uint32_t speed = SET_4MHZ;
++static uint32_t wait = DELAY_5MS;
+ static uint16_t delay = 0;
+ static int read_times = 1;
+ 
+@@ -205,6 +205,7 @@ int main(int argc, char *argv[])
+ 	int ret = 0;
+ 	int size;
+ 	int fd;
++	int count = READ_RETRY_TIMES;
+ 
+ 	buffer = malloc(sizeof(uint8_t) * MAX_BUFFER_SIZE);
+ 	size = parse_opts(argc, argv, buffer);
+@@ -271,24 +272,20 @@ int main(int argc, char *argv[])
+ 	if (os_idg_spi_send(fd, buffer, size, speed, delay, bits) < 1)
+ 		goto IOerror;
+ 
+-	printf("============================================
+"
+-	       "wait for %d us (%d ms)...
+",
+-	       (int)wait, (int)wait/1000);
+-	usleep(wait);
+-	puts("============================================");
+-	while (read_times) {
+-		ret = os_idg_spi_poll(fd, READ_POLL_TIME);
+-		if (ret) {
+-			if (os_idg_spi_receive(fd, MAX_BUFFER_SIZE,
+-					       speed, delay, bits) < 1)
+-				goto IOerror;
+-
+-			usleep(10000); /* wait 10 ms for next response */
+-			read_times--;
+-		} else {
++	do {
++		printf("retry %d times
+"
++		       "============================================
+"
++		       "wait for %d us (%d ms)...
+",
++		       (READ_RETRY_TIMES - count),(int)wait, (int)wait/1000);
++		usleep(wait);
++		puts("============================================");
++		count--;
++		if (count < 0) {
++			puts("
+time out
+");
+ 			break;
+ 		}
+-	}
++	} while (os_idg_spi_receive(fd, MAX_BUFFER_SIZE, speed, delay, bits)
++		 < 1);
+ 
+ IOerror:
+ 	close(fd);
+diff --git a/os_idg_spi.c b/os_idg_spi.c
+index 3074356..38f9673 100644
+--- a/os_idg_spi.c
++++ b/os_idg_spi.c
+@@ -120,7 +120,7 @@ os_send_out:
+ int os_idg_spi_receive(int fd, int data_size, int speed,
+ 			int delay, int bits)
+ {
+-	int ret = 0;
++	int ret = 0, idg_len = 0, i;
+ 	uint8_t dummy[MAX_BUFFER_SIZE] = { };
+ 	uint8_t rx[MAX_BUFFER_SIZE] = { };
+ 	struct spi_ioc_transfer tr = {
+@@ -135,21 +135,31 @@ int os_idg_spi_receive(int fd, int data_size, int speed,
+ 	ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr);
+ 	if (ret < 1) {
+ 		perror("can't receive spi message");
++		ret = -1;
++		goto os_receive_out;
++	}
++	printf("read size = %d
+", ret);
++	idg_len = rx[IDG_SIZE_MSB] << 8;
++	idg_len += rx[IDG_SIZE_LSB];
++	printf("response size = %d
+", idg_len);
++	if (idg_len > ret) {
++		puts("error response size
+");
++		ret = -1;
+ 		goto os_receive_out;
+ 	}
+ 	printf("
+SPI receive : ");
+-	for (ret = 0; ret < MAX_BUFFER_SIZE; ret++) {
+-		if (!(ret % 6))
++	for (i = IDG_FIRST_DATA; i < (idg_len + IDG_FIRST_DATA); i++) {
++		if (!((i - IDG_FIRST_DATA) % 6))
+ 			puts("");
+ 
+-		printf("0x%.2X ", rx[ret]);
++		printf("0x%.2X ", rx[i]);
+ 	}
+ 	puts("
+
+decoded by ASCII:");
+-	for (ret = 0; ret < MAX_BUFFER_SIZE; ret++) {
+-		if (!(ret % 6))
++	for (i = IDG_FIRST_DATA; i < (idg_len + IDG_FIRST_DATA); i++) {
++		if (!((i - IDG_FIRST_DATA) % 6))
+ 			puts("");
+ 
+-		printf("%4c ", rx[ret]);
++		printf("%4c ", rx[i]);
+ 	}
+ 	puts("");
+ 
+@@ -157,29 +167,6 @@ os_receive_out:
+ 	return ret;
+ }
+ 
+-int os_idg_spi_poll(int fd, int timeout) /* time unit 1 ms */
+-{
+-	int ret = 0;
+-	struct pollfd fds = {0, 0, 0};
+-
+-	if (fd < 0) {
+-		perror("SPI poll fd");
+-		ret = -1;
+-		goto os_poll_out;
+-	}
+-	fds.fd = fd;
+-	fds.events = POLLIN;
+-	ret = poll(&fds, 1, timeout);
+-	if (ret == POLLERR) {
+-		perror("SPI poll");
+-		ret = -1;
+-		goto os_poll_out;
+-	}
+-
+-os_poll_out:
+-	return ret; /* 0: timeout, 1: event happen */
+-}
+-
+ int os_idg4send(int index, uint8_t *buf)
+ {
+ 	bool para = false;
+diff --git a/os_idg_spi.h b/os_idg_spi.h
+index 57f137d..cc9d5ae 100644
+--- a/os_idg_spi.h
++++ b/os_idg_spi.h
+@@ -20,20 +20,22 @@
+ #include <getopt.h>
+ #include <fcntl.h>
+ #include <sys/ioctl.h>
+-#include <sys/poll.h>
+ #include <linux/types.h>
+ #include <linux/spi/spidev.h>
+ 
+ #define MAX_BUFFER_SIZE		256 /* as RT1050 */
+-#define READ_POLL_TIME		500 /* poll for 500 ms */
+-#define POLL_GOT		1
++/* for delay 5 ms to 2s timeout in 400 times */
++#define READ_RETRY_TIMES	400
++#define DELAY_5MS		5000
++#define SET_4MHZ		4000000
++#define IDG_SIZE_MSB		12
++#define IDG_SIZE_LSB		13
++#define IDG_FIRST_DATA		14
+ 
+ /* calculate CRC-16/CCTT */
+ unsigned short CalculateCRC(unsigned char *Buffer, unsigned int Len);
+ /* print CRC-16/CCTT result in console */
+ void showCRC(unsigned short result);
+-/* costumized pull function */
+-int os_idg_spi_poll(int fd, int timeout);
+ /* spi receive hex raw data */
+ int os_idg_spi_receive(int fd, int data_size, int speed, int delay,
+ 		       int bits);
+@@ -46,5 +48,4 @@ int os_idg4send(int index, uint8_t *buf);
+ int os_idg4receive(int index);
+ /* print idg commands embedded in this program */
+ void print_idg_support();
+-
+ #endif /* _OS_IDG_SPI_H_ */

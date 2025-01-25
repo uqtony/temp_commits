@@ -1,0 +1,273 @@
+06205d85174f jenkins 2021-07-19
+
+Merge branch 'merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test' into idt-imx-android-11-test
+
+Change-Id: I795ed67593eb6492c706f2a4e250efda861fb609
+
+diff --cc arch/arm64/boot/dts/freescale/Makefile
+index e06bb29aeaea,28eb5661c2af..e9a9e917e509
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@@ -191,32 -192,7 +192,32 @@@ dtb-$(CONFIG_ARCH_S32) += s32v234-evb.d
+  
+  dtb-$(CONFIG_ARCH_MXC) += imx8mm-evk-no-product.dtb imx8mm-ddr4-evk-no-product.dtb
+  dtb-$(CONFIG_ARCH_MXC) += imx8mn-ddr4-evk-no-product.dtb
+- dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-no-product.dtb
++ dtb-$(CONFIG_ARCH_MXC) += imx8mp-evk-no-product.dtb imx8mp-evk-powersave.dtb imx8mp-evk-powersave-non-rpmsg.dtb
+  dtb-$(CONFIG_ARCH_MXC) += imx8mq-evk-no-product.dtb
+- dtb-$(CONFIG_ARCH_MXC) += imx8qm-mek-ov5640-no-product.dtb
++ dtb-$(CONFIG_ARCH_MXC) += imx8qm-mek-ov5640-no-product.dtb imx8qm-mek-md.dtb
+  dtb-$(CONFIG_ARCH_MXC) += imx8qxp-mek-ov5640-rpmsg-no-product.dtb
+ +
+ +dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_evt-0_evk_evk-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_evk_dual-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_evk_mipi-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_evk_mipipanel-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_evk_lcdifrm67191-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_evk_ram1gb-0_mic1g.dtb \
+ +			 idt_imx8mq_evt-0_redwood_evt-0_ktc2g.dtb \
+ +			 idt_imx8mq_evt-0_redwood_evt-0_ktc4g.dtb \
+ +			 idt_a300_evt-0_devboard_evt-0_ktc2g.dtb \
+ +			 idt_a300_evt-0_devboard_hdmi-0_ktc2g.dtb \
+ +			 idt_a300_evt-0_devboard_evt-1_ktc2g.dtb \
+ +			 idt_a300_evt-0_devboard_hdmi-1_ktc2g.dtb \
+ +			 idt_a300_evt-0_devboard_evt-2_ktc2g.dtb \
+ +			 idt_imx8mn_evt-0_evk_rpmsg-0_mic2g.dtb \
+ +			 idt_imx8mn_evt-0_evk_evk-0_mic2g.dtb \
+ +			 idt_a100_evt-0_devboard_evt-0_ktc2g.dtb \
+ +			 idt_a100_evt-0_devboard_evt-1_ktc2g.dtb \
+ +			 idt_a100_evt-0_devboard_evt-0_ktc1g.dtb \
+ +			 idt_a300_evt-0_devboard_evt-1_ktc4g.dtb \
+ +			 idt_imx8mp_evt-0_evk_evk-0_mic6g.dtb \
+ +			 idt_imx8mp_evt-0_evk_ov5640-0_mic6g.dtb \
+ +			 idt_imx8mq_evt-0_ibr210_evt-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_ibr210_hdmi-0_mic3g.dtb \
+ +			 idt_imx8mq_evt-0_phanbell_evt-0_ktc4g.dtb
+diff --cc drivers/clk/clk.c
+index 8bc1100b296a,5672c1da6915..bf755a88b204
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@@ -1279,23 -1272,7 +1280,27 @@@ unprepare_out
+  		clk_core_disable_unprepare(core->parent);
+  }
+  
+++<<<<<<< HEAD
+ +static void __init idt_restore_preenable_unused_flag(struct clk_core *core)
+ +{
+ +	struct clk_core *child;
+ +
+ +	lockdep_assert_held(&prepare_lock);
+ +
+ +	hlist_for_each_entry(child, &core->children, child_node)
+ +		idt_restore_preenable_unused_flag(child);
+ +
+ +	if (core->flags & IDT_IGNORE_PREENABLE_UNUSED_CLK) {
+ +		core->flags &= ~IDT_IGNORE_PREENABLE_UNUSED_CLK;
+ +		return;
+ +	}
+ +}
+ +
+ +
+ +static bool clk_ignore_unused __initdata;
+++=======
++ static bool clk_ignore_unused;
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  static int __init clk_ignore_unused_setup(char *__unused)
+  {
+  	clk_ignore_unused = true;
+@@@ -4448,11 -4539,41 +4573,49 @@@ int clk_notifier_unregister(struct clk 
+  }
+  EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+  
+++<<<<<<< HEAD
+ +void idt_ignore_preenable_unused_clk(struct clk *tarClk)
+ +{
+ +	tarClk->core->flags |= IDT_IGNORE_PREENABLE_UNUSED_CLK;
+ +	return;
+ +}
+++=======
++ struct clk_notifier_devres {
++ 	struct clk *clk;
++ 	struct notifier_block *nb;
++ };
++ 
++ static void devm_clk_notifier_release(struct device *dev, void *res)
++ {
++ 	struct clk_notifier_devres *devres = res;
++ 
++ 	clk_notifier_unregister(devres->clk, devres->nb);
++ }
++ 
++ int devm_clk_notifier_register(struct device *dev, struct clk *clk,
++ 			       struct notifier_block *nb)
++ {
++ 	struct clk_notifier_devres *devres;
++ 	int ret;
++ 
++ 	devres = devres_alloc(devm_clk_notifier_release,
++ 			      sizeof(*devres), GFP_KERNEL);
++ 
++ 	if (!devres)
++ 		return -ENOMEM;
++ 
++ 	ret = clk_notifier_register(clk, nb);
++ 	if (!ret) {
++ 		devres->clk = clk;
++ 		devres->nb = nb;
++ 	} else {
++ 		devres_free(devres);
++ 	}
++ 
++ 	return ret;
++ }
++ EXPORT_SYMBOL_GPL(devm_clk_notifier_register);
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  
+  #ifdef CONFIG_OF
+  static void clk_core_reparent_orphans(void)
+diff --cc drivers/hid/hid-cp2112.c
+index 0fdbfc82b25d,477baa30889c..b311fe502945
+--- a/drivers/hid/hid-cp2112.c
++++ b/drivers/hid/hid-cp2112.c
+@@@ -1340,10 -1329,18 +1331,19 @@@ static int cp2112_probe(struct hid_devi
+  	dev->gc.ngpio			= 8;
+  	dev->gc.can_sleep		= 1;
+  	dev->gc.parent			= &hdev->dev;
+ +	dev->gc.of_node = of_find_node_by_path("/gpio@cp2112");
+  
++ 	dev->irq.name = "cp2112-gpio";
++ 	dev->irq.irq_startup = cp2112_gpio_irq_startup;
++ 	dev->irq.irq_shutdown = cp2112_gpio_irq_shutdown;
++ 	dev->irq.irq_ack = cp2112_gpio_irq_ack;
++ 	dev->irq.irq_mask = cp2112_gpio_irq_mask;
++ 	dev->irq.irq_unmask = cp2112_gpio_irq_unmask;
++ 	dev->irq.irq_set_type = cp2112_gpio_irq_type;
++ 	dev->irq.flags = IRQCHIP_MASK_ON_SUSPEND;
++ 
+  	girq = &dev->gc.irq;
+- 	girq->chip = &cp2112_gpio_irqchip;
++ 	girq->chip = &dev->irq;
+  	/* The event comes from the outside so no parent handler */
+  	girq->parent_handler = NULL;
+  	girq->num_parents = 0;
+diff --cc drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
+index 56df1e2dcfb4,ffdec26b453d..609baf3877de
+--- a/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
++++ b/drivers/mxc/gpu-viv/hal/os/linux/kernel/allocator/default/gc_hal_kernel_allocator_user_memory.c
+@@@ -353,8 -346,7 +346,12 @@@ static int import_pfn_map(struct um_des
+  
+      if (pageCount == pfn_count)
+      {
+++<<<<<<< HEAD
+ +#if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
+ +    && (defined(ARCH_HAS_SG_CHAIN) || defined(CONFIG_ARCH_HAS_SG_CHAIN))
+++=======
++ #if gcdUSE_Linux_SG_TABLE_API
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+          result = sg_alloc_table_from_pages(&um->sgt, pages, pfn_count,
+                          addr & ~PAGE_MASK, pfn_count * PAGE_SIZE, GFP_KERNEL | gcdNOWARN);
+  
+@@@ -374,8 -366,7 +371,12 @@@
+  
+          if (unlikely(result != um->sgt.nents))
+          {
+++<<<<<<< HEAD
+ +#if LINUX_VERSION_CODE >= KERNEL_VERSION (3,6,0) \
+ +    && (defined(ARCH_HAS_SG_CHAIN) || defined(CONFIG_ARCH_HAS_SG_CHAIN))
+++=======
++ #if gcdUSE_Linux_SG_TABLE_API
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+              sg_free_table(&um->sgt);
+  #else
+              kfree(um->sgt.sgl);
+diff --cc drivers/pci/controller/dwc/pci-imx6.c
+index 7c686579f2a1,9026b1c44bb0..779af164607f
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@@ -2680,46 -2736,6 +2742,49 @@@ static int imx6_pcie_probe(struct platf
+  			goto err_ret;
+  		}
+  		pci_imx_set_msi_en(&imx6_pcie->pci->pp);
+++<<<<<<< HEAD
+ +
+ +		/*
+ +		 * If the L1SS is enabled, disable the over ride after link up.
+ +		 * Let the CLK_REQ# controlled by HW L1SS automatically.
+ +		 */
+ +		ret = ((imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_SUPPORTS_L1SS) && !imx6_pcie->l1ss_support_disabled);
+ +		if (IS_ENABLED(CONFIG_PCIEASPM_POWER_SUPERSAVE) && (ret > 0)) {
+ +			switch (imx6_pcie->drvdata->variant) {
+ +			case IMX8MQ:
+ +			case IMX8MM:
+ +			case IMX8MP:
+ +			case IMX8MQ_EP:
+ +			case IMX8MM_EP:
+ +			case IMX8MP_EP:
+ +				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+ +					imx6_pcie_grp_offset(imx6_pcie),
+ +					IMX8MQ_GPR_PCIE_CLK_REQ_OVERRIDE_EN,
+ +					0);
+ +				break;
+ +			case IMX8QXP:
+ +			case IMX8QXP_EP:
+ +				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+ +					IMX8QM_CSR_MISC_OFFSET,
+ +					IMX8QM_MISC_CLKREQ_OVERRIDE_EN_1,
+ +					0);
+ +				break;
+ +			case IMX8QM:
+ +			case IMX8QM_EP:
+ +				if (imx6_pcie->controller_id)
+ +					reg = IMX8QM_MISC_CLKREQ_OVERRIDE_EN_1;
+ +				else
+ +					reg = IMX8QM_MISC_CLKREQ_OVERRIDE_EN_0;
+ +				regmap_update_bits(imx6_pcie->iomuxc_gpr,
+ +					IMX8QM_CSR_MISC_OFFSET,
+ +					reg, 0);
+ +				break;
+ +			default:
+ +				break;
+ +			};
+ +		}
+++=======
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  		break;
+  	case DW_PCIE_EP_TYPE:
+  		if (!IS_ENABLED(CONFIG_PCI_IMX_EP))
+diff --cc drivers/remoteproc/remoteproc_core.c
+index d1d80d085a6d,ea53ac510873..b0002b578c21
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@@ -1710,7 -1713,7 +1713,11 @@@ int rproc_trigger_recovery(struct rpro
+  	/* load firmware */
+  	if (!rproc->autonomous) {
+  		/* generate coredump */
+++<<<<<<< HEAD
+ +		rproc_coredump(rproc);
+++=======
++ 		rproc->ops->coredump(rproc);
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  
+  		ret = request_firmware(&firmware_p, rproc->firmware, dev);
+  		if (ret < 0) {
+diff --cc drivers/video/fbdev/core/fbcon.c
+index bca4edb9c92f,26581194fdf8..85dbb19187c9
+--- a/drivers/video/fbdev/core/fbcon.c
++++ b/drivers/video/fbdev/core/fbcon.c
+@@@ -1366,10 -1344,11 +1366,16 @@@ static void fbcon_cursor(struct vc_dat
+  
+  	ops->cursor_flash = (mode == CM_ERASE) ? 0 : 1;
+  
+++<<<<<<< HEAD
+ +#if CONSOLE_CURSOR_SHOWING
+++=======
++ 	if (!ops->cursor)
++ 		return;
++ 
+++>>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+  	ops->cursor(vc, info, mode, get_color(vc, info, c, 1),
+  		    get_color(vc, info, c, 0));
+ +#endif /* CONSOLE_CURSOR_SHOWING */
+  }
+  
+  static int scrollback_phys_max = 0;

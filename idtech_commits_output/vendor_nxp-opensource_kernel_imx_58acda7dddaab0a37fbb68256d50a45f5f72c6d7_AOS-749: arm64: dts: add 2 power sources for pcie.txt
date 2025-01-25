@@ -1,0 +1,71 @@
+58acda7dddaa George.Huang 2021-09-29
+
+AOS-749: arm64: dts: add 2 power sources for pcie
+
+- RADIO_PWR_ON(1.8V) controls VRADIO(3.9V)
+- BLE_RESET(1.8V) and VRADIO control WL_BT_PWR / 3V3_WIFI-BT / 1V8_WIFI_BT
+
+Change-Id: I6234de5847cc9d0bef06b8bc73f5ef9709bbe35b
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 5b00c9a580e7..d1a7e61eaa5a 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -236,9 +236,35 @@ pcie0_refclk: pcie0-refclk {
+ 
+ 	reg_pcie: regulator-pcie {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "VPCIE_3V3";
+-		regulator-min-microvolt = <3000000>;
+-		regulator-max-microvolt = <3000000>;
++		regulator-name = "VPCIE_1V8";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	reg_wifi_bt_1v8_vdd: fixed-regulator-wifi-bt-1v8-vdd {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_wifi_bt>;
++		compatible = "regulator-fixed";
++		regulator-name = "WL_BT_PWR";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio3 6 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_vradio_1v8_vdd: fixed-regulator-vradio-1v8-vdd {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_vradio>;
++		compatible = "regulator-fixed";
++		regulator-name = "RADIO_PWR_ON";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio3 3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-boot-on;
+ 		regulator-always-on;
+ 	};
+ 
+@@ -1049,6 +1075,18 @@ MX8MQ_IOMUXC_SAI1_MCLK_GPIO4_IO20			0x16  //WIFI_BT_PM_ENn
+ 		>;
+ 	};
+ 
++	pinctrl_reg_wifi_bt: regwifibtgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6			0x19  //BLE_RESET
++		>;
++	};
++
++	pinctrl_reg_vradio: regvradiogrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3			0x17059  //RADIO_PWR_ON
++		>;
++	};
++
+ 	pinctrl_ecspi1: ecspi1grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9			0x19

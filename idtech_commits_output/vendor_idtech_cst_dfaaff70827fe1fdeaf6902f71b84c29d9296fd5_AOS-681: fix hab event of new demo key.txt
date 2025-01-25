@@ -1,0 +1,217 @@
+dfaaff7 owen.wen 2021-09-11
+
+AOS-681: fix hab event of new demo key
+
+Symptom: hab_status report events
+--------- HAB Event 1 -----------------
+event data:
+        0xdb 0x00 0x14 0x44 0x33 0x18 0xc0 0xff
+        0xca 0x00 0x0c 0x00 0x01 0xc5 0x1d 0x00
+        0x00 0x00 0x07 0xfc
+
+STS = HAB_FAILURE (0x33)
+RSN = HAB_INV_SIGNATURE (0x18)
+CTX = HAB_CTX_COMMAND (0xC0)
+ENG = HAB_ENG_SW (0xFF)
+
+--------- HAB Event 2 -----------------
+event data:
+        0xdb 0x00 0x14 0x44 0x33 0x0c 0xa0 0x00
+        0x00 0x00 0x00 0x00 0x00 0x7e 0x0f 0xc0
+        0x00 0x00 0x00 0x20
+
+STS = HAB_FAILURE (0x33)
+RSN = HAB_INV_ASSERTION (0x0C)
+CTX = HAB_CTX_ASSERT (0xA0)
+ENG = HAB_ENG_ANY (0x00)
+
+--------- HAB Event 3 -----------------
+event data:
+        0xdb 0x00 0x14 0x44 0x33 0x0c 0xa0 0x00
+        0x00 0x00 0x00 0x00 0x00 0x7e 0x0f 0xe0
+        0x00 0x00 0x00 0x01
+
+STS = HAB_FAILURE (0x33)
+RSN = HAB_INV_ASSERTION (0x0C)
+CTX = HAB_CTX_ASSERT (0xA0)
+ENG = HAB_ENG_ANY (0x00)
+
+--------- HAB Event 4 -----------------
+event data:
+        0xdb 0x00 0x14 0x44 0x33 0x0c 0xa0 0x00
+        0x00 0x00 0x00 0x00 0x00 0x7e 0x10 0x00
+        0x00 0x00 0x00 0x04
+
+STS = HAB_FAILURE (0x33)
+RSN = HAB_INV_ASSERTION (0x0C)
+CTX = HAB_CTX_ASSERT (0xA0)
+ENG = HAB_ENG_ANY (0x00)
+
+RootCause:
+Signature of new demo key is 1 byte less than old one
+
+new demo key(has no user defined extension field)
+$ csf_parser -d -c obj/UBOOT_OBJ/csf_spl.bin
+$ ls -l output/
+-rw-rw-r-- 1 owenwen owenwen   861 Sep 11 15:58 output/cert0.der
+-rw-rw-r-- 1 owenwen owenwen   861 Sep 11 15:58 output/cert1.der
+-rw-rw-r-- 1 owenwen owenwen 20542 Sep 11 15:58 output/debug_log.txt
+-rw-rw-r-- 1 owenwen owenwen 11510 Sep 11 15:58 output/parsed_output.txt
+-rw-rw-r-- 1 owenwen owenwen   532 Sep 11 15:58 output/sig0.bin
+-rw-rw-r-- 1 owenwen owenwen   532 Sep 11 15:58 output/sig1.bin
+-rw-rw-r-- 1 owenwen owenwen  1088 Sep 11 15:58 output/SRKTable.bin
+$ openssl asn1parse -i -inform DER -in output/sig0.bin
+128:d=6  hl=2 l=   7 prim:       INTEGER           :45F6600000FBDD
+
+old demo key(has user defined extension field)
+$ csf_parser -d -c obj/UBOOT_OBJ/csf_spl.bin
+$ ls -l output/
+total 56
+-rw-rw-r-- 1 owenwen owenwen   927 Sep 11 16:14 cert0.der
+-rw-rw-r-- 1 owenwen owenwen   927 Sep 11 16:14 cert1.der
+-rw-rw-r-- 1 owenwen owenwen 21215 Sep 11 16:14 debug_log.txt
+-rw-rw-r-- 1 owenwen owenwen 11510 Sep 11 16:14 parsed_output.txt
+-rw-rw-r-- 1 owenwen owenwen   533 Sep 11 16:14 sig0.bin
+-rw-rw-r-- 1 owenwen owenwen   533 Sep 11 16:14 sig1.bin
+-rw-rw-r-- 1 owenwen owenwen  1088 Sep 11 16:14 SRKTable.bin
+$ openssl asn1parse -i -inform DER -in output/sig0.bin
+128:d=6  hl=2 l=   8 prim:       INTEGER           :BC4929000007E6
+
+Solution: adjust related offset
+
+Change-Id: I19d0a917d76638073ca431f64894204e8f500334
+
+diff --git a/post_sign_bootloader.py b/post_sign_bootloader.py
+index 25bb7de..6964031 100644
+--- a/post_sign_bootloader.py
++++ b/post_sign_bootloader.py
+@@ -12,10 +12,10 @@ is_spl = 0
+ is_bootloader = 0
+ is_uboot = 0
+ 
+-# when you openssl asn1parse the sig0.bin, the sig offset is at offset 273 + 4(header)
+-# the attribute data offset 151 + 2 (first byte will be replaced by 0x31)
+-SIG_OFFSET_IN_CMS = 277
+-SIG_ATTR_OFFSET   = 152
++# when you openssl asn1parse the sig0.bin, the sig offset is at offset 272 + 4(header)
++# the attribute data offset 150 + 2 (first byte will be replaced by 0x31)
++SIG_OFFSET_IN_CMS = 272
++SIG_ATTR_OFFSET   = 150
+ 
+ class env(object):
+   def __init__(self, host_env):
+@@ -27,8 +27,14 @@ class env(object):
+     self.csf_crt   = self.get_data(self.crt_dir + "CSF1_1_sha256_2048_65537_v3_usr_crt.der")
+     self.img_crt   = self.get_data(self.crt_dir + "IMG1_1_sha256_2048_65537_v3_usr_crt.der")
+     assert len(self.srk_table) == 1088
+-    assert len(self.csf_crt)   == 927
+-    assert len(self.img_crt)   == 927
++    # using csf_parser to break csf_spl.bin after local build
++    # the file size change from 927 to 861 since Lewis help to remove user defined extension
++    # $ csf_parser -d -c obj/UBOOT_OBJ/csf_spl.bin
++    # $ ls -l output
++    # -rw-rw-r-- 1 owenwen owenwen   861 Sep 11 15:58 cert0.der
++    # -rw-rw-r-- 1 owenwen owenwen   861 Sep 11 15:58 cert1.der
++    assert len(self.csf_crt)   == 861
++    assert len(self.img_crt)   == 861
+ 
+   def get_data(self, path):
+     with open(path, "rb") as f:
+@@ -51,11 +57,15 @@ class offsets(object):
+ class hab_data(object):
+   def __init__(self, name, data):
+     if name == "spl":
+-      self.size = 4120
++      # $ ls -l obj/UBOOT_OBJ/csf_spl.bin
++      # -rw-rw-r-- 1 owenwen owenwen 3984 Sep 11 15:58 obj/UBOOT_OBJ/csf_spl.bin
++      self.size = 3984
+       self.magic = b'\xd4\x00\x58\x43'
+       self.hab_offset = data.index(self.magic)
+     if name == "fit":
+-      self.size = 4136
++      # $ ls -l obj/UBOOT_OBJ/csf_fit.bin
++      # -rw-rw-r-- 1 owenwen owenwen 4000 Sep 11 15:58 obj/UBOOT_OBJ/csf_fit.bin
++      self.size = 4000
+       self.magic = b'\xd4\x00\x68\x43'
+       self.hab_offset = data.index(self.magic)
+ 
+@@ -75,8 +85,8 @@ class hab_data(object):
+     self.srk_table_offset = int(self.parsed_offset.cert[0], 16)
+     self.csf_cert_offset  = int(self.parsed_offset.cert[1], 16)
+     self.img_cert_offset  = int(self.parsed_offset.cert[2], 16)
+-    self.csf_sig_offset   = int(self.parsed_offset.sig[0], 16) + SIG_OFFSET_IN_CMS
+-    self.img_sig_offset   = int(self.parsed_offset.sig[1], 16) + SIG_OFFSET_IN_CMS
++    self.csf_sig_offset   = int(self.parsed_offset.sig[0], 16) + SIG_OFFSET_IN_CMS + 4
++    self.img_sig_offset   = int(self.parsed_offset.sig[1], 16) + SIG_OFFSET_IN_CMS + 4
+ 
+   def write_tosign_data(self, key):
+     if key == "csf":
+@@ -84,9 +94,41 @@ class hab_data(object):
+     if key == "img":
+       sig_path = "output/sig1.bin"
+ 
++    # check if SIG_ATTR_OFFSET is message digest column
++    # in case HSM output a different layout of certificate
++    # openssl asn1parse -i -inform DER --offset 150 -in output/sig0.bin | grep -w cont
++    p = subprocess.Popen(
++        ['openssl', 'asn1parse', '-i', '-inform', 'DER', '--offset', str(SIG_ATTR_OFFSET), '-in', sig_path],
++        stdin=subprocess.PIPE,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++        universal_newlines=True)
++    (pout, perr) = p.communicate()
++    if p.returncode != 0:
++      raise ValueError('openssl error, cannot execute openssl asn1parse')
++    # there must be a key word "cont" in first line
++    if "cont" not in pout.splitlines()[0]:
++      raise ValueError('openssl error, cannot locate message digest')
++
++    # check if SIG_OFFSET_IN_CMS is signature column
++    # in case HSM output a different layout of certificate
++    # openssl asn1parse -i -inform DER --offset 150 -in output/sig0.bin | grep -w cont
++    p = subprocess.Popen(
++        ['openssl', 'asn1parse', '-i', '-inform', 'DER', '--offset', str(SIG_OFFSET_IN_CMS), '-in', sig_path],
++        stdin=subprocess.PIPE,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE,
++        universal_newlines=True)
++    (pout, perr) = p.communicate()
++    if p.returncode != 0:
++      raise ValueError('openssl error, cannot execute openssl asn1parse')
++    # there must be a key word "OCTET STRING" in first line
++    if "OCTET STRING" not in pout.splitlines()[0]:
++      raise ValueError('openssl error, cannot locate signature')
++
+     tosign_fname = self.hab_name + "_" + key + "_tosign"
+     with open(sig_path, "rb") as f_sig, open(tosign_fname, "wb") as f_tosign:
+-      f_sig.seek(SIG_ATTR_OFFSET)
++      f_sig.seek(SIG_ATTR_OFFSET+1) # (first byte will be replaced by 0x31)
+       tosign_data = f_sig.read(106)
+       f_tosign.write(b'\x31')
+       f_tosign.write(tosign_data)
+diff --git a/sign_uboot.py b/sign_uboot.py
+index 221a36b..60e491e 100755
+--- a/sign_uboot.py
++++ b/sign_uboot.py
+@@ -68,7 +68,9 @@ def GenerateCsfBin(dirpath, tool_path):
+               "-o", os.path.join(dirpath, "csf_spl.bin")]
+     print(cmd)
+     p = subprocess.Popen(cmd, cwd=tool_path)
+-    p.wait()
++    (pout, perr) = p.communicate()
++    if p.returncode != 0:
++      raise ValueError(perr)
+ 
+   if not spl_only:
+     cmd = ["./release/linux64/bin/cst",
+@@ -76,7 +78,9 @@ def GenerateCsfBin(dirpath, tool_path):
+               "-o", os.path.join(dirpath, "csf_fit.bin")]
+     print(cmd)
+     p = subprocess.Popen(cmd, cwd=tool_path)
+-    p.wait()
++    (pout, perr) = p.communicate()
++    if p.returncode != 0:
++      raise ValueError(perr)
+ 
+ def WriteSignedImage(uboot_obj_dir, product_out_dir, tool_path):
+   cmd = ["cp", orig_image, os.path.join(product_out_dir, image_out)]

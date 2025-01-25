@@ -1,0 +1,416 @@
+f01a849 jenkins 2020-05-26
+
+Download imx-android-10.0.0_2.0.0.tar.gz from nxp.com
+
+Change-Id: If321b2fc40c754d4d5d6487b2b8b35eb944153e0
+
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/power_mode_switch/cm4_core1/armgcc/MIMX8QM6xxxFF_cm4_core1_ram.ld b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/power_mode_switch/cm4_core1/armgcc/MIMX8QM6xxxFF_cm4_core1_ram.ld
+index aacec81..f9fa722 100644
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/power_mode_switch/cm4_core1/armgcc/MIMX8QM6xxxFF_cm4_core1_ram.ld
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/power_mode_switch/cm4_core1/armgcc/MIMX8QM6xxxFF_cm4_core1_ram.ld
+@@ -34,7 +34,7 @@ MEMORY
+   m_text                (RX)  : ORIGIN = 0x1FFE0A00, LENGTH = 0x0001F600
+   m_data                (RW)  : ORIGIN = 0x20000000, LENGTH = 0x00020000
+   m_resume              (RX)  : ORIGIN = 0x88800000, LENGTH = 0x00100000
+-  m_data2               (RW)  : ORIGIN = 0x88900000, LENGTH = 0x07700000
++  m_data2               (RW)  : ORIGIN = 0x88900000, LENGTH = 0x00800000
+ }
+ 
+ /* Define output sections */
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/app_srtm.c b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/app_srtm.c
+index 8e0e0bd..da336c2 100644
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/app_srtm.c
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/app_srtm.c
+@@ -415,6 +415,7 @@ static srtm_status_t APP_SRTM_Auto_PowerReport(srtm_auto_adapter_t adapter,
+ 
+     ap_report.powerState = (reqData[1] << 8) | reqData[0];
+     ap_report.time_postpone = (reqData[3] << 24) | (reqData[2] << 16) | (reqData[1] << 8) | reqData[0];
++    ap_report.is_request = 0;
+     PRINTF("Receive power report, state=%x,time_postpone=%d
+", ap_report.powerState, ap_report.time_postpone);
+     if (xQueueSend(xAPPowerQueue, (void *)&ap_report, (TickType_t)0))
+     {
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/armgcc/CMakeLists.txt b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/armgcc/CMakeLists.txt
+index 1e40c90..42f48fc 100755
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/armgcc/CMakeLists.txt
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/armgcc/CMakeLists.txt
+@@ -1145,5 +1145,10 @@ target_link_libraries(rear_view_camera.elf optimized nosys)
+ 
+ TARGET_LINK_LIBRARIES(rear_view_camera.elf -Wl,--end-group)
+ 
++option(CMAKE_BOOT_FROM_A72 "option for i.mx8qm boot from A72" OFF)
++if(CMAKE_BOOT_FROM_A72)
++add_definitions(-DCMAKE_BOOT_FROM_A72)
++endif(CMAKE_BOOT_FROM_A72)
++
+ ADD_CUSTOM_COMMAND(TARGET rear_view_camera.elf POST_BUILD COMMAND ${CMAKE_OBJCOPY}
+ -Obinary ${EXECUTABLE_OUTPUT_PATH}/rear_view_camera.elf ${EXECUTABLE_OUTPUT_PATH}/m4_image.bin)
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.c b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.c
+index 5a5dded..d53f6ee 100644
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.c
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.c
+@@ -106,27 +106,47 @@ static void ap_power_monitor_task(void *pvParameters)
+     {
+         if (xQueueReceive(xAPPowerQueue, &ap_power, portMAX_DELAY))
+         {
+-            switch (ap_power.powerState)
+-            {
+-            case AP_POWER_REPORT_BOOT_COMPLETE:
+-                /* TODO: send BOOT_REASON to android, boot reason need to get from other module*/
+-                reqData[0] = BOOT_REASON_USER_POWER_ON;
+-                AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_BOOT_REASON, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
+-                break;
+-            case AP_POWER_REPORT_DEEP_SLEEP_ENTRY:
+-                break;
+-            case AP_POWER_REPORT_DEEP_SLEEP_EXIT:
+-                break;
+-            case AP_POWER_REPORT_SHUTDOWN_POSTPONE:
+-                break;
+-            case AP_POWER_REPORT_SHUTDOWN_START:
+-                break;
+-            case AP_POWER_REPORT_DISPLAY_OFF:
+-                break;
+-            case AP_POWER_REPORT_DISPLAY_ON:
+-                break;
+-            default:
+-                break;
++            if (ap_power.is_request == 0) {
++                switch (ap_power.powerState)
++                {
++                case AP_POWER_REPORT_BOOT_COMPLETE:
++                    /* TODO: send BOOT_REASON to android, boot reason need to get from other module*/
++                    reqData[0] = BOOT_REASON_USER_POWER_ON;
++                    AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_BOOT_REASON, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
++                    break;
++                case AP_POWER_REPORT_DEEP_SLEEP_ENTRY:
++                    break;
++                case AP_POWER_REPORT_DEEP_SLEEP_EXIT:
++                    break;
++                case AP_POWER_REPORT_SHUTDOWN_POSTPONE:
++                    break;
++                case AP_POWER_REPORT_SHUTDOWN_START:
++                    break;
++                case AP_POWER_REPORT_DISPLAY_OFF:
++                    break;
++                case AP_POWER_REPORT_DISPLAY_ON:
++                    break;
++                default:
++                    break;
++                }
++            } else {
++                switch (ap_power.powerState)
++                {
++                case AP_POWER_REQUEST_ON:
++                case AP_POWER_REQUEST_SHUTDOWN_PREPARE:
++                case AP_POWER_REQUEST_CANCEL_SHUTDOWN:
++                case AP_POWER_REQUEST_FINISHED:
++                    reqData[0] = (uint8_t)(ap_power.powerState & 0xff);
++                    reqData[1] = (uint8_t)((ap_power.powerState >> 8) & 0xff);
++                    reqData[2] = (uint8_t)(ap_power.state_param & 0xff);
++                    reqData[3] = (uint8_t)((ap_power.state_param >> 8) & 0xff);
++                    reqData[4] = (uint8_t)((ap_power.state_param >> 16) & 0xff);
++                    reqData[5] = (uint8_t)((ap_power.state_param >> 24) & 0xff);
++                    AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_POWER_CTRL, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
++                    break;
++                default:
++                    break;
++                }
+             }
+         }
+     }
+@@ -396,6 +416,7 @@ int do_help(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_version(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_gear_state(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_turn_signal(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
++int do_power_request(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_vehicle_state_report(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ 
+ struct cmd_tbl_s cmd_tables[] =
+@@ -422,6 +443,13 @@ struct cmd_tbl_s cmd_tables[] =
+                                  "format: gear index
+	reverse: gear 2
+	drive: gear 4"},
+     {"turn", 1, do_turn_signal, "send turn signal(none/left/right) to android",
+                                "turn none/left/right:
+	turn 0/1/2"},
++    {"power", 2, do_power_request, "send power request control(on/shutdown) to android",
++                                "format: power state param
+available state and param:
+	"
++                                        "0 0: ON
+	"
++                                        "1 1: shutdown right now
+	"
++                                        "1 2: shutdown after work done
+	"
++                                        "2 0: cancel shutdown
+	"
++                                        "3 0: finished
+	"},
+ };
+ 
+ #define CMD_TABLE_ITEM_CNT      (sizeof(cmd_tables)/sizeof(cmd_tbl_t))
+@@ -503,6 +531,21 @@ int do_turn_signal(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[])
+     return 0;
+ }
+ 
++int do_power_request(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[])
++{
++    ap_power_state_t ap_power_state;
++    char *endptr;
++    if (argc != 3)
++        return CMD_RET_USAGE;
++
++    ap_power_state.powerState = strtol(argv[1], &endptr, 0);
++    ap_power_state.state_param = strtol(argv[2], &endptr, 0);
++    ap_power_state.is_request = 1;
++    xQueueSend(xAPPowerQueue, (void *)&ap_power_state, (TickType_t)0);
++
++    return 0;
++}
++
+ hvac_cmd_map_t hvac_cmd_map[] =
+ {
+     {"ac_on", STATE_TYPE_AC_ON, 1},
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.h b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.h
+index 37ec25c..f53e50e 100644
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.h
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/automotive.h
+@@ -60,6 +60,7 @@ enum _VEHICLE_STATE_TYPE
+     STATE_TYPE_LIGHT,    /* B0:light index, B1:level */
+     STATE_TYPE_GEAR,     /* B0:gear index */
+     STATE_TYPE_TURN_SIGNAL, /* B0:none/left/right */
++    STATE_TYPE_POWER_REQ, /* B0:power on/off */
+ 
+     STATE_TYPE_ANDROID,  /* B0:registered/unregistered, B1:partition/reason */
+     STATE_TYPE_AP_POWER, /* B0:AP power state */
+@@ -136,10 +137,22 @@ enum _AP_POWER_REPORT
+     AP_POWER_REPORT_DISPLAY_ON,
+ };
+ 
++enum _AP_POWER_REQUEST
++{
++    AP_POWER_REQUEST_ON = 0U,
++    AP_POWER_REQUEST_SHUTDOWN_PREPARE,
++    AP_POWER_REQUEST_CANCEL_SHUTDOWN,
++    AP_POWER_REQUEST_FINISHED,
++};
++
+ typedef struct
+ {
+     uint16_t powerState;
+-    uint32_t time_postpone;
++    union {
++        uint32_t time_postpone;
++        uint32_t state_param;
++    };
++    uint8_t is_request;
+ } ap_power_state_t;
+ 
+ typedef struct _hvac_command_map
+@@ -200,4 +213,4 @@ struct cmd_tbl_s {
+ };
+ typedef struct cmd_tbl_s cmd_tbl_t;
+ 
+-#endif
+\ No newline at end of file
++#endif
+diff --git a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/isi_board.c b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/isi_board.c
+index 5e77cf5..d918c73 100644
+--- a/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/isi_board.c
++++ b/SDK_MEK-MIMX8QM/boards/mekmimx8qm/demo_apps/rear_view_camera/cm4_core1/isi_board.c
+@@ -1582,7 +1582,11 @@ void SOC_UnsetIsiPermission(void)
+ 
+ #define AP_BOOT_PARTITION_ID   1
+ #define AP_BOOT_MU             SC_R_MU_0A
++#ifdef CMAKE_BOOT_FROM_A72
++#define AP_BOOT_CPU            SC_R_A72_0
++#else
+ #define AP_BOOT_CPU            SC_R_A53_0
++#endif
+ #define AP_BOOT_ADDR           0x00000000           /* boot spl*/
+ #define AP_BOOT_DEV            SC_R_SDHC_0
+ 
+diff --git a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/app_srtm.c b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/app_srtm.c
+index af19724..82f0e0e 100644
+--- a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/app_srtm.c
++++ b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/app_srtm.c
+@@ -423,6 +423,7 @@ static srtm_status_t APP_SRTM_Auto_PowerReport(srtm_auto_adapter_t adapter,
+ 
+     ap_report.powerState = (reqData[1] << 8) | reqData[0];
+     ap_report.time_postpone = (reqData[3] << 24) | (reqData[2] << 16) | (reqData[1] << 8) | reqData[0];
++    ap_report.is_request = 0;
+ 
+     PRINTF("Receive power report, state=%x,time_postpone=%d
+", ap_report.powerState, ap_report.time_postpone);
+     if (xQueueSend(xAPPowerQueue, (void *)&ap_report, (TickType_t)0))
+diff --git a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.c b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.c
+index 5a5dded..9913c06 100644
+--- a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.c
++++ b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.c
+@@ -106,27 +106,47 @@ static void ap_power_monitor_task(void *pvParameters)
+     {
+         if (xQueueReceive(xAPPowerQueue, &ap_power, portMAX_DELAY))
+         {
+-            switch (ap_power.powerState)
+-            {
+-            case AP_POWER_REPORT_BOOT_COMPLETE:
+-                /* TODO: send BOOT_REASON to android, boot reason need to get from other module*/
+-                reqData[0] = BOOT_REASON_USER_POWER_ON;
+-                AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_BOOT_REASON, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
+-                break;
+-            case AP_POWER_REPORT_DEEP_SLEEP_ENTRY:
+-                break;
+-            case AP_POWER_REPORT_DEEP_SLEEP_EXIT:
+-                break;
+-            case AP_POWER_REPORT_SHUTDOWN_POSTPONE:
+-                break;
+-            case AP_POWER_REPORT_SHUTDOWN_START:
+-                break;
+-            case AP_POWER_REPORT_DISPLAY_OFF:
+-                break;
+-            case AP_POWER_REPORT_DISPLAY_ON:
+-                break;
+-            default:
+-                break;
++            if (ap_power.is_request == 0) {
++                switch (ap_power.powerState)
++                {
++                    case AP_POWER_REPORT_BOOT_COMPLETE:
++                        /* TODO: send BOOT_REASON to android, boot reason need to get from other module*/
++                        reqData[0] = BOOT_REASON_USER_POWER_ON;
++                        AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_BOOT_REASON, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
++                        break;
++                    case AP_POWER_REPORT_DEEP_SLEEP_ENTRY:
++                        break;
++                    case AP_POWER_REPORT_DEEP_SLEEP_EXIT:
++                        break;
++                    case AP_POWER_REPORT_SHUTDOWN_POSTPONE:
++                        break;
++                    case AP_POWER_REPORT_SHUTDOWN_START:
++                        break;
++                    case AP_POWER_REPORT_DISPLAY_OFF:
++                        break;
++                    case AP_POWER_REPORT_DISPLAY_ON:
++                        break;
++                    default:
++                        break;
++                }
++            } else {
++                switch (ap_power.powerState)
++                {
++                    case AP_POWER_REQUEST_ON:
++                    case AP_POWER_REQUEST_SHUTDOWN_PREPARE:
++                    case AP_POWER_REQUEST_CANCEL_SHUTDOWN:
++                    case AP_POWER_REQUEST_FINISHED:
++                        reqData[0] = (uint8_t)(ap_power.powerState & 0xff);
++                        reqData[1] = (uint8_t)((ap_power.powerState >> 8) & 0xff);
++                        reqData[2] = (uint8_t)(ap_power.state_param & 0xff);
++                        reqData[3] = (uint8_t)((ap_power.state_param >> 8) & 0xff);
++                        reqData[4] = (uint8_t)((ap_power.state_param >> 16) & 0xff);
++                        reqData[5] = (uint8_t)((ap_power.state_param >> 24) & 0xff);
++                        AUTO_SRTM_SendCommand(SRTM_AUTO_CMD_POWER_CTRL, reqData, SRTM_USER_DATA_LENGTH, (TickType_t)10);
++                        break;
++                    default:
++                        break;
++                }
+             }
+         }
+     }
+@@ -396,6 +416,7 @@ int do_help(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_version(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_gear_state(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_turn_signal(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
++int do_power_request(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ int do_vehicle_state_report(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[]);
+ 
+ struct cmd_tbl_s cmd_tables[] =
+@@ -422,6 +443,13 @@ struct cmd_tbl_s cmd_tables[] =
+                                  "format: gear index
+	reverse: gear 2
+	drive: gear 4"},
+     {"turn", 1, do_turn_signal, "send turn signal(none/left/right) to android",
+                                "turn none/left/right:
+	turn 0/1/2"},
++    {"power", 2, do_power_request, "send power request control(on/shutdown) to android",
++                                "format: power state param
+available state and param:
+	"
++                                        "0 0: ON
+	"
++                                        "1 1: shutdown right now
+	"
++                                        "1 2: shutdown after work done
+	"
++                                        "2 0: cancel shutdown
+	"
++                                        "3 0: finished
+	"},
+ };
+ 
+ #define CMD_TABLE_ITEM_CNT      (sizeof(cmd_tables)/sizeof(cmd_tbl_t))
+@@ -503,6 +531,21 @@ int do_turn_signal(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[])
+     return 0;
+ }
+ 
++int do_power_request(struct cmd_tbl_s *cmd_tbl, int argc, char * const argv[])
++{
++    ap_power_state_t ap_power_state;
++    char *endptr;
++    if (argc != 3)
++        return CMD_RET_USAGE;
++
++    ap_power_state.powerState = strtol(argv[1], &endptr, 0);
++    ap_power_state.state_param = strtol(argv[2], &endptr, 0);
++    ap_power_state.is_request = 1;
++    xQueueSend(xAPPowerQueue, (void *)&ap_power_state, (TickType_t)0);
++
++    return 0;
++}
++
+ hvac_cmd_map_t hvac_cmd_map[] =
+ {
+     {"ac_on", STATE_TYPE_AC_ON, 1},
+diff --git a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.h b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.h
+index 37ec25c..f53e50e 100644
+--- a/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.h
++++ b/SDK_MEK-MIMX8QX/boards/mekmimx8qx/demo_apps/rear_view_camera/automotive.h
+@@ -60,6 +60,7 @@ enum _VEHICLE_STATE_TYPE
+     STATE_TYPE_LIGHT,    /* B0:light index, B1:level */
+     STATE_TYPE_GEAR,     /* B0:gear index */
+     STATE_TYPE_TURN_SIGNAL, /* B0:none/left/right */
++    STATE_TYPE_POWER_REQ, /* B0:power on/off */
+ 
+     STATE_TYPE_ANDROID,  /* B0:registered/unregistered, B1:partition/reason */
+     STATE_TYPE_AP_POWER, /* B0:AP power state */
+@@ -136,10 +137,22 @@ enum _AP_POWER_REPORT
+     AP_POWER_REPORT_DISPLAY_ON,
+ };
+ 
++enum _AP_POWER_REQUEST
++{
++    AP_POWER_REQUEST_ON = 0U,
++    AP_POWER_REQUEST_SHUTDOWN_PREPARE,
++    AP_POWER_REQUEST_CANCEL_SHUTDOWN,
++    AP_POWER_REQUEST_FINISHED,
++};
++
+ typedef struct
+ {
+     uint16_t powerState;
+-    uint32_t time_postpone;
++    union {
++        uint32_t time_postpone;
++        uint32_t state_param;
++    };
++    uint8_t is_request;
+ } ap_power_state_t;
+ 
+ typedef struct _hvac_command_map
+@@ -200,4 +213,4 @@ struct cmd_tbl_s {
+ };
+ typedef struct cmd_tbl_s cmd_tbl_t;
+ 
+-#endif
+\ No newline at end of file
++#endif

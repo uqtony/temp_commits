@@ -1,0 +1,1735 @@
+b0315dc7f5 Arthur Chen 2020-06-23
+
+AOS-117: Add MIPI panel display support.
+
+    - initial MIPI phy clocks & LCDIF pixel clock
+    - add MIPI phy initialization.
+    - add LCDIF framebuffer initialization.
+    - add panel module initialization.
+    - use colorbars for default display image.
+
+Change-Id: I9a71a296e1488151c4168d73ef8f3ffc7cc73182
+
+diff --git a/arch/arm/include/asm/arch-imx8m/clock.h b/arch/arm/include/asm/arch-imx8m/clock.h
+index dc89527fbd..4a2d64503c 100644
+--- a/arch/arm/include/asm/arch-imx8m/clock.h
++++ b/arch/arm/include/asm/arch-imx8m/clock.h
+@@ -26,6 +26,13 @@ enum mxc_clock {
+ 	MXC_I2C_CLK,
+ 	MXC_UART_CLK,
+ 	MXC_QSPI_CLK,
++	MXC_MIPI_DSI_PHY_REF_CLK,
++	MXC_MIPI_DSI_ESC_RX_CLK,
++	MXC_MIPI_DSI_ESC_TX_CLK,
++	MXC_MIPI_DSI_CORE_CLK,
++	MXC_MIPI_DSI_DBI_CLK,
++	MXC_OLD_MIPI_DSI_ESC_RX_CLK,
++	MXC_LCDIF_PIXEL_CLK,
+ };
+ 
+ enum clk_slice_type {
+@@ -259,6 +266,7 @@ void init_uart_clk(u32 index);
+ void init_usb_clk(void);
+ void init_wdog_clk(void);
+ void init_clk_ecspi(u32 index);
++void init_mipi_clk(void);
+ unsigned int mxc_get_clock(enum mxc_clock  clk);
+ int clock_enable(enum clk_ccgr_index index, bool enable);
+ int clock_root_enabled(enum clk_root_index clock_id);
+diff --git a/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h b/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
+index 42ece958ee..24828fc48f 100644
+--- a/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
++++ b/arch/arm/include/asm/arch-imx8m/clock_imx8mq.h
+@@ -42,7 +42,8 @@ enum clk_root_index {
+ 	AHB_CLK_ROOT			= 32,
+ 	IPG_CLK_ROOT			= 33,
+ 	AUDIO_AHB_CLK_ROOT		= 34,
+-	MIPI_DSI_ESC_RX_CLK_ROOT	= 36,
++	MIPI_DSI_ESC_RX_CLK_ROOT	= 36,  /* in linux kernel: DSI_AHB */
++	MIPI_DSI_ESC_TX_CLK_ROOT	= 37, /* in linux kernel: DSI_IPGDIV */
+ 	DRAM_SEL_CFG			= 48,
+ 	CORE_SEL_CFG			= 49,
+ 	DRAM_ALT_CLK_ROOT		= 64,
+diff --git a/arch/arm/include/asm/arch-imx8m/video_common.h b/arch/arm/include/asm/arch-imx8m/video_common.h
+index cdeec6999c..c7fa751989 100644
+--- a/arch/arm/include/asm/arch-imx8m/video_common.h
++++ b/arch/arm/include/asm/arch-imx8m/video_common.h
+@@ -26,8 +26,10 @@ struct video_mode_settings {
+ 
+ #define	PS2KHZ(ps)	(1000000000UL / (ps))
+ struct video_mode_settings *imx8m_get_gmode(void);
++struct video_mode_settings *imx8m_get_mipi_gmode(void);
+ GraphicDevice *imx8m_get_gd(void);
+ void imx8m_show_gmode(void);
++void imx8m_show_mipi_gmode(void);
+ void imx8m_create_color_bar(
+ 	void *start_address,
+ 	struct video_mode_settings *vms);
+@@ -35,6 +37,8 @@ int imx8m_fb_init(
+ 	struct fb_videomode const *mode,
+ 	uint8_t disp,
+ 	uint32_t pixfmt);
++int imx8m_mipi_fb_init(struct fb_videomode const *mode, uint32_t pixfmt);
+ void imx8m_fb_disable(void);
++void imx8m_mipi_fb_disable(void);
+ 
+ #endif /* __ASM_ARCH_VIDEO_COMMON_H__ */
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index c7026d8d8c..8636ea8168 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -394,6 +394,7 @@ void arch_preboot_os(void)
+ #endif
+ #if defined(CONFIG_VIDEO_IMXDCSS)
+ 	imx8m_fb_disable();
++	imx8m_mipi_fb_disable();
+ #endif
+ }
+ 
+diff --git a/arch/arm/mach-imx/imx8m/clock_imx8mq.c b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+index b6175d8154..3b3307b35c 100644
+--- a/arch/arm/mach-imx/imx8m/clock_imx8mq.c
++++ b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+@@ -29,6 +29,12 @@ static u32 decode_frac_pll(enum clk_root_src frac_pll)
+ 		pllout_div_shift = HW_FRAC_ARM_PLL_DIV_SHIFT;
+ 		pllout_div_mask = HW_FRAC_ARM_PLL_DIV_MASK;
+ 		break;
++	case VIDEO_PLL_CLK:
++		pll_cfg0 = readl(&ana_pll->video_pll_cfg0);
++		pll_cfg1 = readl(&ana_pll->video_pll_cfg1);
++		pllout_div_shift = HW_FRAC_ARM_PLL_DIV_SHIFT;
++		pllout_div_mask = HW_FRAC_ARM_PLL_DIV_MASK;
++		break;
+ 	default:
+ 		printf("Frac PLL %d not supporte
+", frac_pll);
+ 		return 0;
+@@ -254,6 +260,7 @@ static u32 get_root_src_clk(enum clk_root_src root_src)
+ 	case OSC_32K_CLK:
+ 		return 32768;
+ 	case ARM_PLL_CLK:
++	case VIDEO_PLL_CLK:
+ 		return decode_frac_pll(root_src);
+ 	case SYSTEM_PLL1_800M_CLK:
+ 	case SYSTEM_PLL1_400M_CLK:
+@@ -352,6 +359,20 @@ unsigned int mxc_get_clock(enum mxc_clock clk)
+ 		return get_root_clk(UART1_CLK_ROOT);
+ 	case MXC_QSPI_CLK:
+ 		return get_root_clk(QSPI_CLK_ROOT);
++	case MXC_MIPI_DSI_PHY_REF_CLK:
++		return get_root_clk(MIPI_DSI_PHY_REF_CLK_ROOT);
++	case MXC_MIPI_DSI_ESC_RX_CLK:
++		return get_root_clk(MIPI_DSI_ESC_RX_CLK_ROOT);
++	case MXC_OLD_MIPI_DSI_ESC_RX_CLK:
++		return get_root_clk(OLD_MIPI_DSI_ESC_RX_ROOT);
++	case MXC_MIPI_DSI_ESC_TX_CLK:
++		return get_root_clk(MIPI_DSI_ESC_TX_CLK_ROOT);
++	case MXC_MIPI_DSI_CORE_CLK:
++		return get_root_clk(MIPI_DSI_CORE_CLK_ROOT);
++	case MXC_MIPI_DSI_DBI_CLK:
++		return get_root_clk(MIPI_DSI_DBI_CLK_ROOT);
++	case MXC_LCDIF_PIXEL_CLK:
++		return get_root_clk(LCDIF_PIXEL_CLK_ROOT);
+ 	default:
+ 		printf("Unsupported mxc_clock %d
+", clk);
+ 		break;
+@@ -427,6 +448,66 @@ void init_nand_clk(void)
+ 	clock_enable(CCGR_RAWNAND, 1);
+ }
+ 
++void init_mipi_clk(void)
++{
++	/* MIPI power on */
++	writel(0x0000ffff, (GPC_BASE_ADDR + 0xEC));
++	writel(0x1, (GPC_BASE_ADDR + 0XF8));
++
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_BYPASS_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_PD_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_REFCLK_SEL_OSC_27M |
++		     FRAC_PLL_LOCK_SEL_MASK);
++	clrbits_le32(&ana_pll->video_pll_cfg0,
++		     FRAC_PLL_COUNTCLK_SEL_MASK | BIT(0));
++
++	setbits_le32(&ana_pll->video_pll_cfg1,
++		     BIT(30) | BIT(26) | BIT(25) | BIT(24) | BIT(20) |
++		     BIT(19) | BIT(18) | BIT(14) | BIT(13) | BIT(12) |
++		     BIT(8) | BIT(5) | BIT(3) | BIT(2));
++	clrbits_le32(&ana_pll->video_pll_cfg1, BIT(6));
++
++	clrbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_PD_MASK);
++	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_CLKE_MASK);
++	clrbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_BYPASS_MASK);
++	udelay(50);
++	clrbits_le32(&ana_pll->sys_pll1_cfg0,
++		     SSCG_PLL_BYPASS1_MASK | SSCG_PLL_BYPASS2_MASK);
++
++	clock_set_target_val(MIPI_DSI_PHY_REF_CLK_ROOT, CLK_ROOT_ON |
++			     BIT(5) | BIT(3) |
++			     CLK_ROOT_SOURCE_SEL(7));
++	clock_enable(MIPI_DSI_PHY_REF_CLK_ROOT, 1);
++
++	clock_enable(MIPI_DSI_CORE_CLK_ROOT, 0);
++	clock_set_target_val(MIPI_DSI_CORE_CLK_ROOT, CLK_ROOT_ON |
++			     CLK_ROOT_SOURCE_SEL(1));
++	clock_enable(MIPI_DSI_CORE_CLK_ROOT, 1);
++
++	clock_set_target_val(MIPI_DSI_DBI_CLK_ROOT, CLK_ROOT_OFF);
++	clrbits_le32(MIPI_DSI_DBI_CLK_ROOT, BIT(28));
++	writel(0x0, MIPI_DSI_DBI_CLK_ROOT);
++
++	clock_set_target_val(OLD_MIPI_DSI_ESC_RX_ROOT, CLK_ROOT_OFF);
++	clrbits_le32(OLD_MIPI_DSI_ESC_RX_ROOT, BIT(28));
++	writel(0x0, OLD_MIPI_DSI_ESC_RX_ROOT);
++
++	clock_enable(MIPI_DSI_ESC_RX_CLK_ROOT, 0); /* IMX8MQ_CLK_DSI_AHB */
++	clock_set_target_val(MIPI_DSI_ESC_RX_CLK_ROOT, CLK_ROOT_ON |
++			     CLK_ROOT_SOURCE_SEL(2));
++	clock_enable(MIPI_DSI_ESC_RX_CLK_ROOT, 1);
++
++	clock_enable(MIPI_DSI_ESC_TX_CLK_ROOT, 0);
++	writel(0x3, 0x30389280);
++	clock_enable(MIPI_DSI_ESC_TX_CLK_ROOT, 1);
++
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 0); /* IMX8MQ_CLK_DSI_AHB */
++	clock_set_target_val(LCDIF_PIXEL_CLK_ROOT, CLK_ROOT_ON |
++			     BIT(3) | BIT(1) | BIT(0) |
++			     CLK_ROOT_SOURCE_SEL(1));
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 1);
++}
++
+ void init_uart_clk(u32 index)
+ {
+ 	/* Set uart clock root 25M OSC */
+@@ -713,6 +794,7 @@ int frac_pll_init(u32 pll, enum frac_pll_out_val val)
+ 				 val_cfg0 & FRAC_PLL_LOCK_MASK, 1);
+ 	if (ret)
+ 		printf("%s timeout
+", __func__);
++
+ 	clrbits_le32(pll_cfg0, FRAC_PLL_NEWDIV_VAL_MASK);
+ 
+ 	return 0;
+@@ -819,6 +901,9 @@ int clock_init(void)
+ 	 * sys pll2 fixed at 1GHz
+ 	 * Here we only enable the outputs.
+ 	 */
++
++	/* enable SYS_PLL1 */
++
+ 	setbits_le32(&ana_pll->sys_pll1_cfg0, SSCG_PLL_CLKE_MASK |
+ 		     SSCG_PLL_DIV2_CLKE_MASK | SSCG_PLL_DIV3_CLKE_MASK |
+ 		     SSCG_PLL_DIV4_CLKE_MASK | SSCG_PLL_DIV5_CLKE_MASK |
+@@ -831,6 +916,12 @@ int clock_init(void)
+ 		     SSCG_PLL_DIV6_CLKE_MASK | SSCG_PLL_DIV8_CLKE_MASK |
+ 		     SSCG_PLL_DIV10_CLKE_MASK | SSCG_PLL_DIV20_CLKE_MASK);
+ 
++	/*
++	 * According to ANAMIX SPEC
++	 * video_pll1_ref fixed at 27MHz
++	 * Here we only enable the outputs.
++	 */
++
+ 	clock_set_target_val(NAND_USDHC_BUS_CLK_ROOT, CLK_ROOT_ON |
+ 			     CLK_ROOT_SOURCE_SEL(1));
+ 
+@@ -857,7 +948,23 @@ int do_imx8m_showclocks(cmd_tbl_t *cmdtp, int flag, int argc,
+ 	u32 freq;
+ 
+ 	freq = decode_frac_pll(ARM_PLL_CLK);
+-	printf("ARM_PLL    %8d MHz
+", freq / 1000000);
++	printf("ARM_PLL	 %8d MHz
+", freq / 1000000);
++	freq = decode_frac_pll(VIDEO_PLL_CLK);
++	printf("VIDEO_PLL_CLK	 %ld Hz
+", freq);
++	freq = mxc_get_clock(MXC_MIPI_DSI_PHY_REF_CLK);
++	printf("MIPI_DSI_PHY_REF_CLK	 %ld Hz
+", freq);
++	freq = mxc_get_clock(MXC_MIPI_DSI_ESC_RX_CLK);
++	printf("MIPI_DSI_ESC_RX_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_OLD_MIPI_DSI_ESC_RX_CLK);
++	printf("OLD_MIPI_DSI_ESC_RX_ROOT	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_ESC_TX_CLK);
++	printf("MIPI_DSI_ESC_TX_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_CORE_CLK);
++	printf("MIPI_DSI_CORE_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_MIPI_DSI_DBI_CLK);
++	printf("MIPI_DSI_DBI_CLK	 %8d MHz
+", freq / 1000000);
++	freq = mxc_get_clock(MXC_LCDIF_PIXEL_CLK);
++	printf("MXC_LCDIF_PIXEL_CLK	 %ld Hz
+", freq);
+ 	freq = decode_sscg_pll(SYSTEM_PLL1_800M_CLK);
+ 	printf("SYS_PLL1_800    %8d MHz
+", freq / 1000000);
+ 	freq = decode_sscg_pll(SYSTEM_PLL1_400M_CLK);
+diff --git a/arch/arm/mach-imx/imx8m/clock_slice.c b/arch/arm/mach-imx/imx8m/clock_slice.c
+index 8d086ac1bc..1088e9588a 100644
+--- a/arch/arm/mach-imx/imx8m/clock_slice.c
++++ b/arch/arm/mach-imx/imx8m/clock_slice.c
+@@ -114,10 +114,13 @@ static struct clk_root_map root_array[] = {
+ 	  SYSTEM_PLL3_CLK, AUDIO_PLL1_CLK, VIDEO_PLL_CLK}
+ 	},
+ 	{MIPI_DSI_ESC_RX_CLK_ROOT, AHB_CLOCK_SLICE, 2,
+-	 {OSC_25M_CLK, SYSTEM_PLL2_100M_CLK, SYSTEM_PLL1_40M_CLK,
++	 {OSC_25M_CLK, SYSTEM_PLL2_100M_CLK, SYSTEM_PLL1_80M_CLK,
+ 	  SYSTEM_PLL1_800M_CLK, SYSTEM_PLL2_1000M_CLK,
+ 	  SYSTEM_PLL3_CLK, EXT_CLK_3, AUDIO_PLL1_CLK },
+ 	},
++	{MIPI_DSI_ESC_TX_CLK_ROOT, IPG_CLOCK_SLICE, 1,
++	 {},
++	},
+ 	{DRAM_ALT_CLK_ROOT, IP_CLOCK_SLICE, 0,
+ 	 {OSC_25M_CLK, SYSTEM_PLL1_800M_CLK, SYSTEM_PLL1_100M_CLK,
+ 	  SYSTEM_PLL2_500M_CLK, SYSTEM_PLL2_250M_CLK,
+diff --git a/arch/arm/mach-imx/imx8m/video_common.c b/arch/arm/mach-imx/imx8m/video_common.c
+index e2c7c01258..36a4d6db8b 100644
+--- a/arch/arm/mach-imx/imx8m/video_common.c
++++ b/arch/arm/mach-imx/imx8m/video_common.c
+@@ -25,13 +25,21 @@ DECLARE_GLOBAL_DATA_PTR;
+ #undef IMXDCSS_SET_PIXEL_CLOCK
+ 
+ static struct video_mode_settings gmode;
++static struct video_mode_settings mipi_gmode;
+ static uint32_t gpixfmt;
++static uint32_t mipi_gpixfmt;
+ GraphicDevice panel;
++GraphicDevice mipi_panel;
+ struct video_mode_settings *imx8m_get_gmode(void)
+ {
+ 	return &gmode;
+ }
+ 
++struct video_mode_settings *imx8m_get_mipi_gmode(void)
++{
++	return &mipi_gmode;
++}
++
+ void imx8m_show_gmode(void)
+ {
+ 	printf("gmode =
+"
+@@ -55,13 +63,44 @@ void imx8m_show_gmode(void)
+ 	       gmode.vbp, gmode.hsync, gmode.vsync, gmode.hpol, gmode.vpol);
+ }
+ 
++void imx8m_show_mipi_gmode(void)
++{
++	printf("mipi_gmode :
+"
++	       "pixelclock = %u
+"
++	       "xres       = %u
+"
++	       "yres       = %u
+"
++	       "hfp        = %u
+"
++	       "hbp        = %u
+"
++	       "vfp        = %u
+"
++	       "vbp        = %u
+"
++	       "hsync      = %u
+"
++	       "vsync      = %u
+"
++	       "hpol       = %u
+"
++	       "vpol       = %u
+",
++	       mipi_gmode.pixelclock,
++	       mipi_gmode.xres,
++	       mipi_gmode.yres,
++	       mipi_gmode.hfp,
++	       mipi_gmode.hbp,
++	       mipi_gmode.vfp,
++	       mipi_gmode.vbp, mipi_gmode.hsync, mipi_gmode.vsync,
++	       mipi_gmode.hpol, mipi_gmode.vpol);
++}
++
+ GraphicDevice *imx8m_get_gd(void)
+ {
+ 	return &panel;
+ }
+ 
++GraphicDevice *imx8m_mipi_get_gd(void)
++{
++	return &mipi_panel;
++}
++
+ #define REG_BASE_ADDR 0x32e00000UL
+ 
++#define LCDIF_REG_BASE_ADDR 0x30320000UL
++
+ /*#define DEBUGREG*/
+ #ifdef DEBUGREG
+ #define reg32_write(addr, val) \
+@@ -625,6 +664,78 @@ static void imx8m_display_init(u64 buffer, int encoding,
+ 	debug("leaving %s() ...
+", __func__);
+ }
+ 
++static void imx8m_lcdif_display_init(u64 buffer,
++				     struct video_mode_settings *vms)
++{
++	struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *) LCDIF_REG_BASE_ADDR;
++	uint32_t word_len = 0, bus_width = 0;
++	uint8_t valid_data = 0;
++
++	debug("entering %s() ...
+", __func__);
++	debug("%s() buffer ...
+", __func__);
++
++	mxs_reset_block(&regs->hw_lcdif_ctrl_reg);
++
++	/* 24 BITS SETTING */
++	word_len = LCDIF_CTRL_WORD_LENGTH_24BIT;
++	bus_width = LCDIF_CTRL_LCD_DATABUS_WIDTH_24BIT;
++	valid_data = 0x7;
++
++	writel(bus_width | word_len | LCDIF_CTRL_DOTCLK_MODE |
++	       LCDIF_CTRL_BYPASS_COUNT | LCDIF_CTRL_LCDIF_MASTER,
++	       &regs->hw_lcdif_ctrl);
++
++	writel(valid_data << LCDIF_CTRL1_BYTE_PACKING_FORMAT_OFFSET,
++	       &regs->hw_lcdif_ctrl1);
++
++	writel(LCDIF_CTRL2_OUTSTANDING_REQS_REQ_16 |
++	       LCDIF_CTRL2_ODD_LINE_PATTERN_BGR |
++	       LCDIF_CTRL2_EVEN_LINE_PATTERN_BGR, &regs->hw_lcdif_ctrl2);
++
++	writel((vms->yres << LCDIF_TRANSFER_COUNT_V_COUNT_OFFSET) | vms->xres,
++		&regs->hw_lcdif_transfer_count);
++
++	writel(LCDIF_VDCTRL0_ENABLE_PRESENT | LCDIF_VDCTRL0_VSYNC_POL |
++		LCDIF_VDCTRL0_HSYNC_POL |
++		LCDIF_VDCTRL0_VSYNC_PERIOD_UNIT |
++		LCDIF_VDCTRL0_VSYNC_PULSE_WIDTH_UNIT |
++		vms->vsync, &regs->hw_lcdif_vdctrl0);
++
++	writel(vms->vfp + vms->vbp +
++		vms->vsync + vms->yres,
++		&regs->hw_lcdif_vdctrl1);
++
++	writel((vms->hsync << LCDIF_VDCTRL2_HSYNC_PULSE_WIDTH_OFFSET) |
++		(vms->hbp + vms->hfp +
++		vms->hsync + vms->xres),
++		&regs->hw_lcdif_vdctrl2);
++
++	writel(((vms->hbp + vms->hsync) <<
++		LCDIF_VDCTRL3_HORIZONTAL_WAIT_CNT_OFFSET) |
++		(vms->vfp + vms->vsync),
++		&regs->hw_lcdif_vdctrl3);
++
++	writel((0 << LCDIF_VDCTRL4_DOTCLK_DLY_SEL_OFFSET) | vms->xres,
++		&regs->hw_lcdif_vdctrl4);
++
++	writel((ulong) buffer, &regs->hw_lcdif_cur_buf);
++	writel((ulong) buffer, &regs->hw_lcdif_next_buf);
++
++	/* Flush FIFO first */
++	writel(LCDIF_CTRL1_FIFO_CLEAR, &regs->hw_lcdif_ctrl1_set);
++
++	/* Sync signals ON */
++	setbits_le32(&regs->hw_lcdif_vdctrl4, LCDIF_VDCTRL4_SYNC_SIGNALS_ON);
++
++	/* FIFO cleared */
++	writel(LCDIF_CTRL1_FIFO_CLEAR, &regs->hw_lcdif_ctrl1_clr);
++
++	/* RUN! */
++	writel(LCDIF_CTRL_RUN, &regs->hw_lcdif_ctrl_set);
++
++	debug("leaving %s() ...
+", __func__);
++}
++
+ void imx8m_display_shutdown(void)
+ {
+ 	/* stop the DCSS modules in use */
+@@ -648,6 +759,23 @@ void imx8m_display_shutdown(void)
+ #endif
+ 
+ }
++
++void imx8m_lcdif_display_shutdown(void)
++{
++	struct mxs_lcdif_regs *regs = (struct mxs_lcdif_regs *)
++				      LCDIF_REG_BASE_ADDR;
++	int timeout = 1000000;
++
++	writel(LCDIF_CTRL1_VSYNC_EDGE_IRQ, &regs->hw_lcdif_ctrl1_clr);
++	while (--timeout) {
++		if (readl(&regs->hw_lcdif_ctrl1_reg) &
++		    LCDIF_CTRL1_VSYNC_EDGE_IRQ)
++			break;
++		udelay(1);
++	}
++	mxs_reset_block((struct mxs_register_32 *)&regs->hw_lcdif_ctrl_reg);
++}
++
+ void *video_hw_init(void)
+ {
+ 	void *fb;
+@@ -692,6 +820,41 @@ void *video_hw_init(void)
+ 	return &panel;
+ }
+ 
++void *mipi_video_hw_init(void)
++{
++	void *fb;
++	int ret;
++
++	debug("%s()
+", __func__);
++
++	mipi_panel.winSizeX = mipi_gmode.xres;
++	mipi_panel.winSizeY = mipi_gmode.yres;
++	mipi_panel.plnSizeX = mipi_gmode.xres;
++	mipi_panel.plnSizeY = mipi_gmode.yres;
++	mipi_panel.gdfBytesPP = 4;
++	mipi_panel.gdfIndex = GDF_32BIT_X888RGB;
++	mipi_panel.memSize = mipi_gmode.xres * mipi_gmode.yres * mipi_panel.gdfBytesPP;
++
++	/* Allocate framebuffer */
++	fb = memalign(ARCH_DMA_MINALIGN, roundup(mipi_panel.memSize, ARCH_DMA_MINALIGN));
++	debug("%s(): fb %p
+", __func__, fb);
++	if (!fb) {
++		printf("%s, %s(): Error allocating framebuffer!
+",
++		       __FILE__, __func__);
++
++		return NULL;
++	}
++	/* Wipe framebuffer */
++	memset(fb, 0, mipi_panel.memSize);
++	imx8m_create_color_bar((void *)((uint64_t) fb), &mipi_gmode);
++	/* Start LCDIF */
++	imx8m_lcdif_display_init((uint64_t) fb, &mipi_gmode);
++	mipi_panel.frameAdrs = (ulong) fb;
++	debug("IMX LCDIF display started ...
+");
++
++	return &mipi_panel;
++}
++
+ void imx8m_fb_disable(void)
+ {
+ 	debug("%s()
+", __func__);
+@@ -704,6 +867,16 @@ void imx8m_fb_disable(void)
+ 
+ }
+ 
++void imx8m_mipi_fb_disable(void)
++{
++	debug("%s()
+", __func__);
++
++	if (mipi_panel.frameAdrs) {
++		imx8m_lcdif_display_shutdown();
++	}
++
++}
++
+ int imx8m_fb_init(struct fb_videomode const *mode,
+ 		    uint8_t disp, uint32_t pixfmt)
+ {
+@@ -740,3 +913,29 @@ int imx8m_fb_init(struct fb_videomode const *mode,
+ 
+ 	return 0;
+ }
++
++int imx8m_mipi_fb_init(struct fb_videomode const *mode,
++		       uint32_t pixfmt)
++{
++	debug("entering %s()
+", __func__);
++
++	memset(&mipi_gmode, 0, sizeof(struct video_mode_settings));
++	mipi_gmode.pixelclock = mode->pixclock;
++	mipi_gmode.xres = mode->xres;
++	mipi_gmode.hbp = mode->left_margin;
++	mipi_gmode.hfp = mode->right_margin;
++
++	mipi_gmode.yres = mode->yres;
++	mipi_gmode.vbp = mode->upper_margin;
++	mipi_gmode.vfp = mode->lower_margin;
++
++	mipi_gmode.hsync = mode->hsync_len;
++	mipi_gmode.vsync = mode->vsync_len;
++	mipi_gmode.hpol = (mode->flag & FB_SYNC_HOR_HIGH_ACT) ? 1 : 0;
++	mipi_gmode.vpol = (mode->flag & FB_SYNC_VERT_HIGH_ACT) ? 1 : 0;
++	mipi_gpixfmt = pixfmt;
++
++	debug("leaving %s()
+", __func__);
++
++	return 0;
++}
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index 69eb4b1be5..299208710b 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -30,6 +30,10 @@
+ #include <persist_idt.h>
+ #include <fb_fsl.h>
+ #include <dt_table.h>
++#include <mipi_dsi_northwest.h>
++#include <imx_mipi_dsi_bridge.h>
++#include <mipi_dsi_panel.h>
++#include <stdio_dev.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -269,7 +273,7 @@ static struct display_info_t mipi_displays[] = {{
+ 	.detect	= NULL,
+ 	.enable	= NULL,
+ 	.mode	= {
+-		.name           = "PANEL", /* 720P60 */
++		.name           = "HX8394F", /* 720P60 */
+ 		.refresh        = 60,
+ 		.xres           = 1280,
+ 		.yres           = 720,
+@@ -290,7 +294,7 @@ static struct display_info_t mipi_displays[] = {{
+ #define DTBO_ENTRIES	4
+ #define SLOT_A_P_OFFSET	(2048 + 9)
+ #define SLOT_B_P_OFFSET	(2048 + 13)
+-#define PANEL_PATH "/mipi_dsi_bridge@30A00000/panel@0/display-timings/timing"
++#define PANEL_PATH "/soc@0/bus@30800000/mipi_dsi@30a00000/panel@0/display-timings/timing"
+ static const char *dtbo_slot[2] = {"dtbo_a", "dtbo_b"};
+ int entry_idx;
+ 
+@@ -543,11 +547,66 @@ int get_dtbo_mipi_dsi_timing(void)
+ 	} else {
+ 		printf("fastboot_flash_find_ptn misc fail: %d
+
+",
+ 		       fpt_en_misc);
++		fdt_idx = -1;
+ 	}
+ 
+ 	return fdt_idx;
+ }
+ 
++struct mipi_dsi_client_dev idt_panel_dev = {
++	.channel	= 0,
++	.lanes = 4,
++	.format  = MIPI_DSI_FMT_RGB888,
++	.mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
++		      MIPI_DSI_MODE_EOT_PACKET | MIPI_DSI_MODE_VIDEO_HSE,
++};
++
++#define MIPI_RESET_PAD IMX_GPIO_NR(3, 4)
++
++static iomux_v3_cfg_t const mipi_reset_pads[] = {
++	IMX8MQ_PAD_NAND_CE3_B__GPIO3_IO4 | MUX_PAD_CTRL(NO_PAD_CTRL),
++};
++
++#define MIPI_PWM_PAD IMX_GPIO_NR(5, 5)
++
++static iomux_v3_cfg_t const mipi_pwm_pads[] = {
++	IMX8MQ_PAD_SPDIF_EXT_CLK__GPIO5_IO5 | MUX_PAD_CTRL(NO_PAD_CTRL),
++};
++
++void mipi_backlight_on(void)
++{
++	imx_iomux_v3_setup_multiple_pads(mipi_pwm_pads,
++					 ARRAY_SIZE(mipi_pwm_pads));
++
++	gpio_request(MIPI_PWM_PAD, "mipi_pwm");
++	gpio_direction_output(MIPI_PWM_PAD, 1);
++}
++
++void do_enable_mipi(void)
++{
++	int ret;
++
++	mipi_backlight_on();
++	imx_iomux_v3_setup_multiple_pads(mipi_reset_pads,
++					 ARRAY_SIZE(mipi_reset_pads));
++	reset_mipi_panel(MIPI_RESET_PAD);
++	ret = mipi_dsi_northwest_setup(MIPI_PHY_BASE_ADDR, SRC_IPS_BASE_ADDR);
++	hx8394f_init();
++	idt_panel_dev.name = mipi_displays[0].mode.name;
++	ret = imx_mipi_dsi_bridge_attach(&idt_panel_dev);
++	ret = imx_mipi_dsi_bridge_mode_set(&mipi_displays[0].mode);
++	ret = imx_mipi_dsi_bridge_enable();
++}
++
++void do_enable_lcdif_fb(void)
++{
++	GraphicDevice *pGD_mipi;
++	int ret;
++
++	ret = imx8m_mipi_fb_init(&mipi_displays[0].mode, mipi_displays[0].pixfmt);
++	pGD_mipi = mipi_video_hw_init();
++}
++
+ int board_init(void)
+ {
+ #ifdef CONFIG_FSL_QSPI
+@@ -580,6 +639,10 @@ int board_late_init(void)
+ #endif
+ 	fastboot_setup();
+ 	entry_idx = get_dtbo_mipi_dsi_timing();
++	if (entry_idx > 0) {
++		do_enable_mipi();
++		do_enable_lcdif_fb();
++	}
+ 
+ 	return 0;
+ }
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 34da219a6f..6fdca83763 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -787,4 +787,14 @@ config IHS_VIDEO_OUT
+ 	  out On-screen Display (OSD) used on gdsys FPGAs to control dynamic
+ 	  textual overlays of the display outputs.
+ 
++config ILI9881H
++	bool "Enable panel driver"
++	help
++	  Enable TENMA panel for IDTECH.
++
++config HX8394F
++	bool "Enable panel driver"
++	help
++	  Enable DATA IMAGE panel for IDTECH.
++
+ endmenu
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index dffe7ccc30..2f98ccc646 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -74,6 +74,8 @@ obj-$(CONFIG_IMX_MIPI_DSI_BRIDGE) += imx_mipi_dsi_bridge.o
+ obj-$(CONFIG_HX8363) += hx8363_wvga.o
+ obj-$(CONFIG_RM67191) += rm67191.o
+ obj-$(CONFIG_RM68200) += rm68200.o
++obj-$(CONFIG_ILI9881H) += ili9881h.o
++obj-$(CONFIG_HX8394F) += hx8394f.o
+ 
+ obj-y += bridge/
+ obj-y += sunxi/
+diff --git a/drivers/video/hx8394f.c b/drivers/video/hx8394f.c
+new file mode 100644
+index 0000000000..78cd63df25
+--- /dev/null
++++ b/drivers/video/hx8394f.c
+@@ -0,0 +1,152 @@
++/*
++ * Copyright 2020 IDTECH
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <imx_mipi_dsi_bridge.h>
++#include <mipi_display.h>
++#include <asm-generic/gpio.h>
++
++
++#define CHECK_RETCODE(ret)					\
++do {								\
++	if (ret < 0) {						\
++		printf("%s ERR: ret:%d, line:%d.
+",		\
++			__func__, ret, __LINE__);		\
++		return ret;					\
++	}							\
++} while (0)
++
++static void parse_variadic(int n, u8 *buf, ...)
++{
++	int i = 0;
++	va_list args;
++
++	if (unlikely(!n))
++		return;
++
++	va_start(args, buf);
++
++	for (i = 0; i < n; i++)
++		buf[i + 1] = (u8)va_arg(args, int);
++
++	va_end(args);
++}
++
++#define HX8394F_DCS_write_1A_nP(n, addr, ...) {			\
++	int err;							\
++									\
++	buf[0] = addr;							\
++	parse_variadic(n, buf, ##__VA_ARGS__);				\
++									\
++	if (n >= 2)							\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_LONG_WRITE, (u8 *)buf, n + 1);	\
++	else if (n == 1)						\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_SHORT_WRITE_PARAM, (u8 *)buf, 0);	\
++	else if (n == 0) {						\
++		buf[1] = 0;						\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_SHORT_WRITE, (u8 *)buf, 0);	\
++	}								\
++	CHECK_RETCODE(err);						\
++}
++
++#define HX8394F_DCS_write_1A_0P(addr)			\
++	HX8394F_DCS_write_1A_nP(0, addr)
++
++#define HX8394F_DCS_write_1A_1P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(1, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_2P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(2, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_3P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(3, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_6P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(6, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_10P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(10, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_20P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(20, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_33P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(33, addr, __VA_ARGS__)
++
++#define HX8394F_DCS_write_1A_44P(addr, ...)		\
++	HX8394F_DCS_write_1A_nP(44, addr, __VA_ARGS__)
++
++int mipid_hx8394f_lcd_setup(struct mipi_dsi_client_dev *panel_dev)
++{
++	u8 buf[DSI_CMD_BUF_MAXSIZE];
++
++	HX8394F_DCS_write_1A_3P(0xB9, 0xFF, 0x83, 0x94);
++	HX8394F_DCS_write_1A_10P(0xB1, 0x48, 0x12, 0x72, 0x09, 0x33,
++				 0x24, 0x51, 0x51, 0x30, 0x43);
++	HX8394F_DCS_write_1A_6P(0xBA, 0x63, 0x03, 0x68, 0x6B, 0xB2, 0xC0);
++	HX8394F_DCS_write_1A_6P(0xB2, 0x00, 0x80, 0x64, 0x0C, 0x06, 0x2F);
++	HX8394F_DCS_write_1A_20P(0xB4, 0x76, 0x74, 0x76, 0x74, 0x76, 0x74, 0x01,
++				 0x0C, 0x86, 0x75, 0x00, 0x3F, 0x76, 0x74, 0x76,
++				 0x74, 0x76, 0x74, 0x01, 0x0C);
++	HX8394F_DCS_write_1A_33P(0xD3, 0x00, 0x00, 0x07, 0x07, 0x00, 0x00, 0x12,
++				 0x10, 0x32, 0x10, 0x00, 0x00, 0x00, 0x32, 0x13,
++				 0xC0, 0x00, 0x00, 0x32, 0x10, 0x08, 0x00, 0x00,
++				 0x47, 0x04, 0x02, 0x02, 0x47, 0x04, 0x00, 0x47,
++				 0x0C, 0x40);
++	HX8394F_DCS_write_1A_44P(0xD5, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
++				 0x07, 0x20, 0x21, 0x22, 0x23, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x19, 0x19, 0x18, 0x18);
++	HX8394F_DCS_write_1A_44P(0xD6, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01,
++				 0x00, 0x23, 0x22, 0x21, 0x20, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18,
++				 0x18, 0x18, 0x18, 0x19, 0x19);
++	HX8394F_DCS_write_1A_2P(0xB6, 0x5B, 0x5B);
++	HX8394F_DCS_write_1A_1P(0xCC, 0x0B);
++	HX8394F_DCS_write_1A_2P(0xC0, 0x1F, 0x31);
++	HX8394F_DCS_write_1A_1P(0xD4, 0x02);
++	HX8394F_DCS_write_1A_1P(0xBD, 0x01);
++	HX8394F_DCS_write_1A_1P(0xB1, 0x00);
++	HX8394F_DCS_write_1A_1P(0xBD, 0x00);
++	HX8394F_DCS_write_1A_1P(0xC6, 0xED);
++	HX8394F_DCS_write_1A_0P(0x11);
++	mdelay(100);
++	HX8394F_DCS_write_1A_0P(0x29);
++
++	return 0;
++}
++
++void reset_mipi_panel(int reset_pin)
++{
++	gpio_request(reset_pin, "mipi_reset");
++	gpio_direction_output(reset_pin, 0);
++	mdelay(15);
++	gpio_direction_output(reset_pin, 1);
++	mdelay(15);
++	gpio_direction_output(reset_pin, 0);
++	mdelay(15);
++	gpio_direction_output(reset_pin, 1);
++	mdelay(80);
++}
++
++static struct mipi_dsi_client_driver hx8394f_drv = {
++	.name = "HX8394F",
++	.dsi_client_setup = mipid_hx8394f_lcd_setup,
++};
++
++void hx8394f_init(void)
++{
++	int ret;
++
++	ret = imx_mipi_dsi_bridge_add_client_driver(&hx8394f_drv);
++}
+diff --git a/drivers/video/ili9881h.c b/drivers/video/ili9881h.c
+new file mode 100644
+index 0000000000..92ccde1a7f
+--- /dev/null
++++ b/drivers/video/ili9881h.c
+@@ -0,0 +1,303 @@
++/*
++ * Copyright 2020 IDTECH
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <imx_mipi_dsi_bridge.h>
++#include <mipi_display.h>
++#include <asm-generic/gpio.h>
++
++
++#define CHECK_RETCODE(ret)					\
++do {								\
++	if (ret < 0) {						\
++		printf("%s ERR: ret:%d, line:%d.
+",		\
++			__func__, ret, __LINE__);		\
++		return ret;					\
++	}							\
++} while (0)
++
++static void parse_variadic(int n, u8 *buf, ...)
++{
++	int i = 0;
++	va_list args;
++
++	if (unlikely(!n))
++		return;
++
++	va_start(args, buf);
++
++	for (i = 0; i < n; i++)
++		buf[i + 1] = (u8)va_arg(args, int);
++
++	va_end(args);
++}
++
++#define ILI9881H_DCS_write_1A_nP(n, addr, ...) {			\
++	int err;							\
++									\
++	buf[0] = addr;							\
++	parse_variadic(n, buf, ##__VA_ARGS__);				\
++									\
++	if (n >= 2)							\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_LONG_WRITE, (u8 *)buf, n + 1);	\
++	else if (n == 1)						\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_SHORT_WRITE_PARAM, (u8 *)buf, 0);	\
++	else if (n == 0) {						\
++		buf[1] = 0;						\
++		err = imx_mipi_dsi_bridge_pkt_write(			\
++			MIPI_DSI_DCS_SHORT_WRITE, (u8 *)buf, 0);	\
++	}								\
++	CHECK_RETCODE(err);						\
++}
++
++#define ILI9881H_DCS_write_1A_0P(addr)			\
++	ILI9881H_DCS_write_1A_nP(0, addr)
++
++#define ILI9881H_DCS_write_1A_1P(addr, ...)		\
++	ILI9881H_DCS_write_1A_nP(1, addr, __VA_ARGS__)
++
++#define ILI9881H_DCS_write_1A_3P(addr, ...)		\
++	ILI9881H_DCS_write_1A_nP(3, addr, __VA_ARGS__)
++
++#define ILI9881H_DCS_write_1A_27P(addr, ...)		\
++	ILI9881H_DCS_write_1A_nP(27, addr, __VA_ARGS__)
++
++
++int mipid_ili9881h_lcd_setup(struct mipi_dsi_client_dev *panel_dev)
++{
++	u8 buf[DSI_CMD_BUF_MAXSIZE];
++
++	printf("### MIPI DSI LCD ILI9881H setup.
+");
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x00, 0x4a);
++	ILI9881H_DCS_write_1A_1P(0x01, 0x33);
++	ILI9881H_DCS_write_1A_1P(0x02, 0x00);
++
++	ILI9881H_DCS_write_1A_1P(0x03, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x04, 0xCE);
++	ILI9881H_DCS_write_1A_1P(0x05, 0x13);
++	ILI9881H_DCS_write_1A_1P(0x06, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x07, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x08, 0x86);
++	ILI9881H_DCS_write_1A_1P(0x09, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x0A, 0x73);
++	ILI9881H_DCS_write_1A_1P(0x0B, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x0C, 0x08);
++	ILI9881H_DCS_write_1A_1P(0x0D, 0x08);
++	ILI9881H_DCS_write_1A_1P(0x0E, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x0F, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x24, 0xCE);
++	ILI9881H_DCS_write_1A_1P(0x25, 0x0B);
++	ILI9881H_DCS_write_1A_1P(0x26, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x27, 0x00);
++
++	ILI9881H_DCS_write_1A_1P(0x31, 0x0D);
++	ILI9881H_DCS_write_1A_1P(0x32, 0x21);
++	ILI9881H_DCS_write_1A_1P(0x33, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x34, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x35, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x36, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x37, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x38, 0x09);
++	ILI9881H_DCS_write_1A_1P(0x39, 0x0b);
++	ILI9881H_DCS_write_1A_1P(0x3A, 0x13);
++	ILI9881H_DCS_write_1A_1P(0x3B, 0x11);
++	ILI9881H_DCS_write_1A_1P(0x3C, 0x17);
++	ILI9881H_DCS_write_1A_1P(0x3D, 0x15);
++	ILI9881H_DCS_write_1A_1P(0x3E, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x3F, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x40, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x41, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x42, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x43, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x44, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x45, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x46, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x47, 0x0c);
++	ILI9881H_DCS_write_1A_1P(0x48, 0x20);
++	ILI9881H_DCS_write_1A_1P(0x49, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x4A, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x4B, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x4C, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x4D, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x4E, 0x08);
++	ILI9881H_DCS_write_1A_1P(0x4F, 0x0a);
++	ILI9881H_DCS_write_1A_1P(0x50, 0x12);
++	ILI9881H_DCS_write_1A_1P(0x51, 0x10);
++	ILI9881H_DCS_write_1A_1P(0x52, 0x16);
++	ILI9881H_DCS_write_1A_1P(0x53, 0x14);
++	ILI9881H_DCS_write_1A_1P(0x54, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x55, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x56, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x57, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x58, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x59, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x5A, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x5B, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x5C, 0x07);
++
++	ILI9881H_DCS_write_1A_1P(0x61, 0x0c);
++	ILI9881H_DCS_write_1A_1P(0x62, 0x20);
++	ILI9881H_DCS_write_1A_1P(0x63, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x64, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x65, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x66, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x67, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x68, 0x0a);
++	ILI9881H_DCS_write_1A_1P(0x69, 0x08);
++	ILI9881H_DCS_write_1A_1P(0x6A, 0x14);
++	ILI9881H_DCS_write_1A_1P(0x6B, 0x16);
++	ILI9881H_DCS_write_1A_1P(0x6C, 0x10);
++	ILI9881H_DCS_write_1A_1P(0x6D, 0x12);
++	ILI9881H_DCS_write_1A_1P(0x6E, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x6F, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x70, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x71, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x72, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x73, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x74, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x75, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x76, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x77, 0x0d);
++	ILI9881H_DCS_write_1A_1P(0x78, 0x21);
++	ILI9881H_DCS_write_1A_1P(0x79, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x7A, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x7B, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x7C, 0x00);
++	ILI9881H_DCS_write_1A_1P(0x7D, 0x01);
++	ILI9881H_DCS_write_1A_1P(0x7E, 0x0b);
++	ILI9881H_DCS_write_1A_1P(0x7F, 0x09);
++	ILI9881H_DCS_write_1A_1P(0x80, 0x15);
++	ILI9881H_DCS_write_1A_1P(0x81, 0x17);
++	ILI9881H_DCS_write_1A_1P(0x82, 0x11);
++	ILI9881H_DCS_write_1A_1P(0x83, 0x13);
++	ILI9881H_DCS_write_1A_1P(0x84, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x85, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x86, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x87, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x88, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x89, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x8A, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x8B, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x8C, 0x07);
++
++	ILI9881H_DCS_write_1A_1P(0xB8, 0x20);
++	ILI9881H_DCS_write_1A_1P(0xD0, 0x01);
++	ILI9881H_DCS_write_1A_1P(0xD1, 0x00);
++	ILI9881H_DCS_write_1A_1P(0xD5, 0x00);
++	ILI9881H_DCS_write_1A_1P(0xE2, 0x00);
++	ILI9881H_DCS_write_1A_1P(0xE6, 0x22);
++	ILI9881H_DCS_write_1A_1P(0xE7, 0x54);
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x0E);
++	ILI9881H_DCS_write_1A_1P(0x02, 0x10);
++
++/* GVDDP GVDDN VCOM VGH VGHO VGL VGLO setup */
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x05);
++	ILI9881H_DCS_write_1A_1P(0x03, 0x00);  /* VCOM */
++	ILI9881H_DCS_write_1A_1P(0x04, 0xE7);  /* VCOM */
++
++	ILI9881H_DCS_write_1A_1P(0x58, 0x61);  /* VGL pump */
++	ILI9881H_DCS_write_1A_1P(0x63, 0x88);  /* GVDDN 5.2V */
++	ILI9881H_DCS_write_1A_1P(0x64, 0x88);  /* GVDDP -5.2V */
++	ILI9881H_DCS_write_1A_1P(0x68, 0xA1);  /* VGHO 15V */
++	ILI9881H_DCS_write_1A_1P(0x69, 0xA7);  /* VGH  16V */
++	ILI9881H_DCS_write_1A_1P(0x6A, 0x79);  /* VGLO  -10V */
++	ILI9881H_DCS_write_1A_1P(0x6B, 0x57);  /* VGL  -10V */
++	ILI9881H_DCS_write_1A_1P(0x5D, 0x07);  /* VGLO short to VGL */
++
++/* Resolution 720RGB*1280 */
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x06);
++	ILI9881H_DCS_write_1A_1P(0x2E, 0x01);  /* NL enable */
++	ILI9881H_DCS_write_1A_1P(0xC0, 0x7F);
++	ILI9881H_DCS_write_1A_1P(0xC1, 0x02);
++	ILI9881H_DCS_write_1A_1P(0xC2, 0x04);
++
++	ILI9881H_DCS_write_1A_1P(0xD6, 0x85);  /* FTE=TSVD1,FTE1=TSHD */
++	ILI9881H_DCS_write_1A_1P(0x27, 0x14);
++	ILI9881H_DCS_write_1A_1P(0x28, 0x14);
++
++	ILI9881H_DCS_write_1A_1P(0x11, 0x03);
++	ILI9881H_DCS_write_1A_1P(0x13, 0x45);
++	ILI9881H_DCS_write_1A_1P(0x14, 0x41);
++	ILI9881H_DCS_write_1A_1P(0x15, 0xF1);
++	ILI9881H_DCS_write_1A_1P(0x16, 0x40);
++	ILI9881H_DCS_write_1A_1P(0x17, 0x48);
++	ILI9881H_DCS_write_1A_1P(0x18, 0x3B);
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x01);
++	ILI9881H_DCS_write_1A_1P(0xE7, 0x54);  /* V-porch SRC=V0 */
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x02);
++	ILI9881H_DCS_write_1A_1P(0x4B, 0x5A);  /* Line chopper=2-line */
++
++/* Vbank fine tune */
++	ILI9881H_DCS_write_1A_1P(0x4D, 0x4E);  /* disable source precharge */
++	ILI9881H_DCS_write_1A_1P(0x1A, 0x48);  /* VGL pump clk 1H */
++	ILI9881H_DCS_write_1A_1P(0x63, 0xE0);  /* ILI4003D mode sel */
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x06);
++	ILI9881H_DCS_write_1A_1P(0x27, 0x20);  /* VFP */
++	ILI9881H_DCS_write_1A_1P(0x28, 0x20);  /* VBP */
++	ILI9881H_DCS_write_1A_1P(0x48, 0x0F);  /* 1 bit ESD enable */
++	ILI9881H_DCS_write_1A_1P(0x4D, 0x80);  /* 1 bit ESD enable */
++	ILI9881H_DCS_write_1A_1P(0x4E, 0x40);  /* 1 bit ESD enable */
++	ILI9881H_DCS_write_1A_1P(0x7C, 0x40);
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x07);
++	ILI9881H_DCS_write_1A_1P(0x0F, 0x02);  /* TP_term_GVDD_on */
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x0E);
++	ILI9881H_DCS_write_1A_1P(0x01, 0x28);  /* DELY_VID */
++	ILI9881H_DCS_write_1A_1P(0xC1, 0x80);  /* TP1 unit = 8us */
++
++/* GAMMA */
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x08);
++	ILI9881H_DCS_write_1A_27P(0xE0, 0x00, 0x24, 0x5B, 0x85, 0xBE, 0x54,
++				  0xEF, 0x15, 0x42, 0x68, 0x95, 0xA1, 0xCF,
++				  0xF9, 0x20, 0xAA, 0x4A, 0x7C, 0x9D, 0xC6,
++				  0xFE, 0xEA, 0x18, 0x4D, 0x76, 0x03, 0xAA);
++	ILI9881H_DCS_write_1A_27P(0xE1, 0x00, 0x24, 0x5B, 0x85, 0xBE, 0x54,
++				  0xEF, 0x15, 0x42, 0x68, 0x95, 0xA1, 0xCF,
++				  0xF9, 0x20, 0xAA, 0x4A, 0x7C, 0x9D, 0xC6,
++				  0xFE, 0xEA, 0x18, 0x4D, 0x76, 0x03, 0xAA);
++
++	ILI9881H_DCS_write_1A_3P(0xFF, 0x98, 0x81, 0x00);
++	mdelay(45);
++	ILI9881H_DCS_write_1A_0P(0x11);
++	mdelay(100);
++	ILI9881H_DCS_write_1A_0P(0x29);
++	mdelay(20);
++	ILI9881H_DCS_write_1A_1P(0x35, 0x00);  /* TE enable */
++
++	return 0;
++}
++
++void reset_mipi_panel(int reset_pin)
++{
++	gpio_request(reset_pin, "mipi_reset");
++	gpio_direction_output(reset_pin, 0);
++	mdelay(3);
++	gpio_direction_output(reset_pin, 1);
++	mdelay(13);
++	mdelay(15);
++}
++
++static struct mipi_dsi_client_driver ili9881h_drv = {
++	.name = "ILI9881H",
++	.dsi_client_setup = mipid_ili9881h_lcd_setup,
++};
++
++void ili9881h_init(void)
++{
++	int ret;
++
++	ret = imx_mipi_dsi_bridge_add_client_driver(&ili9881h_drv);
++}
+diff --git a/drivers/video/mipi_dsi_northwest.c b/drivers/video/mipi_dsi_northwest.c
+index 7817aa4e25..e5d8ec42ca 100644
+--- a/drivers/video/mipi_dsi_northwest.c
++++ b/drivers/video/mipi_dsi_northwest.c
+@@ -217,13 +217,25 @@ static void mipi_dsi_set_mode(struct mipi_dsi_northwest_info *mipi_dsi,
+ 	mdelay(1);
+ }
+ 
++#define CN_BUF	0xcb7a89c0
++#define CO_BUF	0x63
++#define CM(x)	( \
++		((x) <  32)?0xe0|((x)-16) : \
++		((x) <  64)?0xc0|((x)-32) : \
++		((x) < 128)?0x80|((x)-64) : \
++		((x) - 128))
++#define CN(x)	(((x) == 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
++#define CO(x)	((CO_BUF)>>(8-(x))&0x3)
++
+ static int mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ {
+ 	uint32_t time_out = 100;
+ 	uint32_t lock;
+-	uint32_t req_bit_clk;
+-	uint32_t bpp;
+-
++	uint64_t req_bit_clk;
++	uint64_t bpp;
++	uint64_t ref_clk;
++	uint64_t div_rate;
++	int hs_reg;
+ 	int i, best_div = -1;
+ 	int64_t delta;
+ 	uint64_t least_delta = ~0U;
+@@ -232,15 +244,16 @@ static int mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	uint64_t norm_denom, norm_num, split_denom;
+ 	struct pll_divider div = { 0 };
+ 
+-	setbits_le32(mipi_dsi->sim_base + SIM_SOPT1, MIPI_ISO_DISABLE);
+-
+ 	bpp = mipi_dsi_pixel_format_to_bpp(mipi_dsi->dsi_panel_dev->format);
+ 
+ 	/* req_bit_clk is PLL out, clk_byte is 1/8th of the req_bit_clk
+ 	*  We need meet clk_byte_freq >= dpi_pclk_freq * DPI_pixel_size / ( 8 * (cfg_num_lanes + 1))
+ 	*/
+ 
+-	req_bit_clk = PS2KHZ(mipi_dsi->mode.pixclock) * 1000U;
++	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
++	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
++	ref_clk = mxc_get_clock(MXC_MIPI_DSI_PHY_REF_CLK);
++	req_bit_clk = mxc_get_clock(MXC_LCDIF_PIXEL_CLK);
+ 	req_bit_clk = req_bit_clk * bpp;
+ 
+ 	switch (mipi_dsi->dsi_panel_dev->lanes) {
+@@ -257,189 +270,106 @@ static int mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 		return -EINVAL;
+ 	}
+ 
+-	/* The max rate for PLL out is 800Mhz */
+-	if (req_bit_clk > 800000000)
+-		return -EINVAL;
+-
+-	/* calc CM, CN and CO according to PHY PLL formula:
+-	 *
+-	 * 'PLL out bitclk = refclk * CM / (CN * CO);'
+-	 *
+-	 * Let:
+-	 * 'numerator   = bitclk / divisor';
+-	 * 'denominator = refclk / divisor';
+-	 * Then:
+-	 * 'numerator / denominator = CM / (CN * CO)';
+-	 *
+-	 * CM is in [16, 255]
+-	 * CN is in [1, 32]
+-	 * CO is in { 1, 2, 4, 8 };
+-	 */
+-	divisor = gcd(24000000, req_bit_clk);
+-	WARN_ON(divisor == 1);
+-
+-	div_result = req_bit_clk;
+-	do_div(div_result, divisor);
+-	numerator = div_result;
+-
+-	div_result = 24000000;
+-	do_div(div_result, divisor);
+-	denominator = div_result;
+-
+-	/* denominator & numerator out of range check */
+-	if (DIV_ROUND_CLOSEST_ULL(numerator, denominator) > 255 ||
+-	    DIV_ROUND_CLOSEST_ULL(denominator, numerator) > 32 * 8)
+-		return -EINVAL;
+-
+-	/* Normalization: reduce or increase
+-	 * numerator	to [16, 255]
+-	 * denominator	to [1, 32 * 8]
+-	 * Reduce normalization result is 'approximiate'
+-	 * Increase nomralization result is 'precise'
+-	 */
+-	if (numerator > 255 || denominator > 32 * 8) {
+-		/* approximate */
+-		if (likely(numerator > denominator)) {
+-			/* 'numerator > 255';
+-			 * 'limit' should meet below conditions:
+-			 *  a. '(numerator   / limit) >= 16'
+-			 *  b. '(denominator / limit) >= 1'
+-			 */
+-			limit = min(denominator,
+-				    DIV_ROUND_CLOSEST_ULL(numerator, 16));
+-
+-			/* Let:
+-			 * norm_num   = numerator   / i;
+-			 * norm_denom = denominator / i;
+-			 *
+-			 * So:
+-			 * delta = numerator * norm_denom -
+-			 * 	   denominator * norm_num
+-			 */
+-			for (i = 2; i <= limit; i++) {
+-				norm_num = DIV_ROUND_CLOSEST_ULL(numerator, i);
+-				if (norm_num > 255)
+-					continue;
+-
+-				norm_denom = DIV_ROUND_CLOSEST_ULL(denominator, i);
+-
+-				/* 'norm_num <= 255' && 'norm_num > norm_denom'
+-				 * so, 'norm_denom < 256'
+-				 */
+-				delta = numerator * norm_denom -
+-					denominator * norm_num;
+-				delta = abs(delta);
+-				if (delta < least_delta) {
+-					least_delta = delta;
+-					best_div = i;
+-				} else if (delta == least_delta) {
+-					/* choose better one IF:
+-					 * 'norm_denom' derived from last 'best_div'
+-					 * needs later split, i.e, 'norm_denom > 32'.
+-					 */
+-					if (DIV_ROUND_CLOSEST_ULL(denominator, best_div) > 32) {
+-						least_delta = delta;
+-						best_div = i;
+-					}
+-				}
+-			}
+-		} else {
+-			/* 'denominator > 32 * 8';
+-			 * 'limit' should meet below conditions:
+-			 *  a. '(numerator   / limit >= 16'
+-			 *  b. '(denominator / limit >= 1': obviously.
+-			 */
+-			limit = DIV_ROUND_CLOSEST_ULL(numerator, 16);
+-			if (!limit ||
+-			    DIV_ROUND_CLOSEST_ULL(denominator, limit) > 32 * 8)
+-				return -EINVAL;
+-
+-			for (i = 2; i <= limit; i++) {
+-				norm_denom = DIV_ROUND_CLOSEST_ULL(denominator, i);
+-				if (norm_denom > 32 * 8)
+-					continue;
+-
+-				norm_num = DIV_ROUND_CLOSEST_ULL(numerator, i);
+-
+-				/* 'norm_denom <= 256' && 'norm_num < norm_denom'
+-				 * so, 'norm_num <= 255'
+-				 */
+-				delta = numerator * norm_denom -
+-					denominator * norm_num;
+-				delta = abs(delta);
+-				if (delta < least_delta) {
+-					least_delta = delta;
+-					best_div = i;
+-				} else if (delta == least_delta) {
+-					if (DIV_ROUND_CLOSEST_ULL(denominator, best_div) > 32) {
+-						least_delta = delta;
+-						best_div = i;
+-					}
+-				}
+-			}
+-		}
+-
+-		numerator   = DIV_ROUND_CLOSEST_ULL(numerator, best_div);
+-		denominator = DIV_ROUND_CLOSEST_ULL(denominator, best_div);
+-	} else if (numerator < 16) {
+-		/* precise */
+-
+-		/* 'limit' should meet below conditions:
+-		 *  a. 'denominator * limit <= 32 * 8'
+-		 *  b. '16 <= numerator * limit <= 255'
+-		 *  Choose 'limit' to be the least value
+-		 *  which makes 'numerator * limit' to be
+-		 *  in [16, 255].
+-		 */
+-		limit = min(256 / (uint32_t)denominator,
+-			    255 / (uint32_t)numerator);
+-		if (limit == 1 || limit < DIV_ROUND_UP_ULL(16, numerator))
+-			return -EINVAL;
+-
+-		/* choose the least available value for 'limit' */
+-		limit = DIV_ROUND_UP_ULL(16, numerator);
+-		numerator   = numerator * limit;
+-		denominator = denominator * limit;
++	writel(0x0, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_PREPARE);
++	if (req_bit_clk <= 61000000)
++		writel(0x3, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else if (req_bit_clk <= 90000000)
++		writel(0x2, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else if (req_bit_clk <= 500000000)
++		writel(0x1, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++	else
++		writel(0x0, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
++
++
++	hs_reg = ((34 * ((int)req_bit_clk / 1000000)) - 2500) / 1000;
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_ZERO);
++
++	hs_reg = ((144 * ((int)req_bit_clk / 1000000)) - 47500) / 10000;
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_M_PRG_HS_ZERO);
++
++	hs_reg = ((103 * ((int)req_bit_clk / 1000000)) + 10000) / 10000;
++	if (hs_reg > 15)
++		hs_reg = 15;
++
++	if (hs_reg < 1)
++		hs_reg = 1;
++
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_TRAIL);
++	writel(hs_reg, mipi_dsi->mmio_base + DPHY_M_PRG_HS_TRAIL);
++
++	if (req_bit_clk <= 80000000)
++		writel(0xd, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 90000000)
++		writel(0xc, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 125000000)
++		writel(0xb, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 150000000)
++		writel(0xa, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 2250000000)
++		writel(0x9, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else if (req_bit_clk <= 5000000000)
++		writel(0x8, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
++	else
++		writel(0x7, mipi_dsi->mmio_base + DPHY_RXHS_SETTLE);
+ 
+-		WARN_ON(numerator < 16 || denominator > 32 * 8);
++	/* The max rate for PLL out is 800Mhz */
++	writel(0x0, mipi_dsi->mmio_base + DPHY_LOCK_BYP);
++	writel(0x1, mipi_dsi->mmio_base + DPHY_RTERM_SEL);
++	writel(0x0, mipi_dsi->mmio_base + DPHY_AUTO_PD_EN);
++	writel(0x2, mipi_dsi->mmio_base + DPHY_RXLPRP);
++	writel(0x2, mipi_dsi->mmio_base + DPHY_RXCDRP);
++	/* write 0x25 to DPHY_TST */
++	setbits_le32(mipi_dsi->mmio_base + DPHY_TST, BIT(5) | BIT(2) | BIT(0));
++	denominator = 1;
++	numerator = 0;
++	div_rate = (req_bit_clk * 1000) / ref_clk;
++	while (denominator <= 256) {
++		if (div_rate % 1000 == 0)
++			numerator = div_rate / 1000;
++
++		if (numerator > 15)
++			break;
++
++		denominator = denominator << 1;
++		div_rate = div_rate << 1;
+ 	}
+-
+-	div.cm = cm_map_table[numerator - 16];
+-
+-	/* split 'denominator' to 'CN' and 'CO' */
+-	if (denominator > 32) {
+-		/* traverse four possible values of 'CO'
+-		 * there must be some value of 'CO' can be used
+-		 */
+-		least_delta = ~0U;
+-		for (i = 0; i < 4; i++) {
+-			split_denom = DIV_ROUND_CLOSEST_ULL(denominator, 1 << i);
+-			if (split_denom > 32)
+-				continue;
+-
+-			/* calc deviation to choose the best one */
+-			delta = denominator - split_denom * (1 << i);
+-			delta = abs(delta);
+-			if (delta < least_delta) {
+-				least_delta = delta;
+-				div.co = co_map_table[i];
+-				div.cn = cn_map_table[split_denom - 1];
+-			}
++	/* CM ranges between 16 and 255 */
++	/* CN ranges between 1 and 32 */
++	/* CO is power of 2: 1, 2, 4, 8 */
++	if (numerator < 16)
++		numerator = div_rate / 1000;
++
++	if (numerator > 255) {
++		while (numerator > 255 && denominator > 1) {
++			numerator = DIV_ROUND_UP(numerator, 2);
++			denominator = denominator >> 1;
+ 		}
+-	} else {
+-		div.co = co_map_table[1 >> 1];
+-		div.cn = cn_map_table[denominator - 1];
+ 	}
+-
+-	debug("cn 0x%x, cm 0x%x, co 0x%x
+", div.cn, div.cm, div.co);
+-
+-	writel(div.cn, mipi_dsi->mmio_base + DPHY_CN);
+-	writel(div.cm, mipi_dsi->mmio_base + DPHY_CM);
+-	writel(div.co, mipi_dsi->mmio_base + DPHY_CO);
+-
+-	writel(0x25, mipi_dsi->mmio_base + DPHY_TST);
++	div.cn = 1;
++	if (denominator > 8) {
++		div.cn = denominator >> 3;
++		denominator = 8;
++	}
++	div.co = denominator;
++	div.cm = numerator;
++
++	debug("cn %u, cm %u, co %u
+", div.cn, div.cm, div.co);
++	/* DPHY_PLL = ref_clk x (cn \ (cm x co)) */
++	writel(CN(div.cn), mipi_dsi->mmio_base + DPHY_CN);
++	writel(CM(div.cm), mipi_dsi->mmio_base + DPHY_CM);
++	writel(CO(div.co), mipi_dsi->mmio_base + DPHY_CO);
++	udelay(100);
+ 	writel(0x0, mipi_dsi->mmio_base + DPHY_PD_PLL);
+-
++	setbits_le32(mipi_dsi->mmio_base + DPHY_TST, BIT(2) | BIT(0));
++	writel(0x25, mipi_dsi->mmio_base + DPHY_TST);
++	udelay(100);
++	time_out = 100;
+ 	while (!(lock = readl(mipi_dsi->mmio_base + DPHY_LOCK))) {
+ 		udelay(10);
+ 		time_out--;
+@@ -449,21 +379,8 @@ static int mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 		}
+ 	}
+ 	debug("%s: dphy lock = 0x%x
+", __func__, lock);
+-
+-	writel(0x0, mipi_dsi->mmio_base + DPHY_LOCK_BYP);
+-	writel(0x1, mipi_dsi->mmio_base + DPHY_RTERM_SEL);
+-	writel(0x0, mipi_dsi->mmio_base + DPHY_AUTO_PD_EN);
+-	writel(0x1, mipi_dsi->mmio_base + DPHY_RXLPRP);
+-	writel(0x1, mipi_dsi->mmio_base + DPHY_RXCDRP);
+-	writel(0x0, mipi_dsi->mmio_base + DPHY_M_PRG_HS_PREPARE);
+-	writel(0x0, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_PREPARE);
+-	writel(0x9, mipi_dsi->mmio_base + DPHY_M_PRG_HS_ZERO);
+-	writel(0x20, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_ZERO);
+-	writel(0x5, mipi_dsi->mmio_base + DPHY_M_PRG_HS_TRAIL);
+-	writel(0x5, mipi_dsi->mmio_base + DPHY_MC_PRG_HS_TRAIL);
+ 	writel(0x0, mipi_dsi->mmio_base + DPHY_PD_DPHY);
+ 
+-	setbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_PLL_EN);
+ 	return 0;
+ }
+ 
+@@ -478,6 +395,12 @@ static int mipi_dsi_host_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	case 2:
+ 		lane_num = 0x1;
+ 		break;
++	case 3:
++		lane_num = 0x2;
++		break;
++	case 4:
++		lane_num = 0x3;
++		break;
+ 	default:
+ 		/* Invalid lane num */
+ 		return -EINVAL;
+@@ -525,18 +448,15 @@ static int mipi_dsi_dpi_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	writel(pixel_fmt, mipi_dsi->mmio_base + DPI_PIXEL_FORMAT);
+ 	writel(0x0, mipi_dsi->mmio_base + DPI_VSYNC_POLARITY);
+ 	writel(0x0, mipi_dsi->mmio_base + DPI_HSYNC_POLARITY);
+-	writel(0x2, mipi_dsi->mmio_base + DPI_VIDEO_MODE);
+-
+-	writel(mode->right_margin * (bpp >> 3), mipi_dsi->mmio_base + DPI_HFP);
+-	writel(mode->left_margin * (bpp >> 3), mipi_dsi->mmio_base + DPI_HBP);
+-	writel(mode->hsync_len * (bpp >> 3), mipi_dsi->mmio_base + DPI_HSA);
++	writel(0x0, mipi_dsi->mmio_base + DPI_VIDEO_MODE);
++	writel(mode->right_margin, mipi_dsi->mmio_base + DPI_HFP);
++	writel(mode->left_margin, mipi_dsi->mmio_base + DPI_HBP);
++	writel(mode->hsync_len, mipi_dsi->mmio_base + DPI_HSA);
+ 	writel(0x0, mipi_dsi->mmio_base + DPI_ENABLE_MULT_PKTS);
+-
+-	writel(mode->upper_margin, mipi_dsi->mmio_base + DPI_VBP);
+-	writel(mode->lower_margin, mipi_dsi->mmio_base + DPI_VFP);
++	writel(mode->upper_margin, mipi_dsi->mmio_base + DPI_VFP);
++	writel(mode->lower_margin, mipi_dsi->mmio_base + DPI_VBP);
+ 	writel(0x1, mipi_dsi->mmio_base + DPI_BLLP_MODE);
+ 	writel(0x0, mipi_dsi->mmio_base + DPI_USE_NULL_PKT_BLLP);
+-
+ 	writel(mode->yres - 1, mipi_dsi->mmio_base + DPI_VACTIVE);
+ 
+ 	writel(0x0, mipi_dsi->mmio_base + DPI_VC);
+@@ -575,18 +495,12 @@ static int mipi_dsi_enable(struct mipi_dsi_northwest_info *mipi_dsi)
+ {
+ 	int ret;
+ 
+-	/* Assert resets */
+-	/* escape domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_ESC_N);
+-
+-	/* byte domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_BYTE_N);
+-
+-	/* dpi domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_DPI_N);
++	/* imx8mq_dsi_poweron */
++	setbits_le32((mipi_dsi->sim_base + SRC_MIPIPHY_RCR),
++		     BIT(5) | BIT(4) | BIT(3) | BIT(1));
+ 
+ 	/* Enable mipi relevant clocks */
+-	enable_mipi_dsi_clk(1);
++	init_mipi_clk();
+ 
+ 	ret = mipi_dsi_dphy_init(mipi_dsi);
+ 	if (ret < 0)
+@@ -600,23 +514,9 @@ static int mipi_dsi_enable(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	/* Deassert resets */
+-	/* escape domain */
+-	setbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_ESC_N);
+-
+-	/* byte domain */
+-	setbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_BYTE_N);
+-
+-	/* dpi domain */
+-	setbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_DPI_N);
+-
+-	/* display_en */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_SD);
+-
+-	/* normal cm */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_CM);
+ 	mdelay(20);
+ 
++	mipi_dsi_set_mode(mipi_dsi, DSI_LP_MODE);
+ 	/* Reset mipi panel */
+ 	board_mipi_panel_reset();
+ 	mdelay(60);
+@@ -786,18 +686,6 @@ static void mipi_dsi_shutdown(struct mipi_dsi_northwest_info *mipi_dsi)
+ 
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
+-
+-	enable_mipi_dsi_clk(0);
+-
+-	/* Assert resets */
+-	/* escape domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_ESC_N);
+-
+-	/* byte domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_BYTE_N);
+-
+-	/* dpi domain */
+-	clrbits_le32(mipi_dsi->sim_base + SIM_SOPT1CFG, DSI_RST_DPI_N);
+ }
+ 
+ /* Attach a LCD panel device */
+@@ -863,9 +751,11 @@ static int mipi_dsi_northwest_bridge_enable(struct mipi_dsi_bridge_driver *bridg
+ {
+ 	struct mipi_dsi_northwest_info *dsi_info = (struct mipi_dsi_northwest_info *)bridge_driver->driver_private;
+ 
++#ifndef CONFIG_TARGET_IMX8MQ_EVK
+ 	if (!dsi_info->dsi_panel_dev || !dsi_info->dsi_panel_drv)
+ 		return -ENODEV;
+ 
++#endif /* !CONFIG_TARGET_IMX8MQ_EVK */
+ 	mipi_dsi_enable(dsi_info);
+ 
+ 	dsi_info->enabled = 1;
+diff --git a/drivers/video/mipi_dsi_northwest_regs.h b/drivers/video/mipi_dsi_northwest_regs.h
+index 6493403a0c..3eed614f46 100644
+--- a/drivers/video/mipi_dsi_northwest_regs.h
++++ b/drivers/video/mipi_dsi_northwest_regs.h
+@@ -23,6 +23,10 @@
+ #define DSI_CM			0x100
+ #define DSI_PLL_EN		0x80
+ 
++#define SRC_MIPIPHY_RCR			0x28
++#define SRC_DISP_RCR			0x34
++
++
+ /* dphy */
+ #define DPHY_PD_DPHY			0x300
+ #define DPHY_M_PRG_HS_PREPARE		0x304
+@@ -42,6 +46,8 @@
+ #define DPHY_AUTO_PD_EN			0x33c
+ #define DPHY_RXLPRP			0x340
+ #define DPHY_RXCDRP			0x344
++#define DPHY_RXHS_SETTLE		0x348
++#define DPHY_BYPASS_PLL			0x34c
+ 
+ /* host */
+ #define HOST_CFG_NUM_LANES		0x0
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+index 068243db45..e06ab8cd0d 100644
+--- a/include/configs/imx8mq_a300.h
++++ b/include/configs/imx8mq_a300.h
+@@ -290,6 +290,9 @@
+ #define CONFIG_VIDEO_LOGO
+ #define CONFIG_VIDEO_BMP_LOGO
+ #define CONFIG_IMX_VIDEO_SKIP
++#define CONFIG_IMX_MIPI_DSI_BRIDGE
++#define CONFIG_IMX_NORTHWEST_MIPI_DSI
++#define CONFIG_HX8394F
+ #endif
+ 
+ #if defined(CONFIG_ANDROID_SUPPORT)
+diff --git a/include/mipi_dsi_panel.h b/include/mipi_dsi_panel.h
+index dc28e7721f..2653c66aac 100644
+--- a/include/mipi_dsi_panel.h
++++ b/include/mipi_dsi_panel.h
+@@ -11,5 +11,7 @@
+ void hx8363_init(void);
+ void rm67191_init(void);
+ void rm68200_init(void);
++void ili9881h_init(void);
++void hx8394f_init(void);
+ 
+ #endif
+diff --git a/include/video_fb.h b/include/video_fb.h
+index e410226594..b468ac8d94 100644
+--- a/include/video_fb.h
++++ b/include/video_fb.h
+@@ -57,6 +57,7 @@ typedef struct graphic_device {
+ /******************************************************************************/
+ 
+ void *video_hw_init (void);       /* returns GraphicDevice struct or NULL */
++void *mipi_video_hw_init(void);	/* returns MIPI GraphicDevice struct or NULL */
+ 
+ #ifdef VIDEO_HW_BITBLT
+ void video_hw_bitblt (

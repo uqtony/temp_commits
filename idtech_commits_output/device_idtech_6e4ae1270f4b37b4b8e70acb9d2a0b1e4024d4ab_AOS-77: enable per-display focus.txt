@@ -1,0 +1,49 @@
+6e4ae127 owen.wen 2020-03-18
+
+AOS-77: enable per-display focus
+
+enable per-display focus
+add multi client IME
+
+Change-Id: I95b6784589c72b448b84101585b6583fbf561212
+
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 943c7c38..1b0dcfd6 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -5,3 +5,5 @@ on early-boot
+     setprop ro.idt.signature_of_signature false
+     # apk on-line check, verify if the app signature digest exist on AMS
+     setprop ro.idt.signature_online_check false
++    # set multi client IME
++    setprop ro.sys.multi_client_ime com.example.android.multiclientinputmethod/.MultiClientInputMethod
+diff --git a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index b6804206..0bddc2ba 100644
+--- a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -21,6 +21,10 @@
+      for different hardware and product builds. -->
+ <resources>
+ 
++    <!-- Whether the system enables per-display focus. If the system has the input method for each
++         display, this value should be true. -->
++    <bool name="config_perDisplayFocusEnabled">true</bool>
++
+     <!--For Android we support eth0 now -->
+     <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
+ 
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index eff1721c..d4becb60 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -289,6 +289,10 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     MultiDisplay
+ 
++# Multi-Client IME
++PRODUCT_PACKAGES += \
++    MultiClientInputMethod
++
+ # Specify rollback index for bootloader and for AVB
+ ifneq ($(AVB_RBINDEX),)
+ BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)

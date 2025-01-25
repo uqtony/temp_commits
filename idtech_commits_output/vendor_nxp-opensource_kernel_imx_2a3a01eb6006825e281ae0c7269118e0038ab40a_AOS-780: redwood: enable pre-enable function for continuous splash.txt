@@ -1,0 +1,65 @@
+2a3a01eb6006 Jay 2022-02-16
+
+AOS-780: redwood: enable pre-enable function for continuous splash
+
+enable backlight lm3697 / panel st7262 / bridge icn6211 pre-enable
+function.
+
+Change-Id: I3951e8fbe324898b10fee69502315a983b91dc2a
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index d926cb40a172..6edc8a83a008 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -183,6 +183,8 @@ reg_lcm_lcd_vdd: fixed-regulator-3v3-vdd {
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&gpio4 11 GPIO_ACTIVE_LOW>;
+ 		off-on_delay-us = <2000>;
++		regulator-always-on;
++		regulator-boot-on;
+ 	};
+ 
+ 	reg_lcm_bridg_vdd: fixed-regulator-3v3-vdd {
+@@ -542,6 +544,7 @@ panel@0 {
+ 		power-supply = <&reg_lcm_lcd_vdd>;
+ 		enable-gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
+ 		backlight = <&backlight>;
++		pre-enable;
+ 		status = "okay";
+ 
+ 		display-timings {
+@@ -789,6 +792,7 @@ led-controller@36 {
+ 		auto-frequency;
+ 		auto-freq-threshold = <0x74>;
+ 		start-up-ramp-level = <1>;
++		pre-enable;
+ 
+ 		lcd_bl: led@0 {
+ 			reg = <0>;
+@@ -1396,10 +1400,12 @@ hdmi_in: endpoint {
+ &lcdif {
+ 	status = "okay";
+ 	max-memory-bandwidth = <1073741824>;	/* 1G */
++	pre-enable;
+ };
+ 
+ &dphy {
+ 	status = "okay";
++	pre-enable;
+ };
+ 
+ &mipi_dsi {
+@@ -1419,6 +1425,7 @@ bridge@0 {
+ 		display-id = "840000"; /* workaround to pass idt_target_panel check */
+ 		video-mode = <2>;       /* 0: burst mode */
+ 		rgb-data-seq = <5>;
++		pre-enable;
+ 
+ 		ports {
+ 			#address-cells = <1>;
+@@ -1527,4 +1534,5 @@ lcdif_reserved: lcdif@7f000000 {
+ 
+ &lcdif {
+ 	memory-region = <&lcdif_reserved>;
++	video-pll-source = <0>;
+ };

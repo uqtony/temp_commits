@@ -1,0 +1,184 @@
+59598c4bb5ae Jay 2022-01-13
+
+AOS-780: redwood: support continuous splash
+
+Do not reset power pin when device tree setup pre-enable
+tag for chipone-icn6211 bridge / st7262 panel / lm3697 backlight
+
+According device tree to setup video pll clock source.
+
+Also change clock driver init sequence from device_init(6) to
+arch_init(4) for continuous splash.
+
+Change-Id: Ib1b1429d1c4f0551baa70feb9b37cb76b8fa8278
+
+diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
+index 68c9a6ddafd8..32e910ea87dd 100644
+--- a/drivers/clk/imx/clk-imx8mq.c
++++ b/drivers/clk/imx/clk-imx8mq.c
+@@ -310,6 +310,7 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	void __iomem *base;
+ 	int err;
++	u32 video_pll_src = 2;
+ 
+ 	check_m4_enabled();
+ 
+@@ -336,13 +337,20 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
+ 	of_node_put(np);
+ 	if (WARN_ON(!base))
+ 		return -ENOMEM;
++	np = dev->of_node;
+ 
+ 	hws[IMX8MQ_ARM_PLL_REF_SEL] = imx_clk_hw_mux("arm_pll_ref_sel", base + 0x28, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_GPU_PLL_REF_SEL] = imx_clk_hw_mux("gpu_pll_ref_sel", base + 0x18, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_VPU_PLL_REF_SEL] = imx_clk_hw_mux("vpu_pll_ref_sel", base + 0x20, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_AUDIO_PLL1_REF_SEL] = imx_clk_hw_mux("audio_pll1_ref_sel", base + 0x0, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_AUDIO_PLL2_REF_SEL] = imx_clk_hw_mux("audio_pll2_ref_sel", base + 0x8, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+-	hws[IMX8MQ_VIDEO_PLL1_REF_SEL] = imx_clk_hw_mux("video_pll1_ref_sel", base + 0x10, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
++
++	if (!of_property_read_u32(np, "video-pll-source", &video_pll_src)) {
++		if (video_pll_src >= 0 && video_pll_src <= 2)
++			hws[IMX8MQ_VIDEO_PLL1_REF_SEL] = imx_clk_hw_mux("video_pll1_ref_sel", base + 0x10, 16, video_pll_src, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
++	} else
++		hws[IMX8MQ_VIDEO_PLL1_REF_SEL] = imx_clk_hw_mux("video_pll1_ref_sel", base + 0x10, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
++
+ 	hws[IMX8MQ_SYS3_PLL1_REF_SEL]	= imx_clk_hw_mux("sys3_pll1_ref_sel", base + 0x48, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_DRAM_PLL1_REF_SEL]	= imx_clk_hw_mux("dram_pll1_ref_sel", base + 0x60, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+ 	hws[IMX8MQ_VIDEO2_PLL1_REF_SEL] = imx_clk_hw_mux("video2_pll1_ref_sel", base + 0x54, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+@@ -671,7 +679,18 @@ static struct platform_driver imx8mq_clk_driver = {
+ 		.of_match_table = of_match_ptr(imx8mq_clk_of_match),
+ 	},
+ };
+-module_platform_driver(imx8mq_clk_driver);
++
++static int __init imx8mq_clk_init(void)
++{
++	return platform_driver_register(&imx8mq_clk_driver);
++}
++arch_initcall(imx8mq_clk_init);
++
++static void __exit imx8mq_clk_exit(void)
++{
++	platform_driver_unregister(&imx8mq_clk_driver);
++}
++__exitcall(imx8mq_clk_exit);
+ 
+ MODULE_AUTHOR("Abel Vesa <abel.vesa@nxp.com>");
+ MODULE_DESCRIPTION("NXP i.MX8MQ clock driver");
+diff --git a/drivers/gpu/drm/bridge/chipone-icn6211.c b/drivers/gpu/drm/bridge/chipone-icn6211.c
+index e1d63d88a8a9..121d22ba462c 100644
+--- a/drivers/gpu/drm/bridge/chipone-icn6211.c
++++ b/drivers/gpu/drm/bridge/chipone-icn6211.c
+@@ -230,7 +230,10 @@ static int chipone_parse_dt(struct chipone *icn)
+ 		DRM_DEV_DEBUG(dev, "failed to get VDD3 regulator: %d
+", ret);
+ 	}
+ 
+-	icn->enable_gpio = devm_gpiod_get(dev, "enable", GPIOD_OUT_LOW);
++	if (icn->pre_enabled)
++		icn->enable_gpio = devm_gpiod_get(dev, "enable", GPIOD_OUT_HIGH);
++	else
++		icn->enable_gpio = devm_gpiod_get(dev, "enable", GPIOD_OUT_LOW);
+ 	if (IS_ERR(icn->enable_gpio)) {
+ 		DRM_DEV_ERROR(dev, "failed to get enable GPIO
+");
+ 		return PTR_ERR(icn->enable_gpio);
+@@ -266,6 +269,9 @@ static int chipone_probe(struct mipi_dsi_device *dsi)
+ 	icn->pre_enabled = false;
+ 	icn->enabled = false;
+ 
++	if (of_get_property(np, "pre-enable", NULL))
++		icn->pre_enabled = true;
++
+ 	ret = chipone_parse_dt(icn);
+ 	if (ret)
+ 		return ret;
+diff --git a/drivers/gpu/drm/panel/panel-sitronix-st7262.c b/drivers/gpu/drm/panel/panel-sitronix-st7262.c
+index 455344c68106..fea07284e812 100644
+--- a/drivers/gpu/drm/panel/panel-sitronix-st7262.c
++++ b/drivers/gpu/drm/panel/panel-sitronix-st7262.c
+@@ -48,6 +48,7 @@ struct st7262 {
+ 
+ 	bool enabled;
+ 	bool prepared;
++	bool pre_enable;
+ };
+ 
+  static const struct display_timing st7262_default_timing = {
+@@ -185,10 +186,14 @@ static int st7262_probe(struct spi_device *spi)
+ 
+ 	ctx->prepared = false;
+ 	ctx->enabled = false;
++	ctx->pre_enable = false;
+ 
+ 	spi_set_drvdata(spi, ctx);
+ 	ctx->spi = spi;
+ 
++	if (of_get_property(np, "pre-enable", NULL))
++		ctx->pre_enable = true;
++
+ 	drm_panel_init(&ctx->panel, &spi->dev, &st7262_drm_funcs,
+ 		       DRM_MODE_CONNECTOR_DPI);
+ 
+@@ -196,7 +201,10 @@ static int st7262_probe(struct spi_device *spi)
+ 	if (IS_ERR(ctx->power))
+ 		return PTR_ERR(ctx->power);
+ 
+-	ctx->enable = devm_gpiod_get(&spi->dev, "enable", GPIOD_OUT_LOW);
++	if (ctx->pre_enable)
++		ctx->enable = devm_gpiod_get(&spi->dev, "enable", GPIOD_OUT_HIGH);
++	else
++		ctx->enable = devm_gpiod_get(&spi->dev, "enable", GPIOD_OUT_LOW);
+ 	if (IS_ERR(ctx->enable)) {
+ 		dev_err(&spi->dev, "Couldn't get our enable line
+");
+ 		return PTR_ERR(ctx->enable);
+diff --git a/drivers/leds/leds-lm3697.c b/drivers/leds/leds-lm3697.c
+index 4f3c9b131c5a..1839b4171458 100644
+--- a/drivers/leds/leds-lm3697.c
++++ b/drivers/leds/leds-lm3697.c
+@@ -88,6 +88,7 @@ struct lm3697 {
+ 	struct regmap *regmap;
+ 	struct device *dev;
+ 	struct mutex lock;
++	bool pre_enable;
+ 
+ 	int bank_cfg;
+ 	int num_banks;
+@@ -176,6 +177,9 @@ static int lm3697_init(struct lm3697 *priv)
+ 	int auto_freq_threshold = 0;
+ 	int start_up_ramp_level = 0;
+ 
++	if (priv->pre_enable == true)
++		return 0;
++
+ 	if (priv->enable_gpio) {
+ 		gpiod_direction_output(priv->enable_gpio, 1);
+ 	} else {
+@@ -283,8 +287,14 @@ static int lm3697_probe_dt(struct lm3697 *priv)
+ 	size_t i = 0;
+ 	int j;
+ 
+-	priv->enable_gpio = devm_gpiod_get_optional(dev, "enable",
+-						    GPIOD_OUT_LOW);
++	if (of_get_property(dev->of_node, "pre-enable", NULL)) {
++		priv->pre_enable = true;
++		priv->enable_gpio = devm_gpiod_get_optional(dev, "enable",
++							    GPIOD_OUT_HIGH);
++	} else
++		priv->enable_gpio = devm_gpiod_get_optional(dev, "enable",
++							    GPIOD_OUT_LOW);
++
+ 	if (IS_ERR(priv->enable_gpio)) {
+ 		ret = PTR_ERR(priv->enable_gpio);
+ 		dev_err(dev, "Failed to get enable gpio: %d
+", ret);
+@@ -396,6 +406,7 @@ static int lm3697_probe(struct i2c_client *client,
+ 	mutex_init(&led->lock);
+ 	i2c_set_clientdata(client, led);
+ 
++	led->pre_enable = false;
+ 	led->client = client;
+ 	led->dev = dev;
+ 	led->num_banks = count;

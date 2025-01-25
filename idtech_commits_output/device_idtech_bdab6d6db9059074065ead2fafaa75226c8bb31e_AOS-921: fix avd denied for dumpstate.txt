@@ -1,0 +1,112 @@
+bdab6d6d owen.wen 2022-05-09
+
+AOS-921: fix avd denied for dumpstate
+
+1. enable developer option
+2. trigger bugreport from settings -> developer options
+3. see avc denied from logcat
+
+Change-Id: I1bdf3f73760921bf66cec894e93f425d16213c25
+
+diff --git a/imx8m/sepolicy/dumpstate.te b/imx8m/sepolicy/dumpstate.te
+index 8ea11e21..654616ea 100644
+--- a/imx8m/sepolicy/dumpstate.te
++++ b/imx8m/sepolicy/dumpstate.te
+@@ -9,3 +9,7 @@ allow dumpstate debugfs:dir { r_dir_perms };
+ allow dumpstate debugfs_dma:dir { search };
+ allow dumpstate debugfs_dma:file { read open getattr };
+ allow dumpstate hal_power_default:binder { call };
++allow dumpstate hal_kioskled_default:binder call;
++allow dumpstate fuse:dir search;
++allow dumpstate idtech_data_file:dir getattr;
++allow dumpstate vold:binder call;
+diff --git a/imx8m/sepolicy/hal_dumpstate_impl.te b/imx8m/sepolicy/hal_dumpstate_impl.te
+index 89aa9c8e..cdc5676e 100644
+--- a/imx8m/sepolicy/hal_dumpstate_impl.te
++++ b/imx8m/sepolicy/hal_dumpstate_impl.te
+@@ -14,5 +14,12 @@ allow hal_dumpstate_impl  sysfs_batteryinfo:dir { read search };
+ allow hal_dumpstate_impl  shell_data_file:file { read getattr };
+ allow hal_dumpstate_impl  debugfs_dma:file { read open };
+ allow hal_dumpstate_impl  debugfs_dma:dir { read search};
++allow hal_dumpstate_impl  aac_drc_prop:file { getattr map open };
++allow hal_dumpstate_impl  ab_update_gki_prop:file { getattr map open };
++allow hal_dumpstate_impl  adbd_config_prop:file { getattr open map };
++allow hal_dumpstate_impl  apexd_config_prop:file { open getattr map };
++# only init and adbd are allowed to set adbd_prop
++# allow hal_dumpstate_impl  adbd_prop:file { getattr map open };
++
+ 
+ set_prop(hal_dumpstate_impl, vendor_logging_prop);
+diff --git a/imx8m/sepolicy/hal_kioskled_default.te b/imx8m/sepolicy/hal_kioskled_default.te
+new file mode 100644
+index 00000000..3131ec71
+--- /dev/null
++++ b/imx8m/sepolicy/hal_kioskled_default.te
+@@ -0,0 +1,2 @@
++allow hal_kioskled_default dumpstate:fd use;
++allow hal_kioskled_default dumpstate:fifo_file write;
+diff --git a/imx8m/sepolicy/hal_power_default.te b/imx8m/sepolicy/hal_power_default.te
+index a22f5061..b90c6038 100644
+--- a/imx8m/sepolicy/hal_power_default.te
++++ b/imx8m/sepolicy/hal_power_default.te
+@@ -3,6 +3,7 @@ allow hal_power_default property_socket:sock_file { write };
+ allow hal_power_default init:unix_stream_socket { connectto };
+ allow hal_power_default latency_device:chr_file rw_file_perms;
+ allow hal_power_default device:file rw_file_perms;
++allow hal_power_default cgroup:file { read getattr };
+ set_prop(hal_power_default, vendor_power_hal_prop)
+ get_prop(hal_power_default, vendor_power_hal_prop)
+ # Rule for hal_power_default to access graphics composer process
+diff --git a/imx8m/sepolicy/incident.te b/imx8m/sepolicy/incident.te
+new file mode 100644
+index 00000000..3de2338a
+--- /dev/null
++++ b/imx8m/sepolicy/incident.te
+@@ -0,0 +1 @@
++allow incident shell_data_file:file append;
+diff --git a/imx8m/sepolicy/incidentd.te b/imx8m/sepolicy/incidentd.te
+new file mode 100644
+index 00000000..c68bdc5d
+--- /dev/null
++++ b/imx8m/sepolicy/incidentd.te
+@@ -0,0 +1,8 @@
++allow incidentd apex_info_file:file { getattr open read };
++allow incidentd aac_drc_prop:file { getattr map open };
++allow incidentd ab_update_gki_prop:file { getattr map open };
++allow incidentd adbd_config_prop:file { getattr map open };
++allow incidentd apexd_config_prop:file { getattr map open };
++allow incidentd apexd_prop:file { getattr open };
++# only init and adbd are allowed to set adbd_prop
++# allow incidentd adbd_prop:file { getattr map open };
+diff --git a/imx8m/sepolicy/surfaceflinger.te b/imx8m/sepolicy/surfaceflinger.te
+index 66e6412a..11b54574 100644
+--- a/imx8m/sepolicy/surfaceflinger.te
++++ b/imx8m/sepolicy/surfaceflinger.te
+@@ -2,5 +2,7 @@ allow surfaceflinger debug_prop:property_service { set };
+ allow surfaceflinger ashmem_device:chr_file {execute};
+ allow surfaceflinger self:process execmem;
+ allow surfaceflinger hal_graphics_allocator_default_tmpfs:file { read write getattr };
++allow surfaceflinger hal_graphics_composer_default:dir search;
++allow surfaceflinger hal_graphics_composer_default:file { getattr open read };
+ 
+ get_prop(surfaceflinger, vendor_public_default_prop)
+diff --git a/imx8m/sepolicy/update_engine.te b/imx8m/sepolicy/update_engine.te
+index 1a0054a5..0a955553 100644
+--- a/imx8m/sepolicy/update_engine.te
++++ b/imx8m/sepolicy/update_engine.te
+@@ -12,3 +12,5 @@ allow update_engine bootloader_block_device:blk_file { open read write ioctl get
+ allow update_engine vfat:file { getattr open read };
+ allow update_engine fuse:file { getattr open read };
+ allow update_engine fuse:dir search;
++allow update_engine dumpstate:fd use;
++allow update_engine dumpstate:fifo_file write;
+diff --git a/imx8m/sepolicy/vold.te b/imx8m/sepolicy/vold.te
+index 7efcf485..c959268d 100644
+--- a/imx8m/sepolicy/vold.te
++++ b/imx8m/sepolicy/vold.te
+@@ -5,3 +5,5 @@ allow vold idtechdata_block_device:blk_file rw_file_perms;
+ allow vold sysfs_usb_uevent:file write;
+ allow vold ram_device:blk_file { getattr };
+ allow vold idtech_data_file:dir { r_file_perms };
++allow vold dumpstate:fd use;
++allow vold dumpstate:fifo_file { open read write getattr };

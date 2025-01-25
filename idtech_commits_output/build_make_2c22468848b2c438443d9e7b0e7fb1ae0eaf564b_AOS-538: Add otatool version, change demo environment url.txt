@@ -1,0 +1,58 @@
+2c2246884 max.yang 2021-03-22
+
+AOS-538: Add otatool version, change demo environment url
+
+Change-Id: Iddb6d398e9f8a2ada9f7ba0ef6e77b59a46342af
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index d19a74a3c..d9675a5f7 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -16,6 +16,9 @@ import idt_web_service
+ from xml.etree import ElementTree
+ from distutils.spawn import find_executable
+ 
++# VERSION: Android Ver.Major.Minor
++OTATOOL_VERSION = "11.01.001"
++
+ WS = idt_web_service.web_service()
+ idt_key_map = {}
+ #TODO: replace cert path once we get it
+@@ -291,6 +294,7 @@ def create_released_bootloader(output_zip, tmp_dir):
+       common.ZipWriteStr(output_zip, "SIGNED/" + file, f_img.read())
+ 
+ def main(argv):
++  print('IDTech otatool version: {}'.format(OTATOOL_VERSION))
+   # PATH environment, otatools/bin should put at front, or it will use system's mke2fs
+   os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
+   print('PATH: {}'.format(os.environ["PATH"]))
+@@ -332,7 +336,7 @@ def main(argv):
+   common.ZipClose(input_zip)
+   common.ZipClose(output_zip)
+ 
+-  print("Done")
++  print("Signing process successfully finished")
+ 
+ if __name__ == '__main__':
+   try:
+diff --git a/tools/releasetools/idt_web_service.py b/tools/releasetools/idt_web_service.py
+index 35ca294bb..535c68d42 100644
+--- a/tools/releasetools/idt_web_service.py
++++ b/tools/releasetools/idt_web_service.py
+@@ -10,14 +10,14 @@ class web_service(object):
+ 
+   def __init__(self):
+     # init for signing parameters
+-    self.HOST_URL = "http://192.168.1.58:5001/"
++    self.HOST_URL = "http://demo.idtechweb.com:8751/"
+     self.SIGN_API = "api/sign/apk"
+     self.AUTH_API = "api/auth/login"
+     self.WSCA = "ANDROID PKI"
+     self.WSHS = "1"
+     self.WSRG = "4"
+     self.WSZA = "1"
+-    self.socket_id = random.randint(1, 10000)
++    self.socket_id = str(random.randint(1, 10000))
+ 
+     # init for dual login
+     self.user1   = None

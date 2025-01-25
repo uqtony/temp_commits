@@ -1,0 +1,64 @@
+ba0b1e9 owen.wen 2022-02-18
+
+AOS-870: support timeout in idg_console_tool
+
+some IDG command has timeout function
+we will not get response until IDG timeout
+
+add 3rd patameter to support timeout function in idg_console_tool
+e.g. idg_console_tool 2 2C200000 10
+     // MSR swipe function, idg_console_tool 10 seconds timeout
+
+Change-Id: I8d7dcd45130f475be5cd241052f891b6a359b52b
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..8d98f9d
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1 @@
++.*
+diff --git a/idg_console_tool/main.c b/idg_console_tool/main.c
+index 4c100dc..b352224 100644
+--- a/idg_console_tool/main.c
++++ b/idg_console_tool/main.c
+@@ -167,6 +167,7 @@ int main(int argc, char const *argv[])
+ 		break;
+ 	case 2:
+ 	case 3:
++	case 4:
+ 		if (*argv[1] == '2') {
+ 			fd = open(LOCAL_DRIVER_V2, O_RDWR);
+ 			printf("path: %s, ttyfd = %d
+", LOCAL_DRIVER_V2, fd);
+@@ -198,13 +199,11 @@ int main(int argc, char const *argv[])
+ 	ret = pthread_create(&read_th, NULL, get_data, (void *)channel);
+ 
+ 	while (1) {
+-		if (argc != 3) {
+-			puts("Please enter IDG command"
+-			     "(hex number only, no space):
+");
+-			scanf("%s", buffer);
+-		} else {
++		if (argc >= 3) {
+ 			/* Third argv is command itself */
+ 			sprintf(buffer, "%s", argv[2]);
++		} else {
++			scanf("%s", buffer);
+ 		}
+ #if IDG_DRIVER_WRITE_WITHOUT_FRAME
+ 		count = strlen(buffer);
+@@ -247,6 +246,11 @@ int main(int argc, char const *argv[])
+ 			sleep(1);
+ 			goto idg_tool_out;
+ 		}
++		if (argc == 4) {
++			printf("timeout: %d
+", atoi(argv[3]));
++			sleep(atoi(argv[3]));
++			goto idg_tool_out;
++		}
+ 	}
+ 	pthread_join(read_th, NULL);
+ 	ret = 0;

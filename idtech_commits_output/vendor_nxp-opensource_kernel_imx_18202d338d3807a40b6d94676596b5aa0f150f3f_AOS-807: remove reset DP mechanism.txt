@@ -1,0 +1,98 @@
+18202d338d38 AndrewS 2022-03-31
+
+AOS-807: remove reset DP mechanism
+
+Change-Id: I4d5d0ecd66de65e63b7aaa914fd5120efb2225ce
+
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 271136a34ba3..be17efcb5eb6 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -445,14 +445,10 @@ static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
+ static int tps65994_reset_connector(struct tps65994 *tps)
+ {
+ 	const char *cmd_dbfg = "DBfg";
+-	const char *cmd_ucsi = "UCSI";
+ 	struct i2c_client *client = tps->i2c_client;
+-	char out_data[64] = {};
+-	char in_data[8] = {};
+ 	int ret = 0;
+ 	int retry = 0;
+ 	char boot_status[5] = { };
+-	char data_status[5] = { };
+ 	char power_path_status[5] = { };
+ 
+ 	mutex_lock(&tps->lock);
+@@ -474,58 +470,17 @@ static int tps65994_reset_connector(struct tps65994 *tps)
+ 		usleep_range(20000, 30000);
+ 	}
+ 
+-	/*
+-	 * UCSI reset connector
+-	 * if DP connection detect, and USB port negotiated(portNegoticated)
+-	 * rev is Revision 3, reset connector to makes signal more stable,
+-	 * this will need power input on another port, because the power
+-	 * from the connector will be cut off during reset.
+-	 */
+-	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_DATA_STATUS,
+-				data_status, NULL);
+-	if (ret) {
+-		dev_err(&client->dev, "failed to read DATA_STATUS, ret=%d
+", ret);
+-		goto out_unlock;
+-	}
+-
+-	if ((data_status[0] & 0x1) && (data_status[1] & 0x1)) {
+-		/* check power path status to confirm dead battery flag cleared */
+-		power_path_status[4] = 0;
+-		while (((power_path_status[4] & 0xc0) != 0x40) && (retry < 50)) {
+-			msleep(20);
+-			ret = tps65994_i2c_read(client, TPS_REG_POWER_PATH_STATUS,
+-						power_path_status, NULL);
+-			if (ret) {
+-				dev_err(&client->dev, "failed to read POWER_PATH_STATUS, ret=%d
+", ret);
+-				goto out_unlock;
+-			}
+-			retry++;
+-		}
+-		/* UCSI to reset connector */
+-		memset(in_data, 0, sizeof(in_data));
+-		in_data[0] = 0x3;
+-		in_data[1] = 0x0;
+-		in_data[2] = (tps->main_port) ? 0x1 : 0x2;
+-		ret = tps65994_exec_cmd(tps, cmd_ucsi, 8, in_data, 1, out_data);
+-		if (ret || (out_data[0] != 0)) {
+-			dev_err(&client->dev, "failed to send cmd_ucsi, ret=%d, out_data[0]=%d
+",
+-					ret, out_data[0]);
++	/* check power path status to confirm dead battery flag cleared */
++	power_path_status[4] = 0;
++	while (((power_path_status[4] & 0xc0) != 0x40) && (retry < 50)) {
++		msleep(20);
++		ret = tps65994_i2c_read(client, TPS_REG_POWER_PATH_STATUS,
++					power_path_status, NULL);
++		if (ret) {
++			dev_err(&client->dev, "failed to read POWER_PATH_STATUS, ret=%d
+", ret);
+ 			goto out_unlock;
+ 		}
+-
+-		retry = 0;
+-		data_status[1] = 0;
+-		while (!(data_status[1] & 0x1) && (retry < 50)) {
+-			msleep(200);
+-			ret = tps65994_i2c_read(client, TPS_REG_DATA_STATUS,
+-						data_status, NULL);
+-			if (ret) {
+-				dev_err(&client->dev, "failed to read DATA_STATUS, ret=%d
+", ret);
+-				goto out_unlock;
+-			}
+-			retry++;
+-		}
+-		msleep(2000);
++		retry++;
+ 	}
+ 
+ out_unlock:

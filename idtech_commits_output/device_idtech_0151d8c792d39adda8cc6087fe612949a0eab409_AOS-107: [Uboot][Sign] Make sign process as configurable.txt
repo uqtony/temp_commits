@@ -1,0 +1,43 @@
+0151d8c7 max.yang 2020-03-12
+
+AOS-107: [Uboot][Sign] Make sign process as configurable
+
+  1. Current sign process will sign all u-boot images, and leave only last one
+  2. We just need to sign default u-boot and its uuu one
+     - Config in UbootKernelBoardConfig.mk, an example below:
+       TARGET_BOOTLOADER_CONFIG += imx8mq-evk-uuu:vp6820_8mq_evk_android_uuu_defconfig:signed
+  3. The output signed u-boot image will have postfix "-signed":
+       u-boot-imx8mq-evk-uuu-signed.imx
+       u-boot-imx8mq-signed.imx
+
+Change-Id: I15341c1f68e0073c83c67ae199065d1cde655a1e
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index d8768484..d49ab938 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -131,11 +131,12 @@ endif
+ CST_PATH := ./vendor/idtech/cst
+ 
+ define sign_imx_uboot
+-       echo IDTech sign uboot process ...; \
++       echo IDTech sign uboot process $(1)...; \
+        $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
+        cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
+        cp $(UBOOT_BIN) $(CST_PATH)/flash.bin; \
+        $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH); \
++       mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/u-boot-$(strip $(1))-signed.imx; \
+        rm $(CST_PATH)/flash.bin;
+ endef
+ 
+@@ -161,7 +162,9 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		    $(call build_uboot_w_tee,  $(TARGET_BOOTLOADER_POSTFIX), $$UBOOT_PLATFORM) \
+ 		fi; \
+ 		install -D $(UBOOT_COLLECTION)/u-boot-$$UBOOT_PLATFORM.imx $(UBOOT_BIN); \
+-		$(call sign_imx_uboot) \
++		if [ "`echo $$ubootplat | cut -d':' -f3`" = "signed" ]; then \
++		    $(call sign_imx_uboot, $$UBOOT_PLATFORM) \
++		fi; \
+ 	done > $(UBOOT_OUT)/sig_info.txt 2>&1
+ 	cat $(UBOOT_OUT)/sig_info.txt
+ 

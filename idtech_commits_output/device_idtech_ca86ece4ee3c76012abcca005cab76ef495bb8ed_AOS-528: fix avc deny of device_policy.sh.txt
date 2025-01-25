@@ -1,0 +1,19 @@
+ca86ece4 owen.wen 2021-03-15
+
+AOS-528: fix avc deny of device_policy.sh
+
+Symptom: avc deny message in log
+./idt.kernel:[ 74.893518] type=1400 audit(1612889156.887:27): avc: denied { read } for comm="app_process" name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=3304 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+Solution: add rules in shell.te
+
+Change-Id: Ia198d983c21e3068f66ed23d3499ca4d8d06ddf6
+
+diff --git a/imx8m/sepolicy/shell.te b/imx8m/sepolicy/shell.te
+index 3a85d92d..7b7ca307 100644
+--- a/imx8m/sepolicy/shell.te
++++ b/imx8m/sepolicy/shell.te
+@@ -10,3 +10,4 @@ allow shell vendor_file:file { read execute open getattr };
+ allow shell system_prop:property_service { set };
+ allow shell sysfs_usb_uevent:file { getattr read open };
+ set_prop(shell, radio_prop)
++get_prop(shell, device_config_runtime_native_boot_prop)

@@ -1,0 +1,57 @@
+3e6fb645a max.yang 2021-01-21
+
+AOS-503: Post process signing support for Android 11
+
+  1. Support for property new locations, remove lagacy one
+     - system_ext
+  2. Support for misc_info manipulation
+     - google added prop into misc_info
+
+Change-Id: I731a4fac0f62701ddc23ed5914ca558ed649ccce
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 2adec97bf..4cd11fe45 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -154,17 +154,14 @@ def handle_all_files_verbatim(input_zip, output_zip):
+     elif filename in ("SYSTEM/build.prop",
+                       "VENDOR/build.prop",
+                       "SYSTEM/vendor/build.prop",
+-                      "ODM/build.prop",  # legacy
+                       "ODM/etc/build.prop",
+-                      "VENDOR/odm/build.prop",  # legacy
+                       "VENDOR/odm/etc/build.prop",
+                       "PRODUCT/build.prop",
+                       "SYSTEM/product/build.prop",
+-                      "PRODUCT_SERVICES/build.prop",
+-                      "SYSTEM/product_services/build.prop",
++                      "SYSTEM_EXT/build.prop",
++                      "SYSTEM/system_ext/build.prop",
+                       "SYSTEM/etc/prop.default",
+                       "BOOT/RAMDISK/prop.default",
+-                      "BOOT/RAMDISK/default.prop",  # legacy
+                       "ROOT/default.prop",  # legacy
+                       "RECOVERY/RAMDISK/prop.default",
+                       "RECOVERY/RAMDISK/default.prop"):  # legacy
+@@ -188,10 +185,21 @@ def handle_all_files_verbatim(input_zip, output_zip):
+     elif filename == "META/care_map.pb" or filename == "META/care_map.txt":
+       pass
+ 
++    # Skip META/misc_info.txt since we will write back the new values later.
++    elif filename == "META/misc_info.txt":
++      pass
++
+     # Copy for all files no need to deal with
+     else:
+       common.ZipWriteStr(output_zip, out_info, data)
+ 
++  sign_target_files_apks.ReplaceAvbSigningKeys(misc_info)
++
++  if misc_info.get('avb_enable') == 'true':
++    sign_target_files_apks.RewriteAvbProps(misc_info)
++
++  sign_target_files_apks.ReplaceMiscInfoTxt(input_zip, output_zip, misc_info)
++
+ def create_released_images(file_path):
+   new_args = ["--is_signing", "--rebuild_recovery", "--add_missing"]
+   new_args.append(file_path)

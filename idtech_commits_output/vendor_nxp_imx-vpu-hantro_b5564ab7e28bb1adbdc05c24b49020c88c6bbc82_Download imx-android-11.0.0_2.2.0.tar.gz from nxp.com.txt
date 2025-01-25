@@ -1,0 +1,1803 @@
+b5564ab jenkins 2021-07-19
+
+Download imx-android-11.0.0_2.2.0.tar.gz from nxp.com
+
+Change-Id: I2b35afc0c791c4204d24b5f31f98e8e007b9ac61
+
+diff --git a/Makefile_H1 b/Makefile_H1
+index 30452b1..0979571 100755
+--- a/Makefile_H1
++++ b/Makefile_H1
+@@ -13,7 +13,7 @@ RELEASE_DIR = bin
+ #CFLAGS += -DENC_MODULE_PATH=\"/dev/mxc_hantro_h1\"
+ 
+ ENV = -DENC_MODULE_PATH=\\"/dev/mxc_hantro_h1\\"
+-ENV += -DMEMALLOC_MODULE_PATH=\\"/dev/ion\\"
++#ENV += -DMEMALLOC_MODULE_PATH=\\"/dev/ion\\"
+ #ENV += -DSDRAM_LM_BASE=0x00000000
+ ENV += -DEWL_NO_HW_TIMEOUT
+ ENV += -DUSE_ION
+diff --git a/decoder_sw/software/linux/dwl/dwl_linux.c b/decoder_sw/software/linux/dwl/dwl_linux.c
+index 24770d4..7d5e33b 100755
+--- a/decoder_sw/software/linux/dwl/dwl_linux.c
++++ b/decoder_sw/software/linux/dwl/dwl_linux.c
+@@ -45,9 +45,13 @@
+ #include <linux/hantrodec.h>
+ #endif
+ #ifdef USE_ION
+-#include <linux/ion.h>
+ #include <linux/dma-buf.h>
+ #include <linux/version.h>
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
++#include <linux/dma-heap.h>
++#else
++#include <linux/ion.h>
++#endif
+ #ifdef ANDROID
+ #include <linux/mxc_ion.h>
+ #include <ion_4.12.h>
+@@ -954,7 +958,7 @@ void DWLFreeRefFrm(const void *instance, struct DWLLinearMem *info) {
+                         parameters are returned
+ ------------------------------------------------------------------------------*/
+ #ifdef USE_ION
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ i32 DWLMallocLinear(const void *instance, u32 size, struct DWLLinearMem *info) {
+   struct HANTRODWL *dec_dwl = (struct HANTRODWL *)instance;
+ 
+@@ -1100,7 +1104,7 @@ bail:
+ #endif
+ }
+ 
+-#else //LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)) //LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ i32 DWLMallocLinear(const void *instance, u32 size, struct DWLLinearMem *info) {
+   struct HANTRODWL *dec_dwl = (struct HANTRODWL *)instance;
+ 
+@@ -1151,49 +1155,45 @@ i32 DWLMallocLinear(const void *instance, u32 size, struct DWLLinearMem *info) {
+     return DWL_ERROR;
+   }
+ 
+-#ifdef CFG_SECURE_DATA_PATH
++  int normal_heaps = 0;
++  int secure_heaps = 0;
++  for (i = 0; i < heap_cnt; i++) {
++      if (ihd[i].type == ION_HEAP_TYPE_DMA) {
++          normal_heaps |= 1 << ihd[i].heap_id;
++          continue;
++      }
++#ifdef ANDROID
++      if (ihd[i].type == ION_HEAP_TYPE_UNMAPPED) {
++          secure_heaps = 1 << ihd[i].heap_id;
++          continue;
++      }
++#endif
++  }
++
+   switch(info->mem_type) {
+     case DWL_MEM_TYPE_CPU:
+     case DWL_MEM_TYPE_VPU_WORKING:
+     case DWL_MEM_TYPE_VPU_WORKING_SPECIAL:
+-      for (i=0; i<heap_cnt; i++) {
+-        if (ihd[i].type == ION_HEAP_TYPE_DMA) {
+-          heap_mask |=  1 << ihd[i].heap_id;
+-        }
+-      }
++      heap_mask = normal_heaps;
+       break;
+     case DWL_MEM_TYPE_DPB:
+     case DWL_MEM_TYPE_VPU_ONLY:
+-      for (i=0; i<heap_cnt; i++) {
+-        if ((ihd[i].type == ION_HEAP_TYPE_UNMAPPED) &&
+-            (!memcmp(ihd[i].name,
+-                DWL_ION_DECODED_BUFFER_DISPLAY_HEAP_NAME,
+-                sizeof(DWL_ION_DECODED_BUFFER_DISPLAY_HEAP_NAME)))) {
+-          heap_mask |=  1 << ihd[i].heap_id;
+-        }
+-      }
+-      break;
+     case DWL_MEM_TYPE_SLICE:
+-      for (i=0; i<heap_cnt; i++) {
+-        if ((ihd[i].type == ION_HEAP_TYPE_UNMAPPED) &&
+-            (!memcmp(ihd[i].name,
+-                DWL_ION_ENCODED_BUFFER_OPTEE_HEAP_NAME,
+-                sizeof(DWL_ION_ENCODED_BUFFER_OPTEE_HEAP_NAME)))) {
+-          heap_mask |=  1 << ihd[i].heap_id;
+-        }
++      if (dec_dwl->use_secure_mode) {
++          heap_mask = secure_heaps;
++      } else {
++          heap_mask = normal_heaps;
+       }
+       break;
+     default:
+-      DWL_DEBUG("ERROR! Incorrect memory type
+");
+-      return DWL_ERROR;
+-  }
+-#else
+-  for (i=0; i<heap_cnt; i++) {
+-    if (ihd[i].type == ION_HEAP_TYPE_DMA) {
+-      heap_mask |=  1 << ihd[i].heap_id;
+-    }
++      if (dec_dwl->use_secure_mode) {
++          DWL_DEBUG("ERROR! Incorrect memory type
+");
++          return DWL_ERROR;
++      } else {
++          heap_mask = normal_heaps;
++          break;
++      }
+   }
+-#endif
+ 
+   allocation_data.heap_id_mask = heap_mask;
+   allocation_data.len = info->size;
+@@ -1258,7 +1258,88 @@ bail:
+   return DWL_ERROR;
+ }
+ 
+-#endif //LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#else //(LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
++i32 DWLMallocLinear(const void *instance, u32 size, struct DWLLinearMem *info) {
++  struct HANTRODWL *dec_dwl = (struct HANTRODWL *)instance;
++  struct dma_heap_allocation_data data = { 0 };
++  struct dma_buf_phys dma_phys;
++  u32 pgsize = getpagesize();
++  int ret;
++
++  assert(dec_dwl != NULL);
++  assert(info != NULL);
++
++#ifdef MEMORY_USAGE_TRACE
++  printf("DWLMallocLinear	%8d bytes 
+", size);
++#endif
++
++  info->logical_size = size;
++  info->size = NEXT_MULTIPLE(size, pgsize);
++  info->virtual_address = MAP_FAILED;
++  info->bus_address = 0;
++
++  info->ion_fd = -1;
++
++  data.len = info->size,
++  data.fd_flags = O_RDWR | O_CLOEXEC;
++  data.heap_flags = 0;
++  ret = ioctl (dec_dwl->fd_memalloc, DMA_HEAP_IOCTL_ALLOC, &data);
++  if (ret < 0) {
++    DWL_DEBUG("ion allocate failed. 
+");
++    return DWL_ERROR;
++  }
++  info->ion_fd = data.fd;
++
++  ret = ioctl(info->ion_fd, DMA_BUF_IOCTL_PHYS, &dma_phys);
++  if (ret < 0) {
++    DWL_DEBUG("ion get phys failed. 
+");
++    goto bail;
++  }
++
++  info->bus_address = dma_phys.phys;
++
++  DWL_DEBUG("DWLMallocLinear	 mem_type %d
+", info->mem_type);
++  DWL_DEBUG("DWLMallocLinear	 physical address: %p
+", info->bus_address);
++
++  switch(info->mem_type) {
++    case DWL_MEM_TYPE_CPU:
++    case DWL_MEM_TYPE_VPU_WORKING:
++    case DWL_MEM_TYPE_VPU_WORKING_SPECIAL:
++#ifndef CFG_SECURE_DATA_PATH
++    case DWL_MEM_TYPE_DPB:
++    case DWL_MEM_TYPE_VPU_ONLY:
++    case DWL_MEM_TYPE_SLICE:
++#endif
++      info->virtual_address =
++      (u32 *)mmap(0, info->size, PROT_READ | PROT_WRITE, MAP_SHARED,
++                  info->ion_fd, 0);
++      break;
++    default:
++      info->virtual_address = NULL;
++      break;
++  }
++
++  if (info->virtual_address == MAP_FAILED) {
++    DWL_DEBUG("ERROR! mmap failed
+");
++    goto bail;
++  }
++
++#ifdef MEMORY_USAGE_TRACE
++  printf("DWLMallocLinear 0x%08x virtual_address: 0x%08x (type %d)
+", info->bus_address,
++         (unsigned)info->virtual_address, info->mem_type);
++#endif
++
++  if (info->virtual_address == MAP_FAILED) return DWL_ERROR;
++
++  return DWL_OK;
++
++bail:
++  if (info->ion_fd >= 0)
++    close(info->ion_fd);
++
++  return DWL_ERROR;
++}
++#endif //LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 
+ #else  //USE_ION
+ 
+@@ -1714,6 +1795,12 @@ void *DWLmemset(void *d, i32 c, u32 n) {
+   return memset(d, (int)c, (size_t)n);
+ }
+ 
++void DWLSetSecureMode(const void *instance, u32 use_secure_mode)
++{
++  struct HANTRODWL *dec_dwl = (struct HANTRODWL *)instance;
++  dec_dwl->use_secure_mode = use_secure_mode;
++}
++
+ /*------------------------------------------------------------------------------
+     Function name   : DWLFakeTimeout
+     Description     : Testing help function that changes HW stream errors info
+diff --git a/decoder_sw/software/linux/dwl/dwl_linux.h b/decoder_sw/software/linux/dwl/dwl_linux.h
+index f270eeb..a2e0693 100755
+--- a/decoder_sw/software/linux/dwl/dwl_linux.h
++++ b/decoder_sw/software/linux/dwl/dwl_linux.h
+@@ -51,6 +51,7 @@
+ #include <sys/timeb.h>
+ #endif
+ #include <sys/types.h>
++#include <linux/version.h>
+ 
+ #ifdef _DWL_DEBUG
+ #define DWL_DEBUG(fmt, args...) \
+@@ -67,7 +68,11 @@
+ 
+ #ifndef MEMALLOC_MODULE_PATH
+ #ifdef USE_ION
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
++#define MEMALLOC_MODULE_PATH "/dev/dma_heap/linux,cma-uncached"
++#else
+ #define MEMALLOC_MODULE_PATH "/dev/ion"
++#endif
+ #else
+ #define MEMALLOC_MODULE_PATH "/tmp/dev/memalloc"
+ #endif
+@@ -128,6 +133,7 @@ struct HANTRODWL {
+   struct ActivityTrace activity;
+   u32 b_ppreserved;
+   u32 asic_id;
++  u32 use_secure_mode;
+ };
+ 
+ i32 DWLWaitDecHwReady(const void *instance, i32 core_id, u32 timeout);
+diff --git a/decoder_sw/software/source/avs/avsdecapi.c b/decoder_sw/software/source/avs/avsdecapi.c
+index c109533..adb334e 100755
+--- a/decoder_sw/software/source/avs/avsdecapi.c
++++ b/decoder_sw/software/source/avs/avsdecapi.c
+@@ -3751,7 +3751,8 @@ void AvsStateReset(DecContainer *dec_cont) {
+   dec_cont->StrmStorage.future2prev_past_dist = 0;
+ 
+   /* Clear internal parameters in DecApiStorage */
+-  dec_cont->ApiStorage.DecStat = INITIALIZED;
++  if (dec_cont->ApiStorage.DecStat != HEADERSDECODED)
++    dec_cont->ApiStorage.DecStat = INITIALIZED;
+   dec_cont->ApiStorage.first_field = 1;
+   dec_cont->ApiStorage.output_other_field = 0;
+ 
+@@ -3778,6 +3779,46 @@ void AvsStateReset(DecContainer *dec_cont) {
+ #endif
+ }
+ 
++AvsDecRet AvsDecRemoveBuffer(AvsDecInst dec_inst) {
++  DecContainer *dec_cont = (DecContainer *) dec_inst;
++  AvsDecRet re = AVSDEC_OK;
++  u32 buffers = 3;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  FifoSetAbort(dec_cont->fifo_display);
++  BqueueRemove(&dec_cont->StrmStorage.bq);
++  dec_cont->StrmStorage.work_out = 0;
++  dec_cont->StrmStorage.work0 =
++    dec_cont->StrmStorage.work1 = INVALID_ANCHOR_PICTURE;
++
++  AvsStateReset(dec_cont);
++
++  if( !dec_cont->pp_instance ) { /* Combined mode used */
++    buffers = dec_cont->StrmStorage.max_num_buffers;
++    if( buffers < 3 )
++      buffers = 3;
++  }
++
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->fifo_index = 0;
++  dec_cont->ext_buffer_num = 0;
++
++  dec_cont->StrmStorage.bq.queue_size = buffers;
++  dec_cont->StrmStorage.num_buffers = buffers;
++  (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf, 0, 16 * sizeof(picture_t));
++  (void) DWLmemset(dec_cont->StrmStorage.picture_info, 0, 32 * sizeof(AvsDecPicture));
++  if (dec_cont->fifo_display)
++    FifoRelease(dec_cont->fifo_display);
++  if (FifoInit(32, &dec_cont->fifo_display) != FIFO_OK) {
++    re = AVSDEC_MEMFAIL;
++    goto end;
++  }
++  FifoClearAbort(dec_cont->fifo_display);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
++
+ AvsDecRet AvsDecAbort(AvsDecInst dec_inst) {
+   DecContainer *dec_cont = (DecContainer *) dec_inst;
+ 
+diff --git a/decoder_sw/software/source/common/bqueue.c b/decoder_sw/software/source/common/bqueue.c
+index 6be2616..917aa6c 100755
+--- a/decoder_sw/software/source/common/bqueue.c
++++ b/decoder_sw/software/source/common/bqueue.c
+@@ -381,6 +381,29 @@ void BqueueClearAbort(struct BufferQueue *bq) {
+   pthread_mutex_unlock(&bq->buf_release_mutex);
+ }
+ 
++void BqueueRemove(struct BufferQueue *bq) {
++  u32 i;
++  if(bq->pic_i == NULL || bq->buf_used == NULL)
++    return;
++
++  pthread_mutex_lock(&bq->buf_release_mutex);
++#ifndef USE_EXTERNAL_BUFFER
++  for( i = 0 ; i < bq->queue_size ; ++i ) {
++    bq->pic_i[i] = 0;
++    bq->buf_used[i] = 0;
++  }
++#else
++  for( i = 0; i < MAX_OUTPUT_BUFFERS; ++i ) {
++    bq->pic_i[i] = 0;
++    bq->buf_used[i] = 0;
++  }
++#endif
++  bq->ctr = 1;
++  bq->abort = 0;
++  bq->prev_anchor_slot  = 0;
++  pthread_mutex_unlock(&bq->buf_release_mutex);
++}
++
+ void BqueueEmpty(struct BufferQueue *bq) {
+   u32 i;
+   if(bq->pic_i == NULL || bq->buf_used == NULL)
+diff --git a/decoder_sw/software/source/common/bqueue.h b/decoder_sw/software/source/common/bqueue.h
+index e2420c7..f0ceaae 100755
+--- a/decoder_sw/software/source/common/bqueue.h
++++ b/decoder_sw/software/source/common/bqueue.h
+@@ -73,6 +73,7 @@ void BqueueSetAbort(struct BufferQueue *bq);
+ void BqueueClearAbort(struct BufferQueue *bq);
+ #ifdef USE_EXTERNAL_BUFFER
+ void BqueueEmpty(struct BufferQueue *bq);
++void BqueueRemove(struct BufferQueue *bq);
+ #endif
+ #endif
+ 
+diff --git a/decoder_sw/software/source/common/input_queue.c b/decoder_sw/software/source/common/input_queue.c
+index 098ad4d..46ef803 100755
+--- a/decoder_sw/software/source/common/input_queue.c
++++ b/decoder_sw/software/source/common/input_queue.c
+@@ -104,6 +104,34 @@ InputQueue InputQueueInit(i32 n_buffers) {
+   return q;
+ }
+ #ifdef USE_EXTERNAL_BUFFER
++void InputQueueReset2(InputQueue queue) {
++  assert(queue);
++  struct IQueue* q = (struct IQueue*)queue;
++  i32 i;
++  FifoObject j;
++  enum FifoRet ret;
++  if (q->fifo_in) {/* Empty the fifo before releasing. */
++    FifoRelease(q->fifo_in);
++    pthread_mutex_destroy(&q->cs);
++    pthread_mutex_destroy(&q->buf_release_mutex);
++    pthread_cond_destroy(&q->buf_release_cv);
++  }
++  ret = FifoInit(MAX_PIC_BUFFERS, &q->fifo_in);
++  if (FIFO_ERROR_MEMALLOC == ret)
++    return;
++  assert(q->fifo_in);
++  q->max_buffers = MAX_PIC_BUFFERS;
++  q->n_buffers = 0;
++  memset(q->buffers, 0, sizeof(q->buffers));
++  memset(q->buffer_in_fifo, 0, sizeof(q->buffer_in_fifo));
++  pthread_mutex_init(&q->cs, NULL);
++  pthread_mutex_init(&q->buf_release_mutex, NULL);
++  pthread_cond_init(&q->buf_release_cv, NULL);
++  (void)ret;
++  (void)i;
++  (void)j;
++}
++
+ void InputQueueReset(InputQueue queue) {
+ #ifdef BUFFER_QUEUE_PRINT_STATUS
+   printf(__FUNCTION__);
+diff --git a/decoder_sw/software/source/common/input_queue.h b/decoder_sw/software/source/common/input_queue.h
+index 0ddd49f..e38b02a 100755
+--- a/decoder_sw/software/source/common/input_queue.h
++++ b/decoder_sw/software/source/common/input_queue.h
+@@ -77,5 +77,6 @@ void InputQueueSetAbort(InputQueue queue);
+ void InputQueueClearAbort(InputQueue queue);
+ void InputQueueReturnAllBuffer(InputQueue queue);
+ void InputQueueReset(InputQueue queue);
++void InputQueueReset2(InputQueue queue);
+ #endif
+ #endif /* _INPUT_QUEUE_H_ */
+diff --git a/decoder_sw/software/source/common/raster_buffer_mgr.c b/decoder_sw/software/source/common/raster_buffer_mgr.c
+index a4dc52d..93e7b16 100755
+--- a/decoder_sw/software/source/common/raster_buffer_mgr.c
++++ b/decoder_sw/software/source/common/raster_buffer_mgr.c
+@@ -232,4 +232,10 @@ void RbmResetPpBuffer(RasterBufferMgr instance) {
+ 
+   InputQueueReset(inst->pp_queue);
+ }
++
++void RbmResetPpBuffer2(RasterBufferMgr instance) {
++  RasterBufferMgrInst* inst = (RasterBufferMgrInst*)instance;
++  InputQueueReset2(inst->pp_queue);
++}
++
+ #endif
+diff --git a/decoder_sw/software/source/common/raster_buffer_mgr.h b/decoder_sw/software/source/common/raster_buffer_mgr.h
+index 1369344..913fff9 100755
+--- a/decoder_sw/software/source/common/raster_buffer_mgr.h
++++ b/decoder_sw/software/source/common/raster_buffer_mgr.h
+@@ -66,6 +66,7 @@ void RbmAddPpBuffer(RasterBufferMgr instance, struct DWLLinearMem *pp_buffer, i3
+ struct DWLLinearMem * RbmReturnPpBuffer(RasterBufferMgr instance, const addr_t addr);
+ void RbmReturnAllPpBuffer(RasterBufferMgr instance);
+ void RbmResetPpBuffer(RasterBufferMgr instance);
++void RbmResetPpBuffer2(RasterBufferMgr instance);
+ void RbmWaitPending(RasterBufferMgr instance);
+ void RbmSetAbortStatus(RasterBufferMgr instance);
+ void RbmClearAbortStatus(RasterBufferMgr instance);
+diff --git a/decoder_sw/software/source/h264high/h264decapi.c b/decoder_sw/software/source/h264high/h264decapi.c
+index fff374b..f319dc5 100755
+--- a/decoder_sw/software/source/h264high/h264decapi.c
++++ b/decoder_sw/software/source/h264high/h264decapi.c
+@@ -4247,6 +4247,61 @@ H264DecRet H264DecGetBufferInfo(H264DecInst dec_inst, H264DecBufferInfo *mem_inf
+   return H264DEC_WAITING_FOR_BUFFER;
+ }
+ 
++static void h264RemoveDpb(dpbStorage_t *dpb) {
++  FrameBufferList *fb_list = dpb->fb_list;
++  for(u32 i = 0; i < 16 + 1; i++) {
++      dpb->buffer[i].data = NULL;
++      dpb->buffer[i].mem_idx = 0;
++  }
++
++#define FB_OUTPUT           0x04U
++
++  for (u32 i = 0; i < MAX_FRAME_BUFFER_NUMBER; i++) {
++    if (fb_list->fb_stat[i].b_used & FB_OUTPUT) {
++      ClearOutput(fb_list, i);
++    }
++  }
++
++  for (u32 i = 0; i < dpb->tot_buffers; i++) {
++#ifdef USE_NULL_POINTER_PROTECT
++    if (dpb->pic_buffers[i].bus_address)
++#endif
++    {
++      if (dpb->pic_buff_id[i] != FB_NOT_VALID_ID) {
++        ReleaseId(dpb->fb_list, dpb->pic_buff_id[i]);
++      }
++    }
++  }
++  dpb->fb_list->free_buffers = 0;
++  dpb->tot_buffers = dpb->tot_buffers_reserved;
++}
++
++H264DecRet H264DecRemoveBuffer(H264DecInst dec_inst) {
++  decContainer_t *dec_cont = (decContainer_t *)dec_inst;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++
++  h264StateReset(dec_cont);
++
++  dec_cont->buffer_index[0] = 0;
++  dec_cont->buffer_index[1] = 0;
++  dec_cont->ext_buffer_num = 0;
++
++  dpbStorage_t *dpb = dec_cont->storage.dpbs[0];
++  h264RemoveDpb(dpb);
++  if (dec_cont->storage.mvc_stream) {
++    dpb = dec_cont->storage.dpbs[1];
++    h264RemoveDpb(dpb);
++  }
++
++  pthread_mutex_lock(&dec_cont->fb_list.ref_count_mutex);
++  for (u32 i = 0; i < MAX_FRAME_BUFFER_NUMBER; i++) {
++    dec_cont->fb_list.fb_stat[i].n_ref_count = 0;
++  }
++  pthread_mutex_unlock(&dec_cont->fb_list.ref_count_mutex);
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return H264DEC_OK;
++}
++
+ H264DecRet H264DecAddBuffer(H264DecInst dec_inst, struct DWLLinearMem *info) {
+   decContainer_t *dec_cont = (decContainer_t *)dec_inst;
+   H264DecRet dec_ret = H264DEC_OK;
+@@ -4436,7 +4491,8 @@ void h264StateReset(decContainer_t *dec_cont) {
+   h264bsdClearStorage(&dec_cont->storage);
+ 
+   /* Clear parameters in decContainer */
+-  dec_cont->dec_stat = H264DEC_INITIALIZED;
++  if(dec_cont->dec_stat != H264DEC_WAITING_FOR_BUFFER)
++    dec_cont->dec_stat = H264DEC_INITIALIZED;
+   dec_cont->pic_number = 0;
+ #ifdef CLEAR_HDRINFO_IN_SEEK
+   dec_cont->rlc_mode = 0;
+diff --git a/decoder_sw/software/source/h264high/h264hwd_storage.c b/decoder_sw/software/source/h264high/h264hwd_storage.c
+index ec5520a..772a0cb 100755
+--- a/decoder_sw/software/source/h264high/h264hwd_storage.c
++++ b/decoder_sw/software/source/h264high/h264hwd_storage.c
+@@ -980,7 +980,7 @@ u32 h264bsdAllocateSwResources(
+   u32 max_dpb_size;
+   struct dpbInitParams dpb_params;
+   dpbStorage_t * dpb = storage->dpb;
+-
++  u32 pre_pic_size_in_mbs = storage->pic_size_in_mbs;
+   storage->pic_size_in_mbs = p_sps->pic_width_in_mbs * p_sps->pic_height_in_mbs;
+   storage->curr_image->width = p_sps->pic_width_in_mbs;
+   storage->curr_image->height = p_sps->pic_height_in_mbs;
+@@ -1071,6 +1071,7 @@ u32 h264bsdAllocateSwResources(
+ 
+     if (storage->ext_buffer_added && (pp_buff_size > storage->ext_buffer_size || new_tot_buffers > dpb->tot_buffers)) {
+       storage->release_buffer = 1;
++      storage->pic_size_in_mbs = pre_pic_size_in_mbs;
+       return H264DEC_WAITING_FOR_BUFFER;
+     }
+   }
+@@ -1087,9 +1088,10 @@ u32 h264bsdAllocateSwResources(
+   dpb->pic_width = h264bsdPicWidth(storage) << 4;
+   dpb->pic_height = h264bsdPicHeight(storage) << 4;
+ 
+-  if(tmp != HANTRO_OK)
++  if(tmp != HANTRO_OK) {
++    storage->pic_size_in_mbs = pre_pic_size_in_mbs;
+     return (tmp);
+-
++  }
+   return HANTRO_OK;
+ }
+ 
+@@ -1099,6 +1101,7 @@ u32 h264bsdMVCAllocateSwResources(const void *dwl, storage_t * storage,
+   u32 tmp;
+   u32 no_reorder;
+   u32 max_dpb_size;
++  u32 pre_pic_size_in_mbs = storage->pic_size_in_mbs;
+   struct dpbInitParams dpb_params;
+ 
+   for(u32 i = 0; i < 2; i ++) {
+@@ -1149,8 +1152,10 @@ u32 h264bsdMVCAllocateSwResources(const void *dwl, storage_t * storage,
+     storage->dpbs[i]->pic_height = h264bsdPicHeight(storage) << 4;
+   }
+ 
+-  if(tmp != HANTRO_OK)
++  if(tmp != HANTRO_OK) {
++    storage->pic_size_in_mbs = pre_pic_size_in_mbs;
+     return (tmp);
++  }
+ 
+   return HANTRO_OK;
+ }
+diff --git a/decoder_sw/software/source/hevc/hevcdecapi.c b/decoder_sw/software/source/hevc/hevcdecapi.c
+index 6f9c266..7d6fb8b 100755
+--- a/decoder_sw/software/source/hevc/hevcdecapi.c
++++ b/decoder_sw/software/source/hevc/hevcdecapi.c
+@@ -164,6 +164,7 @@ enum DecRet HevcDecInit(HevcDecInst *dec_inst, const void *dwl, struct HevcDecCo
+ 
+   /* TODO: ? */
+   dwl_init.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
++  DWLSetSecureMode(dwl, dec_cfg->use_secure_mode);
+ 
+   dec_cont =
+     (struct HevcDecContainer *)DWLmalloc(sizeof(struct HevcDecContainer));
+@@ -315,6 +316,33 @@ enum DecRet HevcDecInit(HevcDecInst *dec_inst, const void *dwl, struct HevcDecCo
+   return (DEC_OK);
+ }
+ 
++/* This function get exactly bit-depth from sps info. This
++ * function should not be called before HevcDecDecode function has
++ * indicated that headers are ready. */
++enum DecRet HevcDecGetSpsBitDepth(HevcDecInst dec_inst, u32 *bit_depth) {
++  struct HevcDecContainer *dec_cont = (struct HevcDecContainer *)dec_inst;
++  struct Storage *storage;
++
++  if (dec_inst == NULL) {
++    return (DEC_PARAM_ERROR);
++  }
++
++  /* Check for valid decoder instance */
++  if (dec_cont->checksum != dec_cont) {
++    return (DEC_NOT_INITIALIZED);
++  }
++
++  storage = &dec_cont->storage;
++
++  if (storage->active_sps == NULL || storage->active_pps == NULL) {
++    return (DEC_HDRS_NOT_RDY);
++  }
++
++  *bit_depth = ((HevcLumaBitDepth(storage) != 8) || (HevcChromaBitDepth(storage) != 8)) ? 10 : 8;
++  return (DEC_OK);
++}
++
++
+ /* This function provides read access to decoder information. This
+  * function should not be called before HevcDecDecode function has
+  * indicated that headers are ready. */
+@@ -2018,6 +2046,107 @@ void HevcDropCurrentPicutre(struct HevcDecContainer *dec_cont) {
+ #endif
+ 
+ #ifdef USE_EXTERNAL_BUFFER
++
++static void hevcRemoveDpb(const void *dec_inst, struct DpbStorage *dpb) {
++  struct HevcDecContainer *dec_cont = (struct HevcDecContainer *)dec_inst;
++  struct FrameBufferList *fb_list = dpb->fb_list;
++  i32 i, j;
++
++#define INVALID_MEM_IDX 0xFF
++
++  for (i = 0; i < MAX_DPB_SIZE; i++) {
++    dpb->buffer[i].pp_data = NULL;
++    if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++      dpb->buffer[i].mem_idx = INVALID_MEM_IDX;
++      dpb->buffer[i].data = NULL;
++    }
++  }
++
++  #define FB_OUTPUT 0x04U
++
++  for (i = 0; i < MAX_FRAME_BUFFER_NUMBER; i++) {
++    if (dpb->fb_list->fb_stat[i].b_used & FB_OUTPUT) {
++      for (j = 0; j < MAX_DPB_SIZE + 1; j++) {
++        if (dpb->buffer[j].mem_idx == i) {
++          /* For raster/dscale buffer, return to input buffer queue. */
++          if (dpb->storage->raster_buffer_mgr &&
++              dpb->buffer[j].pp_data != NULL) {
++            RbmReturnPpBuffer(dpb->storage->raster_buffer_mgr,
++                              dpb->buffer[j].pp_data->bus_address);
++          }
++          break;
++        }
++      }
++    }
++  }
++
++  for (i = 0; i < MAX_FRAME_BUFFER_NUMBER; i++) {
++    if (fb_list->fb_stat[i].b_used & FB_OUTPUT) {
++      ClearOutput(fb_list, i);
++    }
++  }
++
++  if (dpb->storage && dpb->storage->raster_buffer_mgr) {
++      RbmReturnAllPpBuffer(dpb->storage->raster_buffer_mgr);
++      RbmResetPpBuffer2(dpb->storage->raster_buffer_mgr);
++    }
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++    for (i = 0; i < dpb->tot_buffers; i++) {
++#ifdef USE_NULL_POINTER_PROTECT
++      if (dpb->pic_buffers[i].bus_address)
++#endif
++      {
++        if (dpb->pic_buff_id[i] != FB_NOT_VALID_ID) {
++          ReleaseId(dpb->fb_list, dpb->pic_buff_id[i]);
++        }
++      }
++    }
++    dpb->fb_list->free_buffers = 0;
++  }
++
++  dpb->tot_buffers = dpb->dpb_size + 2 + dec_cont->storage.n_extra_frm_buffers;
++  if (dpb->tot_buffers > MAX_FRAME_BUFFER_NUMBER)
++    dpb->tot_buffers = MAX_FRAME_BUFFER_NUMBER;
++  (void)dec_cont;
++}
++
++enum DecRet HevcDecRemoveBuffer(HevcDecInst dec_inst) {
++  struct HevcDecContainer *dec_cont = (struct HevcDecContainer *)dec_inst;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  struct DpbStorage *dpb = dec_cont->storage.dpb;
++  HevcEmptyDpb(dec_cont, dec_cont->storage.dpb);
++  HevcClearStorage(&(dec_cont->storage));
++  hevcRemoveDpb(dec_inst, dpb);
++
++  if(dec_cont->dec_state != HEVCDEC_WAITING_FOR_BUFFER)
++    dec_cont->dec_state = HEVCDEC_INITIALIZED;
++  dec_cont->start_code_detected = 0;
++  dec_cont->pic_number = 0;
++  dec_cont->packet_decoded = 0;
++
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER))
++    dec_cont->min_buffer_num = dec_cont->storage.dpb->dpb_size + 2;   /* We need at least (dpb_size+2) output buffers before starting decoding. */
++  else
++    dec_cont->min_buffer_num = dec_cont->storage.dpb->dpb_size + 1;
++
++  dec_cont->buffer_index = 0;
++  dec_cont->buf_num = dec_cont->min_buffer_num;
++  dec_cont->buffer_num_added = 0;
++
++  if (dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
++    int i;
++    pthread_mutex_lock(&dec_cont->fb_list.ref_count_mutex);
++    for (i = 0; i < MAX_FRAME_BUFFER_NUMBER; i++) {
++      dec_cont->fb_list.fb_stat[i].n_ref_count = 0;
++    }
++    pthread_mutex_unlock(&dec_cont->fb_list.ref_count_mutex);
++  }
++
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++
++  return DEC_OK;
++}
++
+ enum DecRet HevcDecAddBuffer(HevcDecInst dec_inst,
+                              struct DWLLinearMem *info) {
+   struct HevcDecContainer *dec_cont = (struct HevcDecContainer *)dec_inst;
+@@ -2467,7 +2596,8 @@ enum DecRet HevcDecAbortAfter(HevcDecInst dec_inst) {
+   HevcClearStorage(&(dec_cont->storage));
+ 
+   /* Clear internal parameters in HevcDecContainer */
+-  dec_cont->dec_state = HEVCDEC_INITIALIZED;
++  if(dec_cont->dec_state != HEVCDEC_WAITING_FOR_BUFFER)
++    dec_cont->dec_state = HEVCDEC_INITIALIZED;
+   dec_cont->start_code_detected = 0;
+   dec_cont->pic_number = 0;
+   dec_cont->packet_decoded = 0;
+@@ -2592,6 +2722,28 @@ enum DecRet HevcDecSetInfo(HevcDecInst dec_inst,
+   dec_cont->use_ringbuffer = dec_cfg->use_ringbuffer;
+   dec_cont->use_fetch_one_pic = dec_cfg->use_fetch_one_pic;
+   dec_cont->storage.use_video_compressor = dec_cfg->use_video_compressor;
++
++#ifdef USE_EXTERNAL_BUFFER
++	  if(dec_cont->output_format != DEC_OUT_FRM_TILED_4X4 &&
++		  dec_cfg->output_format == DEC_OUT_FRM_TILED_4X4 &&
++		  dec_cont->reset_dpb_done == 1) {
++		  HevcFreeDpb(dec_cont, dec_cont->storage.dpb);
++		  dec_cont->reset_dpb_done = 0;
++		  dec_cont->storage.dpb[0].dpb_size = 0;
++		  dec_cont->storage.dpb[1].dpb_size = 0;
++		  dec_cont->storage.dpb[0].real_size = 0;
++		  dec_cont->storage.dpb[1].real_size = 0;
++		  dec_cont->min_buffer_num = 0;
++		  if (dec_cont->storage.raster_buffer_mgr) {
++			RbmRelease(dec_cont->storage.raster_buffer_mgr);
++			dec_cont->storage.raster_buffer_mgr = NULL;
++		  }
++		  ReleaseAsicBuffers(dec_cont, dec_cont->asic_buff);
++		  ReleaseAsicTileEdgeMems(dec_cont);
++		  ReleaseList(&dec_cont->fb_list);
++	  }
++#endif 
++
+   dec_cont->output_format = dec_cfg->output_format;
+   if (dec_cfg->output_format == DEC_OUT_FRM_RASTER_SCAN) {
+     dec_cont->storage.raster_enabled = 1;
+diff --git a/decoder_sw/software/source/inc/avsdecapi.h b/decoder_sw/software/source/inc/avsdecapi.h
+index c725990..7387f30 100755
+--- a/decoder_sw/software/source/inc/avsdecapi.h
++++ b/decoder_sw/software/source/inc/avsdecapi.h
+@@ -256,6 +256,8 @@ AvsDecRet AvsDecPeek(AvsDecInst dec_inst, AvsDecPicture * picture);
+ #ifdef USE_EXTERNAL_BUFFER
+ AvsDecRet AvsDecGetBufferInfo(AvsDecInst dec_inst, AvsDecBufferInfo *mem_info);
+ 
++AvsDecRet AvsDecRemoveBuffer(AvsDecInst dec_inst);
++
+ AvsDecRet AvsDecAddBuffer(AvsDecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ #ifdef USE_OUTPUT_RELEASE
+diff --git a/decoder_sw/software/source/inc/dwl.h b/decoder_sw/software/source/inc/dwl.h
+index 4f17338..b2aae30 100755
+--- a/decoder_sw/software/source/inc/dwl.h
++++ b/decoder_sw/software/source/inc/dwl.h
+@@ -173,6 +173,8 @@ void *DWLcalloc(u32 n, u32 s);
+ void *DWLmemcpy(void *d, const void *s, u32 n);
+ void *DWLmemset(void *d, i32 c, u32 n);
+ 
++void DWLSetSecureMode(const void *instance, u32 use_secure_mode);
++
+ /* SW/HW shared memory access*/
+ u8 DWLPrivateAreaReadByte(const u8 *p);
+ void DWLPrivateAreaWriteByte(u8 *p, u8 data);
+diff --git a/decoder_sw/software/source/inc/h264decapi.h b/decoder_sw/software/source/inc/h264decapi.h
+index 125acac..8490fdc 100755
+--- a/decoder_sw/software/source/inc/h264decapi.h
++++ b/decoder_sw/software/source/inc/h264decapi.h
+@@ -481,6 +481,9 @@ H264DecRet H264DecPeek(H264DecInst dec_inst, H264DecPicture *picture);
+ 
+ #ifdef USE_EXTERNAL_BUFFER
+ 
++
++H264DecRet H264DecRemoveBuffer(H264DecInst dec_inst);
++
+ /*!rief Add externally allocated memories to reference buffer
+ *
+ */
+diff --git a/decoder_sw/software/source/inc/hevcdecapi.h b/decoder_sw/software/source/inc/hevcdecapi.h
+index fd436f9..710acf2 100755
+--- a/decoder_sw/software/source/inc/hevcdecapi.h
++++ b/decoder_sw/software/source/inc/hevcdecapi.h
+@@ -213,6 +213,8 @@ enum DecRet HevcDecPictureConsumed(HevcDecInst dec_inst,
+ 
+ enum DecRet HevcDecEndOfStream(HevcDecInst dec_inst);
+ 
++enum DecRet HevcDecGetSpsBitDepth(HevcDecInst dec_inst, u32 *bit_depth);
++
+ enum DecRet HevcDecGetInfo(HevcDecInst dec_inst, struct HevcDecInfo *dec_info);
+ 
+ enum DecRet HevcDecPeek(HevcDecInst dec_inst, struct HevcDecPicture *output);
+@@ -224,6 +226,8 @@ enum DecRet HevcDecGetBufferInfo(HevcDecInst dec_inst, struct HevcDecBufferInfo
+ 
+ enum DecRet HevcDecAbort(HevcDecInst dec_inst);
+ 
++enum DecRet HevcDecRemoveBuffer(HevcDecInst dec_inst);
++
+ enum DecRet HevcDecAbortAfter(HevcDecInst dec_inst);
+ #endif
+ 
+diff --git a/decoder_sw/software/source/inc/mp4decapi.h b/decoder_sw/software/source/inc/mp4decapi.h
+index a1d01de..8ccc150 100755
+--- a/decoder_sw/software/source/inc/mp4decapi.h
++++ b/decoder_sw/software/source/inc/mp4decapi.h
+@@ -297,6 +297,8 @@ MP4DecRet MP4DecPeek(MP4DecInst        dec_inst,
+ #ifdef USE_EXTERNAL_BUFFER
+ MP4DecRet MP4DecGetBufferInfo(MP4DecInst dec_inst, MP4DecBufferInfo *mem_info);
+ 
++MP4DecRet MP4DecRemoveBuffer(MP4DecInst dec_inst);
++
+ MP4DecRet MP4DecAddBuffer(MP4DecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ 
+diff --git a/decoder_sw/software/source/inc/mpeg2decapi.h b/decoder_sw/software/source/inc/mpeg2decapi.h
+index d1af652..1d39ddc 100755
+--- a/decoder_sw/software/source/inc/mpeg2decapi.h
++++ b/decoder_sw/software/source/inc/mpeg2decapi.h
+@@ -264,6 +264,8 @@ Mpeg2DecRet Mpeg2DecPeek(Mpeg2DecInst dec_inst, Mpeg2DecPicture * picture);
+ #ifdef USE_EXTERNAL_BUFFER
+ Mpeg2DecRet Mpeg2DecGetBufferInfo(Mpeg2DecInst dec_inst, Mpeg2DecBufferInfo *mem_info);
+ 
++Mpeg2DecRet Mpeg2DecRemoveBuffer(Mpeg2DecInst dec_inst);
++
+ Mpeg2DecRet Mpeg2DecAddBuffer(Mpeg2DecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ 
+diff --git a/decoder_sw/software/source/inc/rvdecapi.h b/decoder_sw/software/source/inc/rvdecapi.h
+index 91c6c7d..a374bba 100755
+--- a/decoder_sw/software/source/inc/rvdecapi.h
++++ b/decoder_sw/software/source/inc/rvdecapi.h
+@@ -243,6 +243,8 @@ RvDecRet RvDecPeek(RvDecInst dec_inst, RvDecPicture * picture);
+ #ifdef USE_EXTERNAL_BUFFER
+ RvDecRet RvDecGetBufferInfo(RvDecInst dec_inst, RvDecBufferInfo *mem_info);
+ 
++RvDecRet RvDecRemoveBuffer(RvDecInst dec_inst);
++
+ RvDecRet RvDecAddBuffer(RvDecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ #ifdef USE_OUTPUT_RELEASE
+diff --git a/decoder_sw/software/source/inc/vc1decapi.h b/decoder_sw/software/source/inc/vc1decapi.h
+index 7cd793f..1e1d672 100755
+--- a/decoder_sw/software/source/inc/vc1decapi.h
++++ b/decoder_sw/software/source/inc/vc1decapi.h
+@@ -300,6 +300,7 @@ VC1DecRet VC1DecPictureConsumed(VC1DecInst  dec_inst,
+                                 VC1DecPicture *picture);
+ 
+ VC1DecRet VC1DecEndOfStream(VC1DecInst dec_inst, u32 strm_end_flag);
++VC1DecRet VC1DecRemoveBuffer(VC1DecInst dec_inst);
+ 
+ VC1DecRet VC1DecAbort(VC1DecInst dec_inst);
+ 
+@@ -314,6 +315,10 @@ VC1DecRet VC1DecGetBufferInfo(VC1DecInst dec_inst, VC1DecBufferInfo *mem_info);
+ VC1DecRet VC1DecAddBuffer(VC1DecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ 
++/* For advance profile only.
++ * To indicate if following input frame data has frame-start-code (0) or not (1)
++ */
++VC1DecRet VC1DecSetFrameDataMode(VC1DecInst dec_inst, u32 raw_frame_data);
+ /*------------------------------------------------------------------------------
+     Prototype of the API trace funtion. Traces all API entries and returns.
+     This must be implemented by the application using the decoder API!
+diff --git a/decoder_sw/software/source/inc/vp8decapi.h b/decoder_sw/software/source/inc/vp8decapi.h
+index a2cea04..554756b 100755
+--- a/decoder_sw/software/source/inc/vp8decapi.h
++++ b/decoder_sw/software/source/inc/vp8decapi.h
+@@ -454,6 +454,8 @@ VP8DecRet VP8DecPeek(VP8DecInst dec_inst, VP8DecPicture *picture);
+ #ifdef USE_EXTERNAL_BUFFER
+ VP8DecRet VP8DecGetBufferInfo(VP8DecInst dec_inst, VP8DecBufferInfo *mem_info);
+ 
++VP8DecRet VP8DecRemoveBuffer(VP8DecInst dec_inst);
++
+ VP8DecRet VP8DecAddBuffer(VP8DecInst dec_inst, struct DWLLinearMem *info);
+ #endif
+ 
+diff --git a/decoder_sw/software/source/inc/vp9decapi.h b/decoder_sw/software/source/inc/vp9decapi.h
+index e262c5a..bacfd64 100755
+--- a/decoder_sw/software/source/inc/vp9decapi.h
++++ b/decoder_sw/software/source/inc/vp9decapi.h
+@@ -179,6 +179,8 @@ enum DecRet Vp9DecEndOfStream(Vp9DecInst dec_inst);
+ enum DecRet Vp9DecGetInfo(Vp9DecInst dec_inst, struct Vp9DecInfo *dec_info);
+ 
+ #ifdef USE_EXTERNAL_BUFFER
++enum DecRet  Vp9DecRemoveBuffer(Vp9DecInst dec_inst);
++
+ enum DecRet Vp9DecAddBuffer(Vp9DecInst dec_inst, struct DWLLinearMem *info);
+ 
+ enum DecRet Vp9DecGetBufferInfo(Vp9DecInst dec_inst, struct Vp9DecBufferInfo *mem_info);
+diff --git a/decoder_sw/software/source/mpeg2/mpeg2decapi.c b/decoder_sw/software/source/mpeg2/mpeg2decapi.c
+index 0243562..6df5eed 100755
+--- a/decoder_sw/software/source/mpeg2/mpeg2decapi.c
++++ b/decoder_sw/software/source/mpeg2/mpeg2decapi.c
+@@ -4322,7 +4322,8 @@ void Mpeg2StateReset(DecContainer *dec_cont) {
+   dec_cont->StrmStorage.last_bskipped = 0;
+ 
+   /* Clear parameters in DecApiStorage */
+-  dec_cont->ApiStorage.DecStat = INITIALIZED;
++  if (dec_cont->ApiStorage.DecStat != HEADERSDECODED)
++    dec_cont->ApiStorage.DecStat = INITIALIZED;
+   dec_cont->ApiStorage.first_field = 1;
+   dec_cont->ApiStorage.output_other_field = 0;
+   dec_cont->ApiStorage.ignore_field = 0;
+@@ -4364,6 +4365,50 @@ void Mpeg2StateReset(DecContainer *dec_cont) {
+ #endif
+ }
+ 
++Mpeg2DecRet Mpeg2DecRemoveBuffer(Mpeg2DecInst dec_inst) {
++  DecContainer *dec_cont = (DecContainer *)dec_inst;
++  Mpeg2DecRet re = MPEG2DEC_OK;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  FifoSetAbort(dec_cont->fifo_display);
++  BqueueRemove(&dec_cont->StrmStorage.bq);
++  dec_cont->StrmStorage.work_out_prev = 0;
++  dec_cont->StrmStorage.work_out = 0;
++  dec_cont->StrmStorage.work0 =
++    dec_cont->StrmStorage.work1 = INVALID_ANCHOR_PICTURE;
++
++  Mpeg2StateReset(dec_cont);
++
++  u32 buffers = 3;
++  if( dec_cont->pp_instance ) { /* Combined mode used */
++    dec_cont->PPConfigQuery(dec_cont->pp_instance,
++                            &dec_cont->pp_config_query);
++    if(dec_cont->pp_config_query.multi_buffer)
++      buffers = 4;
++  } else { /* Dec only or separate PP */
++    buffers = dec_cont->StrmStorage.max_num_buffers;
++    if( buffers < 3 )
++      buffers = 3;
++  }
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->fifo_index = 0;
++  dec_cont->ext_buffer_num = 0;
++  dec_cont->StrmStorage.bq.queue_size = buffers;
++  dec_cont->StrmStorage.num_buffers = buffers;
++  (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf, 0, MPEG2_MAX_BUFFERS * sizeof(picture_t));
++  (void) DWLmemset(dec_cont->StrmStorage.picture_info, 0, MPEG2_MAX_BUFFERS * 2 * sizeof(Mpeg2DecPicture));
++  if (dec_cont->fifo_display)
++    FifoRelease(dec_cont->fifo_display);
++  if (FifoInit(MPEG2_MAX_BUFFERS*2, &dec_cont->fifo_display) != FIFO_OK) {
++    re = MPEG2DEC_MEMFAIL;
++    goto end;
++  }
++  FifoClearAbort(dec_cont->fifo_display);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
++
+ Mpeg2DecRet Mpeg2DecAbort(Mpeg2DecInst dec_inst) {
+   DecContainer *dec_cont = (DecContainer *) dec_inst;
+ 
+diff --git a/decoder_sw/software/source/mpeg4/mp4decapi.c b/decoder_sw/software/source/mpeg4/mp4decapi.c
+index 77c173c..acdce80 100755
+--- a/decoder_sw/software/source/mpeg4/mp4decapi.c
++++ b/decoder_sw/software/source/mpeg4/mp4decapi.c
+@@ -4624,7 +4624,8 @@ void MP4StateReset(DecContainer *dec_cont) {
+   dec_cont->StrmStorage.gov_time_increment = 0;
+ 
+   /* Clear internal parameters in DecApiStorage */
+-  dec_cont->ApiStorage.DecStat = INITIALIZED;
++  if (dec_cont->ApiStorage.DecStat != HEADERSDECODED)
++    dec_cont->ApiStorage.DecStat = INITIALIZED;
+   dec_cont->ApiStorage.output_other_field = 0;
+ 
+   /* Clear internal parameters in DecVopDesc */
+@@ -4694,6 +4695,53 @@ void MP4StateReset(DecContainer *dec_cont) {
+ #endif
+ }
+ 
++MP4DecRet MP4DecRemoveBuffer(MP4DecInst dec_inst) {
++  DecContainer *dec_cont = (DecContainer *) dec_inst;
++  MP4DecRet re = MP4DEC_OK;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  FifoSetAbort(dec_cont->fifo_display);
++  BqueueRemove(&dec_cont->StrmStorage.bq);
++  dec_cont->VopDesc.vop_number_in_seq = 0;
++  dec_cont->StrmStorage.work_out_prev = 0;
++  dec_cont->StrmStorage.work_out = 0;
++  dec_cont->StrmStorage.work0 =
++    dec_cont->StrmStorage.work1 = INVALID_ANCHOR_PICTURE;
++
++  MP4StateReset(dec_cont);
++
++  u32 buffers = 3;
++
++  if( dec_cont->pp_instance ) { /* Combined mode used */
++    dec_cont->PPConfigQuery(dec_cont->pp_instance,
++                            &dec_cont->pp_config_query);
++    if(dec_cont->pp_config_query.multi_buffer)
++      buffers = 4;
++  } else { /* Dec only or separate PP */
++    buffers = dec_cont->StrmStorage.max_num_buffers;
++    if( buffers < 3 )
++      buffers = 3;
++  }
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->fifo_index = 0;
++  dec_cont->ext_buffer_num = 0;
++  dec_cont->StrmStorage.bq.queue_size = buffers;
++  dec_cont->StrmStorage.num_buffers = buffers;
++  (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf, 0, MP4_MAX_BUFFERS * sizeof(picture_t));
++  (void) DWLmemset(dec_cont->StrmStorage.picture_info, 0, MP4_MAX_BUFFERS * 2 * sizeof(MP4DecPicture));
++  if (dec_cont->fifo_display)
++    FifoRelease(dec_cont->fifo_display);
++  if (FifoInit(MP4_MAX_BUFFERS*2, &dec_cont->fifo_display) != FIFO_OK) {
++    re = MP4DEC_MEMFAIL;
++    goto end;
++  }
++
++  FifoClearAbort(dec_cont->fifo_display);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
++
+ MP4DecRet MP4DecAbort(MP4DecInst dec_inst) {
+   DecContainer *dec_cont = (DecContainer *) dec_inst;
+ 
+diff --git a/decoder_sw/software/source/rv/rvdecapi.c b/decoder_sw/software/source/rv/rvdecapi.c
+index e31b277..2cea956 100755
+--- a/decoder_sw/software/source/rv/rvdecapi.c
++++ b/decoder_sw/software/source/rv/rvdecapi.c
+@@ -616,8 +616,12 @@ RvDecRet RvDecDecode(RvDecInst dec_inst,
+                                 dec_cont->StrmStorage.work1,
+                                 BQUEUE_UNUSED,
+                                 dec_cont->StrmStorage.rpr_next_pic_type == RV_B_PIC );
+-      if (rpr_buf_idx == (u32)0xFFFFFFFFU)
+-        return RVDEC_ABORTED;
++
++      if (rpr_buf_idx == (u32)0xFFFFFFFFU) {
++        dec_cont->StrmStorage.rpr_detected = 1;
++        rvFreeRprBuffer( dec_cont );
++        return RVDEC_NO_DECODING_BUFFER;
++      }
+       dec_cont->StrmStorage.p_rpr_buf = dec_cont->StrmStorage.p_pic_buf[rpr_buf_idx];
+ 
+ #ifndef DISABLE_CPU_ACCESS
+@@ -3113,7 +3117,9 @@ void RvStateReset(DecContainer *dec_cont) {
+ #endif
+ 
+   /* Clear internal parameters in DecApiStorage */
+-  dec_cont->ApiStorage.DecStat = STREAMDECODING;
++  if (dec_cont->ApiStorage.DecStat != INITIALIZED &&
++      dec_cont->ApiStorage.DecStat != HEADERSDECODED)
++      dec_cont->ApiStorage.DecStat = STREAMDECODING;
+ 
+   /* Clear internal parameters in DecFrameDesc */
+   dec_cont->FrameDesc.frame_number = 0;
+@@ -3144,6 +3150,49 @@ void RvStateReset(DecContainer *dec_cont) {
+ #endif
+ }
+ 
++RvDecRet RvDecRemoveBuffer(RvDecInst dec_inst) {
++  DecContainer *dec_cont = (DecContainer *)dec_inst;
++  RvDecRet re = RVDEC_OK;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  FifoSetAbort(dec_cont->fifo_display);
++  BqueueRemove(&dec_cont->StrmStorage.bq);
++  dec_cont->StrmStorage.work_out = 0;
++  dec_cont->StrmStorage.work0 =
++    dec_cont->StrmStorage.work1 = INVALID_ANCHOR_PICTURE;
++
++  RvStateReset(dec_cont);
++
++  u32 buffers = 4;
++  if( !dec_cont->pp_instance ) { /* Combined mode used */
++    buffers = dec_cont->StrmStorage.max_num_buffers;
++    if( buffers < 4 )
++      buffers = 4;
++  }
++
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->tot_buffers_added = 0;
++
++  dec_cont->fifo_index = 0;
++  dec_cont->ext_buffer_num = 0;
++
++  dec_cont->StrmStorage.bq.queue_size = buffers;
++  dec_cont->StrmStorage.num_buffers = buffers;
++  (void) DWLmemset(dec_cont->StrmStorage.p_pic_buf, 0, 16 * sizeof(picture_t));
++  (void) DWLmemset(dec_cont->StrmStorage.picture_info, 0, 32 * sizeof(RvDecPicture));
++
++  if (dec_cont->fifo_display)
++    FifoRelease(dec_cont->fifo_display);
++  if (FifoInit(32, &dec_cont->fifo_display) != FIFO_OK) {
++    re = RVDEC_MEMFAIL;
++    goto end;
++  }
++  FifoClearAbort(dec_cont->fifo_display);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
++
+ RvDecRet RvDecAbort(RvDecInst dec_inst) {
+   DecContainer *dec_cont = (DecContainer *) dec_inst;
+ 
+diff --git a/decoder_sw/software/source/rv/rvdecapi_internal.h b/decoder_sw/software/source/rv/rvdecapi_internal.h
+index 497bd58..b474a92 100755
+--- a/decoder_sw/software/source/rv/rvdecapi_internal.h
++++ b/decoder_sw/software/source/rv/rvdecapi_internal.h
+@@ -84,6 +84,7 @@ RvDecRet rvAllocateBuffers(DecContainer * dec_cont);
+ RvDecRet rvDecCheckSupport(DecContainer * dec_cont);
+ void rvDecPreparePicReturn(DecContainer * dec_cont);
+ void rvDecAspectRatio(DecContainer * dec_cont, RvDecInfo * dec_info);
++void rvFreeRprBuffer(DecContainer * dec_cont);
+ void rvDecBufferPicture(DecContainer * dec_cont, u32 pic_id, u32 buffer_b,
+                         u32 is_inter, RvDecRet return_value, u32 nbr_err_mbs);
+ void rvFreeBuffers(DecContainer * dec_cont);
+diff --git a/decoder_sw/software/source/vc1/vc1decapi.c b/decoder_sw/software/source/vc1/vc1decapi.c
+index 1f37d66..ca7d9bd 100755
+--- a/decoder_sw/software/source/vc1/vc1decapi.c
++++ b/decoder_sw/software/source/vc1/vc1decapi.c
+@@ -451,10 +451,14 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+   stream_data.strm_buff_read_bits = 0;
+   stream_data.strm_exhausted = HANTRO_FALSE;
+ 
+-  if (dec_cont->storage.profile == VC1_ADVANCED)
++  if (dec_cont->storage.profile == VC1_ADVANCED) {
+     stream_data.remove_emul_prev_bytes = 1;
+-  else
++    stream_data.raw_frame_data = dec_cont->raw_frame_data;
++  }
++  else {
+     stream_data.remove_emul_prev_bytes = 0;
++    stream_data.raw_frame_data = 0;
++  }
+ 
+   first_frame = (dec_cont->storage.first_frame) ? 1 : 0;
+ 
+@@ -543,6 +547,14 @@ VC1DecRet VC1DecDecode( VC1DecInst dec_inst,
+   /* decode SW part (picture layer) */
+   if (dec_cont->storage.resolution_changed == HANTRO_FALSE) {
+     dec_result = vc1hwdDecode(dec_cont, &dec_cont->storage, &stream_data);
++    if(dec_result == VC1HWD_NOT_CODED_PIC ||
++        dec_result == VC1HWD_ERROR ||
++        dec_result == VC1HWD_METADATA_ERROR ||
++        dec_result == VC1HWD_HDRS_ERROR) {
++        if(stream_data.bit_pos_in_word) {
++          vc1hwdFlushBits(&stream_data, 8-stream_data.bit_pos_in_word);
++        }
++    }
+     if (dec_cont->storage.resolution_changed) {
+       /* save stream position and dec_result */
+       dec_cont->storage.tmp_strm_data = stream_data;
+@@ -2395,6 +2407,36 @@ VC1DecRet VC1DecEndOfStream(VC1DecInst dec_inst, u32 strm_end_flag) {
+ 
+ #endif
+ 
++/*------------------------------------------------------------------------------
++
++    Function: VC1DecSetFrameDataMode()
++
++        Functional description:
++            To indicate if following input frame data has frame-start-code.
++
++        Inputs:
++            dec_inst         decoder instance
++            raw_frame_data   Has frame-start-code (0) or not (1)
++
++        Returns:
++
++------------------------------------------------------------------------------*/
++VC1DecRet VC1DecSetFrameDataMode(VC1DecInst dec_inst, u32 raw_frame_data) {
++  decContainer_t *dec_cont;
++
++  DEC_API_TRC("VC1DecGetInfo#");
++
++  if(dec_inst == NULL) {
++    DEC_API_TRC("VC1DecSetFrameDataMode# ERROR: dec_inst is NULL");
++    return (VC1DEC_PARAM_ERROR);
++  }
++
++  dec_cont = (decContainer_t*)dec_inst;
++
++  dec_cont->raw_frame_data = raw_frame_data;
++  return (VC1DEC_OK);
++}
++
+ /*------------------------------------------------------------------------------
+ 
+     Function name: Vc1CheckFormatSupport
+@@ -2758,7 +2800,8 @@ void VC1StateReset(decContainer_t *dec_cont) {
+   }
+ 
+   /* Clear parameters in decContainer_t */
+-  dec_cont->dec_stat = VC1DEC_RESOURCES_ALLOCATED;
++  if (dec_cont->dec_stat != VC1DEC_INITIALIZED)
++    dec_cont->dec_stat = VC1DEC_RESOURCES_ALLOCATED;
+   dec_cont->pic_number = 0;
+ #ifdef USE_EXTERNAL_BUFFER
+ #ifdef USE_OMXIL_BUFFER
+@@ -2819,6 +2862,54 @@ void VC1StateReset(decContainer_t *dec_cont) {
+   }
+ #endif
+ }
++VC1DecRet VC1DecRemoveBuffer(VC1DecInst dec_inst) {
++  decContainer_t *dec_cont = (decContainer_t *) dec_inst;
++  VC1DecRet re = VC1DEC_OK;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++  FifoSetAbort(dec_cont->fifo_display);
++  BqueueRemove(&dec_cont->storage.bq);
++  dec_cont->storage.work_out = 0;
++  dec_cont->storage.work_out_prev = 0;
++  dec_cont->storage.work0 =
++    dec_cont->storage.work1 = INVALID_ANCHOR_PICTURE;
++
++  VC1StateReset(dec_cont);
++
++  u32 buffers = 0;
++  if( dec_cont->storage.max_bframes > 0 ) {
++    buffers = 3;
++  } else {
++    buffers = 2;
++  }
++  if(dec_cont->pp_instance) {
++    if( dec_cont->storage.max_bframes > 0 )
++      buffers = 4;
++  } else {
++    u32 newbuffers = dec_cont->storage.max_num_buffers;
++    if(newbuffers > buffers)
++      buffers = newbuffers;
++  }
++
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->fifo_index = 0;
++  dec_cont->ext_buffer_num = 0;
++  dec_cont->storage.work_buf_amount = buffers;
++  dec_cont->storage.bq.queue_size = buffers;
++  if (dec_cont->storage.p_pic_buf)
++    (void) DWLmemset(dec_cont->storage.p_pic_buf, 0, 16 * sizeof(picture_t));
++  (void) DWLmemset(dec_cont->storage.picture_info, 0, 32 * sizeof(VC1DecPicture));
++  if (dec_cont->fifo_display)
++    FifoRelease(dec_cont->fifo_display);
++  if (FifoInit(32, &dec_cont->fifo_display) != FIFO_OK) {
++    re = VC1DEC_MEMFAIL;
++    goto end;
++  }
++  FifoClearAbort(dec_cont->fifo_display);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
+ 
+ VC1DecRet VC1DecAbort(VC1DecInst dec_inst) {
+   decContainer_t *dec_cont = (decContainer_t *) dec_inst;
+diff --git a/decoder_sw/software/source/vc1/vc1hwd_container.h b/decoder_sw/software/source/vc1/vc1hwd_container.h
+index b737935..a29015d 100755
+--- a/decoder_sw/software/source/vc1/vc1hwd_container.h
++++ b/decoder_sw/software/source/vc1/vc1hwd_container.h
+@@ -135,6 +135,8 @@ typedef struct {
+ 
+   InputQueue pp_buffer_queue;
+   u32 send_out;
++
++  u32 raw_frame_data;
+ } decContainer_t;
+ 
+ /*------------------------------------------------------------------------------
+diff --git a/decoder_sw/software/source/vc1/vc1hwd_decoder.c b/decoder_sw/software/source/vc1/vc1hwd_decoder.c
+index c54ca7f..b42404b 100755
+--- a/decoder_sw/software/source/vc1/vc1hwd_decoder.c
++++ b/decoder_sw/software/source/vc1/vc1hwd_decoder.c
+@@ -470,7 +470,12 @@ u16x vc1hwdDecode( decContainer_t *dec_cont,
+     storage->missing_field = HANTRO_FALSE;
+     do {
+       /* Get Start Code */
+-      start_code = vc1hwdGetStartCode(stream_data);
++      if(stream_data->raw_frame_data) {
++        start_code = SC_FRAME;
++      }
++      else {
++        start_code = vc1hwdGetStartCode(stream_data);
++      }
+       switch (start_code) {
+       case SC_SEQ:
+         DPRINT(("
+Sc_seq found
+"));
+@@ -721,12 +726,15 @@ u16x vc1hwdDecode( decContainer_t *dec_cont,
+         BqueueDiscard( &storage->bq, storage->work_out );
+         storage->work_out_prev = storage->work_out;
+         storage->work_out = storage->work0;
++#ifndef USE_PICTURE_DISCARD
++
+ #ifdef USE_OUTPUT_RELEASE
+         BqueueWaitBufNotInUse( &dec_cont->storage.bq, dec_cont->storage.work_out);
+ #endif
+         if(dec_cont->pp_enabled) {
+           InputQueueWaitBufNotUsed(dec_cont->pp_buffer_queue,dec_cont->storage.p_pic_buf[dec_cont->storage.work_out].pp_data->bus_address);
+         }
++#endif
+         EPRINT(("Skipped picture with MAXBFRAMES>0!"));
+         return(VC1HWD_ERROR);
+       } else {
+diff --git a/decoder_sw/software/source/vc1/vc1hwd_stream.h b/decoder_sw/software/source/vc1/vc1hwd_stream.h
+index b120143..aaa9733 100755
+--- a/decoder_sw/software/source/vc1/vc1hwd_stream.h
++++ b/decoder_sw/software/source/vc1/vc1hwd_stream.h
+@@ -62,6 +62,7 @@ typedef struct {
+                              * than available. */
+   u32  remove_emul_prev_bytes;
+   u32  slice_piclayer_emulation_bits;   /*fix slice picture layer length error when emulation  */
++  u32  raw_frame_data;     /* 1: current input is a frame data without frame-start-code*/
+ } strmData_t;
+ 
+ /*------------------------------------------------------------------------------
+diff --git a/decoder_sw/software/source/vp8/vp8decapi.c b/decoder_sw/software/source/vp8/vp8decapi.c
+index a05087c..65affbe 100755
+--- a/decoder_sw/software/source/vp8/vp8decapi.c
++++ b/decoder_sw/software/source/vp8/vp8decapi.c
+@@ -326,7 +326,7 @@ VP8DecRet VP8DecInit(VP8DecInst * dec_inst,
+   if ((dec_format == VP8DEC_VP8) || (dec_format == VP8DEC_WEBP))
+     dec_cont->stride_support = config.stride_support;
+ #ifdef USE_OUTPUT_RELEASE
+-  if (FifoInit(VP8DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK){
++  if (FifoInit(VP8DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK) {
+     DWLfree(dec_cont);
+     return VP8DEC_MEMFAIL;
+   }
+@@ -794,7 +794,7 @@ VP8DecRet VP8DecDecode(VP8DecInst dec_inst,
+         (dec_cont->height != (dec_cont->decoder.height))) {
+ #ifdef USE_EXTERNAL_BUFFER
+       if ((!dec_cont->use_adaptive_buffers &&
+-           (dec_cont->decoder.width * dec_cont->decoder.height >
++           (dec_cont->decoder.width * dec_cont->decoder.height !=
+             dec_cont->width * dec_cont->height)) ||
+           (dec_cont->use_adaptive_buffers &&
+            ((dec_cont->decoder.width * dec_cont->decoder.height >
+@@ -2500,7 +2500,9 @@ void VP8StateReset(VP8DecContainer_t* dec_cont) {
+   u32 buffers = dec_cont->num_buffers_reserved;
+ 
+   /* Clear internal parameters in VP8DecContainer_t */
+-  dec_cont->dec_stat = VP8DEC_INITIALIZED;
++  if (dec_cont->dec_stat != VP8DEC_INITIALIZED &&
++      dec_cont->dec_stat != VP8DEC_NEW_HEADERS)
++    dec_cont->dec_stat = VP8DEC_DECODING;
+   dec_cont->pic_number = 0;
+   dec_cont->display_number = 0;
+ #ifdef USE_EXTERNAL_BUFFER
+@@ -2559,6 +2561,58 @@ void VP8StateReset(VP8DecContainer_t* dec_cont) {
+   (void)buffers;
+ }
+ 
++VP8DecRet VP8DecRemoveBuffer(VP8DecInst dec_inst) {
++  VP8DecContainer_t *dec_cont = (VP8DecContainer_t *)dec_inst;
++  VP8DecRet re = VP8DEC_OK;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++
++  FifoSetAbort(dec_cont->fifo_out);
++  VP8EmptyBufferQueue(dec_cont);
++  VP8StateReset(dec_cont);
++
++  DecAsicBuffers_t *p_asic_buff = dec_cont->asic_buff;
++  u32 buffers = dec_cont->num_buffers_reserved;
++  dec_cont->tot_buffers = buffers;
++  dec_cont->buffer_index = 0;
++  dec_cont->num_buffers = buffers;
++  if (dec_cont->bq)
++    VP8HwdBufferQueueRelease(dec_cont->bq);
++  dec_cont->bq = VP8HwdBufferQueueInitialize(dec_cont->num_buffers);
++  if (dec_cont->bq == NULL) {
++    re = VP8DEC_MEMFAIL;
++    goto end;
++  }
++  (void) DWLmemset(p_asic_buff->not_displayed, 0, VP8DEC_MAX_PIC_BUFFERS * sizeof(u32));
++  (void) DWLmemset(p_asic_buff->display_index, 0, VP8DEC_MAX_PIC_BUFFERS * sizeof(u32));
++  (void) DWLmemset(p_asic_buff->picture_info, 0, VP8DEC_MAX_PIC_BUFFERS * sizeof(VP8DecPicture));
++  if (dec_cont->fifo_out)
++    FifoRelease(dec_cont->fifo_out);
++  if (FifoInit(VP8DEC_MAX_PIC_BUFFERS, &dec_cont->fifo_out) != FIFO_OK) {
++    re = VP8DEC_MEMFAIL;
++    goto end;
++  }
++
++  p_asic_buff->out_buffer_i = VP8HwdBufferQueueGetBuffer(dec_cont->bq);
++  if(p_asic_buff->out_buffer_i != 0xFFFFFFFF) {
++      p_asic_buff->first_show[p_asic_buff->out_buffer_i] = 1;
++      p_asic_buff->out_buffer = &p_asic_buff->pictures[p_asic_buff->out_buffer_i];
++      VP8HwdBufferQueueUpdateRef(dec_cont->bq,
++          BQUEUE_FLAG_PREV | BQUEUE_FLAG_GOLDEN | BQUEUE_FLAG_ALT,
++          p_asic_buff->out_buffer_i);
++ }
++
++  if(dec_cont->intra_only != HANTRO_TRUE)
++  {
++      VP8HwdBufferQueueAddRef(dec_cont->bq, VP8HwdBufferQueueGetPrevRef(dec_cont->bq));
++      VP8HwdBufferQueueAddRef(dec_cont->bq, VP8HwdBufferQueueGetAltRef(dec_cont->bq));
++      VP8HwdBufferQueueAddRef(dec_cont->bq, VP8HwdBufferQueueGetGoldenRef(dec_cont->bq));
++  }
++  FifoClearAbort(dec_cont->fifo_out);
++end:
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return re;
++}
++
+ VP8DecRet VP8DecAbort(VP8DecInst dec_inst) {
+   VP8DecContainer_t *dec_cont = (VP8DecContainer_t *)dec_inst;
+ 
+diff --git a/decoder_sw/software/source/vp9/vp9decapi.c b/decoder_sw/software/source/vp9/vp9decapi.c
+index 2853823..95267e9 100755
+--- a/decoder_sw/software/source/vp9/vp9decapi.c
++++ b/decoder_sw/software/source/vp9/vp9decapi.c
+@@ -147,6 +147,7 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+ 
+   /* init struct DWL for the specified client */
+   dwl_init.client_type = DWL_CLIENT_TYPE_VP9_DEC;
++  DWLSetSecureMode(dwl, dec_cfg->use_secure_mode);
+ 
+   /* allocate instance */
+   dec_cont =
+@@ -957,6 +958,13 @@ i32 Vp9DecodeHeaders(struct Vp9DecContainer *dec_cont,
+             Vp9BufferQueueRemoveRef(dec_cont->bq, ref_buffer_i);
+           }
+         }
++#ifndef USE_EXT_BUF_SAFE_RELEASE
++        if (dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
++            for (i = 0; i < dec_cont->num_buffers; i++) {
++              Vp9BufferQueueEmptyRef(dec_cont->bq, i);
++            }
++        }
++#endif
+         Vp9BufferQueueWaitPending(dec_cont->bq);
+       }
+       //Vp9AsicReleaseMem(dec_cont);
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_asic.c b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+index 49b1a3d..e7afa97 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_asic.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_asic.c
+@@ -822,6 +822,18 @@ i32 Vp9ReallocateFrame(struct Vp9DecContainer *dec_cont, u32 index) {
+   return ret;
+ }
+ 
++static u32 vp9CalcuCloselyLumaSize(struct Vp9DecContainer *dec_cont)
++{
++  u32 luma_size = 0 ;
++  u32 hw_addr_limit = 16;
++  struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
++  u32 pic_stride = NEXT_MULTIPLE(asic_buff->width, 8) * dec_cont->decoder.bit_depth / 8;
++
++  luma_size = NEXT_MULTIPLE(asic_buff->height * pic_stride, hw_addr_limit);
++
++  return luma_size;
++}
++
+ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+   struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
+   u32 num_ctbs, luma_size, chroma_size, dir_mvs_size;
+@@ -836,7 +848,12 @@ i32 Vp9MallocRefFrm(struct Vp9DecContainer *dec_cont, u32 index) {
+   rs_bit_depth = (dec_cont->use_8bits_output || bit_depth == 8) ? 8 :
+                  (dec_cont->use_p010_output) ? 16 : bit_depth;
+ 
+-  luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  if(dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
++    luma_size = vp9CalcuCloselyLumaSize(dec_cont);
++  } else {
++    luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  }
++
+   chroma_size = (asic_buff->height / 2) * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
+   num_ctbs = ((asic_buff->width + 63) / 64) * ((asic_buff->height + 63) / 64);
+   dir_mvs_size = num_ctbs * 64 * 16; /* MVs (16 MBs / CTB * 16 bytes / MB) */
+@@ -971,7 +988,11 @@ void Vp9SetExternalBufferInfo(struct Vp9DecContainer *dec_cont) {
+   rs_bit_depth = (dec_cont->use_8bits_output || bit_depth == 8) ? 8 :
+                  (dec_cont->use_p010_output) ? 16 : bit_depth;
+ 
+-  luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  if(dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
++    luma_size = vp9CalcuCloselyLumaSize(dec_cont);
++  } else {
++    luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  }
+   chroma_size = (asic_buff->height / 2) * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
+   num_ctbs = ((asic_buff->width + 63) / 64) * ((asic_buff->height + 63) / 64);
+   dir_mvs_size = num_ctbs * 64 * 16; /* MVs (16 MBs / CTB * 16 bytes / MB) */
+@@ -1044,8 +1065,13 @@ void Vp9CalculateBufSize(struct Vp9DecContainer *dec_cont, i32 index) {
+   rs_bit_depth = (dec_cont->use_8bits_output || bit_depth == 8) ? 8 :
+                  (dec_cont->use_p010_output) ? 16 : bit_depth;
+ 
+-  luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  if(dec_cont->output_format == DEC_OUT_FRM_TILED_4X4) {
++    luma_size = vp9CalcuCloselyLumaSize(dec_cont);
++  } else {
++    luma_size = asic_buff->height * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++  }
+   chroma_size = (asic_buff->height / 2) * NEXT_MULTIPLE(asic_buff->width * bit_depth, 16 * 8) / 8;
++
+   num_ctbs = ((asic_buff->width + 63) / 64) * ((asic_buff->height + 63) / 64);
+   dir_mvs_size = num_ctbs * 64 * 16; /* MVs (16 MBs / CTB * 16 bytes / MB) */
+   pp_luma_size = NEXT_MULTIPLE((asic_buff->width >> dec_cont->down_scale_x_shift) * rs_bit_depth, 16 * 8) / 8 *
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.c b/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.c
+index 408bc4b..a2f6287 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.c
+@@ -439,6 +439,26 @@ static void ClearRefCount(struct BQueue* q, i32 i) {
+   }
+ }
+ 
++void vp9BufferQueueReset2(BufferQueue queue) {
++  assert(queue);
++  struct BQueue* q = (struct BQueue*)queue;
++  i32 i;
++  FifoObject j;
++  enum FifoRet ret;
++  if (q->empty_fifo) {/* Empty the fifo before releasing. */
++    FifoRelease(q->empty_fifo);
++  }
++  pthread_mutex_destroy(&q->cs);
++  pthread_mutex_init(&q->cs, NULL);
++  ret = FifoInit(VP9DEC_MAX_PIC_BUFFERS, &q->empty_fifo);
++  if (FIFO_ERROR_MEMALLOC == ret)
++    return;
++  assert(q->empty_fifo);
++  q->n_buffers = 0;
++  memset(q->n_references, 0, sizeof(q->n_references));
++  Vp9BufferQueueResetReferences(q);
++}
++
+ void Vp9BufferQueueReset(BufferQueue queue) {
+ #ifdef BUFFER_QUEUE_PRINT_STATUS
+   printf(__FUNCTION__);
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.h b/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.h
+index 11df6c0..aba1ab1 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.h
++++ b/decoder_sw/software/source/vp9/vp9hwd_buffer_queue.h
+@@ -94,4 +94,7 @@ void Vp9BufferQueueClearAbort(BufferQueue queue);
+ void Vp9BufferQueueEmptyRef(BufferQueue queue, i32 buffer);
+ 
+ void Vp9BufferQueueReset(BufferQueue queue);
++
++void vp9BufferQueueReset2(BufferQueue queue);
++
+ #endif /* VP9HWD_PICTURE_BUFFER_QUEUE_H_ */
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_output.c b/decoder_sw/software/source/vp9/vp9hwd_output.c
+index 6ee0866..ef1369e 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_output.c
++++ b/decoder_sw/software/source/vp9/vp9hwd_output.c
+@@ -864,7 +864,6 @@ void Vp9ExistAbortState(struct Vp9DecContainer *dec_cont) {
+   dec_cont->abort = 0;
+ }
+ 
+-
+ void Vp9EmptyBufferQueue(struct Vp9DecContainer *dec_cont) {
+ #ifdef USE_OMXIL_BUFFER
+   u32 i;
+@@ -885,7 +884,10 @@ void Vp9EmptyBufferQueue(struct Vp9DecContainer *dec_cont) {
+ 
+ void Vp9ResetDecState(struct Vp9DecContainer *dec_cont) {
+   /* Clear internal parameters in Vp9DecContainer */
+-  dec_cont->dec_stat = VP9DEC_DECODING;
++  if (dec_cont->dec_stat == VP9DEC_NEW_HEADERS)
++    dec_cont->dec_stat = VP9DEC_INITIALIZED;
++  if (dec_cont->dec_stat != VP9DEC_INITIALIZED)
++    dec_cont->dec_stat = VP9DEC_DECODING;
+   //dec_cont->dec_stat = VP9DEC_INITIALIZED;
+   dec_cont->add_buffer = 0;
+   dec_cont->out_count = 0;
+@@ -943,6 +945,57 @@ void Vp9ResetDecState(struct Vp9DecContainer *dec_cont) {
+   dec_cont->no_decoding_buffer = 0;
+ }
+ 
++enum DecRet Vp9DecRemoveBuffer(Vp9DecInst dec_inst)
++{
++  struct Vp9DecContainer *dec_cont = (struct Vp9DecContainer *)dec_inst;
++  struct DecAsicBuffers *asic_buff = dec_cont->asic_buff;
++  pthread_mutex_lock(&dec_cont->protect_mutex);
++
++  for (u32  i = 0; i < dec_cont->num_buffers; i++) {
++    Vp9BufferQueueEmptyRef(dec_cont->bq, i);
++    asic_buff->display_index[i] = 0;
++  }
++
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
++      IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
++    for (u32 i = 0; i < dec_cont->num_pp_buffers; i++) {
++      Vp9BufferQueueEmptyRef(dec_cont->pp_bq, i);
++      asic_buff->display_index[i] = 0;
++    }
++  }
++
++  Vp9ResetDecState(dec_cont);
++
++  dec_cont->buffer_index = 0;
++  dec_cont->buf_num = dec_cont->min_buffer_num;
++  dec_cont->buffer_num_added = 0;
++  dec_cont->next_buf_size = 0;
++  DWLmemset(asic_buff->first_show, 0, VP9DEC_MAX_PIC_BUFFERS * sizeof(i32));
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
++      IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
++    asic_buff->out_pp_buffer_i = VP9_UNDEFINED_BUFFER;
++    DWLmemset(asic_buff->pp_buffer_map, 0, VP9DEC_MAX_PIC_BUFFERS * sizeof(i32));
++    DWLmemset(asic_buff->pp_pictures, 0, VP9DEC_MAX_PIC_BUFFERS * sizeof(struct DWLLinearMem));
++  }
++
++  if (dec_cont->bq && IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, REFERENCE_BUFFER)) {
++     dec_cont->num_buffers = dec_cont->num_buffers_reserved;
++     Vp9BufferQueueRelease(dec_cont->bq, 0);
++     dec_cont->bq = Vp9BufferQueueInitialize(dec_cont->num_buffers);
++  }
++
++  if (IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, RASTERSCAN_OUT_BUFFER) ||
++      IS_EXTERNAL_BUFFER(dec_cont->ext_buffer_config, DOWNSCALE_OUT_BUFFER)) {
++    dec_cont->num_pp_buffers = 0;
++    if (dec_cont->pp_bq) {
++      vp9BufferQueueReset2(dec_cont->pp_bq);
++    }
++  }
++
++  pthread_mutex_unlock(&dec_cont->protect_mutex);
++  return DEC_OK;
++}
++
+ enum DecRet Vp9DecAbort(Vp9DecInst dec_inst) {
+   if (dec_inst == NULL) {
+     return DEC_PARAM_ERROR;
+diff --git a/decoder_sw/software/test/vp8/dectestbench.c b/decoder_sw/software/test/vp8/dectestbench.c
+index a2c527b..88422ba 100755
+--- a/decoder_sw/software/test/vp8/dectestbench.c
++++ b/decoder_sw/software/test/vp8/dectestbench.c
+@@ -833,7 +833,7 @@ int main(int argc, char**argv) {
+                    dwl_inst,
+ #endif
+                    dec_format, TBGetDecErrorConcealment( &tb_cfg ),
+-                   num_frame_buffers, tiled_output, 0, 0 );
++                   num_frame_buffers, tiled_output, 1, 0 );
+   END_SW_PERFORMANCE;
+   decsw_performance();
+ 
+diff --git a/h1_encoder/software/linux_reference/ewl/ewl_x280_common.c b/h1_encoder/software/linux_reference/ewl/ewl_x280_common.c
+index 2b4e0fe..312e4cc 100755
+--- a/h1_encoder/software/linux_reference/ewl/ewl_x280_common.c
++++ b/h1_encoder/software/linux_reference/ewl/ewl_x280_common.c
+@@ -49,7 +49,11 @@
+ 
+ #include "linux/hx280enc.h"
+ #ifdef USE_ION
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 11, 0)
++#include <linux/dma-heap.h>
++#else
+ #include <linux/ion.h>
++#endif
+ #include <linux/dma-buf.h>
+ #include <linux/version.h>
+ #ifdef ANDROID
+@@ -721,7 +725,7 @@ void EWLFreeRefFrm(const void *instance, EWLLinearMem_t * info)
+                         buffer parameters are returned
+ ------------------------------------------------------------------------------*/
+ #ifdef USE_ION
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 
+ i32 EWLMallocLinear(const void *instance, u32 size, EWLLinearMem_t * info)
+ {
+@@ -823,7 +827,7 @@ i32 EWLMallocLinear(const void *instance, u32 size, EWLLinearMem_t * info)
+ #endif
+ }
+ 
+-#else  // LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)) //LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ i32 EWLMallocLinear(const void *instance, u32 size, EWLLinearMem_t * info)
+ {
+     hx280ewl_t *enc_ewl = (hx280ewl_t *) instance;
+@@ -914,7 +918,62 @@ i32 EWLMallocLinear(const void *instance, u32 size, EWLLinearMem_t * info)
+       return EWL_ERROR;
+ }
+ 
+-#endif // LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 34)
++#else  // (LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0))
++i32 EWLMallocLinear(const void *instance, u32 size, EWLLinearMem_t * info)
++{
++    hx280ewl_t *enc_ewl = (hx280ewl_t *) instance;
++    EWLLinearMem_t *buff = (EWLLinearMem_t *) info;
++
++    struct dma_heap_allocation_data data = { 0 };
++    struct dma_buf_phys dma_phys;
++    int ret;
++
++    u32 pgsize = getpagesize();
++
++    assert(enc_ewl != NULL);
++    assert(buff != NULL);
++
++    PTRACE("EWLMallocLinear	%8d bytes
+", size);
++
++    buff->size = (size + (pgsize - 1)) & (~(pgsize - 1));
++
++    buff->ion_fd = -1;
++    data.len = buff->size;
++    data.fd_flags = O_RDWR | O_CLOEXEC;
++    data.heap_flags = 0;
++    ret = ioctl (enc_ewl->fd_memalloc, DMA_HEAP_IOCTL_ALLOC, &data);
++    if (ret < 0) {
++      PTRACE("ion allocate failed. 
+");
++      goto bail;
++    }
++    info->ion_fd = data.fd;
++
++    ret = ioctl(info->ion_fd, DMA_BUF_IOCTL_PHYS, &dma_phys);
++    if (ret < 0) {
++      PTRACE("ion get phys failed. 
+");
++      goto bail;
++    }
++
++    buff->busAddress = dma_phys.phys;
++
++    PTRACE("physical address: %p
+", buff->busAddress);
++
++    buff->virtualAddress = (u32 *)mmap(0, buff->size, PROT_READ | PROT_WRITE, MAP_SHARED,
++                  buff->ion_fd, 0);
++    if (buff->virtualAddress == MAP_FAILED) {
++      PTRACE("ERROR! mmap failed
+");
++      goto bail;
++    }
++
++    return EWL_OK;
++
++bail:
++    if (buff->ion_fd >= 0)
++      close(buff->ion_fd);
++
++    return EWL_ERROR;
++}
++#endif // LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+ 
+ #else //USE_ION
+ 
+diff --git a/h1_encoder/software/linux_reference/ewl/ewl_x280_common.h b/h1_encoder/software/linux_reference/ewl/ewl_x280_common.h
+index fc72491..f9a94b3 100755
+--- a/h1_encoder/software/linux_reference/ewl/ewl_x280_common.h
++++ b/h1_encoder/software/linux_reference/ewl/ewl_x280_common.h
+@@ -54,6 +54,16 @@ extern FILE *fEwl;
+ #   define PTRACE(...)  /* no trace */
+ #endif
+ 
++#ifdef USE_ION
++#include <linux/version.h>
++#undef MEMALLOC_MODULE_PATH
++#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
++#define MEMALLOC_MODULE_PATH        "/dev/ion"
++#else
++#define MEMALLOC_MODULE_PATH        "/dev/dma_heap/linux,cma-uncached"
++#endif
++#endif
++
+ /* the encoder device driver nod */
+ #ifndef MEMALLOC_MODULE_PATH
+ #define MEMALLOC_MODULE_PATH        "/tmp/dev/memalloc"

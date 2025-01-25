@@ -1,0 +1,198 @@
+c110c7fc George.Huang 2020-07-31
+
+AOS-273: imx8mq: sync necessary changes between vp6820_8mq and evk_a300
+
+Change-Id: Ia04c6248df71eb12627a1726088d6a9f00edfce0
+
+diff --git a/imx8m/evk_a300/AndroidUboot.mk b/imx8m/evk_a300/AndroidUboot.mk
+index 92f3f8ca..06a2fe2a 100644
+--- a/imx8m/evk_a300/AndroidUboot.mk
++++ b/imx8m/evk_a300/AndroidUboot.mk
+@@ -17,7 +17,7 @@ define build_imx_uboot
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
++	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
+ 		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mq.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+ 	else \
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index 76cb095f..fbe7f237 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -109,7 +109,7 @@ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+ else
+-CMASIZE=1280M
++CMASIZE=800M
+ endif
+ 
+ # NXP default config
+diff --git a/imx8m/evk_a300/android_addition_defconfig b/imx8m/evk_a300/android_addition_defconfig
+index 3f3c0c4b..d0a658f9 100644
+--- a/imx8m/evk_a300/android_addition_defconfig
++++ b/imx8m/evk_a300/android_addition_defconfig
+@@ -22,6 +22,9 @@ CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM=y
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_KPROBE_EVENTS=y
+ CONFIG_UPROBE_EVENTS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
+ 
+ CONFIG_PARAVIRT=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y
+diff --git a/imx8m/evk_a300/fstab.freescale b/imx8m/evk_a300/fstab.freescale
+index 194a157c..789645d6 100644
+--- a/imx8m/evk_a300/fstab.freescale
++++ b/imx8m/evk_a300/fstab.freescale
+@@ -3,6 +3,7 @@
+ # The filesystem that contains the filesystem checker binary (typically /system) cannot
+ # specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+ 
++/devices/platform/soc@0/38100000.usb/xhci-hcd.1.auto/usb4/4-1/4-1:1.0/host0/* auto auto defaults voldmanaged=usb:auto
+ /devices/platform/soc@0/38200000.usb/xhci-hcd.0.auto/* auto auto defaults voldmanaged=usb:auto
+ /dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+diff --git a/imx8m/evk_a300/init.rc b/imx8m/evk_a300/init.rc
+index 4db0ad0f..4bd5104c 100644
+--- a/imx8m/evk_a300/init.rc
++++ b/imx8m/evk_a300/init.rc
+@@ -203,10 +203,10 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     oneshot
+ 
+ service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+-	class hal
+-	user system
+-	group system wakelock input root
+-	capabilities BLOCK_SUSPEND SYS_NICE
++    class hal
++    user system
++    group system wakelock input root
++    capabilities BLOCK_SUSPEND SYS_NICE
+ 
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+index 4245813d..c5b08840 100644
+--- a/imx8m/evk_a300/sepolicy/file_contexts
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+diff --git a/imx8m/vp6820_8mq/AndroidUboot.mk b/imx8m/vp6820_8mq/AndroidUboot.mk
+index 92f3f8ca..06a2fe2a 100644
+--- a/imx8m/vp6820_8mq/AndroidUboot.mk
++++ b/imx8m/vp6820_8mq/AndroidUboot.mk
+@@ -17,7 +17,7 @@ define build_imx_uboot
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
++	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
+ 		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mq.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+ 	else \
+diff --git a/imx8m/vp6820_8mq/camera_config_imx8mq.json b/imx8m/vp6820_8mq/camera_config_imx8mq.json
+index 7ccd0cd9..dc40c5d3 100644
+--- a/imx8m/vp6820_8mq/camera_config_imx8mq.json
++++ b/imx8m/vp6820_8mq/camera_config_imx8mq.json
+@@ -10,7 +10,7 @@
+   "camera_metadata": [
+     {
+       "camera_type": "back",
+-      "camera_name": "mx6s-csi",
++      "camera_name": "mx6s-csi0",
+       "orientation": "0",
+       "buffer_type": "mmap",
+       "ActiveArrayWidth": "2592",
+@@ -38,19 +38,31 @@
+     },
+     {
+       "camera_type": "front",
+-      "camera_name": "uvc",
++      "camera_name": "mx6s-csi1",
+       "orientation": "0",
+-      "buffer_type": "dma",
+-      "ActiveArrayWidth": "1920",
+-      "ActiveArrayHeight": "1080",
+-      "PixelArrayWidth": "1920",
+-      "PixelArrayHeight": "1080",
+-      "PhysicalWidth": "2.688",
+-      "PhysicalHeight": "1.512",
+-      "FocalLength": "3.42",
+-      "MaxJpegSize": "4194304",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "1600",
++      "ActiveArrayHeight": "1200",
++      "PixelArrayWidth": "1600",
++      "PixelArrayHeight": "1200",
++      "PhysicalWidth": "2.24",
++      "PhysicalHeight": "1.68",
++      "FocalLength": "2.66",
++      "MaxJpegSize": "2097152",
+       "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000"
++      "MaxFrameDuration": "300000000",
++      "OmitFrame": [
++          {
++              "width": "1600",
++              "height": "1200",
++              "omit_num": "2"
++          },
++          {
++              "width": "1280",
++              "height": "720",
++              "omit_num": "1"
++          }
++      ]
+     }
+   ]
+ }
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index 098d0a67..2caa61b2 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -203,10 +203,10 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     oneshot
+ 
+ service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+-	class hal
+-	user system
+-	group system wakelock input root
+-	capabilities BLOCK_SUSPEND SYS_NICE
++    class hal
++    user system
++    group system wakelock input root
++    capabilities BLOCK_SUSPEND SYS_NICE
+ 
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 6d24426e..707e5401 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -351,12 +351,13 @@ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+ 
+ ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++# Tensorflow lite camera demo
++PRODUCT_PACKAGES += \
++                    tflitecamerademo
++
+ # Multi-Display launcher
+ PRODUCT_PACKAGES += \
+     MultiDisplay
+-# Tensorflow lite camera demo
+-PRODUCT_PACKAGES += \
+-    tflitecamerademo
+ endif
+ 
+ # Multi-Client IME

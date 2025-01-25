@@ -1,0 +1,49 @@
+5565da96 George.Huang 2020-09-03
+
+AOS-321: imx8m: align vbmeta image size to 1MB
+
+Align vbmeta image size with partition size will help
+clean-up the tail of this partition, and is not necessary
+to erase partiton before flashing it.
+
+vbmeta partition size is defined in:
+  device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+  device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
+
+vbmeta image size is defined in:
+  device/idtech/imx8m/BoardConfigCommon.mk
+
+Change-Id: I23e7d7bca2d3759d77f2a4262a6d35148855d6d6
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index 0de08f4a..b2ca8b94 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -81,6 +81,7 @@ $(IMX_INSTALLED_VBMETAIMAGE_TARGET): $(PRODUCT_OUT)/vbmeta.img $(BOARD_PREBUILT_
+ 			$(BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS) \
+ 			--include_descriptors_from_image $(PRODUCT_OUT)/vbmeta.img \
+ 			--include_descriptors_from_image $$DTBO_IMG \
++			--padding_size $(BOARD_VBMETAIMAGE_PARTITION_SIZE) \
+ 			--output $$VBMETA_IMG, \
+ 		$(AVBTOOL) make_vbmeta_image \
+ 			--algorithm $(BOARD_AVB_ALGORITHM) --key $(BOARD_AVB_KEY_PATH) \
+@@ -88,6 +89,7 @@ $(IMX_INSTALLED_VBMETAIMAGE_TARGET): $(PRODUCT_OUT)/vbmeta.img $(BOARD_PREBUILT_
+ 			--include_descriptors_from_image $(PRODUCT_OUT)/vbmeta.img \
+ 			--include_descriptors_from_image $$DTBO_IMG \
+ 			--include_descriptors_from_image $$RECOVERY_IMG \
++			--padding_size $(BOARD_VBMETAIMAGE_PARTITION_SIZE) \
+ 			--output $$VBMETA_IMG); \
+ 	cp $(IMX_INSTALLED_VBMETAIMAGE_TARGET) $(PRODUCT_OUT)/vbmeta.img
+ 	mv $(IMX_INSTALLED_VBMETAIMAGE_TARGET) $(IMX_INSTALLED_VBMETAIMAGE_TARGET).bak
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 9d5c5bcd..691bb7dd 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -114,6 +114,7 @@ TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8888"
+ 
+ BOARD_DTBOIMG_PARTITION_SIZE := 4194304
+ BOARD_BOOTIMAGE_PARTITION_SIZE := 67108864
++BOARD_VBMETAIMAGE_PARTITION_SIZE := 1048576
+ 
+ BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE = ext4
+ TARGET_COPY_OUT_VENDOR := vendor

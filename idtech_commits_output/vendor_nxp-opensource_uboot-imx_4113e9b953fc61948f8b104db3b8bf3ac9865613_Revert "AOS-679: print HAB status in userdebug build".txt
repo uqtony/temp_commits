@@ -1,0 +1,126 @@
+4113e9b953 owen.wen 2021-09-03
+
+Revert "AOS-679: print HAB status in userdebug build"
+
+This reverts commit 5751e871f0b2ec3540fe96beb61892d5f669ff15.
+
+Change-Id: I246230014f7825c50088ab26eb59213fdc9feac7
+
+diff --git a/arch/arm/include/asm/mach-imx/hab.h b/arch/arm/include/asm/mach-imx/hab.h
+index 18894f5fd6..2abf28ea45 100644
+--- a/arch/arm/include/asm/mach-imx/hab.h
++++ b/arch/arm/include/asm/mach-imx/hab.h
+@@ -137,7 +137,9 @@ struct imx_sec_config_fuse_t {
+ 	int word;
+ };
+ 
++#if defined(CONFIG_IMX_HAB)
+ extern struct imx_sec_config_fuse_t const imx_sec_config_fuse;
++#endif
+ 
+ /*Function prototype description*/
+ typedef enum hab_status hab_rvt_report_event_t(enum hab_status, uint32_t,
+@@ -230,8 +232,6 @@ typedef void hapi_clock_init_t(void);
+ 
+ /* ----------- end of HAB API updates ------------*/
+ 
+-int get_hab_status(void);
+-
+ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
+ 			       uint32_t ivt_offset);
+ bool imx_hab_is_enabled(void);
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 4f133fdfe1..a2d9e16c7c 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -17,7 +17,7 @@ obj-y += mmc_env.o
+ obj-$(CONFIG_FEC_MXC) += mac.o
+ obj-$(CONFIG_DWC_ETH_QOS) += mac.o
+ obj-$(CONFIG_SYS_I2C_MXC) += i2c-mxv7.o
+-obj-y += hab.o
++obj-$(CONFIG_IMX_HAB) += hab.o
+ obj-y += cpu.o
+ endif
+ 
+diff --git a/arch/arm/mach-imx/hab.c b/arch/arm/mach-imx/hab.c
+index a900224d7e..a5bfeb0947 100644
+--- a/arch/arm/mach-imx/hab.c
++++ b/arch/arm/mach-imx/hab.c
+@@ -246,6 +246,8 @@ void *hab_rvt_authenticate_image(uint8_t cid, ptrdiff_t ivt_offset,
+ 	return ret;
+ }
+ 
++#if !defined(CONFIG_SPL_BUILD)
++
+ #define MAX_RECORD_BYTES     (8*1024) /* 4 kbytes */
+ 
+ struct record {
+@@ -442,7 +444,7 @@ static void display_event(uint8_t *event_data, size_t bytes)
+ 	process_event_record(event_data, bytes);
+ }
+ 
+-int get_hab_status(void)
++static int get_hab_status(void)
+ {
+ 	uint32_t index = 0; /* Loop index */
+ 	uint8_t event_data[128]; /* Event data buffer */
+@@ -482,8 +484,6 @@ int get_hab_status(void)
+ 	return 0;
+ }
+ 
+-#if !defined(CONFIG_SPL_BUILD)
+-
+ #ifdef CONFIG_MX7ULP
+ 
+ static int get_record_len(struct record *rec)
+@@ -899,9 +899,7 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
+ 	printf("
+Authenticate image from DDR location 0x%x...
+",
+ 	       ddr_start);
+ 
+-#if defined(CONFIG_IMX_HAB)
+ 	hab_caam_clock_enable(1);
+-#endif
+ 
+ 	/* Calculate IVT address header */
+ 	ivt_addr = (ulong) (ddr_start + ivt_offset);
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index 18fd6c19ad..012b0b8736 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -39,10 +39,12 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
++#if defined(CONFIG_IMX_HAB) || defined(CONFIG_AVB_ATX) || defined(CONFIG_IMX_TRUSTY_OS)
+ struct imx_sec_config_fuse_t const imx_sec_config_fuse = {
+ 	.bank = 1,
+ 	.word = 3,
+ };
++#endif
+ 
+ int timer_init(void)
+ {
+diff --git a/common/spl/spl_fit.c b/common/spl/spl_fit.c
+index 9acd074760..fcd00819ec 100644
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@ -16,7 +16,6 @@
+ #include <asm/cache.h>
+ #include <asm/global_data.h>
+ #include <linux/libfdt.h>
+-#include <asm/mach-imx/hab.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -785,9 +784,6 @@ int spl_load_simple_fit(struct spl_image_info *spl_image,
+ 	ret = 0;
+ 	if (IS_ENABLED(CONFIG_IMX_HAB) && !(spl_image->flags & SPL_FIT_BYPASS_POST_LOAD))
+ 		ret = board_spl_fit_post_load(ctx.fit);
+-	else
+-		ret = get_hab_status();
+-
+ 	if (ret < 0)
+ 		return ret;
+ 

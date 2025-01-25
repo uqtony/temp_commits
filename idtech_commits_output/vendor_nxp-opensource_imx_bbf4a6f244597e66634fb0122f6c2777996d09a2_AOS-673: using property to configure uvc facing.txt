@@ -1,0 +1,82 @@
+bbf4a6f AndrewS 2021-08-03
+
+AOS-673: using property to configure uvc facing
+
+In Android-11.0.0_2.2.0, NXP move external camera to imx hal,
+so we need to parsing camera facing here also.
+
+Change-Id: I7561820d0857a3432c7b2146d3949567adc91f6b
+
+diff --git a/external_camera/ExternalCameraDevice.cpp b/external_camera/ExternalCameraDevice.cpp
+index be0c1ce..4a1839e 100644
+--- a/external_camera/ExternalCameraDevice.cpp
++++ b/external_camera/ExternalCameraDevice.cpp
+@@ -26,6 +26,7 @@
+ #include "CameraMetadata.h"
+ #include "../../3.2/default/include/convert.h"
+ #include "ExternalCameraDevice_3_4.h"
++#include <cutils/properties.h>
+ 
+ namespace android {
+ namespace hardware {
+@@ -223,7 +224,7 @@ status_t ExternalCameraDevice::initCameraCharacteristics() {
+         }
+ 
+         status_t ret;
+-        ret = initDefaultCharsKeys(&mCameraCharacteristics);
++        ret = initDefaultCharsKeys(fd.get(), &mCameraCharacteristics);
+         if (ret != OK) {
+             ALOGE("%s: init default characteristics key failed: errorno %d", __FUNCTION__, ret);
+             mCameraCharacteristics.clear();
+@@ -298,7 +299,7 @@ status_t ExternalCameraDevice::initAvailableCapabilities(
+ }
+ 
+ status_t ExternalCameraDevice::initDefaultCharsKeys(
+-        ::android::hardware::camera::common::V1_0::helper::CameraMetadata* metadata) {
++        int fd, ::android::hardware::camera::common::V1_0::helper::CameraMetadata* metadata) {
+     const uint8_t hardware_level = ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL_EXTERNAL;
+     UPDATE(ANDROID_INFO_SUPPORTED_HARDWARE_LEVEL, &hardware_level, 1);
+ 
+@@ -373,7 +374,28 @@ status_t ExternalCameraDevice::initDefaultCharsKeys(
+     UPDATE(ANDROID_LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION,
+            &opticalStabilizationMode, 1);
+ 
+-    const uint8_t facing = ANDROID_LENS_FACING_EXTERNAL;
++    uint8_t facing = ANDROID_LENS_FACING_EXTERNAL;
++    char value[PROPERTY_VALUE_MAX]={0};
++    // configure facing for different usb bus
++    if (property_get("persist.idt.camera_facing", value, "") > 0) {
++        struct v4l2_capability vidCap;
++        int ret = TEMP_FAILURE_RETRY(ioctl(fd, VIDIOC_QUERYCAP, &vidCap));
++        if (ret == 0) {
++            char *p;
++            uint32_t busInfoLen = strlen((char *)vidCap.bus_info);
++            p = strtok(value, ";");
++            while (p) {
++                if (!strncmp(p, (char *)vidCap.bus_info, busInfoLen)) {
++                    p += busInfoLen + 1;
++                    if (!strcmp(p, "front"))
++                        facing = ANDROID_LENS_FACING_FRONT;
++                    else if (!strcmp(p, "back"))
++                        facing = ANDROID_LENS_FACING_BACK;
++                }
++                p = strtok(NULL, ";");
++            }
++        }
++    }
+     UPDATE(ANDROID_LENS_FACING, &facing, 1);
+ 
+     // android.noiseReduction
+diff --git a/external_camera/include/ExternalCameraDevice_3_4.h b/external_camera/include/ExternalCameraDevice_3_4.h
+index c34bf8a..5fece71 100644
+--- a/external_camera/include/ExternalCameraDevice_3_4.h
++++ b/external_camera/include/ExternalCameraDevice_3_4.h
+@@ -108,7 +108,7 @@ protected:
+     virtual status_t initAvailableCapabilities(
+             ::android::hardware::camera::common::V1_0::helper::CameraMetadata*);
+     // Init non-device dependent keys
+-    virtual status_t initDefaultCharsKeys(
++    virtual status_t initDefaultCharsKeys(int fd,
+             ::android::hardware::camera::common::V1_0::helper::CameraMetadata*);
+     // Init camera control chars keys. Caller still owns fd
+     status_t initCameraControlsCharsKeys(int fd,

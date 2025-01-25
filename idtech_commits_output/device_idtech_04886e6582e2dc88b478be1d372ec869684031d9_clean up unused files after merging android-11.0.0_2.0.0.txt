@@ -1,0 +1,1013 @@
+04886e65 George.Huang 2021-06-09
+
+clean up unused files after merging android-11.0.0_2.0.0
+
+Change-Id: I0c5ee01be95875d618191ef8b071baabb30118fc
+
+diff --git a/imx8m/evk_a100/AndroidUboot.mk~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a100/AndroidUboot.mk~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 53e65262..00000000
+--- a/imx8m/evk_a100/AndroidUboot.mk~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,52 +0,0 @@
+-# uboot.imx in android combine scfw.bin and uboot.bin
+-MAKE += SHELL=/bin/bash
+-
+-ifneq ($(AARCH64_GCC_CROSS_COMPILE),)
+-  ATF_CROSS_COMPILE := $(strip $(AARCH64_GCC_CROSS_COMPILE))
+-else
+-  $(error shell env AARCH64_GCC_CROSS_COMPILE is not set)
+-endif
+-
+-define build_imx_uboot
+-	$(hide) echo Building i.MX U-Boot with firmware; \
+-	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "ddr4" ]; then \
+-		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	else \
+-		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	fi; \
+-	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ]; then \
+-		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mn.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+-		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+-	else \
+-		if [ -f $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin ] ; then \
+-			rm -rf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+-		fi; \
+-		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B 1>/dev/null || exit 1; \
+-	fi; \
+-	cp $(IMX_PATH)/arm-trusted-firmware/build/`echo $(2) | cut -d '-' -f1`/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/bl31.bin; \
+-	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "ddr4" ]; then \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN  flash_ddr4_evk || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab_ddr4 || exit 1; \
+-	elif [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_spl_uboot || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab || exit 1; \
+-	else \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_evk_no_hdmi_dual_bootloader || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
+-	fi; \
+-	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+-		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \
+-	else \
+-		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/spl-$(strip $(2)).bin; \
+-		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/u-boot-ivt.itb $(UBOOT_COLLECTION)/bootloader-$(strip $(2)).img; \
+-	fi;
+-endef
+-
+-
+diff --git a/imx8m/evk_a100/audio_policy_configuration.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a100/audio_policy_configuration.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 5cfd9f4f..00000000
+--- a/imx8m/evk_a100/audio_policy_configuration.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,94 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+-<!-- Copyright (C) 2017 The Android Open Source Project
+-
+-     Licensed under the Apache License, Version 2.0 (the "License");
+-     you may not use this file except in compliance with the License.
+-     You may obtain a copy of the License at
+-
+-          http://www.apache.org/licenses/LICENSE-2.0
+-
+-     Unless required by applicable law or agreed to in writing, software
+-     distributed under the License is distributed on an "AS IS" BASIS,
+-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+-     See the License for the specific language governing permissions and
+-     limitations under the License.
+--->
+-
+-<audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+-    <globalConfiguration speaker_drc_enabled="true"/>
+-
+-    <modules>
+-        <module name="primary" halVersion="2.0">
+-            <attachedDevices>
+-                <item>Speaker</item>
+-                <item>Built-In Mic</item>
+-            </attachedDevices>
+-            <defaultOutputDevice>Speaker</defaultOutputDevice>
+-            <mixPorts>
+-                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
+-                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+-                </mixPort>
+-                <mixPort name="bt sco output" role="source">
+-                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-                             samplingRates="16000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
+-                </mixPort>
+-
+-                <mixPort name="primary input" role="sink">
+-                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+-                             samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
+-                             channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
+-                </mixPort>
+-            </mixPorts>
+-            <devicePorts>
+-                <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink" >
+-                </devicePort>
+-                <devicePort tagName="Wired Headphones" type="AUDIO_DEVICE_OUT_WIRED_HEADPHONE" role="sink">
+-                </devicePort>
+-                <devicePort tagName="BT SCO Headset" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET" role="sink">
+-                </devicePort>
+-                <devicePort tagName="BT SCO CarKit" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT" role="sink">
+-                </devicePort>
+-                <devicePort tagName="BT SCO" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO" role="sink">
+-                </devicePort>
+-
+-                <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
+-                </devicePort>
+-                <devicePort tagName="Spdif-In" type="AUDIO_DEVICE_IN_AUX_DIGITAL" role="source">
+-                </devicePort>
+-                <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET" role="source">
+-                </devicePort>
+-            </devicePorts>
+-            <routes>
+-                <route type="mix" sink="Speaker"
+-                       sources="primary output"/>
+-                <route type="mix" sink="Wired Headphones"
+-                       sources="primary output"/>
+-                <route type="mix" sink="BT SCO Headset"
+-                        sources="bt sco output"/>
+-                <route type="mix" sink="BT SCO CarKit"
+-                       sources="bt sco output"/>
+-                <route type="mix" sink="BT SCO"
+-                       sources="bt sco output"/>
+-
+-                <route type="mix" sink="primary input"
+-                       sources="Built-In Mic,Spdif-In,BT SCO Headset Mic"/>
+-            </routes>
+-        </module>
+-
+-        <!-- A2dp Audio HAL -->
+-        <xi:include href="a2dp_audio_policy_configuration.xml"/>
+-
+-        <!-- Usb Audio HAL -->
+-        <xi:include href="usb_audio_policy_configuration.xml"/>
+-
+-        <!-- Remote Submix Audio HAL -->
+-        <xi:include href="r_submix_audio_policy_configuration.xml"/>
+-
+-    </modules>
+-
+-    <!-- Volume section -->
+-    <xi:include href="audio_policy_volumes.xml"/>
+-    <xi:include href="default_volume_tables.xml"/>
+-
+-</audioPolicyConfiguration>
+diff --git a/imx8m/evk_a100/manifest.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a100/manifest.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index aba9b68e..00000000
+--- a/imx8m/evk_a100/manifest.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,153 +0,0 @@
+-<manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
+-    <hal format="hidl">
+-	<name>android.hardware.graphics.allocator</name>
+-        <transport>hwbinder</transport>
+-	<impl level="generic"></impl>
+-	<version>4.0</version>
+-	<interface>
+-	    <name>IAllocator</name>
+-	    <instance>default</instance>
+-	</interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.composer</name>
+-        <transport>hwbinder</transport>
+-        <version>2.4</version>
+-        <interface>
+-            <name>IComposer</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.keymaster</name>
+-        <transport>hwbinder</transport>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IKeymasterDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.drm</name>
+-        <transport>hwbinder</transport>
+-        <version>1.3</version>
+-        <interface>
+-            <name>ICryptoFactory</name>
+-        </interface>
+-        <interface>
+-            <name>IDrmFactory</name>
+-        </interface>
+-        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
+-        <fqname>@1.3::IDrmFactory/clearkey</fqname>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.gatekeeper</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IGatekeeper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.mapper</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <impl level="generic"></impl>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IMapper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.renderscript</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.c2</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IComponentStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.omx</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IOmx</name>
+-            <instance>default</instance>
+-        </interface>
+-        <interface>
+-            <name>IOmxStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio</name>
+-        <transport>hwbinder</transport>
+-        <version>6.0</version>
+-        <interface>
+-            <name>IDevicesFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio.effect</name>
+-        <transport>hwbinder</transport>
+-		<version>6.0</version>
+-        <interface>
+-            <name>IEffectsFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.bluetooth</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IBluetoothHci</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.dumpstate</name>
+-        <transport>hwbinder</transport>
+-        <version>1.1</version>
+-        <interface>
+-            <name>IDumpstateDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>nxp.hardware.display</name>
+-            <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDisplay</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-       <name>android.hardware.camera.provider</name>
+-       <transport>hwbinder</transport>
+-       <fqname>@2.4::ICameraProvider/external/0</fqname>
+-    </hal>
+-</manifest>
+diff --git a/imx8m/evk_a200/manifest.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a200/manifest.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index aba9b68e..00000000
+--- a/imx8m/evk_a200/manifest.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,153 +0,0 @@
+-<manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
+-    <hal format="hidl">
+-	<name>android.hardware.graphics.allocator</name>
+-        <transport>hwbinder</transport>
+-	<impl level="generic"></impl>
+-	<version>4.0</version>
+-	<interface>
+-	    <name>IAllocator</name>
+-	    <instance>default</instance>
+-	</interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.composer</name>
+-        <transport>hwbinder</transport>
+-        <version>2.4</version>
+-        <interface>
+-            <name>IComposer</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.keymaster</name>
+-        <transport>hwbinder</transport>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IKeymasterDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.drm</name>
+-        <transport>hwbinder</transport>
+-        <version>1.3</version>
+-        <interface>
+-            <name>ICryptoFactory</name>
+-        </interface>
+-        <interface>
+-            <name>IDrmFactory</name>
+-        </interface>
+-        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
+-        <fqname>@1.3::IDrmFactory/clearkey</fqname>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.gatekeeper</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IGatekeeper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.mapper</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <impl level="generic"></impl>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IMapper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.renderscript</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.c2</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IComponentStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.omx</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IOmx</name>
+-            <instance>default</instance>
+-        </interface>
+-        <interface>
+-            <name>IOmxStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio</name>
+-        <transport>hwbinder</transport>
+-        <version>6.0</version>
+-        <interface>
+-            <name>IDevicesFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio.effect</name>
+-        <transport>hwbinder</transport>
+-		<version>6.0</version>
+-        <interface>
+-            <name>IEffectsFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.bluetooth</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IBluetoothHci</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.dumpstate</name>
+-        <transport>hwbinder</transport>
+-        <version>1.1</version>
+-        <interface>
+-            <name>IDumpstateDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>nxp.hardware.display</name>
+-            <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDisplay</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-       <name>android.hardware.camera.provider</name>
+-       <transport>hwbinder</transport>
+-       <fqname>@2.4::ICameraProvider/external/0</fqname>
+-    </hal>
+-</manifest>
+diff --git a/imx8m/evk_a300/AndroidTee.mk~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a300/AndroidTee.mk~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 21ba9b56..00000000
+--- a/imx8m/evk_a300/AndroidTee.mk~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,13 +0,0 @@
+-# uboot.imx in android combine scfw.bin and uboot.bin
+-MAKE += SHELL=/bin/bash
+-
+-define build_uboot_w_tee
+-	$(MAKE) -C bootable/bootloader/arm-trusted-firmware/ -B CROSS_COMPILE=aarch64-linux-android- PLAT=imx8mq V=1 SPD=opteed DECRYPTED_BUFFER_START=$(DECRYPTED_BUFFER_START) DECRYPTED_BUFFER_LEN=$(DECRYPTED_BUFFER_LEN) DECODED_BUFFER_START=$(DECODED_BUFFER_START) DECODED_BUFFER_LEN=$(DECODED_BUFFER_LEN) bl31; \
+-	cp bootable/bootloader/arm-trusted-firmware/build/imx8mq/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.;\
+-	aarch64-linux-android-objcopy -O binary out/target/product/evk_8mq/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+-	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+-	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M  flash_hdmi_spl_uboot; \
+-	cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(PRODUCT_OUT)/u-boot-$(strip $(2)).imx;
+-endef
+-
+-
+diff --git a/imx8m/evk_a300/camera_config_imx8mq.json~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a300/camera_config_imx8mq.json~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index a8bde1a0..00000000
+--- a/imx8m/evk_a300/camera_config_imx8mq.json~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,41 +0,0 @@
+-{
+-  "__readme": [
+-    "Basic Camera HAL v3 configuration."
+-  ],
+-
+-  "hal_version": "3",
+-  "cam_blit_copy": "GPU_3D",
+-  "cam_blit_csc": "CPU",
+-
+-  "camera_metadata": [
+-    {
+-      "camera_type": "back",
+-      "camera_name": "mx6s-csi",
+-      "bus_info": "platform:30b80000.csi2_bridge",
+-      "orientation": "0",
+-      "buffer_type": "mmap",
+-      "ActiveArrayWidth": "2592",
+-      "ActiveArrayHeight": "1944",
+-      "PixelArrayWidth": "2592",
+-      "PixelArrayHeight": "1944",
+-      "PhysicalWidth": "3.6288",
+-      "PhysicalHeight": "2.7216",
+-      "FocalLength": "3.37",
+-      "MaxJpegSize": "8388608",
+-      "MinFrameDuration": "33331760",
+-      "MaxFrameDuration": "300000000",
+-      "OmitFrame": [
+-          {
+-              "width": "2592",
+-              "height": "1944",
+-              "omit_num": "3"
+-          },
+-          {
+-              "width": "1920",
+-              "height": "1080",
+-              "omit_num": "2"
+-          }
+-      ]
+-    }
+-  ]
+-}
+diff --git a/imx8m/evk_a300/manifest.xml~post_merge_android-11.0.0_2.0.0 b/imx8m/evk_a300/manifest.xml~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 9dab44ed..00000000
+--- a/imx8m/evk_a300/manifest.xml~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,153 +0,0 @@
+-<manifest version="1.0" type="device" target-level="5">
+-    <kernel  target-level="5" />
+-    <hal format="hidl">
+-	<name>android.hardware.graphics.allocator</name>
+-        <transport>hwbinder</transport>
+-	<impl level="generic"></impl>
+-	<version>4.0</version>
+-	<interface>
+-	    <name>IAllocator</name>
+-	    <instance>default</instance>
+-	</interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.composer</name>
+-        <transport>hwbinder</transport>
+-        <version>2.4</version>
+-        <interface>
+-            <name>IComposer</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-       <name>android.hardware.camera.provider</name>
+-       <transport>hwbinder</transport>
+-       <fqname>@2.4::ICameraProvider/external/0</fqname>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.keymaster</name>
+-        <transport>hwbinder</transport>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IKeymasterDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.drm</name>
+-        <transport>hwbinder</transport>
+-        <version>1.3</version>
+-        <interface>
+-            <name>ICryptoFactory</name>
+-        </interface>
+-        <interface>
+-            <name>IDrmFactory</name>
+-        </interface>
+-        <fqname>@1.3::ICryptoFactory/clearkey</fqname>
+-        <fqname>@1.3::IDrmFactory/clearkey</fqname>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.gatekeeper</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IGatekeeper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.graphics.mapper</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <impl level="generic"></impl>
+-        <version>4.0</version>
+-        <interface>
+-            <name>IMapper</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.renderscript</name>
+-        <transport arch="32+64">passthrough</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.c2</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IComponentStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.media.omx</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IOmx</name>
+-            <instance>default</instance>
+-        </interface>
+-        <interface>
+-            <name>IOmxStore</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio</name>
+-        <transport>hwbinder</transport>
+-        <version>6.0</version>
+-        <interface>
+-            <name>IDevicesFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.audio.effect</name>
+-        <transport>hwbinder</transport>
+-        <version>6.0</version>
+-        <interface>
+-            <name>IEffectsFactory</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.bluetooth</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IBluetoothHci</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.dumpstate</name>
+-        <transport>hwbinder</transport>
+-        <version>1.1</version>
+-        <interface>
+-            <name>IDumpstateDevice</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-    <hal format="hidl">
+-        <name>nxp.hardware.display</name>
+-            <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IDisplay</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+-</manifest>
+diff --git a/imx8m/vp6820_8mn/fstab.nxp~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mn/fstab.nxp~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index f48e33b5..00000000
+--- a/imx8m/vp6820_8mn/fstab.nxp~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,12 +0,0 @@
+-# Android fstab file.
+-#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
+-# The filesystem that contains the filesystem checker binary (typically /system) cannot
+-# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
+-
+-/devices/platform/soc@0/32c00000.bus/32e40000.usb/* auto auto defaults voldmanaged=usb:auto
+-/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block
+-/dev/block/by-name/metadata    /metadata    ext4    noatime,nosuid,nodev,discard,sync                                                wait,formattable,first_stage_mount,check
+-/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+-/dev/block/zram0 none swap defaults zramsize=629145600
+-/tmp /sdcard none defaults,bind recoveryonly
+-
+diff --git a/imx8m/vp6820_8mn/powerhint_imx8mn.json b/imx8m/vp6820_8mn/powerhint_imx8mn.json
+index 06f1feef..56c3da5d 100644
+--- a/imx8m/vp6820_8mn/powerhint_imx8mn.json
++++ b/imx8m/vp6820_8mn/powerhint_imx8mn.json
+@@ -45,7 +45,7 @@
+       "Name": "PowerHALMainState",
+       "Path": "vendor.powerhal.camera",
+       "Values": [
+-        "CAMERA_STREAMING",
++        "CAMERA_STREAMING_MID",
+         ""
+       ],
+       "Type": "Property"
+@@ -54,7 +54,7 @@
+       "Name": "PowerHALAudioState",
+       "Path": "vendor.powerhal.audio",
+       "Values": [
+-        "AUDIO_LOW_LATENCY",
++        "AUDIO_STREAMING_LOW_LATENCY",
+         ""
+       ],
+       "Type": "Property"
+@@ -131,13 +131,13 @@
+       "Value": "0"
+     },
+     {
+-      "PowerHint": "CAMERA_STREAMING",
++      "PowerHint": "CAMERA_STREAMING_MID",
+       "Node": "PowerHALMainState",
+       "Duration": 0,
+-      "Value": "CAMERA_STREAMING"
++      "Value": "CAMERA_STREAMING_MID"
+     },
+     {
+-      "PowerHint": "CAMERA_STREAMING",
++      "PowerHint": "CAMERA_STREAMING_MID",
+       "Node": "CPULittleClusterMaxFreq",
+       "Duration": 0,
+       "Value": "1400000"
+@@ -173,28 +173,28 @@
+       "Value": "1400000"
+     },
+     {
+-      "PowerHint": "AUDIO_STREAMING",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 2000,
+-      "Value": "0"
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PowerHALAudioState",
++      "Duration": 0,
++      "Value": "AUDIO_STREAMING_LOW_LATENCY"
+     },
+     {
+-      "PowerHint": "AUDIO_STREAMING",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 2000,
+-      "Value": "1400000"
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 0,
++      "Value": "0"
+     },
+     {
+-      "PowerHint": "AUDIO_LOW_LATENCY",
+-      "Node": "PowerHALAudioState",
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMaxFreq",
+       "Duration": 0,
+-      "Value": "AUDIO_LOW_LATENCY"
++      "Value": "1400000"
+     },
+     {
+-      "PowerHint": "AUDIO_LOW_LATENCY",
+-      "Node": "PMQoSCpuDmaLatency",
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMinFreq",
+       "Duration": 0,
+-      "Value": "0"
++      "Value": "1400000"
+     }
+   ]
+ }
+diff --git a/imx8m/vp6820_8mn/powerhint_imx8mn.json~post_merge_android-11.0.0_2.0.0 b/imx8m/vp6820_8mn/powerhint_imx8mn.json~post_merge_android-11.0.0_2.0.0
+deleted file mode 100644
+index 56c3da5d..00000000
+--- a/imx8m/vp6820_8mn/powerhint_imx8mn.json~post_merge_android-11.0.0_2.0.0
++++ /dev/null
+@@ -1,200 +0,0 @@
+-{
+-  "Nodes": [
+-    {
+-      "Name": "CPULittleClusterMaxFreq",
+-      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+-      "Values": [
+-        "1500000",
+-        "1400000",
+-        "1200000"
+-      ],
+-      "DefaultIndex": 0,
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "CPULittleClusterMinFreq",
+-      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
+-      "Values": [
+-        "1500000",
+-        "1400000",
+-        "1200000"
+-      ],
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "TASchedtuneBoost",
+-      "Path": "/dev/stune/top-app/schedtune.boost",
+-      "Values": [
+-        "60",
+-        "10"
+-      ],
+-      "DefaultIndex": 1,
+-      "ResetOnInit": true
+-    },
+-    {
+-      "Name": "PMQoSCpuDmaLatency",
+-      "Path": "/dev/cpu_dma_latency",
+-      "Values": [
+-        "0",
+-        "3000"
+-      ],
+-      "DefaultIndex": 1,
+-      "HoldFd": true
+-    },
+-    {
+-      "Name": "PowerHALMainState",
+-      "Path": "vendor.powerhal.camera",
+-      "Values": [
+-        "CAMERA_STREAMING_MID",
+-        ""
+-      ],
+-      "Type": "Property"
+-    },
+-    {
+-      "Name": "PowerHALAudioState",
+-      "Path": "vendor.powerhal.audio",
+-      "Values": [
+-        "AUDIO_STREAMING_LOW_LATENCY",
+-        ""
+-      ],
+-      "Type": "Property"
+-    },
+-    {
+-      "Name": "PowerHALRenderingState",
+-      "Path": "vendor.powerhal.rendering",
+-      "Values": [
+-        "EXPENSIVE_RENDERING",
+-        ""
+-      ],
+-      "Type": "Property"
+-    }
+-  ],
+-  "Actions": [
+-    {
+-      "PowerHint": "SUSTAINED_PERFORMANCE",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1400000"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "TASchedtuneBoost",
+-      "Duration": 0,
+-      "Value": "60"
+-    },
+-    {
+-      "PowerHint": "INTERACTION",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 500,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "LAUNCH",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 5000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_LAUNCH",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 1000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "CAMERA_STREAMING_MID",
+-      "Node": "PowerHALMainState",
+-      "Duration": 0,
+-      "Value": "CAMERA_STREAMING_MID"
+-    },
+-    {
+-      "PowerHint": "CAMERA_STREAMING_MID",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1400000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 5000,
+-      "Value": "1500000"
+-    },
+-    {
+-      "PowerHint": "CAMERA_SHOT",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 1000,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "LOW_POWER",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1200000"
+-    },
+-    {
+-      "PowerHint": "LOW_POWER",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1400000"
+-    },
+-    {
+-      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
+-      "Node": "PowerHALAudioState",
+-      "Duration": 0,
+-      "Value": "AUDIO_STREAMING_LOW_LATENCY"
+-    },
+-    {
+-      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
+-      "Node": "PMQoSCpuDmaLatency",
+-      "Duration": 0,
+-      "Value": "0"
+-    },
+-    {
+-      "PowerHint": "FIXED_PERFORMANCE",
+-      "Node": "CPULittleClusterMaxFreq",
+-      "Duration": 0,
+-      "Value": "1400000"
+-    },
+-    {
+-      "PowerHint": "FIXED_PERFORMANCE",
+-      "Node": "CPULittleClusterMinFreq",
+-      "Duration": 0,
+-      "Value": "1400000"
+-    }
+-  ]
+-}

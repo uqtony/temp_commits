@@ -1,0 +1,109 @@
+e05893a Arthur Chen 2020-01-30
+
+AOS-63: SPI IDG: Add stress test tool source.
+
+    It's python script tool.
+    Usage: idg_st.py <target ip address> <test times count>
+    Once test with 2 commands FW version & query SN.
+
+Change-Id: Iaf27368b5111a92d70abd9add0bdd90a1534211c
+
+diff --git a/idg_stress_test/idg_st.py b/idg_stress_test/idg_st.py
+new file mode 100644
+index 0000000..0ef9cd1
+--- /dev/null
++++ b/idg_stress_test/idg_st.py
+@@ -0,0 +1,87 @@
++#!/usr/bin/python
++import socket, select, time, sys
++
++# check parameter is int or not
++def RepresentsInt(v):
++    try:
++        int(v)
++        return True
++    except ValueError:
++        return False
++
++if len(sys.argv) == 2:
++    if RepresentsInt(sys.argv[1]):
++        TARGET = '192.168.168.80'
++        times = int(sys.argv[1])
++    else:
++        TARGET = sys.argv[1]
++        times = 5
++elif len(sys.argv) == 3:
++    if RepresentsInt(sys.argv[1]):
++        TARGET = sys.argv[2]
++        times = int(sys.argv[1])
++    else:
++        TARGET = sys.argv[1]
++        times = int(sys.argv[2])
++else:
++    TARGET = '192.168.168.80'
++    times = 5
++
++# define
++PORTV2 = 1221
++PORTV5 = 1220
++IDGFWVersion = '29000000'
++FWVersion = 'VP6820 FW v1.00.001.0398.S'
++IDGSN = '12010000'
++SN = '938T148678\x00\x00\x00\x00\x00'
++BUF_SIZE = 2048
++timeout = 0.5
++
++# initial value
++success = 0.0
++missed = 0.0
++error = 0.0
++
++# initial socket
++clientV2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++clientV2.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
++clientV5 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
++clientV5.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
++
++# socket connect
++clientV2.connect((TARGET, PORTV2))
++time.sleep(0.05)
++clientV5.connect((TARGET, PORTV5))
++
++# start stress test
++for test in range(0, times):
++    clientV2.sendall(IDGFWVersion.encode())
++    ready = select.select([clientV2], [], [], timeout)
++    if ready[0]:
++        serverMessage = str(clientV2.recv(BUF_SIZE))
++	if serverMessage == FWVersion:
++            success += 1.0
++        else:
++            error += 1.0
++    else:
++        missed += 1.0
++    clientV2.sendall(IDGSN.encode())
++    ready = select.select([clientV2], [], [], timeout)
++    if ready[0]:
++        serverMessage = str(clientV2.recv(BUF_SIZE))
++	if serverMessage == SN:
++            success += 1.0
++        else:
++            error += 1.0
++    else:
++        missed += 1.0
++
++# socket disconnect
++clientV2.close()
++clientV5.close()
++
++# print result
++total = times*2.0
++print 'result: 
+	error rate: %.4f 
+	total: %.0f \
++
+	success: %.0f 
+	missed: %.0f
+	error: %.0f
+' \
++% (((missed + error)/total), total, success, missed, error)

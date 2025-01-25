@@ -1,0 +1,46 @@
+0165cd55e7 AndrewS 2020-09-04
+
+AOS-222: enable performance improve patch only when property ro.idt.hdmi_performance_improve set to 1
+
+Change-Id: Iddca8b362babcc116232710d1118e986e851c4d8
+
+diff --git a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+index ee86286e33..efb3f05b7e 100644
+--- a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
++++ b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+@@ -26,6 +26,7 @@
+ 
+ #include <utils/String8.h>
+ #include <log/log.h>
++#include <cutils/properties.h>
+ 
+ #include <hardware/hardware.h>
+ #include <gui/BufferItem.h>
+@@ -65,13 +66,22 @@ FramebufferSurface::FramebufferSurface(HWComposer& hwc, DisplayId displayId,
+         mPreviousBuffer() {
+     ALOGV("Creating for display %s", to_string(displayId).c_str());
+ 
++    // performance improve for HDMI display
++    bool hdmiPerformanceImprove = (property_get_int32("ro.idt.hdmi_performance_improve", int32_t(0)) == 1);
++
+     mName = "FramebufferSurface";
+     mConsumer->setConsumerName(mName);
+-    mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
+-                                       GRALLOC_USAGE_HW_RENDER |
+-                                       GRALLOC_USAGE_HW_COMPOSER |
+-                                       GRALLOC_USAGE_HW_TEXTURE |
+-                                       GRALLOC_USAGE_PRIVATE_0);
++    if (hdmiPerformanceImprove) {
++        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
++                                           GRALLOC_USAGE_HW_RENDER |
++                                           GRALLOC_USAGE_HW_COMPOSER |
++                                           GRALLOC_USAGE_HW_TEXTURE |
++                                           GRALLOC_USAGE_PRIVATE_0);
++    } else {
++        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
++                                           GRALLOC_USAGE_HW_RENDER |
++                                           GRALLOC_USAGE_HW_COMPOSER);
++    }
+     const auto& activeConfig = mHwc.getActiveConfig(displayId);
+     mConsumer->setDefaultBufferSize(activeConfig->getWidth(),
+             activeConfig->getHeight());

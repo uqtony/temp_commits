@@ -1,0 +1,75 @@
+66d83de max.yang 2020-05-20
+
+AOS-189: [Post Sign] Update auxiliary binary which helps for parsing HAB data
+
+  1. The binary is the output when we instruct "make" under the folder
+  2. This file is used to parse hab data and output signature/certificate and layout
+  3. Add support for HAB version which used by current cst tool in this package
+  4. Tend to use this binary directly instead of porting whole code into post sign tool
+
+Change-Id: I18fc6c4c616f97f3d43c956759b8177c1a4342cd
+
+diff --git a/release/code/hab_csf_parser/csf_parser b/release/code/hab_csf_parser/csf_parser
+new file mode 100755
+index 0000000..ab945c9
+Binary files /dev/null and b/release/code/hab_csf_parser/csf_parser differ
+diff --git a/release/code/hab_csf_parser/csf_parser.c b/release/code/hab_csf_parser/csf_parser.c
+index 08a9fec..d92c400 100644
+--- a/release/code/hab_csf_parser/csf_parser.c
++++ b/release/code/hab_csf_parser/csf_parser.c
+@@ -36,7 +36,8 @@ int parse_mac_sec(const uint8_t *csf_hdr, int csf_len, int offset)
+         validate(mac_sec_temp->tag == HAB_TAG_MAC, "tag");
+         validate((mac_sec_temp->version == HAB_VER_40 || \
+                   mac_sec_temp->version == HAB_VER_41 || \
+-                  mac_sec_temp->version == HAB_VER_42 ), "hab version");
++                  mac_sec_temp->version == HAB_VER_42 || \
++                  mac_sec_temp->version == HAB_VER_43), "hab version");
+         validate((offset + HAB_HDR_LEN(mac_sec_temp)) <= csf_len, "length OOB");
+         validate((HAB_HDR_LEN(mac_sec_temp) == (mac_sec_temp->nonce_bytes + \
+                                                 mac_sec_temp->mac_bytes + \
+@@ -113,7 +114,8 @@ int parse_sig_sec(const uint8_t *csf_hdr, int csf_len, int offset, int *sig_num)
+         validate(sig_sec_temp->tag == HAB_TAG_SIG, "tag");
+         validate((sig_sec_temp->version == HAB_VER_40 || \
+                   sig_sec_temp->version == HAB_VER_41 || \
+-                  sig_sec_temp->version == HAB_VER_42 ), "hab version");
++                  sig_sec_temp->version == HAB_VER_42 || \
++                  sig_sec_temp->version == HAB_VER_43), "hab version");
+         validate((offset + HAB_HDR_LEN(sig_sec_temp)) <= csf_len, "length OOB");
+ 
+         csf_sec_sig_t *sig_sec = malloc(HAB_HDR_LEN(sig_sec_temp));
+@@ -189,7 +191,8 @@ int parse_cert_sec(const uint8_t *csf_hdr, int csf_len, int offset)
+         validate(cert_sec->tag == HAB_TAG_CRT, "tag");
+         validate((cert_sec->version == HAB_VER_40 || \
+                   cert_sec->version == HAB_VER_41 || \
+-                  cert_sec->version == HAB_VER_42), "hab version");
++                  cert_sec->version == HAB_VER_42 || \
++                  cert_sec->version == HAB_VER_43), "hab version");
+         validate((offset + HAB_HDR_LEN(cert_sec)) <= csf_len, "length OOB");
+ 
+         fprintf(fp_output, "
+
+");
+@@ -1029,7 +1032,8 @@ int parse_csf_hdr(const uint8_t *csf_hdr, int csf_len, int offset)
+         validate(csf_header->tag == HAB_TAG_CSF, "tag");
+         validate((csf_header->version == HAB_VER_40 || \
+                   csf_header->version == HAB_VER_41 || \
+-                  csf_header->version == HAB_VER_42 ), "hab version");
++                  csf_header->version == HAB_VER_42 || \
++                  csf_header->version == HAB_VER_43), "hab version");
+         validate((offset + HAB_HDR_LEN(csf_header)) <= csf_len, "length OOB");
+ 
+         fprintf(fp_output, "
+
+");
+diff --git a/release/code/hab_csf_parser/csf_parser.h b/release/code/hab_csf_parser/csf_parser.h
+index 480812b..78d1d5c 100644
+--- a/release/code/hab_csf_parser/csf_parser.h
++++ b/release/code/hab_csf_parser/csf_parser.h
+@@ -93,6 +93,7 @@
+ #define HAB_VER_40      0x40 /* HAB 4.0: 0x40 */
+ #define HAB_VER_41      0x41 /* HAB 4.1: 0x41 */
+ #define HAB_VER_42      0x42 /* HAB 4.2: 0x42 */
++#define HAB_VER_43      0x43 /* HAB 4.3: 0x43 */
+ 
+ /************************
+         HAB engines

@@ -1,0 +1,825 @@
+74b2ef441 George.Huang 2020-02-13
+
+Merge tag 'android_9_idt_dev_200104' into HEAD
+
+android_9_idt_dev_vp6820_8mq-user-daily_4
+
+Change-Id: I66ffcffc075d0895a7f21fa0908fd910f35ced1c
+
+diff --cc core/Makefile
+index 0b3111025,f15100be8..03dc35ca7
+--- a/core/Makefile
++++ b/core/Makefile
+@@@ -2250,11 -1574,10 +2250,12 @@@ define build-systemimage-targe
+    @echo "Target system fs image: $(1)"
+    $(call create-system-vendor-symlink)
+    $(call create-system-product-symlink)
+ +  $(call create-system-product_services-symlink)
+ +  $(call check-apex-libs-absence-on-disk)
+    @mkdir -p $(dir $(1)) $(systemimage_intermediates) && rm -rf $(systemimage_intermediates)/system_image_info.txt
+ -  $(call generate-userimage-prop-dictionary, $(systemimage_intermediates)/system_image_info.txt, \
+ +  $(call generate-image-prop-dictionary, $(systemimage_intermediates)/system_image_info.txt,system, \
+        skip_fsck=true)
++   $(hide) echo "system_block_list=$(systemimage_intermediates)/system.map" >> $(systemimage_intermediates)/system_image_info.txt
+    $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+        build/make/tools/releasetools/build_image.py \
+        $(TARGET_OUT) $(systemimage_intermediates)/system_image_info.txt $(1) $(TARGET_OUT) \
+@@@ -2812,9 -2024,9 +2813,10 @@@ BUILT_VENDORIMAGE_TARGET := $(PRODUCT_O
+  define build-vendorimage-target
+    $(call pretty,"Target vendor fs image: $(INSTALLED_VENDORIMAGE_TARGET)")
+    @mkdir -p $(TARGET_OUT_VENDOR)
+ +  $(call create-vendor-odm-symlink)
+    @mkdir -p $(vendorimage_intermediates) && rm -rf $(vendorimage_intermediates)/vendor_image_info.txt
+ -  $(call generate-userimage-prop-dictionary, $(vendorimage_intermediates)/vendor_image_info.txt, skip_fsck=true)
+ +  $(call generate-image-prop-dictionary, $(vendorimage_intermediates)/vendor_image_info.txt,vendor,skip_fsck=true)
++   $(hide) echo "vendor_block_list=$(vendorimage_intermediates)/vendor.map" >> $(vendorimage_intermediates)/vendor_image_info.txt
+    $(if $(BOARD_VENDOR_KERNEL_MODULES), \
+      $(call build-image-kernel-modules,$(BOARD_VENDOR_KERNEL_MODULES),$(TARGET_OUT_VENDOR),vendor/,$(call intermediates-dir-for,PACKAGING,depmod_vendor)))
+    $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+@@@ -3808,47 -2546,35 +3810,49 @@@ ende
+  # Depending on the various images guarantees that the underlying
+  # directories are up-to-date.
+  $(BUILT_TARGET_FILES_PACKAGE): \
+ -		$(INSTALLED_BOOTIMAGE_TARGET) \
+ -		$(INSTALLED_RADIOIMAGE_TARGET) \
+ -		$(INSTALLED_RECOVERYIMAGE_TARGET) \
+ -		$(FULL_SYSTEMIMAGE_DEPS) \
+ -		$(INSTALLED_USERDATAIMAGE_TARGET) \
+ -		$(INSTALLED_CACHEIMAGE_TARGET) \
+ -		$(INSTALLED_VENDORIMAGE_TARGET) \
+ -		$(INSTALLED_PRODUCTIMAGE_TARGET) \
+ -		$(INSTALLED_VBMETAIMAGE_TARGET) \
+ -		$(INSTALLED_DTBOIMAGE_TARGET) \
+ -		$(INTERNAL_SYSTEMOTHERIMAGE_FILES) \
+ -		$(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+ -		$(INSTALLED_KERNEL_TARGET) \
+ -		$(INSTALLED_2NDBOOTLOADER_TARGET) \
+ -		$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_SYSTEM_BASE_FS_PATH) \
+ -		$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_VENDOR_BASE_FS_PATH) \
+ -		$(PRODUCTS.$(INTERNAL_PRODUCT).PRODUCT_PRODUCT_BASE_FS_PATH) \
+ -		$(SELINUX_FC) \
+ -		$(APKCERTS_FILE) \
+ -		$(SOONG_ZIP) \
+ -		$(HOST_OUT_EXECUTABLES)/fs_config \
+ -		$(HOST_OUT_EXECUTABLES)/imgdiff \
+ -		$(HOST_OUT_EXECUTABLES)/bsdiff \
+ -		$(BUILD_IMAGE_SRCS) \
+ -		$(BUILT_VENDOR_MANIFEST) \
+ -		$(BUILT_VENDOR_MATRIX) \
+ -		$(IMX_INSTALLED_VBMETAIMAGE_TARGET) \
+ -		$(INSTALLED_BPTIMAGE_TARGET) \
+ -		| $(ACP)
+ +	    $(INSTALLED_RAMDISK_TARGET) \
+ +	    $(INSTALLED_BOOTIMAGE_TARGET) \
+ +	    $(INSTALLED_RADIOIMAGE_TARGET) \
+ +	    $(INSTALLED_RECOVERYIMAGE_TARGET) \
+ +	    $(FULL_SYSTEMIMAGE_DEPS) \
+ +	    $(INSTALLED_USERDATAIMAGE_TARGET) \
+ +	    $(INSTALLED_CACHEIMAGE_TARGET) \
+ +	    $(INSTALLED_VENDORIMAGE_TARGET) \
+ +	    $(INSTALLED_PRODUCTIMAGE_TARGET) \
+ +	    $(INSTALLED_PRODUCT_SERVICESIMAGE_TARGET) \
+ +	    $(INSTALLED_VBMETAIMAGE_TARGET) \
+ +	    $(INSTALLED_ODMIMAGE_TARGET) \
+ +	    $(INSTALLED_DTBOIMAGE_TARGET) \
+ +	    $(INTERNAL_SYSTEMOTHERIMAGE_FILES) \
+ +	    $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+ +	    $(INSTALLED_KERNEL_TARGET) \
+ +	    $(INSTALLED_DTBIMAGE_TARGET) \
+ +	    $(INSTALLED_2NDBOOTLOADER_TARGET) \
+ +	    $(BOARD_PREBUILT_DTBOIMAGE) \
+ +	    $(BOARD_PREBUILT_RECOVERY_DTBOIMAGE) \
+ +	    $(BOARD_RECOVERY_ACPIO) \
+ +	    $(PRODUCT_SYSTEM_BASE_FS_PATH) \
+ +	    $(PRODUCT_VENDOR_BASE_FS_PATH) \
+ +	    $(PRODUCT_PRODUCT_BASE_FS_PATH) \
+ +	    $(PRODUCT_PRODUCT_SERVICES_BASE_FS_PATH) \
+ +	    $(PRODUCT_ODM_BASE_FS_PATH) \
+ +	    $(LPMAKE) \
+ +	    $(SELINUX_FC) \
+ +	    $(APKCERTS_FILE) \
+ +	    $(SOONG_APEX_KEYS_FILE) \
+ +	    $(SOONG_ZIP) \
+ +	    $(HOST_OUT_EXECUTABLES)/fs_config \
+ +	    $(HOST_OUT_EXECUTABLES)/imgdiff \
+ +	    $(HOST_OUT_EXECUTABLES)/bsdiff \
+ +	    $(HOST_OUT_EXECUTABLES)/care_map_generator \
+ +	    $(BUILD_IMAGE_SRCS) \
+ +	    $(BUILT_ASSEMBLED_FRAMEWORK_MANIFEST) \
+ +	    $(BUILT_ASSEMBLED_VENDOR_MANIFEST) \
+ +	    $(BUILT_SYSTEM_MATRIX) \
+ +	    $(BUILT_VENDOR_MATRIX) \
+++	    $(IMX_INSTALLED_VBMETAIMAGE_TARGET) \
+++	    $(INSTALLED_BPTIMAGE_TARGET) \
+ +	    | $(ACP)
+  	@echo "Package target files: $@"
+  	$(call create-system-vendor-symlink)
+  	$(call create-system-product-symlink)
+@@@ -4147,7 -2828,32 +4151,33 @@@ ifdef BOARD_AVB_DTBO_KEY_PAT
+  endif # BOARD_AVB_DTBO_KEY_PATH
+  endif # BOARD_AVB_ENABLE
+  endif # BOARD_PREBUILT_DTBOIMAGE
+ +	$(call dump-dynamic-partitions-info,$(zip_root)/META/misc_info.txt)
++ 
++ 	# IDtech added for image consistency
++ 	$(hide) mkdir -p $(zip_root)/IMAGES
++ 	# boot image
++ 	$(hide) cp $(INSTALLED_BOOTIMAGE_TARGET) $(zip_root)/IMAGES/
++ 	# vendor image and vendor.map
++ 	$(hide) cp $(INSTALLED_VENDORIMAGE_TARGET) $(zip_root)/IMAGES/
++ 	$(hide) cp $(vendorimage_intermediates)/vendor.map $(zip_root)/IMAGES/
++ 	# system image and system.map
++ 	$(hide) cp $(INSTALLED_SYSTEMIMAGE) $(zip_root)/IMAGES/
++ 	$(hide) cp $(systemimage_intermediates)/system.map $(zip_root)/IMAGES/
++ 	# IDtech specific dtbo/vbmeta image
++ 	cp $(PRODUCT_OUT)/dtbo.img $(zip_root)/IMAGES/
++ 	cp $(PRODUCT_OUT)/vbmeta.img $(zip_root)/IMAGES/
++ 	# partition table
++ 	cp $(BUILT_BPTIMAGE_TARGET) $(zip_root)/IMAGES/
++ 	cp $(BUILT_BPTJSON_TARGET) $(zip_root)/IMAGES/
++ 
++ 	# Copy IDtech's images and scripts
++ 	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
++ 	# Flashing script
++ 	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
++ 	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
++ 	# U-boot
++ 	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
++ 
+  	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+  	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+  	@# INSTALLED_RADIOIMAGE_TARGET.
+@@@ -4451,168 -3091,6 +4481,168 @@@ $(PROGUARD_DICT_ZIP) 
+  
+  endif # TARGET_BUILD_APPS
+  
+ +
+ +ifeq (true,$(PRODUCT_USE_DYNAMIC_PARTITIONS))
+ +
+ +# Dump variables used by build_super_image.py (for building super.img and super_empty.img).
+ +# $(1): output file
+ +define dump-super-image-info
+ +  $(call dump-dynamic-partitions-info,$(1))
+ +  $(if $(filter true,$(AB_OTA_UPDATER)), \
+ +    echo "ab_update=true" >> $(1))
+ +endef
+ +
+ +endif # PRODUCT_USE_DYNAMIC_PARTITIONS
+ +
+ +# -----------------------------------------------------------------
+ +# super partition image (dist)
+ +
+ +ifeq (true,$(PRODUCT_BUILD_SUPER_PARTITION))
+ +
+ +# BOARD_SUPER_PARTITION_SIZE must be defined to build super image.
+ +ifneq ($(BOARD_SUPER_PARTITION_SIZE),)
+ +
+ +ifneq (true,$(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS))
+ +
+ +# For real devices and for dist builds, build super image from target files to an intermediate directory.
+ +INTERNAL_SUPERIMAGE_DIST_TARGET := $(call intermediates-dir-for,PACKAGING,super.img)/super.img
+ +$(INTERNAL_SUPERIMAGE_DIST_TARGET): extracted_input_target_files := $(patsubst %.zip,%,$(BUILT_TARGET_FILES_PACKAGE))
+ +$(INTERNAL_SUPERIMAGE_DIST_TARGET): $(LPMAKE) $(BUILT_TARGET_FILES_PACKAGE) $(BUILD_SUPER_IMAGE)
+ +	$(call pretty,"Target super fs image from target files: $@")
+ +	PATH=$(dir $(LPMAKE)):$$PATH \
+ +	    $(BUILD_SUPER_IMAGE) -v $(extracted_input_target_files) $@
+ +
+ +# Skip packing it in dist package because it is in update package.
+ +ifneq (true,$(BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE))
+ +$(call dist-for-goals,dist_files,$(INTERNAL_SUPERIMAGE_DIST_TARGET))
+ +endif
+ +
+ +.PHONY: superimage_dist
+ +superimage_dist: $(INTERNAL_SUPERIMAGE_DIST_TARGET)
+ +
+ +endif # PRODUCT_RETROFIT_DYNAMIC_PARTITIONS != "true"
+ +endif # BOARD_SUPER_PARTITION_SIZE != ""
+ +endif # PRODUCT_BUILD_SUPER_PARTITION == "true"
+ +
+ +# -----------------------------------------------------------------
+ +# super partition image for development
+ +
+ +ifeq (true,$(PRODUCT_BUILD_SUPER_PARTITION))
+ +ifneq ($(BOARD_SUPER_PARTITION_SIZE),)
+ +ifneq (true,$(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS))
+ +
+ +# Build super.img by using $(INSTALLED_*IMAGE_TARGET) to $(1)
+ +# $(1): built image path
+ +# $(2): misc_info.txt path; its contents should match expectation of build_super_image.py
+ +define build-superimage-target
+ +  mkdir -p $(dir $(2))
+ +  rm -rf $(2)
+ +  $(call dump-super-image-info,$(2))
+ +  $(foreach p,$(BOARD_SUPER_PARTITION_PARTITION_LIST), \
+ +    echo "$(p)_image=$(INSTALLED_$(call to-upper,$(p))IMAGE_TARGET)" >> $(2);)
+ +  mkdir -p $(dir $(1))
+ +  PATH=$(dir $(LPMAKE)):$$PATH \
+ +    $(BUILD_SUPER_IMAGE) -v $(2) $(1)
+ +endef
+ +
+ +INSTALLED_SUPERIMAGE_TARGET := $(PRODUCT_OUT)/super.img
+ +INSTALLED_SUPERIMAGE_DEPENDENCIES := $(LPMAKE) $(BUILD_SUPER_IMAGE) \
+ +    $(foreach p, $(BOARD_SUPER_PARTITION_PARTITION_LIST), $(INSTALLED_$(call to-upper,$(p))IMAGE_TARGET))
+ +
+ +# If BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT is set, super.img is built from images in the
+ +# $(PRODUCT_OUT) directory, and is built to $(PRODUCT_OUT)/super.img. Also, it will
+ +# be built for non-dist builds. This is useful for devices that uses super.img directly, e.g.
+ +# virtual devices.
+ +ifeq (true,$(BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT))
+ +$(INSTALLED_SUPERIMAGE_TARGET): $(INSTALLED_SUPERIMAGE_DEPENDENCIES)
+ +	$(call pretty,"Target super fs image for debug: $@")
+ +	$(call build-superimage-target,$(INSTALLED_SUPERIMAGE_TARGET),\
+ +	  $(call intermediates-dir-for,PACKAGING,superimage_debug)/misc_info.txt)
+ +
+ +droidcore: $(INSTALLED_SUPERIMAGE_TARGET)
+ +
+ +# For devices that uses super image directly, the superimage target points to the file in $(PRODUCT_OUT).
+ +.PHONY: superimage
+ +superimage: $(INSTALLED_SUPERIMAGE_TARGET)
+ +endif # BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT
+ +
+ +# Build $(PRODUCT_OUT)/super.img without dependencies.
+ +.PHONY: superimage-nodeps supernod
+ +superimage-nodeps supernod: intermediates :=
+ +superimage-nodeps supernod: | $(INSTALLED_SUPERIMAGE_DEPENDENCIES)
+ +	$(call pretty,"make $(INSTALLED_SUPERIMAGE_TARGET): ignoring dependencies")
+ +	$(call build-superimage-target,$(INSTALLED_SUPERIMAGE_TARGET),\
+ +	  $(call intermediates-dir-for,PACKAGING,superimage-nodeps)/misc_info.txt)
+ +
+ +endif # PRODUCT_RETROFIT_DYNAMIC_PARTITIONS != "true"
+ +endif # BOARD_SUPER_PARTITION_SIZE != ""
+ +endif # PRODUCT_BUILD_SUPER_PARTITION == "true"
+ +
+ +# -----------------------------------------------------------------
+ +# super empty image
+ +
+ +ifeq (true,$(PRODUCT_USE_DYNAMIC_PARTITIONS))
+ +ifneq ($(BOARD_SUPER_PARTITION_SIZE),)
+ +
+ +INSTALLED_SUPERIMAGE_EMPTY_TARGET := $(PRODUCT_OUT)/super_empty.img
+ +$(INSTALLED_SUPERIMAGE_EMPTY_TARGET): intermediates := $(call intermediates-dir-for,PACKAGING,super_empty)
+ +$(INSTALLED_SUPERIMAGE_EMPTY_TARGET): $(LPMAKE) $(BUILD_SUPER_IMAGE)
+ +	$(call pretty,"Target empty super fs image: $@")
+ +	mkdir -p $(intermediates)
+ +	rm -rf $(intermediates)/misc_info.txt
+ +	$(call dump-super-image-info,$(intermediates)/misc_info.txt)
+ +	PATH=$(dir $(LPMAKE)):$$PATH \
+ +	    $(BUILD_SUPER_IMAGE) -v $(intermediates)/misc_info.txt $@
+ +
+ +$(call dist-for-goals,dist_files,$(INSTALLED_SUPERIMAGE_EMPTY_TARGET))
+ +
+ +endif # BOARD_SUPER_PARTITION_SIZE != ""
+ +endif # PRODUCT_USE_DYNAMIC_PARTITIONS == "true"
+ +
+ +
+ +# -----------------------------------------------------------------
+ +# The update package
+ +
+ +name := $(TARGET_PRODUCT)
+ +ifeq ($(TARGET_BUILD_TYPE),debug)
+ +  name := $(name)_debug
+ +endif
+ +name := $(name)-img-$(FILE_NAME_TAG)
+ +
+ +INTERNAL_UPDATE_PACKAGE_TARGET := $(PRODUCT_OUT)/$(name).zip
+ +
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET): $(BUILT_TARGET_FILES_PACKAGE) $(ZIP2ZIP)
+ +
+ +ifeq (true,$(BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE))
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET): $(INTERNAL_SUPERIMAGE_DIST_TARGET)
+ +	@echo "Package: $@"
+ +	# Filter out super_empty and images in BOARD_SUPER_PARTITION_PARTITION_LIST.
+ +	# Filter out system_other for launch DAP devices because it is in super image.
+ +	# Include OTA/super_*.img for retrofit devices and super.img for non-retrofit
+ +	# devices.
+ +	$(hide) $(ZIP2ZIP) -i $(BUILT_TARGET_FILES_PACKAGE) -o $@ \
+ +	  -x IMAGES/super_empty.img \
+ +	  $(foreach partition,$(BOARD_SUPER_PARTITION_PARTITION_LIST), \
+ +	    -x IMAGES/$(partition).img) \
+ +	  $(if $(filter system, $(BOARD_SUPER_PARTITION_PARTITION_LIST)), \
+ +	    $(if $(filter true, $(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS)),, \
+ +	      -x IMAGES/system_other.img)) \
+ +	  $(if $(filter true,$(PRODUCT_RETROFIT_DYNAMIC_PARTITIONS)), \
+ +	    $(foreach device,$(BOARD_SUPER_PARTITION_BLOCK_DEVICES), \
+ +	      OTA/super_$(device).img:super_$(device).img)) \
+ +	  OTA/android-info.txt:android-info.txt "IMAGES/*.img:."
+ +	$(if $(INTERNAL_SUPERIMAGE_DIST_TARGET), zip -q -j -u $@ $(INTERNAL_SUPERIMAGE_DIST_TARGET))
+ +else
+ +$(INTERNAL_UPDATE_PACKAGE_TARGET):
+ +	@echo "Package: $@"
+- 	$(hide) $(ZIP2ZIP) -i $(BUILT_TARGET_FILES_PACKAGE) -o $@ \
+- 	  OTA/android-info.txt:android-info.txt "IMAGES/*.img:."
+++	$(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+++	    ./build/tools/releasetools/img_from_target_files.py $(BUILT_TARGET_FILES_PACKAGE) $@
+ +endif # BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE
+ +
+ +.PHONY: updatepackage
+ +updatepackage: $(INTERNAL_UPDATE_PACKAGE_TARGET)
+ +
+ +
+  # -----------------------------------------------------------------
+  # dalvik something
+  .PHONY: dalvikfiles
+diff --cc target/product/base_system.mk
+index e3e3fbf7e,000000000..e4592f8ff
+mode 100644,000000..100644
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@@ -1,391 -1,0 +1,400 @@@
+ +#
+ +# Copyright (C) 2018 The Android Open Source Project
+ +#
+ +# Licensed under the Apache License, Version 2.0 (the "License");
+ +# you may not use this file except in compliance with the License.
+ +# You may obtain a copy of the License at
+ +#
+ +#      http://www.apache.org/licenses/LICENSE-2.0
+ +#
+ +# Unless required by applicable law or agreed to in writing, software
+ +# distributed under the License is distributed on an "AS IS" BASIS,
+ +# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ +# See the License for the specific language governing permissions and
+ +# limitations under the License.
+ +#
+ +
+++# install adbd if string TARGET_PRODUCT contains no secure
+++ifneq (secure,$(findstring secure, $(TARGET_PRODUCT)))
+++PRODUCT_PACKAGES += \
+++    adbd
+++endif
+++
+ +# Base modules and settings for the system partition.
+ +PRODUCT_PACKAGES += \
+ +    abb \
+-     adbd \
+ +    am \
+ +    android.hidl.allocator@1.0-service \
+ +    android.hidl.base-V1.0-java \
+ +    android.hidl.manager-V1.0-java \
+ +    android.hidl.memory@1.0-impl \
+ +    android.hidl.memory@1.0-impl.vendor \
+ +    android.system.suspend@1.0-service \
+ +    android.test.base \
+ +    android.test.mock \
+ +    android.test.runner \
+ +    apexd \
+ +    applypatch \
+ +    appops \
+ +    app_process \
+ +    appwidget \
+ +    ashmemd \
+ +    atrace \
+ +    audioserver \
+ +    BackupRestoreConfirmation \
+ +    bcc \
+ +    blank_screen \
+ +    blkid \
+ +    bmgr \
+ +    bootanimation \
+ +    bootstat \
+ +    bpfloader \
+ +    bu \
+ +    bugreport \
+ +    bugreportz \
+ +    cgroups.json \
+ +    charger \
+ +    cmd \
+ +    com.android.conscrypt \
+ +    com.android.location.provider \
+ +    com.android.media \
+ +    com.android.media.swcodec \
+ +    com.android.resolv \
+ +    com.android.tzdata \
+ +    ContactsProvider \
+ +    content \
+ +    crash_dump \
+ +    CtsShimPrebuilt \
+ +    CtsShimPrivPrebuilt \
+ +    debuggerd\
+ +    device_config \
+ +    dmctl \
+ +    dnsmasq \
+ +    DownloadProvider \
+ +    dpm \
+ +    dumpstate \
+ +    dumpsys \
+ +    DynamicSystemInstallationService \
+ +    e2fsck \
+ +    ExtServices \
+ +    ExtShared \
+ +    flags_health_check \
+ +    framework \
+ +    framework-res \
+ +    framework-sysconfig.xml \
+ +    fsck_msdos \
+ +    fs_config_files_system \
+ +    fs_config_dirs_system \
+ +    gsid \
+ +    gsi_tool \
+ +    heapprofd \
+ +    heapprofd_client \
+ +    gatekeeperd \
+ +    gpuservice \
+ +    hid \
+ +    hwservicemanager \
+ +    idmap \
+ +    idmap2 \
+ +    idmap2d \
+ +    ime \
+ +    ims-common \
+ +    incident \
+ +    incidentd \
+ +    incident_helper \
+ +    init.environ.rc \
+ +    init.rc \
+ +    init_system \
+ +    input \
+ +    installd \
+ +    iorapd \
+ +    ip \
+ +    ip6tables \
+ +    iptables \
+ +    ip-up-vpn \
+ +    javax.obex \
+ +    keystore \
+ +    ld.config.txt \
+ +    ld.mc \
+ +    libaaudio \
+ +    libamidi \
+ +    libandroid \
+ +    libandroidfw \
+ +    libandroid_runtime \
+ +    libandroid_servers \
+ +    libartpalette-system \
+ +    libashmemd_client \
+ +    libaudioeffect_jni \
+ +    libbinder \
+ +    libbinder_ndk \
+ +    libc.bootstrap \
+ +    libcamera2ndk \
+ +    libc_malloc_debug \
+ +    libc_malloc_hooks \
+ +    libcutils \
+ +    libdl.bootstrap \
+ +    libdrmframework \
+ +    libdrmframework_jni \
+ +    libEGL \
+ +    libETC1 \
+ +    libFFTEm \
+ +    libfilterfw \
+ +    libgatekeeper \
+ +    libGLESv1_CM \
+ +    libGLESv2 \
+ +    libGLESv3 \
+ +    libgui \
+ +    libhardware \
+ +    libhardware_legacy \
+ +    libinput \
+ +    libinputflinger \
+ +    libiprouteutil \
+ +    libjnigraphics \
+ +    libjpeg \
+ +    liblog \
+ +    libm.bootstrap \
+ +    libmdnssd \
+ +    libmedia \
+ +    libmedia_jni \
+ +    libmediandk \
+ +    libmtp \
+ +    libnetd_client \
+ +    libnetlink \
+ +    libnetutils \
+ +    libneuralnetworks \
+ +    libOpenMAXAL \
+ +    libOpenSLES \
+ +    libpdfium \
+ +    libpixelflinger \
+ +    libpower \
+ +    libpowermanager \
+ +    libradio_metadata \
+ +    librtp_jni \
+ +    libsensorservice \
+ +    libsfplugin_ccodec \
+ +    libskia \
+ +    libsonic \
+ +    libsonivox \
+ +    libsoundpool \
+ +    libspeexresampler \
+ +    libsqlite \
+ +    libstagefright \
+ +    libstagefright_amrnb_common \
+ +    libstagefright_enc_common \
+ +    libstagefright_foundation \
+ +    libstagefright_omx \
+ +    libstdc++ \
+ +    libsurfaceflinger \
+ +    libsysutils \
+ +    libui \
+ +    libusbhost \
+ +    libutils \
+ +    libvorbisidec \
+ +    libvulkan \
+ +    libwifi-service \
+ +    libwilhelm \
+ +    linker \
+ +    lmkd \
+ +    LocalTransport \
+ +    locksettings \
+ +    logcat \
+ +    logd \
+ +    lpdump \
+ +    lshal \
+ +    mdnsd \
+ +    media \
+ +    mediacodec.policy \
+ +    mediadrmserver \
+ +    mediaextractor \
+ +    mediametrics \
+ +    media_profiles_V1_0.dtd \
+ +    MediaProvider \
+ +    mediaserver \
+ +    mke2fs \
+ +    monkey \
+ +    mtpd \
+ +    ndc \
+ +    netd \
+ +    NetworkStack \
+ +    org.apache.http.legacy \
+ +    PackageInstaller \
+ +    perfetto \
+ +    PermissionController \
+ +    ping \
+ +    ping6 \
+ +    platform.xml \
+ +    pm \
+ +    pppd \
+ +    privapp-permissions-platform.xml \
+ +    racoon \
+ +    recovery-persist \
+ +    resize2fs \
+ +    rss_hwm_reset \
+ +    run-as \
+ +    schedtest \
+ +    screencap \
+ +    sdcard \
+ +    secdiscard \
+ +    SecureElement \
+ +    selinux_policy_system \
+ +    sensorservice \
+ +    service \
+ +    servicemanager \
+ +    services \
+ +    settings \
+ +    SettingsProvider \
+ +    sgdisk \
+ +    Shell \
+ +    shell_and_utilities_system \
+ +    sm \
+ +    statsd \
+ +    storaged \
+ +    surfaceflinger \
+ +    svc \
+ +    task_profiles.json \
+ +    tc \
+ +    telecom \
+ +    telephony-common \
+ +    tombstoned \
+ +    traced \
+ +    traced_probes \
+ +    tune2fs \
+ +    tzdatacheck \
+ +    uiautomator \
+ +    uncrypt \
+ +    usbd \
+ +    vdc \
+ +    viewcompiler \
+ +    voip-common \
+ +    vold \
+ +    WallpaperBackup \
+ +    watchdogd \
+ +    wificond \
+ +    wifi-service \
+ +    wm \
+ +
+ +# VINTF data for system image
+ +PRODUCT_PACKAGES += \
+ +    system_manifest.xml \
+ +    system_compatibility_matrix.xml \
+ +
+ +# Host tools to install
+ +PRODUCT_HOST_PACKAGES += \
+ +    BugReport \
+ +    adb \
+ +    art-tools \
+ +    atest \
+ +    bcc \
+ +    bit \
+ +    e2fsck \
+ +    fastboot \
+ +    flags_health_check \
+ +    icu-data_host_runtime_apex \
+ +    idmap2 \
+ +    incident_report \
+ +    ld.mc \
+ +    lpdump \
+ +    mdnsd \
+ +    minigzip \
+ +    mke2fs \
+ +    resize2fs \
+ +    sgdisk \
+ +    sqlite3 \
+ +    tinyplay \
+ +    tune2fs \
+ +    tzdatacheck \
+ +    unwind_info \
+ +    unwind_reg_info \
+ +    unwind_symbols \
+ +    viewcompiler \
+ +    tzdata_host \
+ +    tzdata_host_runtime_apex \
+ +    tzlookup.xml_host_runtime_apex \
+ +    tz_version_host \
+ +    tz_version_host_runtime_apex \
+ +
+ +ifeq ($(TARGET_CORE_JARS),)
+ +$(error TARGET_CORE_JARS is empty; cannot initialize PRODUCT_BOOT_JARS variable)
+ +endif
+ +
+ +# The order matters for runtime class lookup performance.
+ +PRODUCT_BOOT_JARS := \
+ +    $(TARGET_CORE_JARS) \
+ +    framework \
+ +    ext \
+ +    telephony-common \
+ +    voip-common \
+ +    ims-common \
+ +    updatable-media
+ +PRODUCT_UPDATABLE_BOOT_MODULES := conscrypt updatable-media
+ +PRODUCT_UPDATABLE_BOOT_LOCATIONS := \
+ +    /apex/com.android.conscrypt/javalib/conscrypt.jar \
+ +    /apex/com.android.media/javalib/updatable-media.jar
+ +
+- 
+++# copy usb rc files if string TARGET_PRODUCT contains no secure
+++ifneq (secure,$(findstring secure, $(TARGET_PRODUCT)))
+ +PRODUCT_COPY_FILES += \
+ +    system/core/rootdir/init.usb.rc:root/init.usb.rc \
+-     system/core/rootdir/init.usb.configfs.rc:root/init.usb.configfs.rc \
+++    system/core/rootdir/init.usb.configfs.rc:root/init.usb.configfs.rc
+++endif
+++
+++PRODUCT_COPY_FILES += \
+ +    system/core/rootdir/ueventd.rc:root/ueventd.rc \
+ +    system/core/rootdir/etc/hosts:system/etc/hosts
+ +
+ +# Add the compatibility library that is needed when android.test.base
+ +# is removed from the bootclasspath.
+ +ifeq ($(REMOVE_ATB_FROM_BCP),true)
+ +PRODUCT_PACKAGES += framework-atb-backward-compatibility
+ +PRODUCT_BOOT_JARS += framework-atb-backward-compatibility
+ +else
+ +PRODUCT_BOOT_JARS += android.test.base
+ +endif
+ +
+ +PRODUCT_COPY_FILES += system/core/rootdir/init.zygote32.rc:root/init.zygote32.rc
+ +PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.zygote=zygote32
+ +
+ +PRODUCT_SYSTEM_DEFAULT_PROPERTIES += debug.atrace.tags.enableflags=0
+ +
+ +# Packages included only for eng or userdebug builds, previously debug tagged
+ +PRODUCT_PACKAGES_DEBUG := \
+ +    adb_keys \
+ +    arping \
+ +    gdbserver \
+ +    init-debug.rc \
+ +    iotop \
+ +    iw \
+ +    logpersist.start \
+ +    logtagd.rc \
+ +    procrank \
+ +    showmap \
+ +    sqlite3 \
+ +    ss \
+ +    strace \
+ +    su \
+ +    sanitizer-status \
+ +    tracepath \
+ +    tracepath6 \
+ +    traceroute6 \
+ +    unwind_info \
+ +    unwind_reg_info \
+ +    unwind_symbols \
+ +
+ +# The set of packages whose code can be loaded by the system server.
+ +PRODUCT_SYSTEM_SERVER_APPS += \
+ +    SettingsProvider \
+ +    WallpaperBackup
+ +
+ +# Packages included only for eng/userdebug builds, when building with SANITIZE_TARGET=address
+ +PRODUCT_PACKAGES_DEBUG_ASAN := \
+ +    fuzz \
+ +    honggfuzz
+ +
+ +PRODUCT_COPY_FILES += $(call add-to-product-copy-files-if-exists,\
+ +    frameworks/base/config/preloaded-classes:system/etc/preloaded-classes)
+ +
+ +# Note: it is acceptable to not have a dirty-image-objects file. In that case, the special bin
+ +#       for known dirty objects in the image will be empty.
+ +PRODUCT_COPY_FILES += $(call add-to-product-copy-files-if-exists,\
+ +    frameworks/base/config/dirty-image-objects:system/etc/dirty-image-objects)
+ +
+ +$(call inherit-product, $(SRC_TARGET_DIR)/product/runtime_libart.mk)
+diff --cc tools/releasetools/add_img_to_target_files.py
+index f2b9afa65,5dd95b493..8a48df29b
+--- a/tools/releasetools/add_img_to_target_files.py
++++ b/tools/releasetools/add_img_to_target_files.py
+@@@ -480,8 -427,12 +480,12 @@@ def AddPartitionTable(output_zip)
+    img = OutputFile(
+        output_zip, OPTIONS.input_tmp, "IMAGES", "partition-table.img")
+    bpt = OutputFile(
+ -      output_zip, OPTIONS.input_tmp, "IMAGES", "partition-table.bpt")
+ +      output_zip, OPTIONS.input_tmp, "META", "partition-table.bpt")
+  
++   if os.path.exists(img.input_name) and os.path.exists(bpt.input_name):
++    print("partition-table already exists; not rebuilding...")
++    return img.input_name
++ 
+    # use BPTTOOL from environ, or "bpttool" if empty or not set.
+    bpttool = os.getenv("BPTTOOL") or "bpttool"
+    cmd = [bpttool, "make_table", "--output_json", bpt.name,
+diff --cc tools/releasetools/build_image.py
+index 4136ed432,3b7b9fc1d..1bb4c76d4
+--- a/tools/releasetools/build_image.py
++++ b/tools/releasetools/build_image.py
+@@@ -563,7 -747,7 +563,8 @@@ def ImagePropFromGlobalDict(glob_dict, 
+      copy_prop("system_extfs_inode_count", "extfs_inode_count")
+      if not copy_prop("system_extfs_rsv_pct", "extfs_rsv_pct"):
+        d["extfs_rsv_pct"] = "0"
+ +    copy_prop("system_reserved_size", "partition_reserved_size")
++     copy_prop("system_block_list", "block_list")
+    elif mount_point == "system_other":
+      # We inherit the selinux policies of /system since we contain some of its
+      # files.
+@@@ -617,7 -800,7 +618,8 @@@
+      copy_prop("vendor_extfs_inode_count", "extfs_inode_count")
+      if not copy_prop("vendor_extfs_rsv_pct", "extfs_rsv_pct"):
+        d["extfs_rsv_pct"] = "0"
+ +    copy_prop("vendor_reserved_size", "partition_reserved_size")
++     copy_prop("vendor_block_list", "block_list")
+    elif mount_point == "product":
+      copy_prop("avb_product_hashtree_enable", "avb_hashtree_enable")
+      copy_prop("avb_product_add_hashtree_footer_args",
+diff --cc tools/releasetools/sign_target_files_apks.py
+index 1b3d6f109,9076256c8..0bfb551fe
+--- a/tools/releasetools/sign_target_files_apks.py
++++ b/tools/releasetools/sign_target_files_apks.py
+@@@ -395,29 -248,24 +395,34 @@@ def ProcessTargetFiles(input_tf_zip, ou
+    system_root_image = misc_info.get("system_root_image") == "true"
+  
+    for info in input_tf_zip.infolist():
+ -    if info.filename.startswith("IMAGES/") \
+ -      and not (info.filename.startswith("IMAGES/board_info") \
+ -               or info.filename.startswith("IMAGES/partition-table") \
+ -               or info.filename.endswith(".sh") \
+ -               or info.filename.endswith(".bat") \
+ -               or info.filename.endswith(".imx")):
+ +    filename = info.filename
+-     if filename.startswith("IMAGES/"):
+++    if filename.startswith("IMAGES/") \
+++      and not (filename.startswith("IMAGES/board_info") \
+++               or filename.startswith("IMAGES/partition-table") \
+++               or filename.endswith(".sh") \
+++               or filename.endswith(".bat") \
+++               or filename.endswith(".imx")):
+ +      continue
+ +
+ +    # Skip split super images, which will be re-generated during signing.
+ +    if filename.startswith("OTA/") and filename.endswith(".img"):
+        continue
+  
+ -    data = input_tf_zip.read(info.filename)
+ +    data = input_tf_zip.read(filename)
+      out_info = copy.copy(info)
+ +    (is_apk, is_compressed, should_be_skipped) = GetApkFileInfo(
+ +        filename, compressed_extension, OPTIONS.skip_apks_with_path_prefix)
+ +
+ +    if is_apk and should_be_skipped:
+ +      # Copy skipped APKs verbatim.
+ +      print(
+ +          "NOT signing: %s
+"
+ +          "        (skipped due to matching prefix)" % (filename,))
+ +      common.ZipWriteStr(output_tf_zip, out_info, data)
+  
+      # Sign APKs.
+ -    if (info.filename.endswith(".apk") or
+ -        (compressed_apk_extension and
+ -         info.filename.endswith(compressed_apk_extension))):
+ -      is_compressed = (compressed_extension and
+ -                       info.filename.endswith(compressed_apk_extension))
+ -      name = os.path.basename(info.filename)
+ +    elif is_apk:
+ +      name = os.path.basename(filename)
+        if is_compressed:
+          name = name[:-len(compressed_extension)]
+  

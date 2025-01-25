@@ -1,0 +1,25 @@
+22bb2b8d Arthur Chen 2020-01-02
+
+AOS-52: DTBO: Change the dtb query list source.
+
+    To avoid the cause of dtbo magic broken by mismatched between
+    dts list items and target dtb objects about multiple dtbs in
+    dtbo image creation.
+
+Change-Id: I5908e757ee0e3994e55f47603979bf7d00b6e25b
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index fe456ebd..a63f70cd 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -54,8 +54,8 @@ endef
+ $(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(DTS_SRC) | $(MKDTIMG) $(AVBTOOL)
+ 	$(hide) echo "Building $(KERNEL_ARCH) dtbo ..."
+ 	$(call clean_cfg, $(TARGET_MTDTBOIMAGE_CONFIG_PATH)); \
+-	for dtsplat in $(TARGET_BOARD_DTS_CONFIG); do \
+-		DTB_NAME=`echo $$dtsplat | cut -d':' -f2`; \
++	for dtsplat in $(shell ls $(TARGET_MTDTBOIMAGE_CONFIG_PATH)| grep "idt_"); do \
++		DTB_NAME=`echo $$dtsplat`; \
+ 		DTB=`echo $(PRODUCT_OUT)/obj/KERNEL_OBJ/arch/$(TARGET_KERNEL_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/$${DTB_NAME}`; \
+ 		echo $$DTB >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \
+ 		echo "" >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \

@@ -1,0 +1,28 @@
+216b6afe George.Huang 2022-04-08
+
+AOS-925: set TARGET_IMX_KERNEL as true by default to avoid using Google prebuilt boot.img
+
+Symptom: can't boot completely with
+  android_12_idt_dev_220324-redwood_8mq-userdebug-rom.zip
+
+Root Cause: make dist will use wrong boot.img when BOARD_PREBUILT_BOOTIMAGE is set
+  BOARD_PREBUILT_BOOTIMAGE := vendor/nxp/fsl-proprietary/gki/boot.img
+
+Solution: set TARGET_IMX_KERNEL ?= true by default to
+  not to use BOARD_PREBUILT_BOOTIMAGE
+
+Change-Id: Id7c88b56637715df298259d639c927d9671664db
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 59799bf1..45d22b9d 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -85,7 +85,7 @@ PRODUCT_COPY_FILES += \
+ 
+ TARGET_BOARD_KERNEL_HEADERS := $(CONFIG_REPO_PATH)/common/kernel-headers
+ 
+-TARGET_IMX_KERNEL ?= false
++TARGET_IMX_KERNEL ?= true
+ ifeq ($(TARGET_IMX_KERNEL),false)
+ # boot-debug.img is built by IMX, with Google released kernel Image
+ # boot.img is released by Google

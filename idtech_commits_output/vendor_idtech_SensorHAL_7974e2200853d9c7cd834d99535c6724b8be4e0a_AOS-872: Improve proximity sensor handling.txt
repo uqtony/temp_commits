@@ -1,0 +1,86 @@
+7974e22 tonyshih 2022-03-02
+
+AOS-872: Improve proximity sensor handling
+
+1. Add vcnl4200 proximity data map from counts to distance.
+2. Add conversion based on data map.
+
+Change-Id: Ic587e9232c8956de6fd521d63c4f78b7c077ec71
+
+diff --git a/ProximitySensor.cpp b/ProximitySensor.cpp
+index 834a7e7..f9b7574 100644
+--- a/ProximitySensor.cpp
++++ b/ProximitySensor.cpp
+@@ -31,6 +31,29 @@
+ 
+ #include "ProximitySensor.h"
+ 
++static float proximityDataToDistance(float data) {
++	if (ARRAY_SIZE(proximity_distance_from_data) <= 0)
++		return data;
++	int lastIndex = ARRAY_SIZE(proximity_distance_from_data) - 1;
++	for (int index = 0; index <= lastIndex; ) {
++		int median = (index + lastIndex) / 2;
++		if (data < proximity_distance_from_data[median][1]) {
++			index = median + 1;
++			if (index >= lastIndex) {
++				return proximity_distance_from_data[lastIndex][0] +
++					((data < proximity_distance_from_data[lastIndex][1])? 1: 0);
++			}
++		}
++		else {
++			lastIndex = median;
++			if (index >= lastIndex) {
++				return proximity_distance_from_data[index][0];
++			}
++		}
++	}
++	return data;
++}
++
+ ProximitySensor::ProximitySensor() :
+ 	SensorBase(NULL, SENSOR_DATANAME_PROXIMITY),
+ 	mEnabled(false),
+@@ -168,7 +191,7 @@ int ProximitySensor::readEvents(sensors_event_t* data, int count)
+ 			float value = (float) event->value;
+ #if SENSORS_PROXIMITY_ENABLE == 1
+ 			if (event->code == MSC_SERIAL) {
+-				mPendingEvents[Proximity].distance = value;
++				mPendingEvents[Proximity].distance = proximityDataToDistance(value);
+ 				mPendingEvents[Proximity].timestamp = timevalToNano(event->time);
+ 				*data++ = mPendingEvents[Proximity];
+ 				count--;
+diff --git a/conf/conf_VCNL4200.h b/conf/conf_VCNL4200.h
+index f829541..3ddb297 100644
+--- a/conf/conf_VCNL4200.h
++++ b/conf/conf_VCNL4200.h
+@@ -33,4 +33,29 @@
+ #define PROXIMITY_LIGHT_MIN_ODR		2		// Set Min value of ODR [Hz]
+ #define PROXIMITY_LIGHT_POWER_CONSUMPTION 	0.016f	// Set sensor's power consumption [mA]
+ 
++static const float proximity_distance_from_data[][2] = {
++	{1, 60000}, {2, 50000}, {3, 36000}, {4, 26000}, {5, 18000}, {6, 14000},
++	{7, 10000}, {8, 8000}, {9, 6000},
++	{10, 5000}, {11, 4500}, {12, 3650}, {13, 3100}, {14, 2700}, {15, 2450},
++	{16, 2100}, {17, 2000}, {18, 1820}, {19, 1600}, // 10cm ~ 19cm
++	{20, 1470}, {21, 1330}, {22, 1200}, {23, 1100}, {24, 1030}, {25, 950},
++	{26, 870}, {27, 810}, {28, 750}, {29, 700}, // 20cm ~ 29cm
++	{30, 660}, {31, 615}, {32, 580}, {33, 540}, {34, 500}, {35, 470},
++	{36, 450}, {37, 420}, {38, 400}, {39, 370}, // 30cm ~ 39cm
++	{40, 360}, {41, 330}, {42, 310}, {43, 280}, {44, 275}, {45, 270},
++	{46, 240}, {47, 235}, {48, 230}, {49, 220}, // 40cm ~ 49cm
++	{50, 210}, {51, 202}, {52, 195}, {53, 188}, {54, 180}, {55, 170},
++	{56, 160}, {57, 154}, {58, 147}, {59, 142}, // 50cm ~ 59cm
++	{60, 138}, {61, 132}, {62, 127}, {63, 122}, {64, 118}, {65, 113},
++	{66, 109}, {67, 104}, {68, 100}, {69, 95}, // 60cm ~ 69cm
++	{70, 90}, {71, 89}, {72, 88}, {73, 84}, {74, 80}, {75, 76}, {76, 72},
++	{77, 71}, {78, 70}, {79, 68}, // 70cm ~ 79cm
++	{80, 67}, {81, 66}, {82, 65}, {83, 63}, {84, 61}, {85, 59}, {86, 58},
++	{88, 57}, {89, 56}, // 80cm ~ 89cm
++	{91, 55}, {92, 54}, {93, 53}, {94, 52}, {95, 51}, {96, 50}, {98, 49},
++	{99, 48}, // 90cm ~ 99cm
++	{101, 47}, {103, 46}, {109, 45},  // 100cm ~ 109cm
++	{110, 44} // 110cm
++};
++
+ #endif /* CONFIGURATION_SENSOR_VCNL4200_H */

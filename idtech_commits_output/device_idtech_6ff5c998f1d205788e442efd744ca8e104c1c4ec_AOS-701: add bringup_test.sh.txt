@@ -1,0 +1,615 @@
+6ff5c998 George.Huang 2021-09-16
+
+AOS-701: add bringup_test.sh
+
+this script can be used for below 2 or more conditions
+1. during bringup to test component works or not
+2. EMI/ESD test, to test component for 1 or many or 0 infinite times
+
+set auto start when boot complete
+1. setup start bringup_test service when property:sys.boot_completed=1
+
+start by adb shell
+1. adb root
+2. adb shell setprop idt.repeat_times 1, 5, ... 0(infinite)
+2. adb shell start/stop check_sdcard, check_idg_nfc, ...etc
+
+BTW, copy rc file to /producy/etc/init where will be import by init daemon automatically
+https://android.googlesource.com/platform/system/core/+/master/init/README.md#imports
+
+Change-Id: Ie6925a62ed6ddd6852c9df27d5a2d27be65dc239
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+new file mode 100644
+index 00000000..8f86bb4f
+--- /dev/null
++++ b/imx8m/bringup_test.sh
+@@ -0,0 +1,418 @@
++#!/system/bin/sh
++
++LOG_TAG="bringup_test"
++LOG_PATH="/data/local/tmp/${LOG_TAG}.log"
++
++logi() {
++#  echo "I $LOG_TAG: $1" >> ${LOG_PATH}
++  echo "$1" |sed "s|^|I ${LOG_TAG}: |g" >> ${LOG_PATH}
++}
++
++loge() {
++#  echo "E $LOG_TAG: $1" >> ${LOG_PATH}
++  echo "$1" |sed "s|^|E ${LOG_TAG}: |g" >> ${LOG_PATH}
++}
++
++check_modem() {
++  logi "== check_modem: lsusb |grep -q 'ID OOOO:XXXX'"
++  idx=0
++  idx_limit=3
++  # vendor: Quectel Wireless Solutions Co., Ltd.
++  vendor_id="2c7c"
++  # product:   EG95   EC25   LTE modem
++  product_id=("0195" "0125")
++  product_num=${#product_id[@]}
++
++  while [ $idx -lt $idx_limit ]; do
++    idx=$((idx + 1))
++    ret=1
++    for i in $(seq 0 $((product_num - 1))); do
++      eval "lsusb |grep -q 'ID ${vendor_id}:${product_id[i]}$'"
++      ret=$((ret & $?))
++    done
++    if [ $ret -eq 0 ]; then
++      setprop ro.radio.noril no
++      logi "modem is found"
++      break
++    else
++      sleep 1
++    fi
++  done
++  if [ $ret -ne 0 ]; then
++    setprop ro.radio.noril yes || true
++    loge "modem not found"
++  fi
++  logi ""
++}
++
++check_uart() {
++# uart1: /dev/ttymxc0, /sys/class/tty/ttymxc0
++# uart3: /dev/ttymxc2, /sys/class/tty/ttymxc2
++# uart2: /dev/ttymxc1, /sys/class/tty/ttymxc1 for BT
++  uart_node="/dev/ttymxc"
++  logi "== check_uart: ${uart_node}[0-2]"
++  for ii in $(seq 0 2); do
++    test_node="${uart_node}${ii}"
++    [ -e "${test_node}" ] &&
++    logi "${test_node} is found" ||
++    loge "${test_node} not found"
++  done
++  logi ""
++}
++
++check_pcie() {
++# /sys/bus/pci_express/devices/*
++  pcie_node="/sys/bus/pci_express/devices/"
++  logi "== check_pcie: ${pcie_node}X"
++  logi "`ls -1d ${pcie_node}*`"
++  pcie_num=`ls -1d ${pcie_node}* |wc -l`
++  [ $pcie_num -ge 1 ] &&
++  logi "${pcie_num} pcie devices are found" ||
++  loge "${pcie_num} pcie devices are found"
++  logi ""
++
++# /sys/firmware/devicetree/base/soc@0/pcie@33800000
++# /sys/firmware/devicetree/base/soc@0/pcie@33c00000
++#  pcie_node="/sys/firmware/devicetree/base/soc@0/pcie@"
++#  pcie_id=("33800000" "33c00000")
++#  pcie_num=${#pcie_id[@]}
++#  logi "== check_pcie: ${pcie_node}OOXX"
++#  for ii in $(seq 0 $((pcie_num - 1))); do
++#    test_node="${pcie_node}${pcie_id[ii]}"
++#    [ -e "${test_node}" ] &&
++#    logi "${test_node} is found" ||
++#    loge "${test_node} not found"
++#  done
++}
++
++check_i2c() {
++# i2cdetect -y 0-2
++  logi "== check_i2c: i2cdetect -y [0-2]"
++  for ii in $(seq 0 2); do
++    [ ${ii} -eq 0 ] && logi "= check_i2c${ii}: usb_hub(NN) / touch(--)"
++    [ ${ii} -eq 1 ] && logi "= check_i2c${ii}: lcd(UU) / display(--) / camera(--)"
++    [ ${ii} -eq 2 ] && logi "= check_i2c${ii}: audio(UU) / optical(UU) / pcm_microphone(NN) / pcie_osc(NN)"
++    dev_all_num=`i2cdetect -y ${ii} 2>&1 |sed "s|^.*: ||g" |grep -oe "[0-9A-Z][0-9A-Z]" |wc -l`
++    dev_used_num=`i2cdetect -y ${ii} 2>&1 |sed "s|^.*: ||g" |grep -oe "UU" |wc -l`
++    logi "i2c${ii} has ${dev_used_num} / ${dev_all_num} devices in use"
++    for dev_path in `ls -d /sys/bus/i2c/devices/${ii}-*`; do
++      dev_name=`cat ${dev_path}/name`
++      dev_addr=`basename ${dev_path} |cut -d'-' -f2`
++      dev_status=`i2cget -f -y $ii 0x${dev_addr} 0x00 2>&1`
++      logi "${dev_path}: ${dev_name}: ${dev_status}"
++    done
++    logi "`i2cdetect -y ${ii}`"
++  done
++  logi ""
++}
++
++check_usb() {
++# /sys/bus/usb/devices/*/manufacturer
++  logi "== check_usb: cat /sys/bus/usb/devices/XX/manufacturer"
++  for dev_path in `ls /sys/bus/usb/devices/*/manufacturer`; do
++    dev_vendor=`cat ${dev_path}`
++    logi "${dev_path}: ${dev_vendor}"
++  done
++  logi ""
++}
++
++check_bringup() {
++  logi "==== START ===="
++  check_modem
++  check_uart
++  check_pcie
++  check_spi
++  check_usb
++  check_i2c
++  logi "====  END  ===="
++}
++
++check_sdcard() {
++  logi "== check_sdcard"
++  # 3GB
++  sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6)
++  if [ -z "$sdcard_path" ]; then
++    # sleep 10 seconds and try again if sdcard not exist
++    logi "sdcard not found(df /mnt/media_rw/* | grep vold/public | cut -F6)"
++    sleep 10
++  else
++    logi "sdcard writing..."
++    dd if=/dev/urandom of=$sdcard_path/urandom.img bs=1024 count=3000000
++    ret=$?
++    if [ "$ret" = "0" ]; then
++      logi "sdcard writing... finish"
++    else
++      logi "sdcard writing... abort"
++    fi
++  fi
++}
++
++check_idg_version() {
++  logi "== check idg version"
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++}
++
++check_idg_nfc() {
++  logi "== check idg nfc"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C0200020A00" # NFC card polling, 0A is for 10 seconds timeout
++  logi "`idg_console_tool 2 2C0200020A00`"
++  logi ""
++  logi "idg_console_tool 2 2801000100" # NFC power off
++  logi "`idg_console_tool 2 2801000100`"
++  logi ""
++  logi "idg_console_tool 2 2C01000100" # disable passthrough mode
++  logi "`idg_console_tool 2 2C01000100`"
++  logi ""
++  sleep 10
++}
++
++#sample log of SAM1
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 01 00 01 01 1D 19
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 12 00 01 21 B9 00
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 13 3B 5F 95 00 80 73 00 01 00 59 43 4C 5A C5 06 12 60 90 00 9E 7E
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 18 00 01 21 D1 AB
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 01 00 01 00 0D 38
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++check_idg_sam1() {
++  logi "== check idg sam1"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C12000121" # sam1 get ATR
++  logi "`idg_console_tool 2 2C12000121`"
++  logi ""
++  logi "idg_console_tool 2 2C18000121" # sam1 transaction power off
++  logi "`idg_console_tool 2 2C18000121`"
++  logi ""
++  logi "idg_console_tool 2 2C01000100" # disable passthrough mode
++  logi "`idg_console_tool 2 2C01000100`"
++  logi ""
++}
++
++#sample log of SAM2
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 01 00 01 01 1D 19
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 12 00 01 22 89 63
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 13 3B 5F 95 00 80 73 00 01 00 59 43 4C 5A C5 06 12 60 90 00 9E 7E
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 18 00 01 22 E1 C8
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 01 00 01 00 0D 38
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++check_idg_sam2() {
++  logi "== check idg sam2"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C12000122" # sam2 get ATR
++  logi "`idg_console_tool 2 2C12000122`"
++  logi ""
++  logi "idg_console_tool 2 2C18000122" # sam2 transaction power off
++  logi "`idg_console_tool 2 2C18000122`"
++  logi ""
++  logi "idg_console_tool 2 2C01000100" # disable passthrough mode
++  logi "`idg_console_tool 2 2C01000100`"
++  logi ""
++}
++
++check_idg_sam3() {
++  logi "== check idg sam3"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C12000123" # sam3 get ATR
++  logi "`idg_console_tool 2 2C12000123`"
++  logi ""
++  logi "idg_console_tool 2 2C18000123" # sam3 transaction power off
++  logi "`idg_console_tool 2 2C18000123`"
++  logi ""
++  logi "idg_console_tool 2 2C01000100" # disable passthrough mode
++  logi "`idg_console_tool 2 2C01000100`"
++  logi ""
++}
++
++check_idg_sam4() {
++  logi "== check idg sam4"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C12000124" # sam4 get ATR
++  logi "`idg_console_tool 2 2C12000124`"
++  logi ""
++  logi "idg_console_tool 2 2C18000124" # sam4 transaction power off
++  logi "`idg_console_tool 2 2C18000124`"
++  logi ""
++  logi "idg_console_tool 2 2C01000100" # disable passthrough mode
++  logi "`idg_console_tool 2 2C01000100`"
++  logi ""
++}
++
++#sample log of MSR
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 20 00 00 9A 5D
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 02 83 3F 93 DB
++check_idg_msr() {
++  logi "== check idg msr"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C200000" # MSR no need enable passthrough mode
++  logi "`idg_console_tool 2 2C200000`"
++  logi ""
++}
++
++#sample log of ICC
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 01 00 01 01 1D 19
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 00 1C 9B
++#[TX] - 56 69 56 4F 74 65 63 68 32 00 2C 12 00 01 20 A9 21
++#[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 17 3B EE 00 00 81 31 80 42 80 31 80 66 B0 84 0C 01 6E 01 83 00 90 00 8E 75 55
++check_idg_icc() {
++  logi "== check idg icc"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 2C01000101" # enable passthrough mode
++  logi "`idg_console_tool 2 2C01000101`"
++  logi ""
++  logi "idg_console_tool 2 2C12000120" # ICC
++  logi "`idg_console_tool 2 2C12000120`"
++  logi ""
++}
++
++# no output for this command, but you will see printer rolling a little bit
++check_idg_printer() {
++  logi "== check idg printer"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 9007000100"
++  logi "`idg_console_tool 2 9007000100`"
++  logi ""
++  logi "idg_console_tool 2 901300021069"
++  logi "`idg_console_tool 2 901300021069`"
++  logi ""
++  logi "idg_console_tool 2 901300021080"
++  logi "`idg_console_tool 2 901300021080`"
++  logi ""
++  logi "idg_console_tool 2 901300021000"
++  logi "`idg_console_tool 2 901300021000`"
++  logi ""
++}
++
++# simulate power key pressed, can be used to turn off screen
++check_power_key() {
++  logi "== check power key"
++  logi ""
++  logi "input keyevent 26"
++  logi "`input keyevent 26`"
++  logi ""
++  sleep 1
++}
++
++# start payment transaction of contactless, contact, MSR
++check_idg_transaction_CL_CT_MSR() {
++  logi "== check transaction of contactless, contact, MSR"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 024000190A9C01009F0206000000002000DFEF370107DFEF3C03010100" # start transaction, timeout 0A(10) seconds
++  logi "`idg_console_tool 2 024000190A9C01009F0206000000002000DFEF370107DFEF3C03010100`"
++  logi ""
++  sleep 10
++}
++
++# start payment transaction of contactless
++check_idg_transaction_CL() {
++  logi "== check transaction of contactless"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 024000120A9C01009F0206000000002000DFEF370102" # start transaction, timeout 0A(10) seconds
++  logi "`idg_console_tool 2 024000120A9C01009F0206000000002000DFEF370102`"
++  logi ""
++}
++
++# start payment transaction of contactless, contact, MSR
++check_idg_transaction_MSR() {
++  logi "== check transaction of contactless, contact, MSR"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 024000120A9C01009F0206000000002000DFEF370101" # start transaction, timeout 0A(10) seconds
++  logi "`idg_console_tool 2 024000120A9C01009F0206000000002000DFEF370101`"
++  logi ""
++}
++
++# start payment transaction of contactless, contact, MSR
++check_idg_transaction_CT() {
++  logi "== check transaction of contactless, contact, MSR"
++  logi ""
++  logi "idg_console_tool 2 29000000" # get version
++  logi "`idg_console_tool 2 29000000`"
++  logi ""
++  logi "idg_console_tool 2 024000190A9C01009F0206000000002000DFEF370104DFEF3C03010100" # start transaction, timeout 0A(10) seconds
++  logi "`idg_console_tool 2 024000190A9C01009F0206000000002000DFEF370104DFEF3C03010100`"
++  logi ""
++}
++
++#####################################################
++#                       main                        #
++#####################################################
++# 1st argv: must have, the function to execute
++# property "idt.repeat_times" opional, function repeat times. 0 for infinite. 1 time if not set
++if [ "$(type $1)" != "$1 is a function" ];then
++  echo "$1 not support"
++  exit 1
++fi
++
++repeat_times=$(getprop idt.repeat_times)
++if [ ! -z "$repeat_times" ];then
++  # execute infinitly if 2nd argument is 0
++  if [ "$repeat_times" = "0" ];then
++    while true
++    do
++      $1
++    done
++  fi
++  # execute as many as 2nd argument specified
++  i=0
++  while [ $i -lt $repeat_times ]
++  do
++    $1
++    i=$(($i+1))
++  done
++else
++  # execute 1 time if 2nd argument not set
++  $1
++fi
+diff --git a/imx8m/init.idt.bringuptest.rc b/imx8m/init.idt.bringuptest.rc
+new file mode 100644
+index 00000000..51c55459
+--- /dev/null
++++ b/imx8m/init.idt.bringuptest.rc
+@@ -0,0 +1,149 @@
++# uncomment below to enable auto start sdcard writing when boot complete
++#on property:sys.boot_completed=1
++#    setprop idt.repeat_times 5
++#    start bringup_test
++
++service check_bringup /system/bin/sh /product/bin/bringup_test.sh check_bringup
++    class core
++    oneshot
++    disabled
++    user shell
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_sdcard /system/bin/sh /product/bin/bringup_test.sh check_sdcard
++    class core
++    oneshot
++    disabled
++    user root
++    group root media_rw
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_version /system/bin/sh /product/bin/bringup_test.sh check_idg_version
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_nfc /system/bin/sh /product/bin/bringup_test.sh check_idg_nfc
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_sam1 /system/bin/sh /product/bin/bringup_test.sh check_idg_sam1
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_sam2 /system/bin/sh /product/bin/bringup_test.sh check_idg_sam2
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_sam3 /system/bin/sh /product/bin/bringup_test.sh check_idg_sam3
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_sam4 /system/bin/sh /product/bin/bringup_test.sh check_idg_sam4
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_msr /system/bin/sh /product/bin/bringup_test.sh check_idg_msr
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_icc /system/bin/sh /product/bin/bringup_test.sh check_idg_icc
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_printer /system/bin/sh /product/bin/bringup_test.sh check_idg_printer
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_power_key /system/bin/sh /product/bin/bringup_test.sh check_power_key
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_transaction_CL_CT_MSR /system/bin/sh /product/bin/bringup_test.sh check_idg_transaction_CL_CT_MSR
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_transaction_CL /system/bin/sh /product/bin/bringup_test.sh check_idg_transaction_CL
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_transaction_MSR /system/bin/sh /product/bin/bringup_test.sh check_idg_transaction_MSR
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++service check_idg_transaction_CT /system/bin/sh /product/bin/bringup_test.sh check_idg_transaction_CT
++    class core
++    oneshot
++    disabled
++    user root
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index a779105b..e9d999e4 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -456,3 +456,10 @@ PRODUCT_PACKAGES += \
+ # Enable kernel log for diagnosis
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.logd.kernel=true
++
++# -------@bringup_test-------
++ifeq (userdebug,$(TARGET_BUILD_VARIANT))
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/imx8m/init.idt.bringuptest.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/init.idt.bringuptest.rc \
++    $(CONFIG_REPO_PATH)/imx8m/bringup_test.sh:$(TARGET_COPY_OUT_PRODUCT)/bin/bringup_test.sh
++endif

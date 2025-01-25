@@ -1,0 +1,35 @@
+48e62ed41823 Arthur Chen 2020-04-17
+
+driver: video: To clean the warning message.
+
+Change-Id: I18e21488f70fa364b09311d852e1100e082c2e4d
+
+diff --git a/drivers/video/fbdev/core/fbcon.c b/drivers/video/fbdev/core/fbcon.c
+index 694b29e9c4cb..d625d383ab27 100644
+--- a/drivers/video/fbdev/core/fbcon.c
++++ b/drivers/video/fbdev/core/fbcon.c
+@@ -587,8 +587,12 @@ static void fbcon_prepare_logo(struct vc_data *vc, struct fb_info *info,
+ {
+ 	/* Need to make room for the logo */
+ 	struct fbcon_ops *ops = info->fbcon_par;
+-	int cnt, erase = vc->vc_video_erase_char, step;
+-	unsigned short *save = NULL, *r, *q;
++	int erase = vc->vc_video_erase_char, step;
++#if CONSOLE_CURSOR_SHOWING
++	int cnt;
++	unsigned short *save = NULL, *r;
++#endif /* CONSOLE_CURSOR_SHOWING */
++	unsigned short *q;
+ 	int logo_height;
+ 
+ 	if (info->fbops->owner) {
+@@ -1358,7 +1362,9 @@ static void fbcon_cursor(struct vc_data *vc, int mode)
+ 	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
+ 	struct fbcon_ops *ops = info->fbcon_par;
+ 	int y;
++#if CONSOLE_CURSOR_SHOWING
+  	int c = scr_readw((u16 *) vc->vc_pos);
++#endif /* CONSOLE_CURSOR_SHOWING */
+ 
+ 	ops->cur_blink_jiffies = msecs_to_jiffies(vc->vc_cur_blink_ms);
+ 

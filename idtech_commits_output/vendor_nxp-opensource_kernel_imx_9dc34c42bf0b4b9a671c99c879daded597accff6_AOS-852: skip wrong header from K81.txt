@@ -1,0 +1,36 @@
+9dc34c42bf0b owen.wen 2022-01-11
+
+AOS-852: skip wrong header from K81
+
+Symptom: parse data from a spi message which is invalid NEOII format
+RootCause: fail to tell the difference between "no match" and "match at index 0"
+Solution: assign -1 to idg_start_pos, -1 indicate that
+          the return has no NEOII header
+
+Change-Id: I4ead4d9e9c08fbe89a3512d5c3f89d4c85dd2e7d
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 276105926a49..0d661794a3ea 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -685,7 +685,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ #if IDG_V5_ISSUE_RECOVERY
+ 	char *recover = NULL;
+ 	bool recovered = false;
+-	int idg_start_pos = 0;
++	int idg_start_pos = -1;
+ 	int idg_size_re;
+ #endif /* IDG_V5_ISSUE_RECOVERY */
+ 	int err	= 0;
+@@ -991,6 +991,9 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				dev_info(&spi->dev, "read data CRC error
+");
+ 				err = EINVAL;
+ 			}
++		} else if (idg_start_pos < 0) {
++			dev_info(&spi->dev, "NEOII header not found
+");
++			err = EINVAL;
+ 		} else if (idg_size < MAX_BUFFER_SIZE) {
+ 			x_s->tx_buf = idg_tx_s;
+ 			x_s->tx_nbits = SPI_NBITS_SINGLE;

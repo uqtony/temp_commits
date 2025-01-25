@@ -1,0 +1,45 @@
+e77c075e2675 AndrewS 2021-10-04
+
+AOS-753: reset K81 on boot
+
+Change-Id: Icfd1927889682c22c94c53e466673c43b9dd47a8
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 5fe53f73aaf0..f18f7f34263f 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -1109,6 +1109,13 @@ static irqreturn_t idg_spi_irq_handler(int irq, void *handle)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void idg_device_reset(struct idg_spi_device *idg_dev)
++{
++	gpio_set_value(idg_dev->poweron_gpio, 0);
++	usleep_range(1000, 1500);
++	gpio_set_value(idg_dev->poweron_gpio, 1);
++}
++
+ static int idg_spi_probe(struct spi_device *spi)
+ {
+ 	struct idg_spi_device *idg_dev;
+@@ -1170,6 +1177,10 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	} else if (idg_dev->poweron_gpio < 0) {
+ 		dev_info(&spi->dev, "idg_spi no poweron gpio found
+");
+ 	}
++
++	// reset device
++	idg_device_reset(idg_dev);
++
+ 	spin_lock_init(&idg_dev->spi_lock);
+ 	spi_set_drvdata(spi, idg_dev);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+@@ -1177,6 +1188,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	idg_dev->clock_freq = spi->max_speed_hz;
+ 	idg_dev->bits_per_word = spi->bits_per_word;
+ 	idg_spi_tty = spi;
++
+ 	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_HIGH);
+ 	if (!idg_dev->spi_cs) {
+ 		dev_err(&spi->dev, "chipselect is not exist
+");

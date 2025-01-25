@@ -1,0 +1,712 @@
+f0f862541f02 AndrewS 2020-12-22
+
+AOS-443: Fix conflicts from merging android-11.0.0_1.0.0
+
+Change-Id: I3a068633fea9d7ead6c444bac9f1f03bd93e3c18
+
+diff --git a/Android.bp b/Android.bp
+index 7796e9bb407c..4c9e5e8f9f20 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -383,14 +383,10 @@ java_library {
+         "android.hardware.vibrator-V1.2-java",
+         "android.hardware.vibrator-V1.3-java",
+         "devicepolicyprotosnano",
+-<<<<<<< HEAD
+-        "amsaar",
+-=======
+-
+         "com.android.sysprop.apex",
+         "com.android.sysprop.init",
+         "PlatformProperties",
+->>>>>>> android-11.0.0_1.0.0_history
++        "amsaar",
+     ],
+     sdk_version: "core_platform",
+     installable: false,
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index 65bd8e34f4bb..d3f5a07a69b9 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -374,25 +374,6 @@ status_t BootAnimation::readyToRun() {
+ 
+     mDisplayToken = SurfaceComposerClient::getInternalDisplayToken();
+     if (mDisplayToken == nullptr)
+-<<<<<<< HEAD
+-        return -1;
+-
+-    DisplayInfo dinfo;
+-    status_t status = SurfaceComposerClient::getDisplayInfo(mDisplayToken, &dinfo);
+-    if (status)
+-        return -1;
+-
+-    // check property to see if we need to change orientation
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("ro.boot.idt_orientation", value, "0");
+-    int orientation = atoi(value)/90;
+-    if ((orientation == DISPLAY_ORIENTATION_90) || (orientation == DISPLAY_ORIENTATION_270)) {
+-        int temp = dinfo.h;
+-        dinfo.h = dinfo.w;
+-        dinfo.w = temp;
+-    }
+-
+-=======
+         return NAME_NOT_FOUND;
+ 
+     DisplayConfig displayConfig;
+@@ -404,22 +385,28 @@ status_t BootAnimation::readyToRun() {
+     mMaxWidth = android::base::GetIntProperty("ro.surface_flinger.max_graphics_width", 0);
+     mMaxHeight = android::base::GetIntProperty("ro.surface_flinger.max_graphics_height", 0);
+     ui::Size resolution = displayConfig.resolution;
++
++    // check property to see if we need to change orientation
++    char value[PROPERTY_VALUE_MAX];
++    property_get("ro.boot.idt_orientation", value, "0");
++    int orientation = atoi(value)/90;
++    if ((orientation == ui::ROTATION_90) || (orientation == ui::ROTATION_270)) {
++        int temp = resolution.height;
++        resolution.height = resolution.width;
++        resolution.width = temp;
++    } else if ((orientation != ui::ROTATION_0) && (orientation != ui::ROTATION_180)) {
++        // set orientation to default if orientation value abnormal
++        orientation = ui::ROTATION_0;
++    }
++
+     resolution = limitSurfaceSize(resolution.width, resolution.height);
+->>>>>>> android-11.0.0_1.0.0_history
+     // create the native surface
+     sp<SurfaceControl> control = session()->createSurface(String8("BootAnimation"),
+             resolution.getWidth(), resolution.getHeight(), PIXEL_FORMAT_RGB_565);
+ 
+     SurfaceComposerClient::Transaction t;
+-<<<<<<< HEAD
+-    // set projection if orientation property is set
+-    if ((orientation > DISPLAY_ORIENTATION_0) && (orientation <= DISPLAY_ORIENTATION_270)) {
+-        Rect destRect(dinfo.w, dinfo.h);
+-        t.setDisplayProjection(mDisplayToken, orientation, destRect, destRect);
+-    }
+-=======
+     Rect displayRect(resolution.getWidth(),resolution.getHeight());
+-    t.setDisplayProjection(mDisplayToken, ui::ROTATION_0, displayRect, displayRect);
++    t.setDisplayProjection(mDisplayToken, orientation, displayRect, displayRect);
+ 
+     // this guest property specifies multi-display IDs to show the boot animation
+     // multiple ids can be set with comma (,) as separator, for example:
+@@ -462,7 +449,6 @@ status_t BootAnimation::readyToRun() {
+         t.setLayerStack(control, LAYER_STACK);
+     }
+ 
+->>>>>>> android-11.0.0_1.0.0_history
+     t.setLayer(control, 0x40000000)
+         .apply();
+ 
+@@ -570,25 +556,12 @@ void BootAnimation::findBootAnimationFile() {
+     }
+ 
+     const bool playDarkAnim = android::base::GetIntProperty("ro.boot.theme", 0) == 1;
+-<<<<<<< HEAD
+-    static const char* bootFiles[] =
+-        {IDTECH_BOOTANIMATION_FILE, APEX_BOOTANIMATION_FILE, playDarkAnim ? PRODUCT_BOOTANIMATION_DARK_FILE : PRODUCT_BOOTANIMATION_FILE,
+-         OEM_BOOTANIMATION_FILE, SYSTEM_BOOTANIMATION_FILE};
+-    static const char* shutdownFiles[] =
+-        {PRODUCT_SHUTDOWNANIMATION_FILE, OEM_SHUTDOWNANIMATION_FILE, SYSTEM_SHUTDOWNANIMATION_FILE, "", ""};
+-
+-    for (const char* f : (!mShuttingDown ? bootFiles : shutdownFiles)) {
+-        if (access(f, R_OK) == 0) {
+-            mZipFileName = f;
+-            return;
+-        }
+-=======
+     static const std::vector<std::string> bootFiles = {
+-        APEX_BOOTANIMATION_FILE, playDarkAnim ? PRODUCT_BOOTANIMATION_DARK_FILE : PRODUCT_BOOTANIMATION_FILE,
++        IDTECH_BOOTANIMATION_FILE, APEX_BOOTANIMATION_FILE, playDarkAnim ? PRODUCT_BOOTANIMATION_DARK_FILE : PRODUCT_BOOTANIMATION_FILE,
+         OEM_BOOTANIMATION_FILE, SYSTEM_BOOTANIMATION_FILE
+     };
+     static const std::vector<std::string> shutdownFiles = {
+-        PRODUCT_SHUTDOWNANIMATION_FILE, OEM_SHUTDOWNANIMATION_FILE, SYSTEM_SHUTDOWNANIMATION_FILE, ""
++        PRODUCT_SHUTDOWNANIMATION_FILE, OEM_SHUTDOWNANIMATION_FILE, SYSTEM_SHUTDOWNANIMATION_FILE, "", ""
+     };
+     static const std::vector<std::string> userspaceRebootFiles = {
+         PRODUCT_USERSPACE_REBOOT_ANIMATION_FILE, OEM_USERSPACE_REBOOT_ANIMATION_FILE,
+@@ -601,7 +574,6 @@ void BootAnimation::findBootAnimationFile() {
+         findBootAnimationFileInternal(shutdownFiles);
+     } else {
+         findBootAnimationFileInternal(bootFiles);
+->>>>>>> android-11.0.0_1.0.0_history
+     }
+ }
+ 
+diff --git a/config/hiddenapi-greylist-max-o.txt b/config/hiddenapi-greylist-max-o.txt
+index 2b3ffa03d72d..da2f00e18822 100644
+--- a/config/hiddenapi-greylist-max-o.txt
++++ b/config/hiddenapi-greylist-max-o.txt
+@@ -56879,12 +56879,8 @@ Landroid/provider/Settings$System;->WIFI_STATIC_NETMASK_VALIDATOR:Landroid/provi
+ Landroid/provider/Settings$System;->WIFI_USE_STATIC_IP_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
+ Landroid/provider/Settings$System;->WINDOW_ORIENTATION_LISTENER_LOG:Ljava/lang/String;
+ Landroid/provider/Settings$System;->WINDOW_ORIENTATION_LISTENER_LOG_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
+-<<<<<<< HEAD
+ Landroid/provider/Settings$System;->USER_ROTATION_DISP_2:Ljava/lang/String;
+ Landroid/provider/Settings$System;->USER_ROTATION_DISP_2_VALIDATOR:Landroid/provider/SettingsValidators$Validator;
+-Landroid/provider/Settings$UserSetupPersonalization;
+-=======
+->>>>>>> android-11.0.0_1.0.0_history
+ Landroid/provider/Settings;->ACTION_ALL_APPS_NOTIFICATION_SETTINGS:Ljava/lang/String;
+ Landroid/provider/Settings;->ACTION_APPLICATION_DETAILS_SETTINGS_OPEN_BY_DEFAULT_PAGE:Ljava/lang/String;
+ Landroid/provider/Settings;->ACTION_APP_NOTIFICATION_REDACTION:Ljava/lang/String;
+diff --git a/core/java/android/provider/Settings.java b/core/java/android/provider/Settings.java
+index ad743d086bd3..4d82f0a18e2e 100755
+--- a/core/java/android/provider/Settings.java
++++ b/core/java/android/provider/Settings.java
+@@ -4923,103 +4923,6 @@ public final class Settings {
+         }
+ 
+         /**
+-<<<<<<< HEAD
+-         * These are all public system settings
+-         *
+-         * All settings in {@link SETTINGS_TO_BACKUP} array *must* have a non-null validator,
+-         * otherwise they won't be restored.
+-         *
+-         * @hide
+-         */
+-        @UnsupportedAppUsage
+-        public static final Map<String, Validator> VALIDATORS = new ArrayMap<>();
+-        static {
+-            VALIDATORS.put(STAY_ON_WHILE_PLUGGED_IN, STAY_ON_WHILE_PLUGGED_IN_VALIDATOR);
+-            VALIDATORS.put(END_BUTTON_BEHAVIOR, END_BUTTON_BEHAVIOR_VALIDATOR);
+-            VALIDATORS.put(WIFI_USE_STATIC_IP, WIFI_USE_STATIC_IP_VALIDATOR);
+-            VALIDATORS.put(BLUETOOTH_DISCOVERABILITY, BLUETOOTH_DISCOVERABILITY_VALIDATOR);
+-            VALIDATORS.put(BLUETOOTH_DISCOVERABILITY_TIMEOUT,
+-                    BLUETOOTH_DISCOVERABILITY_TIMEOUT_VALIDATOR);
+-            VALIDATORS.put(NEXT_ALARM_FORMATTED, NEXT_ALARM_FORMATTED_VALIDATOR);
+-            VALIDATORS.put(FONT_SCALE, FONT_SCALE_VALIDATOR);
+-            VALIDATORS.put(DIM_SCREEN, DIM_SCREEN_VALIDATOR);
+-            VALIDATORS.put(DISPLAY_COLOR_MODE, DISPLAY_COLOR_MODE_VALIDATOR);
+-            VALIDATORS.put(SCREEN_OFF_TIMEOUT, SCREEN_OFF_TIMEOUT_VALIDATOR);
+-            VALIDATORS.put(SCREEN_BRIGHTNESS_FOR_VR, SCREEN_BRIGHTNESS_FOR_VR_VALIDATOR);
+-            VALIDATORS.put(SCREEN_BRIGHTNESS_MODE, SCREEN_BRIGHTNESS_MODE_VALIDATOR);
+-            VALIDATORS.put(ADAPTIVE_SLEEP, ADAPTIVE_SLEEP_VALIDATOR);
+-            VALIDATORS.put(MODE_RINGER_STREAMS_AFFECTED, MODE_RINGER_STREAMS_AFFECTED_VALIDATOR);
+-            VALIDATORS.put(MUTE_STREAMS_AFFECTED, MUTE_STREAMS_AFFECTED_VALIDATOR);
+-            VALIDATORS.put(VIBRATE_ON, VIBRATE_ON_VALIDATOR);
+-            VALIDATORS.put(NOTIFICATION_VIBRATION_INTENSITY, VIBRATION_INTENSITY_VALIDATOR);
+-            VALIDATORS.put(RING_VIBRATION_INTENSITY, VIBRATION_INTENSITY_VALIDATOR);
+-            VALIDATORS.put(HAPTIC_FEEDBACK_INTENSITY, VIBRATION_INTENSITY_VALIDATOR);
+-            VALIDATORS.put(RINGTONE, RINGTONE_VALIDATOR);
+-            VALIDATORS.put(NOTIFICATION_SOUND, NOTIFICATION_SOUND_VALIDATOR);
+-            VALIDATORS.put(ALARM_ALERT, ALARM_ALERT_VALIDATOR);
+-            VALIDATORS.put(TEXT_AUTO_REPLACE, TEXT_AUTO_REPLACE_VALIDATOR);
+-            VALIDATORS.put(TEXT_AUTO_CAPS, TEXT_AUTO_CAPS_VALIDATOR);
+-            VALIDATORS.put(TEXT_AUTO_PUNCTUATE, TEXT_AUTO_PUNCTUATE_VALIDATOR);
+-            VALIDATORS.put(TEXT_SHOW_PASSWORD, TEXT_SHOW_PASSWORD_VALIDATOR);
+-            VALIDATORS.put(AUTO_TIME, AUTO_TIME_VALIDATOR);
+-            VALIDATORS.put(AUTO_TIME_ZONE, AUTO_TIME_ZONE_VALIDATOR);
+-            VALIDATORS.put(SHOW_GTALK_SERVICE_STATUS, SHOW_GTALK_SERVICE_STATUS_VALIDATOR);
+-            VALIDATORS.put(WALLPAPER_ACTIVITY, WALLPAPER_ACTIVITY_VALIDATOR);
+-            VALIDATORS.put(TIME_12_24, TIME_12_24_VALIDATOR);
+-            VALIDATORS.put(DATE_FORMAT, DATE_FORMAT_VALIDATOR);
+-            VALIDATORS.put(SETUP_WIZARD_HAS_RUN, SETUP_WIZARD_HAS_RUN_VALIDATOR);
+-            VALIDATORS.put(ACCELEROMETER_ROTATION, ACCELEROMETER_ROTATION_VALIDATOR);
+-            VALIDATORS.put(USER_ROTATION, USER_ROTATION_VALIDATOR);
+-            VALIDATORS.put(USER_ROTATION_DISP_2, USER_ROTATION_DISP_2_VALIDATOR);
+-            VALIDATORS.put(DTMF_TONE_WHEN_DIALING, DTMF_TONE_WHEN_DIALING_VALIDATOR);
+-            VALIDATORS.put(SOUND_EFFECTS_ENABLED, SOUND_EFFECTS_ENABLED_VALIDATOR);
+-            VALIDATORS.put(HAPTIC_FEEDBACK_ENABLED, HAPTIC_FEEDBACK_ENABLED_VALIDATOR);
+-            VALIDATORS.put(POWER_SOUNDS_ENABLED, POWER_SOUNDS_ENABLED_VALIDATOR);
+-            VALIDATORS.put(DOCK_SOUNDS_ENABLED, DOCK_SOUNDS_ENABLED_VALIDATOR);
+-            VALIDATORS.put(SHOW_WEB_SUGGESTIONS, SHOW_WEB_SUGGESTIONS_VALIDATOR);
+-            VALIDATORS.put(WIFI_USE_STATIC_IP, WIFI_USE_STATIC_IP_VALIDATOR);
+-            VALIDATORS.put(END_BUTTON_BEHAVIOR, END_BUTTON_BEHAVIOR_VALIDATOR);
+-            VALIDATORS.put(ADVANCED_SETTINGS, ADVANCED_SETTINGS_VALIDATOR);
+-            VALIDATORS.put(SCREEN_AUTO_BRIGHTNESS_ADJ, SCREEN_AUTO_BRIGHTNESS_ADJ_VALIDATOR);
+-            VALIDATORS.put(VIBRATE_INPUT_DEVICES, VIBRATE_INPUT_DEVICES_VALIDATOR);
+-            VALIDATORS.put(MASTER_MONO, MASTER_MONO_VALIDATOR);
+-            VALIDATORS.put(MASTER_BALANCE, MASTER_BALANCE_VALIDATOR);
+-            VALIDATORS.put(NOTIFICATIONS_USE_RING_VOLUME, NOTIFICATIONS_USE_RING_VOLUME_VALIDATOR);
+-            VALIDATORS.put(VIBRATE_IN_SILENT, VIBRATE_IN_SILENT_VALIDATOR);
+-            VALIDATORS.put(MEDIA_BUTTON_RECEIVER, MEDIA_BUTTON_RECEIVER_VALIDATOR);
+-            VALIDATORS.put(HIDE_ROTATION_LOCK_TOGGLE_FOR_ACCESSIBILITY,
+-                    HIDE_ROTATION_LOCK_TOGGLE_FOR_ACCESSIBILITY_VALIDATOR);
+-            VALIDATORS.put(VIBRATE_WHEN_RINGING, VIBRATE_WHEN_RINGING_VALIDATOR);
+-            VALIDATORS.put(DTMF_TONE_TYPE_WHEN_DIALING, DTMF_TONE_TYPE_WHEN_DIALING_VALIDATOR);
+-            VALIDATORS.put(HEARING_AID, HEARING_AID_VALIDATOR);
+-            VALIDATORS.put(TTY_MODE, TTY_MODE_VALIDATOR);
+-            VALIDATORS.put(NOTIFICATION_LIGHT_PULSE, NOTIFICATION_LIGHT_PULSE_VALIDATOR);
+-            VALIDATORS.put(POINTER_LOCATION, POINTER_LOCATION_VALIDATOR);
+-            VALIDATORS.put(SHOW_TOUCHES, SHOW_TOUCHES_VALIDATOR);
+-            VALIDATORS.put(WINDOW_ORIENTATION_LISTENER_LOG,
+-                    WINDOW_ORIENTATION_LISTENER_LOG_VALIDATOR);
+-            VALIDATORS.put(LOCKSCREEN_SOUNDS_ENABLED, LOCKSCREEN_SOUNDS_ENABLED_VALIDATOR);
+-            VALIDATORS.put(LOCKSCREEN_DISABLED, LOCKSCREEN_DISABLED_VALIDATOR);
+-            VALIDATORS.put(SIP_RECEIVE_CALLS, SIP_RECEIVE_CALLS_VALIDATOR);
+-            VALIDATORS.put(SIP_CALL_OPTIONS, SIP_CALL_OPTIONS_VALIDATOR);
+-            VALIDATORS.put(SIP_ALWAYS, SIP_ALWAYS_VALIDATOR);
+-            VALIDATORS.put(SIP_ADDRESS_ONLY, SIP_ADDRESS_ONLY_VALIDATOR);
+-            VALIDATORS.put(SIP_ASK_ME_EACH_TIME, SIP_ASK_ME_EACH_TIME_VALIDATOR);
+-            VALIDATORS.put(POINTER_SPEED, POINTER_SPEED_VALIDATOR);
+-            VALIDATORS.put(LOCK_TO_APP_ENABLED, LOCK_TO_APP_ENABLED_VALIDATOR);
+-            VALIDATORS.put(EGG_MODE, EGG_MODE_VALIDATOR);
+-            VALIDATORS.put(WIFI_STATIC_IP, WIFI_STATIC_IP_VALIDATOR);
+-            VALIDATORS.put(WIFI_STATIC_GATEWAY, WIFI_STATIC_GATEWAY_VALIDATOR);
+-            VALIDATORS.put(WIFI_STATIC_NETMASK, WIFI_STATIC_NETMASK_VALIDATOR);
+-            VALIDATORS.put(WIFI_STATIC_DNS1, WIFI_STATIC_DNS1_VALIDATOR);
+-            VALIDATORS.put(WIFI_STATIC_DNS2, WIFI_STATIC_DNS2_VALIDATOR);
+-            VALIDATORS.put(SHOW_BATTERY_PERCENT, SHOW_BATTERY_PERCENT_VALIDATOR);
+-            VALIDATORS.put(NOTIFICATION_LIGHT_PULSE, BOOLEAN_VALIDATOR);
+-        }
+-
+-        /**
+-=======
+->>>>>>> android-11.0.0_1.0.0_history
+          * These entries are considered common between the personal and the managed profile,
+          * since the managed profile doesn't get to change them.
+          */
+diff --git a/core/java/android/util/apk/ApkSignatureVerifier.java b/core/java/android/util/apk/ApkSignatureVerifier.java
+index 7d07742e4b6e..21a666cafecc 100644
+--- a/core/java/android/util/apk/ApkSignatureVerifier.java
++++ b/core/java/android/util/apk/ApkSignatureVerifier.java
+@@ -27,11 +27,7 @@ import android.content.pm.PackageParser;
+ import android.content.pm.PackageParser.PackageParserException;
+ import android.content.pm.PackageParser.SigningDetails.SignatureSchemeVersion;
+ import android.content.pm.Signature;
+-<<<<<<< HEAD
+-import android.os.SystemProperties;
+-=======
+ import android.os.Build;
+->>>>>>> android-11.0.0_1.0.0_history
+ import android.os.Trace;
+ import android.util.jar.StrictJarFile;
+ 
+@@ -73,12 +69,6 @@ public class ApkSignatureVerifier {
+         return verifySignatures(apkPath, minSignatureSchemeVersion, true);
+     }
+ 
+-<<<<<<< HEAD
+-        // apex files are all using V3
+-        if (SystemProperties.get("ro.idt.signature_of_signature").contains("false") ||
+-            apkPath.contains("/apex/")) {
+-        if (minSignatureSchemeVersion > SignatureSchemeVersion.SIGNING_BLOCK_V3) {
+-=======
+     /**
+      * Returns the certificates associated with each signer for the given APK without verification.
+      * This method is dangerous and should not be used, unless the caller is absolutely certain the
+@@ -103,7 +93,6 @@ public class ApkSignatureVerifier {
+             throws PackageParserException {
+ 
+         if (minSignatureSchemeVersion > SignatureSchemeVersion.SIGNING_BLOCK_V4) {
+->>>>>>> android-11.0.0_1.0.0_history
+             // V3 and before are older than the requested minimum signing version
+             throw new PackageParserException(INSTALL_PARSE_FAILED_NO_CERTIFICATES,
+                     "No signature found in package of version " + minSignatureSchemeVersion
+@@ -158,12 +147,6 @@ public class ApkSignatureVerifier {
+         try {
+             return verifyV2Signature(apkPath, verifyFull);
+         } catch (SignatureNotFoundException e) {
+-            // throw exception if IDTech Scheme not found and sos is enabled
+-            if (SystemProperties.get("ro.idt.signature_of_signature").contains("true") ||
+-                SystemProperties.get("ro.idt.signature_online_check").contains("true")) {
+-                throw new PackageParserException(INSTALL_PARSE_FAILED_NO_CERTIFICATES,
+-                        "No APK Signature Scheme IDTech signature in package " + apkPath, e);
+-            }
+             // not signed with v2, try older if allowed
+             if (minSignatureSchemeVersion >= SignatureSchemeVersion.SIGNING_BLOCK_V2) {
+                 throw new PackageParserException(INSTALL_PARSE_FAILED_NO_CERTIFICATES,
+@@ -179,18 +162,8 @@ public class ApkSignatureVerifier {
+                             + " or newer for package " + apkPath);
+         }
+ 
+-<<<<<<< HEAD
+-        if (SystemProperties.get("ro.idt.signature_of_signature").contains("false")) {
+-            // v2 didn't work, try jarsigner
+-            return verifyV1Signature(apkPath, true);
+-        }
+-        throw new PackageParserException(INSTALL_PARSE_FAILED_NO_CERTIFICATES,
+-                "Failed to collect certificates from " + apkPath
+-                        + " using IDTech APK Signature Scheme v2");
+-=======
+         // v2 didn't work, try jarsigner
+         return verifyV1Signature(apkPath, verifyFull);
+->>>>>>> android-11.0.0_1.0.0_history
+     }
+ 
+     /**
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index c97ef2de9c07..1b37cd95e650 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1564,29 +1564,15 @@ public final class DisplayManagerService extends SystemService {
+                     + device.getDisplayDeviceInfoLocked());
+             return;
+         }
+-<<<<<<< HEAD
++
+         // For multiple display, need to configure display for each display device.
+         LogicalDisplay configureDisplay = findLogicalDisplayForDeviceLocked(device);
+         final boolean displayEnabled = (mWindowManagerInternal == null)?false:mWindowManagerInternal.ismDisplayEnabledLocked();
+         configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF, displayEnabled);
+-        final int viewportType;
+-        // Update the corresponding viewport.
+-        if ((info.flags & DisplayDeviceInfo.FLAG_DEFAULT_DISPLAY) != 0) {
+-            viewportType = VIEWPORT_INTERNAL;
+-        } else if (info.touch == DisplayDeviceInfo.TOUCH_EXTERNAL) {
+-            viewportType = VIEWPORT_EXTERNAL;
+-        } else if (info.touch == DisplayDeviceInfo.TOUCH_VIRTUAL
+-                && !TextUtils.isEmpty(info.uniqueId)) {
+-            viewportType = VIEWPORT_VIRTUAL;
+-        } else {
+-            Slog.i(TAG, "Display " + info + " does not support input device matching.");
+-            return;
+-=======
+-        display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
++
+         final Optional<Integer> viewportType = getViewportType(info);
+         if (viewportType.isPresent()) {
+             populateViewportLocked(viewportType.get(), display.getDisplayIdLocked(), device, info);
+->>>>>>> android-11.0.0_1.0.0_history
+         }
+     }
+ 
+diff --git a/services/core/java/com/android/server/notification/NotificationManagerService.java b/services/core/java/com/android/server/notification/NotificationManagerService.java
+index fc5de5071b94..d79a4ce572a1 100755
+--- a/services/core/java/com/android/server/notification/NotificationManagerService.java
++++ b/services/core/java/com/android/server/notification/NotificationManagerService.java
+@@ -152,11 +152,8 @@ import android.content.Intent;
+ import android.content.IntentFilter;
+ import android.content.pm.ApplicationInfo;
+ import android.content.pm.IPackageManager;
+-<<<<<<< HEAD
+ import android.content.pm.PackageInfo;
+-=======
+ import android.content.pm.LauncherApps;
+->>>>>>> android-11.0.0_1.0.0_history
+ import android.content.pm.PackageManager;
+ import android.content.pm.PackageManager.NameNotFoundException;
+ import android.content.pm.PackageManagerInternal;
+diff --git a/services/core/java/com/android/server/pm/PackageManagerService.java b/services/core/java/com/android/server/pm/PackageManagerService.java
+index c42ca1fbf2aa..01eba60431b3 100644
+--- a/services/core/java/com/android/server/pm/PackageManagerService.java
++++ b/services/core/java/com/android/server/pm/PackageManagerService.java
+@@ -3649,17 +3649,12 @@ public class PackageManagerService extends IPackageManager.Stub
+         PackageParser.readConfigUseRoundIcon(mContext.getResources());
+ 
+         mServiceStartWithDelay = SystemClock.uptimeMillis() + (60 * 1000L);
+-<<<<<<< HEAD
+-
+-        Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
+ 
+         try {
+             AMS4FConnector.shared().start(context, mHandler);
+         } catch (Exception e) {
+             logCriticalInfo(Log.ERROR, "AMS4FConnector start failed");
+         }
+-=======
+->>>>>>> android-11.0.0_1.0.0_history
+     }
+ 
+     /**
+@@ -17927,19 +17922,6 @@ public class PackageManagerService extends IPackageManager.Stub
+                 + " Activities needs verification ...");
+ 
+         int count = 0;
+-<<<<<<< HEAD
+-        final String packageName = pkg.packageName;
+-
+-        boolean handlesWebUris = false;
+-        final boolean alreadyVerified;
+-        synchronized (mPackages) {
+-            // If this is a new install and we see that we've already run verification for this
+-            // package, we have nothing to do: it means the state was restored from backup.
+-            final IntentFilterVerificationInfo ivi =
+-                    mSettings.getIntentFilterVerificationLPr(packageName);
+-            alreadyVerified = (ivi != null);
+-            if (!replacing && alreadyVerified) {
+-=======
+         boolean handlesWebUris = false;
+         ArraySet<String> domains = new ArraySet<>();
+         final boolean previouslyVerified;
+@@ -17952,34 +17934,21 @@ public class PackageManagerService extends IPackageManager.Stub
+                     mSettings.getIntentFilterVerificationLPr(packageName);
+             previouslyVerified = (ivi != null);
+             if (!replacing && previouslyVerified) {
+->>>>>>> android-11.0.0_1.0.0_history
+                 if (DEBUG_DOMAIN_VERIFICATION) {
+                     Slog.i(TAG, "Package " + packageName + " already verified: status="
+                             + ivi.getStatusString());
+                 }
+                 return;
+-<<<<<<< HEAD
+-=======
+             }
+ 
+             if (DEBUG_DOMAIN_VERIFICATION) {
+                 Slog.i(TAG, "    Previous verified hosts: "
+                         + (ivi == null ? "[none]" : ivi.getDomainsString()));
+->>>>>>> android-11.0.0_1.0.0_history
+             }
+ 
+             // If any filters need to be verified, then all need to be.  In addition, we need to
+             // know whether an updating app has any web navigation intent filters, to re-
+             // examine handling policy even if not re-verifying.
+-<<<<<<< HEAD
+-            boolean needToVerify = false;
+-            for (PackageParser.Activity a : pkg.activities) {
+-                for (ActivityIntentInfo filter : a.intents) {
+-                    if (filter.handlesWebUris(true)) {
+-                        handlesWebUris = true;
+-                    }
+-                    if (filter.needsVerification() && needsNetworkVerificationLPr(filter)) {
+-=======
+             final boolean needsVerification = needsNetworkVerificationLPr(packageName);
+             for (ParsedActivity a : activities) {
+                 for (ParsedIntentInfo filter : a.getIntents()) {
+@@ -17987,35 +17956,21 @@ public class PackageManagerService extends IPackageManager.Stub
+                         handlesWebUris = true;
+                     }
+                     if (needsVerification && filter.needsVerification()) {
+->>>>>>> android-11.0.0_1.0.0_history
+                         if (DEBUG_DOMAIN_VERIFICATION) {
+                             Slog.d(TAG, "autoVerify requested, processing all filters");
+                         }
+-<<<<<<< HEAD
+-                        needToVerify = true;
+-                        // It's safe to break out here because filter.needsVerification()
+-                        // can only be true if filter.handlesWebUris(true) returns true, so
+-=======
+                         needToRunVerify = true;
+                         // It's safe to break out here because filter.needsVerification()
+                         // can only be true if filter.handlesWebUris(true) returned true, so
+->>>>>>> android-11.0.0_1.0.0_history
+                         // we've already noted that.
+                         break;
+                     }
+                 }
+             }
+ 
+-<<<<<<< HEAD
+-            // Note whether this app publishes any web navigation handling support at all,
+-            // and whether there are any web-nav filters that fit the profile for running
+-            // a verification pass now.
+-            if (needToVerify) {
+-=======
+             // Compare the new set of recognized hosts if the app is either requesting
+             // autoVerify or has previously used autoVerify but no longer does.
+             if (needToRunVerify || previouslyVerified) {
+->>>>>>> android-11.0.0_1.0.0_history
+                 final int verificationId = mIntentFilterVerificationToken++;
+                 for (ParsedActivity a : activities) {
+                     for (ParsedIntentInfo filter : a.getIntents()) {
+@@ -18072,33 +18027,15 @@ public class PackageManagerService extends IPackageManager.Stub
+             }
+         }
+ 
+-<<<<<<< HEAD
+-        if (count > 0) {
+-            // count > 0 means that we're running a full verification pass
+-=======
+         if (needToRunVerify && count > 0) {
+             // app requested autoVerify and has at least one matching intent filter
+->>>>>>> android-11.0.0_1.0.0_history
+             if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG, "Starting " + count
+                     + " IntentFilter verification" + (count > 1 ? "s" : "")
+                     +  " for userId:" + userId);
+             mIntentFilterVerifier.startVerifications(userId);
+-        } else if (alreadyVerified && handlesWebUris) {
+-            // App used autoVerify in the past, no longer does, but still handles web
+-            // navigation starts.
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.d(TAG, "App changed web filters but no longer verifying - resetting policy");
+-            }
+-            synchronized (mPackages) {
+-                clearIntentFilterVerificationsLPw(packageName, userId);
+-            }
+         } else {
+             if (DEBUG_DOMAIN_VERIFICATION) {
+-<<<<<<< HEAD
+-                Slog.d(TAG, "No web filters or no prior verify policy for " + packageName);
+-=======
+                 Slog.d(TAG, "No web filters or no new host policy for " + packageName);
+->>>>>>> android-11.0.0_1.0.0_history
+             }
+         }
+     }
+diff --git a/services/core/java/com/android/server/pm/Settings.java b/services/core/java/com/android/server/pm/Settings.java
+index 56a1b87796e3..3de2dc2fdef3 100644
+--- a/services/core/java/com/android/server/pm/Settings.java
++++ b/services/core/java/com/android/server/pm/Settings.java
+@@ -1291,13 +1291,9 @@ public final class Settings {
+             }
+             return false;
+         }
+-<<<<<<< HEAD
+-        ps.clearDomainVerificationStatusForUser(userId);
+-=======
+         if (alsoResetStatus) {
+             ps.clearDomainVerificationStatusForUser(userId);
+         }
+->>>>>>> android-11.0.0_1.0.0_history
+         ps.setIntentFilterVerificationInfo(null);
+         return true;
+     }
+diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
+index caeca04d304a..e0733f43c18a 100644
+--- a/services/core/java/com/android/server/wm/DisplayContent.java
++++ b/services/core/java/com/android/server/wm/DisplayContent.java
+@@ -169,11 +169,8 @@ import android.os.RemoteException;
+ import android.os.SystemClock;
+ import android.os.Trace;
+ import android.os.UserHandle;
+-<<<<<<< HEAD
+ import android.os.SystemProperties;
+-=======
+ import android.provider.Settings;
+->>>>>>> android-11.0.0_1.0.0_history
+ import android.util.ArraySet;
+ import android.util.DisplayMetrics;
+ import android.util.IntArray;
+@@ -374,42 +371,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+     /** The desired scaling factor for compatible apps. */
+     float mCompatibleScreenScale;
+ 
+-<<<<<<< HEAD
+-    /**
+-     * Current rotation of the display.
+-     * Constants as per {@link android.view.Surface.Rotation}.
+-     *
+-     * @see #updateRotationUnchecked()
+-     */
+-    private int mRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+-
+-    /**
+-     * Last applied orientation of the display.
+-     * Constants as per {@link android.content.pm.ActivityInfo.ScreenOrientation}.
+-     *
+-     * @see #updateOrientationFromAppTokens()
+-     */
+-    private int mLastOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+-
+-    /**
+-     * Orientation forced by some window. If there is no visible window that specifies orientation
+-     * it is set to {@link android.content.pm.ActivityInfo#SCREEN_ORIENTATION_UNSPECIFIED}.
+-     *
+-     * @see NonAppWindowContainers#getOrientation()
+-     */
+-    private int mLastWindowForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+-
+-    /**
+-     * Last orientation forced by the keyguard. It is applied when keyguard is shown and is not
+-     * occluded.
+-     *
+-     * @see NonAppWindowContainers#getOrientation()
+-     */
+-    private int mLastKeyguardForcedOrientation = SCREEN_ORIENTATION_UNSPECIFIED;
+-=======
+     /** @see #getCurrentOverrideConfigurationChanges */
+     private int mCurrentOverrideConfigurationChanges;
+->>>>>>> android-11.0.0_1.0.0_history
+ 
+     /**
+      * The maximum aspect ratio (longerSide/shorterSide) that is treated as close-to-square. The
+@@ -1504,30 +1467,6 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+      *                     {@code true} if the caller is not sure whether the activity is launching.
+      * @return {@code true} if the fixed rotation is started.
+      */
+-<<<<<<< HEAD
+-    boolean updateRotationUnchecked(boolean forceUpdate) {
+-        // check if IDT lock orientation property been set
+-        boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
+-        if (lock_orientation) {
+-            return false;
+-        }
+-        ScreenRotationAnimation screenRotationAnimation;
+-        if (!forceUpdate) {
+-            if (mDeferredRotationPauseCount > 0) {
+-                // Rotation updates have been paused temporarily.  Defer the update until
+-                // updates have been resumed.
+-                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, "Deferring rotation, rotation is paused.");
+-                return false;
+-            }
+-
+-            screenRotationAnimation =
+-                    mWmService.mAnimator.getScreenRotationAnimationLocked(mDisplayId);
+-            if (screenRotationAnimation != null && screenRotationAnimation.isAnimating()) {
+-                // Rotation updates cannot be performed while the previous rotation change
+-                // animation is still in progress.  Skip this update.  We will try updating
+-                // again after the animation is finished and the display is unfrozen.
+-                if (DEBUG_ORIENTATION) Slog.v(TAG_WM, "Deferring rotation, animation in progress.");
+-=======
+     boolean handleTopActivityLaunchingInDifferentOrientation(@NonNull ActivityRecord r,
+             boolean checkOpening) {
+         if (!WindowManagerService.ENABLE_FIXED_ROTATION_TRANSFORM) {
+@@ -1551,7 +1490,6 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+                 // Apply normal rotation animation in case of the activity set different requested
+                 // orientation without activity switch, or the transition is unset due to starting
+                 // window was transferred ({@link #mSkipAppTransitionAnimation}).
+->>>>>>> android-11.0.0_1.0.0_history
+                 return false;
+             }
+             if ((mAppTransition.getTransitFlags()
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index 0a611fa613ca..cff659a5790f 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -120,7 +120,7 @@ public class DisplayRotation {
+      * @see #updateRotationUnchecked
+      */
+     @Surface.Rotation
+-    private int mRotation;
++    private int mRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+ 
+     @VisibleForTesting
+     int mLandscapeRotation;  // default landscape
+@@ -250,7 +250,6 @@ public class DisplayRotation {
+         // and create mSettingsObserver and mOrientationListener for multiple displays
+         final ContentResolver resolver = mContext.getContentResolver();
+         if (isDefaultDisplay) {
+-<<<<<<< HEAD
+             mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+             Settings.System.putIntForUser(resolver, Settings.System.USER_ROTATION,
+                     mUserRotation, UserHandle.USER_CURRENT);
+@@ -258,13 +257,6 @@ public class DisplayRotation {
+             mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation_disp_2", 0)/90;
+             Settings.System.putIntForUser(resolver, Settings.System.USER_ROTATION_DISP_2,
+                     mUserRotation, UserHandle.USER_CURRENT);
+-=======
+-            final Handler uiHandler = UiThread.getHandler();
+-            mOrientationListener = new OrientationListener(mContext, uiHandler);
+-            mOrientationListener.setCurrentRotation(mRotation);
+-            mSettingsObserver = new SettingsObserver(uiHandler);
+-            mSettingsObserver.observe();
+->>>>>>> android-11.0.0_1.0.0_history
+         }
+         final Handler uiHandler = UiThread.getHandler();
+         mOrientationListener = new OrientationListener(mContext, uiHandler);
+@@ -423,6 +415,11 @@ public class DisplayRotation {
+      *         THE SCREEN.
+      */
+     boolean updateRotationUnchecked(boolean forceUpdate) {
++        // check if IDT lock orientation property been set
++        boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
++        if (lock_orientation) {
++            return false;
++        }
+         final int displayId = mDisplayContent.getDisplayId();
+         if (!forceUpdate) {
+             if (mDeferredRotationPauseCount > 0) {
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 1273a1ab5368..61d870dcc807 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -3448,13 +3448,8 @@ public class WindowManagerService extends IWindowManager.Stub
+                 mBootAnimationStopped = true;
+             }
+ 
+-<<<<<<< HEAD
+             if (!mForceDisplayEnabled && !checkBootAnimationCompleteLocked() && !extendBootAnim) {
+-                if (DEBUG_BOOT) Slog.i(TAG_WM, "performEnableScreen: Waiting for anim complete");
+-=======
+-            if (!mForceDisplayEnabled && !checkBootAnimationCompleteLocked()) {
+                 ProtoLog.i(WM_DEBUG_BOOT, "performEnableScreen: Waiting for anim complete");
+->>>>>>> android-11.0.0_1.0.0_history
+                 return;
+             }
+ 

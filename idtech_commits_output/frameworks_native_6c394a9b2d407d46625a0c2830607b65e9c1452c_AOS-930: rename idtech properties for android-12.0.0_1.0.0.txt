@@ -1,0 +1,35 @@
+6c394a9b2d George.Huang 2022-03-31
+
+AOS-930: rename idtech properties for android-12.0.0_1.0.0
+
+- rename from ro.idt. to ro.vendor.idt.
+  rename from persist.idt. to persist.vendor.idt.
+
+Change-Id: I01f5cf423000f0cc1411e89f27f03fc9d1f57b0c
+
+diff --git a/services/inputflinger/reader/InputDevice.cpp b/services/inputflinger/reader/InputDevice.cpp
+index e7a1d04d59..57c452cf71 100644
+--- a/services/inputflinger/reader/InputDevice.cpp
++++ b/services/inputflinger/reader/InputDevice.cpp
+@@ -312,7 +312,7 @@ void InputDevice::configure(nsecs_t when, const InputReaderConfiguration* config
+                     mAssociatedDisplayPort = std::make_optional(displayPort->second);
+                 } else {
+                     char value[PROPERTY_VALUE_MAX];
+-                    property_get("persist.idt.default_touch_location", value, "0");
++                    property_get("persist.vendor.idt.default_touch_location", value, "0");
+                     const std::string defaultTouchLocation = value;
+                     auto found = inputPort.find(defaultTouchLocation);
+                     if (found != std::string::npos) {
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 8a713376ec..20d036362c 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -706,7 +706,7 @@ void SurfaceFlinger::bootFinished() {
+     // stop boot animation
+     // formerly we would just kill the process, but we now ask it to exit so it
+     // can choose where to stop the animation.
+-    bool extendBootAnim = (property_get_int32("ro.idt.extend_boot_anim", int32_t(0)) == 1);
++    bool extendBootAnim = (property_get_int32("ro.vendor.idt.extend_boot_anim", int32_t(0)) == 1);
+     // check property to decide if we need to extend boot animation or not.
+     if (!extendBootAnim) {
+         property_set("service.bootanim.exit", "1");

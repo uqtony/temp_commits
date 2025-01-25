@@ -1,0 +1,39 @@
+0bd41a59d705 jay deng 2020-10-12
+
+AOS-369: Change polling period and I2C clock to avoid CP2112 stuck
+
+Change polling period of mlx90614 input device from
+200 ms to 1 second and change I2C clock from 100K to 50K to avoid
+CP2112 stuck.
+
+Change-Id: Iea873c23c7dae296f27feb1e4abd5534f225725f
+
+diff --git a/drivers/hid/hid-cp2112.c b/drivers/hid/hid-cp2112.c
+index dbec872f967b..3bffb9d8f976 100644
+--- a/drivers/hid/hid-cp2112.c
++++ b/drivers/hid/hid-cp2112.c
+@@ -1293,6 +1293,7 @@ static int cp2112_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ 		goto err_power_normal;
+ 	}
+ 
++	config.clock_speed = cpu_to_be32(50000);
+ 	config.retry_time = cpu_to_be16(1);
+ 
+ 	ret = cp2112_hid_output(hdev, (u8 *)&config, sizeof(config),
+diff --git a/drivers/iio/temperature/mlx90614.c b/drivers/iio/temperature/mlx90614.c
+index 35069c972e68..0b0dec146b5e 100644
+--- a/drivers/iio/temperature/mlx90614.c
++++ b/drivers/iio/temperature/mlx90614.c
+@@ -74,9 +74,9 @@
+ #define MLX90614_DRV_NAME			"mlx90614"
+ #define MLX90614_PHY_NAME			"mlx90614/input0"
+ 
+-#define POLL_INTERVAL_MAX			300
+-#define POLL_INTERVAL				200
+-#define POLL_INTERVAL_MIN			100
++#define POLL_INTERVAL_MAX			5000
++#define POLL_INTERVAL				1000
++#define POLL_INTERVAL_MIN			500
+ 
+ struct mlx90614_data {
+ 	struct i2c_client *client;

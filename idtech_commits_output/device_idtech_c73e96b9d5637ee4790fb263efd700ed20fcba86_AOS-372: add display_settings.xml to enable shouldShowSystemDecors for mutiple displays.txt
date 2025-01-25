@@ -1,0 +1,57 @@
+c73e96b9 AndrewS 2020-10-30
+
+AOS-372: add display_settings.xml to enable shouldShowSystemDecors for mutiple displays
+
+Set identifier="1" to use hardware port information.
+In the display HAL init process, it will move primary display to physical port ID 0, so we can configure shouldShowSystemDecors="true" for all non primary display port, currently configure this from physical port ID 1 to physical port ID 3.
+
+With this change we can get below display settings data from device(/data/system/display_settings.xml):
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<display-settings>
+<config identifier="1" />
+<display name="port:0" overscanBottom="-88" />
+<display name="port:1" shouldShowSystemDecors="true" />
+<display name="port:2" shouldShowSystemDecors="true" />
+<display name="port:3" shouldShowSystemDecors="true" />
+</display-settings>
+
+display_settings.xml reference:
+https://source.android.com/devices/tech/display/multi_display/recommended-practices
+
+Change-Id: Ica5fcfce1e53213a60ca01f044d80a9cb7ccacf4
+
+diff --git a/common/display-settings/display_settings.xml b/common/display-settings/display_settings.xml
+new file mode 100644
+index 00000000..c8cb4f53
+--- /dev/null
++++ b/common/display-settings/display_settings.xml
+@@ -0,0 +1,14 @@
++<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
++<display-settings>
++<config identifier="1" />
++<display
++  name="port:1"
++  shouldShowSystemDecors="true" />
++<display
++  name="port:2"
++  shouldShowSystemDecors="true" />
++<display
++  name="port:3"
++  shouldShowSystemDecors="true" />
++</display-settings>
++
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 60bb7715..74ff6df6 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -252,6 +252,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
+ 
++# Copy framework display settings file
++PRODUCT_COPY_FILES += \
++    device/idtech/common/display-settings/display_settings.xml:$(TARGET_COPY_OUT_VENDOR)/etc/display_settings.xml
++
+ # Copy soc related config and binary to board
+ PRODUCT_COPY_FILES += \
+     device/idtech/imx8m/init.idt.common.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/init.idt.common.rc \

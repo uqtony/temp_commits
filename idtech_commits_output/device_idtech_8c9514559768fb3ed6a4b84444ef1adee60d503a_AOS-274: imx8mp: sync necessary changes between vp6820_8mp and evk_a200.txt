@@ -1,0 +1,1474 @@
+8c951455 George.Huang 2020-07-31
+
+AOS-274: imx8mp: sync necessary changes between vp6820_8mp and evk_a200
+
+- check command:
+  $ diff -qrf evk_8mq/ evk_a300/
+  $ diff -qrf evk_a300/ vp6820_8mq/
+  $ diff -qrf evk_8mp/ evk_a200/
+  $ diff -qrf evk_a200/ vp6820_8mp/
+
+- TODO: Need to patch blow files in the future
+  evk_a200/audio_policy_configuration.xml for audio
+  evk_a200/BoardConfig.mk for BT/WIFI
+  evk_a200/camera_config_imx8mp.json for camera
+  evk_a200/init.rc for camera/backlight
+  evk_a200/manifest.xml for radio
+  evk_a200/UbootKernelBoardConfig.mk for uboot
+  vp6820_8mp/audio_policy_configuration.xml for audio
+  vp6820_8mp/BoardConfig.mk for BT/WIFI
+  vp6820_8mp/camera_config_imx8mp.json for camera
+  vp6820_8mp/init.rc for camera/backlight
+  vp6820_8mp/manifest.xml for radio
+  vp6820_8mp/init.imx8mp.rc for spl_[a|b]
+  vp6820_8mp/sepolicy/file_contexts for spl_[a|b]
+  vp6820_8mp/UbootKernelBoardConfig.mk for uboot
+
+Change-Id: I40899b6cd1f63f216b1d273e3a4bcc50ec245189
+
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index 6df5b93e..f85e9332 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -29,11 +29,13 @@
+ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/evk_a300/evk_a300.mk \
+   $(LOCAL_DIR)/evk_a300/evk_a300_drm.mk \
++  $(LOCAL_DIR)/evk_a200/evk_a200.mk \
+   $(LOCAL_DIR)/evk_a100/evk_a100.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_drm.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_secure.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_go.mk \
++  $(LOCAL_DIR)/vp6820_8mp/vp6820_8mp.mk \
+   $(LOCAL_DIR)/vp6820_8mn/vp6820_8mn.mk \
+   $(LOCAL_DIR)/vp6820_8mn/vp6820_8mn_secure.mk
+ 
+@@ -42,6 +44,8 @@ COMMON_LUNCH_CHOICES := \
+   evk_a300-userdebug \
+   evk_a300_drm-user \
+   evk_a300_drm-userdebug \
++  evk_a200-user \
++  evk_a200-userdebug \
+   evk_a100-user \
+   evk_a100-userdebug \
+   vp6820_8mq-user \
+@@ -51,6 +55,8 @@ COMMON_LUNCH_CHOICES := \
+   vp6820_8mq_secure-user \
+   vp6820_8mq_go-user \
+   vp6820_8mq_go-userdebug \
++  vp6820_8mp-user \
++  vp6820_8mp-userdebug \
+   vp6820_8mn-user \
+   vp6820_8mn-userdebug \
+   vp6820_8mn_secure-user
+diff --git a/imx8m/evk_a200/AndroidBoard.mk b/imx8m/evk_a200/AndroidBoard.mk
+index 5619a48b..e9cf443e 100644
+--- a/imx8m/evk_a200/AndroidBoard.mk
++++ b/imx8m/evk_a200/AndroidBoard.mk
+@@ -1,8 +1,8 @@
+ LOCAL_PATH := $(call my-dir)
+ 
+-include device/fsl/common/build/dtbo.mk
+-include device/fsl/common/build/imx-recovery.mk
+-include device/fsl/common/build/gpt.mk
++include device/idtech/common/build/dtbo.mk
++include device/idtech/common/build/imx-recovery.mk
++include device/idtech/common/build/gpt.mk
+ #TODO add imx8mp target
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a200/AndroidUboot.mk b/imx8m/evk_a200/AndroidUboot.mk
+index 9bcaf1f0..9405e681 100644
+--- a/imx8m/evk_a200/AndroidUboot.mk
++++ b/imx8m/evk_a200/AndroidUboot.mk
+@@ -16,7 +16,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/arch/arm/dts/imx8mp-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ]; then \
++	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ]; then \
+ 		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mp.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+ 	else \
+diff --git a/imx8m/evk_a200/BoardConfig.mk b/imx8m/evk_a200/BoardConfig.mk
+index b26a176c..034ec97d 100644
+--- a/imx8m/evk_a200/BoardConfig.mk
++++ b/imx8m/evk_a200/BoardConfig.mk
+@@ -3,7 +3,8 @@
+ #
+ 
+ BOARD_SOC_TYPE := IMX8MP
+-BOARD_TYPE := EVK
++BOARD_SOM_TYPE := a200
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+ HAVE_FSL_IMX_GPU2D := false
+@@ -32,9 +33,9 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ # Product-specific compile-time definitions.
+ #
+ 
+-IMX_DEVICE_PATH := device/fsl/imx8m/evk_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a200
+ 
+-include device/fsl/imx8m/BoardConfigCommon.mk
++include device/idtech/imx8m/BoardConfigCommon.mk
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -43,21 +44,21 @@ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab_super.bpt
+-  ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
+-                           partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab-no-product.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+ endif
+ 
+@@ -85,7 +86,8 @@ BOARD_HAVE_BLUETOOTH_NXP := true
+ # NXP 8997 BT
+ BOARD_HAVE_BLUETOOTH_NXP := true
+ 
+-BOARD_USE_SENSOR_FUSION := true
++#BOARD_USE_SENSOR_FUSION := true
++BOARD_USE_ST_SENSOR_INPUT := true
+ 
+ # we don't support sparse image.
+ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+@@ -99,9 +101,8 @@ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/fsl/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ TARGET_USES_MKE2FS := true
+ 
+ # define frame buffer count
+@@ -134,7 +135,9 @@ $(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open
+ endif
+ endif
+ 
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_8mp/dtbo-imx8mp.img
++LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
++LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a200/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+@@ -159,10 +162,10 @@ else # no dynamic parition feature
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+-       device/fsl/imx8m/sepolicy \
++       device/idtech/imx8m/sepolicy \
+        $(IMX_DEVICE_PATH)/sepolicy
+ 
+-TARGET_BOARD_KERNEL_HEADERS := device/fsl/common/kernel-headers
++TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
+diff --git a/imx8m/evk_a200/UbootKernelBoardConfig.mk b/imx8m/evk_a200/UbootKernelBoardConfig.mk
+index 3327dc7b..3966419e 100644
+--- a/imx8m/evk_a200/UbootKernelBoardConfig.mk
++++ b/imx8m/evk_a200/UbootKernelBoardConfig.mk
+@@ -3,17 +3,17 @@ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target
+-TARGET_BOOTLOADER_CONFIG := imx8mp:imx8mp_evk_android_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty:imx8mp_evk_android_trusty_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-dual:imx8mp_evk_android_dual_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty-dual:imx8mp_evk_android_trusty_dual_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-evk-uuu:imx8mp_evk_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG := imx8mp-devboard:imx8mp_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty:imx8mp_evk_android_trusty_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-dual:imx8mp_evk_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-dual:imx8mp_evk_android_trusty_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-evk-uuu:imx8mp_evk_android_uuu_defconfig
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
+-
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+ TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+diff --git a/imx8m/evk_a200/android_addition_defconfig b/imx8m/evk_a200/android_addition_defconfig
+index 18be38d6..d7438a76 100644
+--- a/imx8m/evk_a200/android_addition_defconfig
++++ b/imx8m/evk_a200/android_addition_defconfig
+@@ -1 +1,251 @@
+ CONFIG_CLD_HL_SDIO_CORE=y
++CONFIG_IDG_SPI=y
++# CONFIG_USB_NET_QMI_WWAN is not set
++CONFIG_SINGLE_LOGO=y
++CONFIG_SPLASH_SCREEN_CENTERED=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_OPTION=y
++CONFIG_INPUT_VL53L1X_ULD=y
++CONFIG_SND_SOC_IMX_RT5640=y
++CONFIG_SND_SOC_RT5640=y
++CONFIG_KEYBOARD_MATRIX=y
++CONFIG_TYPEC_HD3SS3220=y
++CONFIG_MXC_DUAL_MIPI_CAMERA=y
++CONFIG_MXC_CAMERA_OV2685_MIPI_V2=y
++CONFIG_INPUT_ST=y
++CONFIG_INPUT_ECOMPASS=y
++CONFIG_INPUT_LSM303AGR=y
++CONFIG_INPUT_LSM303AGR_I2C=y
++CONFIG_TOUCHSCREEN_GOODIX=y
++CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM=y
++CONFIG_ENABLE_DEFAULT_TRACERS=y
++CONFIG_KPROBE_EVENTS=y
++CONFIG_UPROBE_EVENTS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
++
++CONFIG_PARAVIRT=y
++CONFIG_NETFILTER_XT_TARGET_CT=y
++CONFIG_MVMDIO=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_I2C_SLAVE=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_POWER_RESET_BRCMSTB=y
++CONFIG_REGULATOR=y
++CONFIG_DRM_I2C_CH7006=m
++CONFIG_DRM_I2C_SIL164=m
++CONFIG_TMPFS=y
++CONFIG_BCM_FLEXRM_MBOX=y
++CONFIG_PHY_SAMSUNG_USB2=y
++CONFIG_ARM_TIMER_SP804=y
++CONFIG_COMMON_CLK_VERSATILE=y
++CONFIG_CLK_SP810=y
++CONFIG_USB_SNP_UDC_PLAT=y
++CONFIG_USB_BDC_UDC=y
++CONFIG_BCM_SBA_RAID=m
++
++# CONFIG_KVM is not set
++# CONFIG_MTD_UBI is not set
++# CONFIG_VGA_ARB is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_ALPINE is not set
++# CONFIG_ARCH_BCM2835 is not set
++# CONFIG_ARCH_BCM_IPROC is not set
++# CONFIG_ARCH_BERLIN is not set
++# CONFIG_ARCH_BRCMSTB is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_LAYERSCAPE is not set
++# CONFIG_ARCH_LG1K is not set
++# CONFIG_ARCH_HISI is not set
++# CONFIG_ARCH_MEDIATEK is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_ARCH_QCOM is not set
++# CONFIG_ARCH_ROCKCHIP is not set
++# CONFIG_ARCH_SEATTLE is not set
++# CONFIG_ARCH_RENESAS is not set
++# CONFIG_ARCH_R8A7795 is not set
++# CONFIG_ARCH_R8A7796 is not set
++# CONFIG_ARCH_STRATIX10 is not set
++# CONFIG_ARCH_TEGRA is not set
++# CONFIG_ARCH_SPRD is not set
++# CONFIG_ARCH_THUNDER is not set
++# CONFIG_ARCH_THUNDER2 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_ARCH_VEXPRESS is not set
++# CONFIG_ARCH_XGENE is not set
++# CONFIG_ARCH_ZX is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_PCI_HISI is not set
++# CONFIG_PCIE_KIRIN is not set
++# CONFIG_PCI_AARDVARK is not set
++# CONFIG_PCIE_RCAR is not set
++# CONFIG_PCIE_ROCKCHIP is not set
++# CONFIG_XEN is not set
++# CONFIG_SPI_FSL_QUADSPI is not set
++# CONFIG_XEN_BLKDEV_BACKEND is not set
++# CONFIG_AHCI_MVEBU is not set
++# CONFIG_SATA_RCAR is not set
++# CONFIG_NET_XGENE is not set
++# CONFIG_MVNETA is not set
++# CONFIG_MVPP2 is not set
++# CONFIG_RAVB is not set
++# CONFIG_MESON_GXL_PHY is not set
++# CONFIG_XEN_NETDEV_BACKEND is not set
++# CONFIG_INPUT_PM8941_PWRKEY is not set
++# CONFIG_INPUT_HISI_POWERKEY is not set
++# CONFIG_SERIAL_8250_BCM2835AUX is not set
++# CONFIG_SERIAL_8250_MT6577 is not set
++# CONFIG_SERIAL_8250_UNIPHIER is not set
++# CONFIG_SERIAL_MESON is not set
++# CONFIG_SERIAL_MESON_CONSOLE is not set
++# CONFIG_SERIAL_SAMSUNG is not set
++# CONFIG_SERIAL_SAMSUNG_CONSOLE is not set
++# CONFIG_SERIAL_TEGRA is not set
++# CONFIG_SERIAL_SH_SCI is not set
++# CONFIG_SERIAL_SH_SCI_NR_UARTS is not set
++# CONFIG_SERIAL_SH_SCI_CONSOLE is not set
++# CONFIG_SERIAL_MSM is not set
++# CONFIG_SERIAL_MSM_CONSOLE is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_XILINX_PS_UART_CONSOLE is not set
++# CONFIG_SERIAL_MVEBU_UART is not set
++# CONFIG_I2C_BCM2835 is not set
++# CONFIG_I2C_MESON is not set
++# CONFIG_I2C_MV64XXX is not set
++# CONFIG_I2C_PXA is not set
++# CONFIG_I2C_QUP is not set
++# CONFIG_I2C_SH_MOBILE is not set
++# CONFIG_I2C_TEGRA is not set
++# CONFIG_I2C_UNIPHIER_F is not set
++# CONFIG_I2C_RCAR is not set
++# CONFIG_SPI_BCM2835 is not set
++# CONFIG_SPI_BCM2835AUX is not set
++# CONFIG_SPI_MESON_SPICC is not set
++# CONFIG_SPI_ORION is not set
++# CONFIG_SPI_ROCKCHIP is not set
++# CONFIG_SPI_QUP is not set
++# CONFIG_SPI_S3C64XX is not set
++# CONFIG_PINCTRL_MAX77620 is not set
++# CONFIG_PINCTRL_IPQ8074 is not set
++# CONFIG_PINCTRL_MSM8916 is not set
++# CONFIG_PINCTRL_MSM8994 is not set
++# CONFIG_PINCTRL_MSM8996 is not set
++# CONFIG_PINCTRL_QDF2XXX is not set
++# CONFIG_PINCTRL_QCOM_SPMI_PMIC is not set
++# CONFIG_GPIO_RCAR is not set
++# CONFIG_GPIO_XGENE_SB is not set
++# CONFIG_POWER_RESET_MSM is not set
++# CONFIG_ROCKCHIP_THERMAL is not set
++# CONFIG_EXYNOS_THERMAL is not set
++# CONFIG_S3C2410_WATCHDOG is not set
++# CONFIG_MESON_GXBB_WATCHDOG is not set
++# CONFIG_MESON_WATCHDOG is not set
++# CONFIG_RENESAS_WDT is not set
++# CONFIG_UNIPHIER_WATCHDOG is not set
++# CONFIG_BCM2835_WDT is not set
++# CONFIG_MFD_AXP20X_RSB is not set
++# CONFIG_MFD_EXYNOS_LPASS is not set
++# CONFIG_MFD_HI655X_PMIC is not set
++# CONFIG_MFD_SPMI_PMIC is not set
++# CONFIG_REGULATOR_AXP20X is not set
++# CONFIG_REGULATOR_HI655X is not set
++# CONFIG_REGULATOR_QCOM_SMD_RPM is not set
++# CONFIG_RPMSG is not set
++# CONFIG_IR_MESON is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_JPEG is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_MFC is not set
++# CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC is not set
++# CONFIG_VIDEO_RENESAS_FCP is not set
++# CONFIG_VIDEO_RENESAS_VSP1 is not set
++# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
++# CONFIG_ROCKCHIP_CDN_DP is not set
++# CONFIG_ROCKCHIP_DW_HDMI is not set
++# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
++# CONFIG_ROCKCHIP_INNO_HDMI is not set
++# CONFIG_SND_BCM2835_SOC_I2S is not set
++# CONFIG_SND_SOC_SAMSUNG is not set
++# CONFIG_SND_SOC_RCAR is not set
++# CONFIG_DRM_NOUVEAU is not set
++# CONFIG_DRM_EXYNOS is not set
++# CONFIG_DRM_EXYNOS5433_DECON is not set
++# CONFIG_DRM_EXYNOS7_DECON is not set
++# CONFIG_DRM_EXYNOS_DSI is not set
++# CONFIG_DRM_EXYNOS_DP is not set
++# CONFIG_DRM_EXYNOS_HDMI is not set
++# CONFIG_DRM_EXYNOS_MIC is not set
++# CONFIG_DRM_ROCKCHIP is not set
++# CONFIG_DRM_RCAR_DU is not set
++# CONFIG_DRM_RCAR_LVDS is not set
++# CONFIG_DRM_RCAR_VSP is not set
++# CONFIG_DRM_TEGRA is not set
++# CONFIG_DRM_VC4 is not set
++# CONFIG_DRM_MESON is not set
++# CONFIG_USB_XHCI_TEGRA is not set
++# CONFIG_USB_EHCI_MSM is not set
++# CONFIG_USB_EHCI_EXYNOS is not set
++# CONFIG_USB_OHCI_EXYNOS is not set
++# CONFIG_USB_RENESAS_USBHS is not set
++# CONFIG_USB_QCOM_8X16_PHY is not set
++# CONFIG_RASPBERRYPI_FIRMWARE is not set
++# CONFIG_PHY_SUN4I_USB is not set
++# CONFIG_PHY_HI6220_USB is not set
++# CONFIG_PHY_RCAR_GEN3_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_EMMC is not set
++# CONFIG_PHY_ROCKCHIP_INNO_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_PCIE is not set
++# CONFIG_PHY_TEGRA_XUSB is not set
++# CONFIG_QCOM_L2_PMU is not set
++# CONFIG_QCOM_L3_PMU is not set
++# CONFIG_PWM_MESON is not set
++# CONFIG_PWM_ROCKCHIP is not set
++# CONFIG_PWM_SAMSUNG is not set
++# CONFIG_PWM_TEGRA is not set
++# CONFIG_QCOM_SMEM is not set
++# CONFIG_QCOM_SMD_RPM is not set
++# CONFIG_QCOM_SMP2P is not set
++# CONFIG_QCOM_SMSM is not set
++# CONFIG_ROCKCHIP_PM_DOMAINS is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_EXYNOS_ADC is not set
++# CONFIG_ROCKCHIP_SARADC is not set
++# CONFIG_PWM_BCM2835 is not set
++# CONFIG_RPMSG_QCOM_SMD is not set
++# CONFIG_RASPBERRYPI_POWER is not set
++# CONFIG_BCM2835_MBOX is not set
++# CONFIG_HI6220_MBOX is not set
++# CONFIG_ROCKCHIP_IOMMU is not set
++# CONFIG_HWSPINLOCK_QCOM is not set
++# CONFIG_COMMON_CLK_QCOM is not set
++# CONFIG_QCOM_CLK_SMD_RPM is not set
++# CONFIG_IPQ_GCC_8074 is not set
++# CONFIG_MSM_GCC_8916 is not set
++# CONFIG_MSM_GCC_8994 is not set
++# CONFIG_MSM_MMCC_8996 is not set
++# CONFIG_USB_RENESAS_USBHS_UDC is not set
++# CONFIG_MMC_SDHCI_OF_ESDHC is not set
++# CONFIG_XEN_GNTDEV is not set
++# CONFIG_XEN_GRANT_DEV_ALLOC is not set
++# CONFIG_RCAR_DMAC is not set
++# CONFIG_TEGRA20_APB_DMA is not set
++# CONFIG_QCOM_BAM_DMA is not set
++# CONFIG_K3_DMA is not set
++# CONFIG_DMA_BCM2835 is not set
++# CONFIG_RTC_DRV_XGENE is not set
++# CONFIG_RTC_DRV_TEGRA is not set
++# CONFIG_RTC_DRV_S3C is not set
++# CONFIG_MMC_DW_ROCKCHIP is not set
++# CONFIG_MMC_SUNXI is not set
++# CONFIG_MMC_BCM2835 is not set
++# CONFIG_MMC_SDHCI_TEGRA is not set
++# CONFIG_MMC_MESON_GX is not set
++# CONFIG_MMC_SDHCI_MSM is not set
++# CONFIG_MMC_SDHI is not set
++# CONFIG_MMC_DW_EXYNOS is not set
+diff --git a/imx8m/evk_a200/android_secure_defconfig b/imx8m/evk_a200/android_secure_defconfig
+new file mode 100644
+index 00000000..324e78ac
+--- /dev/null
++++ b/imx8m/evk_a200/android_secure_defconfig
+@@ -0,0 +1,4 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_KPROBE_EVENTS is not set
++# CONFIG_UPROBE_EVENTS is not set
+diff --git a/imx8m/evk_a200/evk_a200.mk b/imx8m/evk_a200/evk_a200.mk
+index 573195e0..c4890600 100644
+--- a/imx8m/evk_a200/evk_a200.mk
++++ b/imx8m/evk_a200/evk_a200.mk
+@@ -1,28 +1,29 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/fsl/imx8m/evk_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/evk_a200
+ 
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+--include device/fsl/common/imx_path/ImxPathConfig.mk
+-include device/fsl/imx8m/ProductConfigCommon.mk
++-include device/idtech/common/imx_path/ImxPathConfig.mk
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+ endif
+ 
+ # Overrides
+-PRODUCT_NAME := evk_8mp
+-PRODUCT_DEVICE := evk_8mp
+-PRODUCT_MODEL := EVK_8MP
++PRODUCT_NAME := evk_a200
++PRODUCT_DEVICE := evk_a200
++PRODUCT_MODEL := EVK_A200
+ 
+ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ 
+ #Enable this to choose 32 bit user space build
+ #IMX8_BUILD_32BIT_ROOTFS := true
+ 
++TARGET_USE_DYNAMIC_PARTITIONS := false
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ #If the device is retrofit to have dynamic partition feature, set this variable to true to build
+@@ -75,9 +76,12 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+     $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+-    device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+-    device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/fsl/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img \
++    device/idtech/common/prebuilts/mem_info.txt:$(PRODUCT_OUT)/mem_info.txt
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -87,19 +91,20 @@ endif
+ 
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/audio-json/wm8960_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8960_config.json \
+-    device/fsl/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
+-    device/fsl/common/audio-json/hdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/hdmi_config.json \
+-    device/fsl/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++    device/idtech/common/audio-json/wm8960_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8960_config.json \
++    device/idtech/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
++    device/idtech/common/audio-json/hdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/hdmi_config.json \
++    device/idtech/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+-    device/fsl/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++    device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    device/idtech/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
++    device/idtech/imx8m/evk_a200/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+@@ -137,17 +142,17 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
+ 
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
++    device/idtech/imx8m/evk_a200/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
+ 
+ # fastboot_imx_flashall scripts, fsl-sdcard-partition script uuu_imx_android_flash scripts
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
+-    device/fsl/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
+-    device/fsl/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
+-    device/fsl/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
+-    device/fsl/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++    device/idtech/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    device/idtech/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    device/idtech/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
++    device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
+ 
+-# Copy media_codecs.xml for 1GB evk_imx8mp board
++# Copy media_codecs.xml for 1GB evk_a200 board
+ ifeq ($(LOW_MEMORY),true)
+ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/imx8mp/media_codecs_no_vpu.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs.xml
+@@ -217,6 +222,9 @@ PRODUCT_PACKAGES += \
+     android.hardware.power@1.3-service.imx \
+     android.hardware.light@2.0-impl \
+     android.hardware.light@2.0-service \
++    android.hardware.sensors@1.0-impl \
++    android.hardware.sensors@1.0-convert \
++    android.hardware.sensors@1.0-service \
+     android.hardware.configstore@1.1-service \
+     configstore@1.1.policy
+ 
+@@ -224,7 +232,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.thermal@2.0-service.imx
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
++    device/idtech/imx8m/evk_a200/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
+ 
+ # Neural Network HAL and lib
+ PRODUCT_PACKAGES += \
+@@ -376,6 +384,10 @@ PRODUCT_PACKAGES += \
+     android.hardware.oemlock@1.0-service.imx
+ endif
+ 
++# Multi-Display launcher
++PRODUCT_PACKAGES += \
++    MultiClientInputMethod
++
+ # Specify rollback index for bootloader and for AVB
+ ifneq ($(AVB_RBINDEX),)
+ BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)
+@@ -404,3 +416,21 @@ endif
+ 
+ # Included GMS package
+ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
++
++# Copy Quectel vendor RIL
++PRODUCT_COPY_FILES += \
++    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
++    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
++    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
++    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
++    vendor/quectel/chat:/system/bin/chat \
++    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
++    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
++    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
++    vendor/quectel/QFlash:/system/bin/QFlash \
++    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
++    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
++    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
++    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
++    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
++    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+diff --git a/imx8m/evk_a200/fstab.freescale b/imx8m/evk_a200/fstab.freescale
+index 3925c752..e647d933 100644
+--- a/imx8m/evk_a200/fstab.freescale
++++ b/imx8m/evk_a200/fstab.freescale
+@@ -8,3 +8,4 @@
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+ /dev/block/zram0 none swap defaults zramsize=629145600
+ 
++/devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
+diff --git a/imx8m/evk_a200/init.rc b/imx8m/evk_a200/init.rc
+index 7901fcc6..97d8e249 100644
+--- a/imx8m/evk_a200/init.rc
++++ b/imx8m/evk_a200/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /init.idtech.rc
+ 
+ on early-init
+     # mount the debugfs
+@@ -80,7 +81,7 @@ on early-boot
+     setprop ro.lmk.critical_upgrade true
+ 
+     # Set the host name which used in console
+-    export HOSTNAME evk_8mp
++    export HOSTNAME evk_a200
+ 
+     # Set permission for IIM node
+     symlink /dev/mxs_viim /dev/mxc_mem
+@@ -171,6 +172,12 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     group input
+     oneshot
+ 
++service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
++    class hal
++    user system
++    group system wakelock input root
++    capabilities BLOCK_SUSPEND SYS_NICE
++
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+     class core
+diff --git a/imx8m/evk_a200/manifest.xml b/imx8m/evk_a200/manifest.xml
+index d486f8ac..41f51192 100644
+--- a/imx8m/evk_a200/manifest.xml
++++ b/imx8m/evk_a200/manifest.xml
+@@ -70,6 +70,15 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl">
++        <name>android.hardware.sensors</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ISensors</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+     <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/evk_a200/sepolicy/file_contexts b/imx8m/evk_a200/sepolicy/file_contexts
+index d453739b..da06f1f8 100644
+--- a/imx8m/evk_a200/sepolicy/file_contexts
++++ b/imx8m/evk_a200/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+diff --git a/imx8m/evk_a200/sepolicy/genfs_contexts b/imx8m/evk_a200/sepolicy/genfs_contexts
+index e6c4c582..ce624313 100644
+--- a/imx8m/evk_a200/sepolicy/genfs_contexts
++++ b/imx8m/evk_a200/sepolicy/genfs_contexts
+@@ -3,6 +3,7 @@ genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/m
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30b60000.mmc/mmc_host/mmc2/mmc2:0001/block/mmcblk2 u:object_r:sysfs_block_devices:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi0/spi0.0/mtd/mtd0/mtdblock0 u:object_r:sysfs_block_devices:s0
+ genfscon sysfs /devices/platform/soc@0/32c00000.bus/32e60000.mipi_dsi/32e60000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
++genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+ 
+ #sys/class/net
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net                u:object_r:sysfs_net:s0
+diff --git a/imx8m/evk_a200/ueventd.freescale.rc b/imx8m/evk_a200/ueventd.freescale.rc
+index ee560a30..227936e3 100644
+--- a/imx8m/evk_a200/ueventd.freescale.rc
++++ b/imx8m/evk_a200/ueventd.freescale.rc
+@@ -19,3 +19,9 @@
+ 
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++#quectel port
++/dev/ttyUSB*              0660   radio        radio
++/dev/cdc-wdm*             0660   radio        radio
++/dev/qcqmi*               0660   radio        radio
++/dev/cdc-acm*             0660   radio        radio
+diff --git a/imx8m/vp6820_8mp/AndroidBoard.mk b/imx8m/vp6820_8mp/AndroidBoard.mk
+index 5619a48b..e9cf443e 100644
+--- a/imx8m/vp6820_8mp/AndroidBoard.mk
++++ b/imx8m/vp6820_8mp/AndroidBoard.mk
+@@ -1,8 +1,8 @@
+ LOCAL_PATH := $(call my-dir)
+ 
+-include device/fsl/common/build/dtbo.mk
+-include device/fsl/common/build/imx-recovery.mk
+-include device/fsl/common/build/gpt.mk
++include device/idtech/common/build/dtbo.mk
++include device/idtech/common/build/imx-recovery.mk
++include device/idtech/common/build/gpt.mk
+ #TODO add imx8mp target
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/vp6820_8mp/AndroidUboot.mk b/imx8m/vp6820_8mp/AndroidUboot.mk
+index 9bcaf1f0..9405e681 100644
+--- a/imx8m/vp6820_8mp/AndroidUboot.mk
++++ b/imx8m/vp6820_8mp/AndroidUboot.mk
+@@ -16,7 +16,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/arch/arm/dts/imx8mp-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ]; then \
++	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ]; then \
+ 		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mp.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+ 	else \
+diff --git a/imx8m/vp6820_8mp/BoardConfig.mk b/imx8m/vp6820_8mp/BoardConfig.mk
+index b26a176c..0577a0a6 100644
+--- a/imx8m/vp6820_8mp/BoardConfig.mk
++++ b/imx8m/vp6820_8mp/BoardConfig.mk
+@@ -3,7 +3,8 @@
+ #
+ 
+ BOARD_SOC_TYPE := IMX8MP
+-BOARD_TYPE := EVK
++BOARD_SOM_TYPE := a200
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+ HAVE_FSL_IMX_GPU2D := false
+@@ -32,9 +33,9 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ # Product-specific compile-time definitions.
+ #
+ 
+-IMX_DEVICE_PATH := device/fsl/imx8m/evk_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mp
+ 
+-include device/fsl/imx8m/BoardConfigCommon.mk
++include device/idtech/imx8m/BoardConfigCommon.mk
+ 
+ BUILD_TARGET_FS ?= ext4
+ TARGET_USERIMAGES_USE_EXT4 := true
+@@ -43,21 +44,21 @@ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.freescale
+ 
+ # Support gpt
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab_super.bpt
+-  ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
+-                           partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab-no-product.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab-no-product.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += device/fsl/common/partition/device-partitions-13GB-ab.bpt
+-    ADDITION_BPT_PARTITION = partition-table-28GB:device/fsl/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:device/fsl/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
+-                             partition-table-28GB-dual:device/fsl/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+ endif
+ 
+@@ -85,7 +86,8 @@ BOARD_HAVE_BLUETOOTH_NXP := true
+ # NXP 8997 BT
+ BOARD_HAVE_BLUETOOTH_NXP := true
+ 
+-BOARD_USE_SENSOR_FUSION := true
++#BOARD_USE_SENSOR_FUSION := true
++BOARD_USE_ST_SENSOR_INPUT := true
+ 
+ # we don't support sparse image.
+ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+@@ -99,9 +101,8 @@ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/fsl/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ TARGET_USES_MKE2FS := true
+ 
+ # define frame buffer count
+@@ -134,7 +135,9 @@ $(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open
+ endif
+ endif
+ 
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_8mp/dtbo-imx8mp.img
++LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
++LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mp/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+@@ -159,10 +162,11 @@ else # no dynamic parition feature
+ endif
+ 
+ BOARD_SEPOLICY_DIRS := \
+-       device/fsl/imx8m/sepolicy \
++       device/idtech/imx8m/sepolicy \
+        $(IMX_DEVICE_PATH)/sepolicy
+ 
+-TARGET_BOARD_KERNEL_HEADERS := device/fsl/common/kernel-headers
++TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
++BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private
+diff --git a/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
+index 3327dc7b..f8e9ac82 100644
+--- a/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mp/UbootKernelBoardConfig.mk
+@@ -3,17 +3,24 @@ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target
+-TARGET_BOOTLOADER_CONFIG := imx8mp:imx8mp_evk_android_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty:imx8mp_evk_android_trusty_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-dual:imx8mp_evk_android_dual_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-trusty-dual:imx8mp_evk_android_trusty_dual_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-evk-uuu:imx8mp_evk_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG := imx8mp-devboard:imx8mp_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty:imx8mp_evk_android_trusty_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-dual:imx8mp_evk_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-dual:imx8mp_evk_android_trusty_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-evk-uuu:imx8mp_evk_android_uuu_defconfig
++
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk:imx8mp_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk-trusty:imx8mp_evk_android_trusty_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk-dual:imx8mp_evk_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk-trusty-dual:imx8mp_evk_android_trusty_dual_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mp-evk-evk-uuu:imx8mp_evk_android_uuu_defconfig
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
+-
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+ TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
+diff --git a/imx8m/vp6820_8mp/android_addition_defconfig b/imx8m/vp6820_8mp/android_addition_defconfig
+index 18be38d6..d7438a76 100644
+--- a/imx8m/vp6820_8mp/android_addition_defconfig
++++ b/imx8m/vp6820_8mp/android_addition_defconfig
+@@ -1 +1,251 @@
+ CONFIG_CLD_HL_SDIO_CORE=y
++CONFIG_IDG_SPI=y
++# CONFIG_USB_NET_QMI_WWAN is not set
++CONFIG_SINGLE_LOGO=y
++CONFIG_SPLASH_SCREEN_CENTERED=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_OPTION=y
++CONFIG_INPUT_VL53L1X_ULD=y
++CONFIG_SND_SOC_IMX_RT5640=y
++CONFIG_SND_SOC_RT5640=y
++CONFIG_KEYBOARD_MATRIX=y
++CONFIG_TYPEC_HD3SS3220=y
++CONFIG_MXC_DUAL_MIPI_CAMERA=y
++CONFIG_MXC_CAMERA_OV2685_MIPI_V2=y
++CONFIG_INPUT_ST=y
++CONFIG_INPUT_ECOMPASS=y
++CONFIG_INPUT_LSM303AGR=y
++CONFIG_INPUT_LSM303AGR_I2C=y
++CONFIG_TOUCHSCREEN_GOODIX=y
++CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM=y
++CONFIG_ENABLE_DEFAULT_TRACERS=y
++CONFIG_KPROBE_EVENTS=y
++CONFIG_UPROBE_EVENTS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
++
++CONFIG_PARAVIRT=y
++CONFIG_NETFILTER_XT_TARGET_CT=y
++CONFIG_MVMDIO=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_I2C_SLAVE=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_POWER_RESET_BRCMSTB=y
++CONFIG_REGULATOR=y
++CONFIG_DRM_I2C_CH7006=m
++CONFIG_DRM_I2C_SIL164=m
++CONFIG_TMPFS=y
++CONFIG_BCM_FLEXRM_MBOX=y
++CONFIG_PHY_SAMSUNG_USB2=y
++CONFIG_ARM_TIMER_SP804=y
++CONFIG_COMMON_CLK_VERSATILE=y
++CONFIG_CLK_SP810=y
++CONFIG_USB_SNP_UDC_PLAT=y
++CONFIG_USB_BDC_UDC=y
++CONFIG_BCM_SBA_RAID=m
++
++# CONFIG_KVM is not set
++# CONFIG_MTD_UBI is not set
++# CONFIG_VGA_ARB is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_ALPINE is not set
++# CONFIG_ARCH_BCM2835 is not set
++# CONFIG_ARCH_BCM_IPROC is not set
++# CONFIG_ARCH_BERLIN is not set
++# CONFIG_ARCH_BRCMSTB is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_LAYERSCAPE is not set
++# CONFIG_ARCH_LG1K is not set
++# CONFIG_ARCH_HISI is not set
++# CONFIG_ARCH_MEDIATEK is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_ARCH_QCOM is not set
++# CONFIG_ARCH_ROCKCHIP is not set
++# CONFIG_ARCH_SEATTLE is not set
++# CONFIG_ARCH_RENESAS is not set
++# CONFIG_ARCH_R8A7795 is not set
++# CONFIG_ARCH_R8A7796 is not set
++# CONFIG_ARCH_STRATIX10 is not set
++# CONFIG_ARCH_TEGRA is not set
++# CONFIG_ARCH_SPRD is not set
++# CONFIG_ARCH_THUNDER is not set
++# CONFIG_ARCH_THUNDER2 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_ARCH_VEXPRESS is not set
++# CONFIG_ARCH_XGENE is not set
++# CONFIG_ARCH_ZX is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_PCI_HISI is not set
++# CONFIG_PCIE_KIRIN is not set
++# CONFIG_PCI_AARDVARK is not set
++# CONFIG_PCIE_RCAR is not set
++# CONFIG_PCIE_ROCKCHIP is not set
++# CONFIG_XEN is not set
++# CONFIG_SPI_FSL_QUADSPI is not set
++# CONFIG_XEN_BLKDEV_BACKEND is not set
++# CONFIG_AHCI_MVEBU is not set
++# CONFIG_SATA_RCAR is not set
++# CONFIG_NET_XGENE is not set
++# CONFIG_MVNETA is not set
++# CONFIG_MVPP2 is not set
++# CONFIG_RAVB is not set
++# CONFIG_MESON_GXL_PHY is not set
++# CONFIG_XEN_NETDEV_BACKEND is not set
++# CONFIG_INPUT_PM8941_PWRKEY is not set
++# CONFIG_INPUT_HISI_POWERKEY is not set
++# CONFIG_SERIAL_8250_BCM2835AUX is not set
++# CONFIG_SERIAL_8250_MT6577 is not set
++# CONFIG_SERIAL_8250_UNIPHIER is not set
++# CONFIG_SERIAL_MESON is not set
++# CONFIG_SERIAL_MESON_CONSOLE is not set
++# CONFIG_SERIAL_SAMSUNG is not set
++# CONFIG_SERIAL_SAMSUNG_CONSOLE is not set
++# CONFIG_SERIAL_TEGRA is not set
++# CONFIG_SERIAL_SH_SCI is not set
++# CONFIG_SERIAL_SH_SCI_NR_UARTS is not set
++# CONFIG_SERIAL_SH_SCI_CONSOLE is not set
++# CONFIG_SERIAL_MSM is not set
++# CONFIG_SERIAL_MSM_CONSOLE is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_XILINX_PS_UART_CONSOLE is not set
++# CONFIG_SERIAL_MVEBU_UART is not set
++# CONFIG_I2C_BCM2835 is not set
++# CONFIG_I2C_MESON is not set
++# CONFIG_I2C_MV64XXX is not set
++# CONFIG_I2C_PXA is not set
++# CONFIG_I2C_QUP is not set
++# CONFIG_I2C_SH_MOBILE is not set
++# CONFIG_I2C_TEGRA is not set
++# CONFIG_I2C_UNIPHIER_F is not set
++# CONFIG_I2C_RCAR is not set
++# CONFIG_SPI_BCM2835 is not set
++# CONFIG_SPI_BCM2835AUX is not set
++# CONFIG_SPI_MESON_SPICC is not set
++# CONFIG_SPI_ORION is not set
++# CONFIG_SPI_ROCKCHIP is not set
++# CONFIG_SPI_QUP is not set
++# CONFIG_SPI_S3C64XX is not set
++# CONFIG_PINCTRL_MAX77620 is not set
++# CONFIG_PINCTRL_IPQ8074 is not set
++# CONFIG_PINCTRL_MSM8916 is not set
++# CONFIG_PINCTRL_MSM8994 is not set
++# CONFIG_PINCTRL_MSM8996 is not set
++# CONFIG_PINCTRL_QDF2XXX is not set
++# CONFIG_PINCTRL_QCOM_SPMI_PMIC is not set
++# CONFIG_GPIO_RCAR is not set
++# CONFIG_GPIO_XGENE_SB is not set
++# CONFIG_POWER_RESET_MSM is not set
++# CONFIG_ROCKCHIP_THERMAL is not set
++# CONFIG_EXYNOS_THERMAL is not set
++# CONFIG_S3C2410_WATCHDOG is not set
++# CONFIG_MESON_GXBB_WATCHDOG is not set
++# CONFIG_MESON_WATCHDOG is not set
++# CONFIG_RENESAS_WDT is not set
++# CONFIG_UNIPHIER_WATCHDOG is not set
++# CONFIG_BCM2835_WDT is not set
++# CONFIG_MFD_AXP20X_RSB is not set
++# CONFIG_MFD_EXYNOS_LPASS is not set
++# CONFIG_MFD_HI655X_PMIC is not set
++# CONFIG_MFD_SPMI_PMIC is not set
++# CONFIG_REGULATOR_AXP20X is not set
++# CONFIG_REGULATOR_HI655X is not set
++# CONFIG_REGULATOR_QCOM_SMD_RPM is not set
++# CONFIG_RPMSG is not set
++# CONFIG_IR_MESON is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_JPEG is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_MFC is not set
++# CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC is not set
++# CONFIG_VIDEO_RENESAS_FCP is not set
++# CONFIG_VIDEO_RENESAS_VSP1 is not set
++# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
++# CONFIG_ROCKCHIP_CDN_DP is not set
++# CONFIG_ROCKCHIP_DW_HDMI is not set
++# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
++# CONFIG_ROCKCHIP_INNO_HDMI is not set
++# CONFIG_SND_BCM2835_SOC_I2S is not set
++# CONFIG_SND_SOC_SAMSUNG is not set
++# CONFIG_SND_SOC_RCAR is not set
++# CONFIG_DRM_NOUVEAU is not set
++# CONFIG_DRM_EXYNOS is not set
++# CONFIG_DRM_EXYNOS5433_DECON is not set
++# CONFIG_DRM_EXYNOS7_DECON is not set
++# CONFIG_DRM_EXYNOS_DSI is not set
++# CONFIG_DRM_EXYNOS_DP is not set
++# CONFIG_DRM_EXYNOS_HDMI is not set
++# CONFIG_DRM_EXYNOS_MIC is not set
++# CONFIG_DRM_ROCKCHIP is not set
++# CONFIG_DRM_RCAR_DU is not set
++# CONFIG_DRM_RCAR_LVDS is not set
++# CONFIG_DRM_RCAR_VSP is not set
++# CONFIG_DRM_TEGRA is not set
++# CONFIG_DRM_VC4 is not set
++# CONFIG_DRM_MESON is not set
++# CONFIG_USB_XHCI_TEGRA is not set
++# CONFIG_USB_EHCI_MSM is not set
++# CONFIG_USB_EHCI_EXYNOS is not set
++# CONFIG_USB_OHCI_EXYNOS is not set
++# CONFIG_USB_RENESAS_USBHS is not set
++# CONFIG_USB_QCOM_8X16_PHY is not set
++# CONFIG_RASPBERRYPI_FIRMWARE is not set
++# CONFIG_PHY_SUN4I_USB is not set
++# CONFIG_PHY_HI6220_USB is not set
++# CONFIG_PHY_RCAR_GEN3_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_EMMC is not set
++# CONFIG_PHY_ROCKCHIP_INNO_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_PCIE is not set
++# CONFIG_PHY_TEGRA_XUSB is not set
++# CONFIG_QCOM_L2_PMU is not set
++# CONFIG_QCOM_L3_PMU is not set
++# CONFIG_PWM_MESON is not set
++# CONFIG_PWM_ROCKCHIP is not set
++# CONFIG_PWM_SAMSUNG is not set
++# CONFIG_PWM_TEGRA is not set
++# CONFIG_QCOM_SMEM is not set
++# CONFIG_QCOM_SMD_RPM is not set
++# CONFIG_QCOM_SMP2P is not set
++# CONFIG_QCOM_SMSM is not set
++# CONFIG_ROCKCHIP_PM_DOMAINS is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_EXYNOS_ADC is not set
++# CONFIG_ROCKCHIP_SARADC is not set
++# CONFIG_PWM_BCM2835 is not set
++# CONFIG_RPMSG_QCOM_SMD is not set
++# CONFIG_RASPBERRYPI_POWER is not set
++# CONFIG_BCM2835_MBOX is not set
++# CONFIG_HI6220_MBOX is not set
++# CONFIG_ROCKCHIP_IOMMU is not set
++# CONFIG_HWSPINLOCK_QCOM is not set
++# CONFIG_COMMON_CLK_QCOM is not set
++# CONFIG_QCOM_CLK_SMD_RPM is not set
++# CONFIG_IPQ_GCC_8074 is not set
++# CONFIG_MSM_GCC_8916 is not set
++# CONFIG_MSM_GCC_8994 is not set
++# CONFIG_MSM_MMCC_8996 is not set
++# CONFIG_USB_RENESAS_USBHS_UDC is not set
++# CONFIG_MMC_SDHCI_OF_ESDHC is not set
++# CONFIG_XEN_GNTDEV is not set
++# CONFIG_XEN_GRANT_DEV_ALLOC is not set
++# CONFIG_RCAR_DMAC is not set
++# CONFIG_TEGRA20_APB_DMA is not set
++# CONFIG_QCOM_BAM_DMA is not set
++# CONFIG_K3_DMA is not set
++# CONFIG_DMA_BCM2835 is not set
++# CONFIG_RTC_DRV_XGENE is not set
++# CONFIG_RTC_DRV_TEGRA is not set
++# CONFIG_RTC_DRV_S3C is not set
++# CONFIG_MMC_DW_ROCKCHIP is not set
++# CONFIG_MMC_SUNXI is not set
++# CONFIG_MMC_BCM2835 is not set
++# CONFIG_MMC_SDHCI_TEGRA is not set
++# CONFIG_MMC_MESON_GX is not set
++# CONFIG_MMC_SDHCI_MSM is not set
++# CONFIG_MMC_SDHI is not set
++# CONFIG_MMC_DW_EXYNOS is not set
+diff --git a/imx8m/vp6820_8mp/android_secure_defconfig b/imx8m/vp6820_8mp/android_secure_defconfig
+new file mode 100644
+index 00000000..324e78ac
+--- /dev/null
++++ b/imx8m/vp6820_8mp/android_secure_defconfig
+@@ -0,0 +1,4 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
++# CONFIG_ENABLE_DEFAULT_TRACERS is not set
++# CONFIG_KPROBE_EVENTS is not set
++# CONFIG_UPROBE_EVENTS is not set
+diff --git a/imx8m/vp6820_8mp/fstab.freescale b/imx8m/vp6820_8mp/fstab.freescale
+index 3925c752..e647d933 100644
+--- a/imx8m/vp6820_8mp/fstab.freescale
++++ b/imx8m/vp6820_8mp/fstab.freescale
+@@ -8,3 +8,4 @@
+ /dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
+ /dev/block/zram0 none swap defaults zramsize=629145600
+ 
++/devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
+diff --git a/imx8m/vp6820_8mp/init.rc b/imx8m/vp6820_8mp/init.rc
+index 7901fcc6..73d644a7 100644
+--- a/imx8m/vp6820_8mp/init.rc
++++ b/imx8m/vp6820_8mp/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /product/etc/init/hw/init.idt.common.rc
+ 
+ on early-init
+     # mount the debugfs
+@@ -80,7 +81,7 @@ on early-boot
+     setprop ro.lmk.critical_upgrade true
+ 
+     # Set the host name which used in console
+-    export HOSTNAME evk_8mp
++    export HOSTNAME vp6820_8mp
+ 
+     # Set permission for IIM node
+     symlink /dev/mxs_viim /dev/mxc_mem
+@@ -171,6 +172,12 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     group input
+     oneshot
+ 
++service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
++    class hal
++    user system
++    group system wakelock input root
++    capabilities BLOCK_SUSPEND SYS_NICE
++
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+     class core
+diff --git a/imx8m/vp6820_8mp/manifest.xml b/imx8m/vp6820_8mp/manifest.xml
+index d486f8ac..41f51192 100644
+--- a/imx8m/vp6820_8mp/manifest.xml
++++ b/imx8m/vp6820_8mp/manifest.xml
+@@ -70,6 +70,15 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl">
++        <name>android.hardware.sensors</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ISensors</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+     <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mp/sepolicy/file_contexts b/imx8m/vp6820_8mp/sepolicy/file_contexts
+index d453739b..da06f1f8 100644
+--- a/imx8m/vp6820_8mp/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mp/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+diff --git a/imx8m/vp6820_8mp/sepolicy/genfs_contexts b/imx8m/vp6820_8mp/sepolicy/genfs_contexts
+index e6c4c582..ce624313 100644
+--- a/imx8m/vp6820_8mp/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mp/sepolicy/genfs_contexts
+@@ -3,6 +3,7 @@ genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/m
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30b60000.mmc/mmc_host/mmc2/mmc2:0001/block/mmcblk2 u:object_r:sysfs_block_devices:s0
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi0/spi0.0/mtd/mtd0/mtdblock0 u:object_r:sysfs_block_devices:s0
+ genfscon sysfs /devices/platform/soc@0/32c00000.bus/32e60000.mipi_dsi/32e60000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
++genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+ 
+ #sys/class/net
+ genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net                u:object_r:sysfs_net:s0
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp.mk b/imx8m/vp6820_8mp/vp6820_8mp.mk
+index 573195e0..c611b6e9 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp.mk
+@@ -1,28 +1,29 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/fsl/imx8m/evk_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mp
+ 
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+--include device/fsl/common/imx_path/ImxPathConfig.mk
+-include device/fsl/imx8m/ProductConfigCommon.mk
++-include device/idtech/common/imx_path/ImxPathConfig.mk
++include device/idtech/imx8m/ProductConfigCommon.mk
+ 
+ ifneq ($(wildcard $(IMX_DEVICE_PATH)/fstab.freescale),)
+ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+ endif
+ 
+ # Overrides
+-PRODUCT_NAME := evk_8mp
+-PRODUCT_DEVICE := evk_8mp
+-PRODUCT_MODEL := EVK_8MP
++PRODUCT_NAME := vp6820_8mp
++PRODUCT_DEVICE := vp6820_8mp
++PRODUCT_MODEL := VP6820_8MP
+ 
+ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ 
+ #Enable this to choose 32 bit user space build
+ #IMX8_BUILD_32BIT_ROOTFS := true
+ 
++TARGET_USE_DYNAMIC_PARTITIONS := false
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+ #If the device is retrofit to have dynamic partition feature, set this variable to true to build
+@@ -75,9 +76,15 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+     $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+-    device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+-    device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/fsl/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++    device/idtech/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
++    device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img \
++    device/idtech/common/prebuilts/mem_info.txt:$(PRODUCT_OUT)/mem_info.txt \
++    device/idtech/imx8m/device_policy.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/device_policy.sh
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -87,19 +94,20 @@ endif
+ 
+ # Audio card json
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/audio-json/wm8960_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8960_config.json \
+-    device/fsl/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
+-    device/fsl/common/audio-json/hdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/hdmi_config.json \
+-    device/fsl/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++    device/idtech/common/audio-json/wm8960_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8960_config.json \
++    device/idtech/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
++    device/idtech/common/audio-json/hdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/hdmi_config.json \
++    device/idtech/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
++    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+-    device/fsl/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++    device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    device/idtech/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
++    device/idtech/imx8m/vp6820_8mp/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+@@ -137,17 +145,17 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
+ 
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
++    device/idtech/imx8m/vp6820_8mp/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
+ 
+ # fastboot_imx_flashall scripts, fsl-sdcard-partition script uuu_imx_android_flash scripts
+ PRODUCT_COPY_FILES += \
+-    device/fsl/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
+-    device/fsl/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
+-    device/fsl/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
+-    device/fsl/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
+-    device/fsl/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++    device/idtech/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    device/idtech/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    device/idtech/common/tools/fsl-sdcard-partition.sh:fsl-sdcard-partition.sh \
++    device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
+ 
+-# Copy media_codecs.xml for 1GB evk_imx8mp board
++# Copy media_codecs.xml for 1GB vp6820_8mp board
+ ifeq ($(LOW_MEMORY),true)
+ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/imx8mp/media_codecs_no_vpu.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs.xml
+@@ -217,6 +225,9 @@ PRODUCT_PACKAGES += \
+     android.hardware.power@1.3-service.imx \
+     android.hardware.light@2.0-impl \
+     android.hardware.light@2.0-service \
++    android.hardware.sensors@1.0-impl \
++    android.hardware.sensors@1.0-convert \
++    android.hardware.sensors@1.0-service \
+     android.hardware.configstore@1.1-service \
+     configstore@1.1.policy
+ 
+@@ -224,7 +235,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.thermal@2.0-service.imx
+ PRODUCT_COPY_FILES += \
+-    device/fsl/imx8m/evk_8mp/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
++    device/idtech/imx8m/vp6820_8mp/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
+ 
+ # Neural Network HAL and lib
+ PRODUCT_PACKAGES += \
+@@ -337,6 +348,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     DirectAudioPlayer
+ 
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
+@@ -344,6 +356,7 @@ PRODUCT_PACKAGES += \
+ # Multi-Display launcher
+ PRODUCT_PACKAGES += \
+     MultiDisplay
++endif
+ 
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+@@ -376,6 +389,10 @@ PRODUCT_PACKAGES += \
+     android.hardware.oemlock@1.0-service.imx
+ endif
+ 
++# Multi-Display launcher
++PRODUCT_PACKAGES += \
++    MultiClientInputMethod
++
+ # Specify rollback index for bootloader and for AVB
+ ifneq ($(AVB_RBINDEX),)
+ BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)
+@@ -404,3 +421,36 @@ endif
+ 
+ # Included GMS package
+ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
++
++# Copy Quectel vendor RIL
++PRODUCT_COPY_FILES += \
++    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
++    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
++    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
++    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
++    vendor/quectel/chat:/system/bin/chat \
++    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
++    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
++    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
++    vendor/quectel/QFlash:/system/bin/QFlash \
++    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
++    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
++    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
++    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
++    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
++    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
++
++#AMS
++PRODUCT_PACKAGES += \
++    deviceadmin \
++    appmanager \
++    amsconnector \
++    amsclouddrive \
++    welcomeapp \
++    diagnosis \
++    youtubeplayer \
++    otaupdater
++
++# Enable kernel log for diagnosis
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.logd.kernel=true

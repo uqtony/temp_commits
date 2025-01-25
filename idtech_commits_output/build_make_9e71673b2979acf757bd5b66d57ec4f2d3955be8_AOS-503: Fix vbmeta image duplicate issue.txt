@@ -1,0 +1,45 @@
+9e71673b2 max.yang 2021-01-25
+
+AOS-503: Fix vbmeta image duplicate issue
+
+Symptom: Duplicated vbmeta images under /IMAGES in target-files
+Root Cause: By post flow, we need to generate vbmeta image first, then
+            extract to_sign data from it. After signed by ca, new vbmeta
+            should put back into same folder, but python zipfile module
+            don't support zip's update/delete function.
+Solution: Two solutions for this issue, we chose #1
+          1. Put signed image in separate folder, and handle it during
+             packing images.zip from target-files
+          2. After generating vbmeat by ca, extract all files from zip
+             replace vbmeta.img, and re-packing all files again.
+
+Change-Id: I2f8f979e57a3a29ac1739e3abaa9ff29e577c678
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 4cd11fe45..2971da14d 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -223,7 +223,7 @@ def create_released_vbmeta(output_zip, tmp_dir):
+ 
+   # Update vbmeta.img-partial to zip
+   with open(tmp_dir + "/IMAGES/vbmeta.img-partial", "r") as f_vbmeta:
+-    common.ZipWriteStr(output_zip, "IMAGES/vbmeta.img", f_vbmeta.read())
++    common.ZipWriteStr(output_zip, "SIGNED/vbmeta.img", f_vbmeta.read())
+ 
+ def bootloader_gen_sig(tgt_img, prefix, key):
+   to_sign = "./vendor/idtech/cst/" + prefix + "_" + key + "_tosign"
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index d49b899a3..76f9ce4fd 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -133,6 +133,10 @@ def EntriesForUserImages(input_file):
+     image = os.path.basename(image_path)
+     if OPTIONS.bootable_only and image not in ('boot.img', 'recovery.img'):
+       continue
++    if image == "vbmeta.img" and "SIGNED/vbmeta.img" in namelist:
++      print('Replace vbmeta.img by SIGNED one')
++      entries.append('{}:{}'.format("SIGNED/vbmeta.img", image))
++      continue
+     if not image.endswith(".img") and not image.endswith(".sh") \
+        and not image.endswith(".imx") and not image.endswith(".bat") \
+        and not image.startswith("spl") \

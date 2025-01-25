@@ -1,0 +1,34 @@
+8d292b56 owen.wen 2019-10-31
+
+AOS-16: always allow OEM UNLOCKED when userdebug build
+
+Change-Id: I15d51bbfe7a12a7af2675fae950039ed25b09641
+Signed-off-by: owen.wen <owen.wen@idtechproducts.com>
+Reviewed-on: https://gerrit.idtechproducts.com/c/android-imx/device/idtech/+/441
+Reviewed-by: Owen Wen <Owen.Wen@idtechproducts.com>
+Reviewed-by: Sergii Postulga <Sergii.Postulga@idtechproducts.com>
+Tested-by: Owen Wen <Owen.Wen@idtechproducts.com>
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index ff496fee..234edfc5 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -120,6 +120,9 @@ $(UBOOTENVSH): | $(UBOOT_OUT)
+ 		echo 'export ROLLBACK_INDEX_IN_CONTAINER=' >> $@; \
+ 	fi
+ 
++ifneq (user,$(filter user, $(TARGET_BUILD_VARIANT)))
++USERDEBUG := USERDEBUG=1
++endif
+ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 	$(hide) echo "Building $(UBOOT_ARCH) $(UBOOT_VERSION) U-Boot ..."
+ 	$(hide) $(call build_m4_image)
+@@ -128,7 +131,7 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		UBOOT_CONFIG=`echo $$ubootplat | cut -d':' -f2`; \
+ 		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) mrproper; \
+ 		$(MAKE) -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) $$UBOOT_CONFIG; \
+-		$(MAKE) -s -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" O=$(realpath $(UBOOT_OUT)) 1>/dev/null || exit 1; \
++		$(MAKE) -s -C $(UBOOT_IMX_PATH)/uboot-imx/ CROSS_COMPILE="$(UBOOT_CROSS_COMPILE_WRAPPER)" $(USERDEBUG) O=$(realpath $(UBOOT_OUT)) 1>/dev/null || exit 1; \
+ 		if [ "$(UBOOT_POST_PROCESS)" = "true" ]; then \
+ 			echo "build post process" ; \
+ 			. $(UBOOTENVSH); \

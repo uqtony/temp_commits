@@ -1,0 +1,232 @@
+c923ebf97261 George.Huang 2021-04-19
+
+AOS-572: qcacld-2.0: Fix CFI warnings
+
+When CFI is enabled, it tries to ensure the execution flow is valid when
+calling or returning from functions. This CL fixed CFI warning of callback
+functions.
+
+CRs-Fixed: 2850139
+Signed-off-by: Zhi Chen <zhichen@codeaurora.org>
+Change-Id: If5f4073cff148c68f5da129715e218721f08b7cc
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/CLD_TXRX/TLSHIM/tl_shim.c b/drivers/net/wireless/qcacld-2.0/CORE/CLD_TXRX/TLSHIM/tl_shim.c
+index 224dd6a0adb3..c31765071ccb 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/CLD_TXRX/TLSHIM/tl_shim.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/CLD_TXRX/TLSHIM/tl_shim.c
+@@ -988,9 +988,10 @@ static void tl_shim_flush_rx_frames(void *vos_ctx,
+ 	clear_bit(TLSHIM_FLUSH_CACHE_IN_PROGRESS, &sta_info->flags);
+ }
+ 
+-static void tlshim_data_rx_cb(struct txrx_tl_shim_ctx *tl_shim,
+-			      adf_nbuf_t buf_list, u_int16_t staid)
++static void tlshim_data_rx_cb(void *context, void *rxpkt, u_int16_t staid)
+ {
++	struct txrx_tl_shim_ctx *tl_shim = (struct txrx_tl_shim_ctx *)context;
++	adf_nbuf_t buf_list = (adf_nbuf_t)rxpkt;
+ 	void *vos_ctx = vos_get_global_context(VOS_MODULE_ID_TL, tl_shim);
+ 	struct tlshim_sta_info *sta_info;
+ 	adf_nbuf_t buf, next_buf;
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_tx_rx.h b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_tx_rx.h
+index 2fd820c5886e..4b68b297d4d4 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_tx_rx.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_tx_rx.h
+@@ -104,7 +104,7 @@
+   @return         : NET_XMIT_DROP if packets are dropped
+                   : NET_XMIT_SUCCESS if packet is enqueued successfully
+   ===========================================================================*/
+-extern int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
++extern netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
+ 
+ extern void hdd_drop_skb(hdd_adapter_t *adapter, struct sk_buff *skb);
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
+index 88c15d5aee11..94d3a8d6577e 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
+@@ -392,7 +392,7 @@ extern int iw_set_essid(struct net_device *dev,
+ 
+ extern int iw_get_essid(struct net_device *dev,
+                        struct iw_request_info *info,
+-                       struct iw_point *dwrq, char *extra);
++                       union iwreq_data *dwrq, char *extra);
+ 
+ 
+ extern int iw_set_ap_address(struct net_device *dev,
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_assoc.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_assoc.c
+index 712270c44035..a59f0da0e0d2 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_assoc.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_assoc.c
+@@ -5814,12 +5814,12 @@ static int __iw_get_essid(struct net_device *dev,
+  */
+ int iw_get_essid(struct net_device *dev,
+ 		 struct iw_request_info *info,
+-		 struct iw_point *wrqu, char *extra)
++		 union iwreq_data *wrqu, char *extra)
+ {
+ 	int ret;
+ 
+ 	vos_ssr_protect(__func__);
+-	ret = __iw_get_essid(dev, info, wrqu, extra);
++	ret = __iw_get_essid(dev, info, (struct iw_point *)wrqu, extra);
+ 	vos_ssr_unprotect(__func__);
+ 
+ 	return ret;
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_tx_rx.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_tx_rx.c
+index f84a6d8efda2..0cec975f550b 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_tx_rx.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_tx_rx.c
+@@ -748,7 +748,7 @@ int __hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+    return NETDEV_TX_OK;
+ }
+ 
+-int hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
++netdev_tx_t hdd_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	int ret;
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
+index f5cae61ab980..e15fc19edcfb 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
+@@ -2013,12 +2013,12 @@ static int __iw_get_name(struct net_device *dev,
+  */
+ static int iw_get_name(struct net_device *dev,
+ 			 struct iw_request_info *info,
+-			 char *wrqu, char *extra)
++			 union iwreq_data *wrqu, char *extra)
+ {
+ 	int ret;
+ 
+ 	vos_ssr_protect(__func__);
+-	ret = __iw_get_name(dev, info, wrqu, extra);
++	ret = __iw_get_name(dev, info, (char *)wrqu, extra);
+ 	vos_ssr_unprotect(__func__);
+ 
+ 	return ret;
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/include/limTrace.h b/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/include/limTrace.h
+index 66772e1af72f..196d943f2b92 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/include/limTrace.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/include/limTrace.h
+@@ -97,7 +97,7 @@ void limTraceUpdateMgmtStat(tpAniSirGlobal pMac, tANI_U8 subtype);
+ void limTraceDumpMgmtStat(tpAniSirGlobal pMac, tANI_U8 subtype);
+ tANI_U8* limTraceGetMlmStateString( tANI_U32 mlmState );
+ tANI_U8* limTraceGetSmeStateString( tANI_U32 smeState );
+-void limTraceDump(tpAniSirGlobal pMac, tpvosTraceRecord pRecord, tANI_U16 recIndex);
++void limTraceDump(void *pMac, tpvosTraceRecord pRecord, tANI_U16 recIndex);
+ void macTraceMsgTx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data);
+ void macTraceMsgRx(tpAniSirGlobal pMac, tANI_U8 session, tANI_U32 data);
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/lim/limTrace.c b/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/lim/limTrace.c
+index f0d1218359f2..3dcb479f2d06 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/lim/limTrace.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/MAC/src/pe/lim/limTrace.c
+@@ -127,9 +127,10 @@ void limTraceInit(tpAniSirGlobal pMac)
+ 
+ 
+ 
+-void limTraceDump(tpAniSirGlobal pMac, tpvosTraceRecord pRecord, tANI_U16 recIndex)
++void limTraceDump(void *context, tpvosTraceRecord pRecord, tANI_U16 recIndex)
+ {
+ 
++    tpAniSirGlobal pMac = (tpAniSirGlobal)context;
+     static char *frameSubtypeStr[LIM_TRACE_MAX_SUBTYPES] =
+     {
+         "Association request",
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_timer_pvt.h b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_timer_pvt.h
+index 459f95209c13..32672abdfc07 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_timer_pvt.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/linux/adf_os_timer_pvt.h
+@@ -44,11 +44,12 @@
+  */
+ typedef struct timer_list       __adf_os_timer_t;
+ typedef struct hrtimer          __adf_os_hrtimer_t;
++typedef enum hrtimer_restart    __adf_os_enum_hrtimer_t;
+ 
+-typedef enum {
++enum {
+     ADF_OS_HRTIMER_NORESTART = HRTIMER_NORESTART,
+     ADF_OS_HRTIMER_RESTART = HRTIMER_RESTART,
+-} __adf_os_enum_hrtimer_t;
++};
+ 
+ typedef enum hrtimer_restart (*__adf_os_hrtimer_func_t) (struct hrtimer *);
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif.h b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif.h
+index 06a02eebc1be..59123397e597 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif.h
+@@ -368,8 +368,8 @@ typedef struct _HID_ACCESS_LOG {
+ struct htc_callbacks {
+     void      *context;     /* context to pass to the dsrhandler
+                                note : rwCompletionHandler is provided the context passed to HIFReadWrite  */
+-    int (* rwCompletionHandler)(void *rwContext, int status);
+-    int (* dsrHandler)(void *context);
++    A_STATUS (* rwCompletionHandler)(void *rwContext, A_STATUS status);
++    A_STATUS (* dsrHandler)(void *context);
+ };
+ 
+ typedef struct osdrv_callbacks {
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif_msg_based.h b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif_msg_based.h
+index ae3332893730..c07ec57ab8ea 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif_msg_based.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/hif_msg_based.h
+@@ -44,7 +44,7 @@ extern "C" {
+ typedef struct {
+ 	void *Context;  /**< context meaningful to HTC */
+ 	A_STATUS (*txCompletionHandler)(void *Context, adf_nbuf_t wbuf,
+-					unsigned transferID);
++					unsigned int transferID);
+ 	A_STATUS (*rxCompletionHandler)(void *Context, adf_nbuf_t wbuf,
+ 					u_int8_t pipeID);
+ 	void     (*txResourceAvailHandler)(void *context, u_int8_t pipe);
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/HIF/sdio/linux/if_ath_sdio.c b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/HIF/sdio/linux/if_ath_sdio.c
+index b3ec7b7e04d6..b9e355d1e45a 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/HIF/sdio/linux/if_ath_sdio.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/HIF/sdio/linux/if_ath_sdio.c
+@@ -135,7 +135,7 @@ static inline void hif_release_ramdump_mem(unsigned long *address)
+ }
+ #endif
+ #endif
+-static A_STATUS
++static int
+ ath_hif_sdio_probe(void *context, void *hif_handle)
+ {
+     int ret = 0;
+@@ -293,7 +293,7 @@ ol_ath_sdio_configure(hif_softc_t hif_sc, struct net_device *dev, hif_handle_t *
+     return ret;
+ }
+ 
+-static A_STATUS
++static int
+ ath_hif_sdio_remove(void *context, void *hif_handle)
+ {
+     ENTER();
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_timer.h b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_timer.h
+index f3d7baa58f15..da2188f1bd6e 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_timer.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_timer.h
+@@ -383,7 +383,7 @@ static inline bool vos_system_time_after(vos_time_t a, vos_time_t b)
+ 
+ unsigned long vos_get_time_of_the_day_ms(void);
+ void vos_get_time_of_the_day_in_hr_min_sec_usec(char *tbuf, int len);
+-void vos_process_wd_timer(void);
++void vos_process_wd_timer(struct work_struct *twork);
+ void vos_wdthread_init_timer_work(void *callbackptr);
+ void vos_wdthread_flush_timer_work(void);
+ #endif // #if !defined __VOSS_TIMER_H
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
+index d316c1cb5d35..de4248955bc2 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
+@@ -1001,8 +1001,9 @@ static void __vos_process_wd_timer(void)
+  * Wrapper function to process timer work.
+  * return - void
+  */
+-void vos_process_wd_timer(void)
++void vos_process_wd_timer(struct work_struct *twork)
+ {
++	(void)(twork);
+ 	vos_ssr_protect(__func__);
+ 	__vos_process_wd_timer();
+ 	vos_ssr_unprotect(__func__);

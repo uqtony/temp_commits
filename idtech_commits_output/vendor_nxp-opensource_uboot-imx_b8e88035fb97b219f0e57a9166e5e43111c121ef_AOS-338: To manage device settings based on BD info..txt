@@ -1,0 +1,497 @@
+b8e88035fb Arthur Chen 2020-10-19
+
+AOS-338: To manage device settings based on BD info.
+
+    - add source about idt board info parser driver for U-boot usage.
+    - the magration design is about previous one in U-boot ver.2019, AOS-117
+    to be U-boot ver.2020.
+    - add features about Linux dtb in dtbo finding and
+    mipi display timing parsing in idt board info parser driver.
+
+Change-Id: Ic3ffc801e576d8ed57c0932177ad6735833ab53b
+
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 9fe5e87608..13f6badc3d 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -29,6 +29,7 @@ obj-$(CONFIG_$(SPL_TPL_)TPM) += tpm/
+ obj-$(CONFIG_$(SPL_TPL_)ACPI_PMC) += power/acpi_pmc/
+ obj-$(CONFIG_$(SPL_)BOARD) += board/
+ obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
++obj-$(CONFIG_IDT_BOARD_INFO_PARSER) += idt/bdinfo_parser/
+ 
+ ifndef CONFIG_TPL_BUILD
+ ifdef CONFIG_SPL_BUILD
+@@ -62,6 +63,7 @@ obj-$(CONFIG_HAVE_BLOCK_DEVICE) += block/
+ obj-$(CONFIG_SPL_FPGA_SUPPORT) += fpga/
+ obj-$(CONFIG_SPL_THERMAL) += thermal/
+ obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
++obj-$(CONFIG_IDT_BOARD_INFO_PARSER) += idt/bdinfo_parser/
+ 
+ endif
+ endif
+diff --git a/drivers/idt/Kconfig b/drivers/idt/Kconfig
+index e6e11abc21..1cad5ff19c 100644
+--- a/drivers/idt/Kconfig
++++ b/drivers/idt/Kconfig
+@@ -1 +1,2 @@
+ source "drivers/idt/multiddr/Kconfig"
++source "drivers/idt/bdinfo_parser/Kconfig"
+diff --git a/drivers/idt/bdinfo_parser/Kconfig b/drivers/idt/bdinfo_parser/Kconfig
+new file mode 100644
+index 0000000000..75d159b042
+--- /dev/null
++++ b/drivers/idt/bdinfo_parser/Kconfig
+@@ -0,0 +1,15 @@
++config IDT_BOARD_INFO_PARSER
++	bool "IDT BOARD INFO PARSER"
++	help
++	 Add support for IDT BOARD INFO PARSER about board info partition in emmc.
++	 Required for mipi display driver and feature controls depended on board
++	 info in U-boot.
++
++if IDT_BOARD_INFO_PARSER
++config IDT_LINUX_DTB
++	bool "IDT parsing Linux device tree depended board info"
++	help
++	  This feature for getting board info in early status, parsing Linux
++	  device tree and synchronized parameters between Linux & U-boot.
++	  IDT uses fastboot api to access data from emmc board info partition.
++endif
+diff --git a/drivers/idt/bdinfo_parser/Makefile b/drivers/idt/bdinfo_parser/Makefile
+new file mode 100644
+index 0000000000..04543e7d0a
+--- /dev/null
++++ b/drivers/idt/bdinfo_parser/Makefile
+@@ -0,0 +1,9 @@
++#
++## Copyright 2020 IDTech
++#
++
++ccflags-y += -I./lib
++
++ifdef CONFIG_IDT_BOARD_INFO_PARSER
++obj-$(CONFIG_IDT_LINUX_DTB) += linux_dtb.o
++endif
+diff --git a/drivers/idt/bdinfo_parser/linux_dtb.c b/drivers/idt/bdinfo_parser/linux_dtb.c
+new file mode 100644
+index 0000000000..1c9176b86a
+--- /dev/null
++++ b/drivers/idt/bdinfo_parser/linux_dtb.c
+@@ -0,0 +1,354 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2020 IDTECH - All Rights Reserved
++ * Author(s): Arthur Chen <arthur.chen@idtechproducts.com> for IDTECH.
++ *
++ */
++
++#include <common.h>
++#include <fb_fsl.h>
++#include <dt_table.h>
++#include <errno.h>
++#include <mmc.h>
++#include <persist_idt.h>
++#include <idt_bdinfo_parser.h>
++#include <stdlib.h>
++#include <fdtdec.h>
++#include "../lib/avb/libavb_ab/libavb_ab.h"
++
++#define GET_BYTE(x, n)  ((x & (0xff << 8 * n)) >> 8 * n)
++#define FDT_ID_SIZE	128
++#define DTBO_ENTRIES	4
++#define SLOT_OFFSET	2048
++#define SLOT_A		0
++#define SLOT_B		1
++
++#define DEBUG_INFO	0
++
++#if defined(CONFIG_IMX8MQ)
++#define PANEL_PATH "/soc@0/bus@30800000/mipi_dsi@30a00000/panel@0/display-timings/timing"
++#elif defined(CONFIG_IMX8MN)
++#define PANEL_PATH "/soc@0/bus@32c00000/dsi_controller@32e10000/panel@0/display-timings/timing"
++#endif
++
++static const char *dtbo_slot[2] = {"dtbo_a", "dtbo_b"};
++
++int get_ab_slot_index(void)
++{
++	AvbIOResult readret;
++	AvbABData *ab_check;
++	struct fastboot_ptentry *fpt_en_misc;
++	struct blk_desc *dev_desc;
++	unsigned char *misc_img;
++	size_t misc_size;
++	size_t num_bytes;
++	int ret;
++
++	fpt_en_misc = fastboot_flash_find_ptn("misc");
++	if (fpt_en_misc > 0) {
++		dev_desc = blk_get_dev("mmc", mmc_get_env_dev());
++		misc_size = (dev_desc->blksz)*(fpt_en_misc->length);
++		misc_img = malloc(misc_size);
++		if (misc_img == NULL) {
++			puts("misc_img init fail
+");
++			return -1;
++		}
++		readret = fsl_read_from_partition_multi(NULL,
++							"misc",
++							SLOT_OFFSET,
++							misc_size,
++							misc_img,
++							&num_bytes);
++		if (readret) {
++			printf("fsl_read_from_partition_multi read"
++			       " misc fail, return: %d
+", readret);
++			free(misc_img);
++			return -1;
++		}
++		ab_check = (struct AvbABData *) misc_img;
++		ret = (ab_check->slots[SLOT_A].priority >=
++		       ab_check->slots[SLOT_B].priority) ? SLOT_A : SLOT_B;
++#if DEBUG_INFO
++		printf("slot_a priority: %d, slot_b priority: %d
+",
++		       ab_check->slots[SLOT_A].priority,
++		       ab_check->slots[SLOT_B].priority);
++		printf("slot_a retry: %d, slot_b retry: %d
+",
++		       ab_check->slots[SLOT_A].tries_remaining,
++		       ab_check->slots[SLOT_B].tries_remaining);
++		printf("select: %s
+", dtbo_slot[ret]);
++#endif /* DEBUG_INFO */
++		free(misc_img);
++	} else {
++		printf("fastboot_flash_find_ptn misc fail: %d
+
+",
++		       fpt_en_misc);
++		ret = -1;
++	}
++
++	if (ret == SLOT_A)
++		env_set("dtbo_slot", "a");
++
++	if (ret == SLOT_B)
++		env_set("dtbo_slot", "b");
++
++	return ret;
++}
++
++int get_target_dtb_index(int slot, char *fdt_id)
++{
++	AvbIOResult readret;
++	struct dt_table_header *dt_table;
++	struct dt_table_entry *dt_entry;
++	struct fastboot_ptentry *fpt_en_dtbo;
++	struct blk_desc *dev_desc;
++	const struct fdt_property *fdt_prop;
++	const u32 *value;
++	unsigned char *dt_img;
++	char *fdt_blob;
++	size_t num_bytes;
++	size_t dtbo_size;
++	u32 dtbo_id;
++	u32 fdt_size;
++	u32 pinfo;
++	int len;
++	int nodeoff;
++	int fdt_count;
++	int fdt_idx = 1;
++	char entry_num[DTBO_ENTRIES] = "";
++
++	if ((slot < 0) || (slot > 1)) {
++		puts("dtbo slot selection fail
+");
++		return -1;
++	}
++#if DEBUG_INFO
++	printf("find partition: %s
+", dtbo_slot[slot]);
++	printf("target dtb id: %s
+", fdt_id);
++#endif /* DEBUG_INFO */
++	fpt_en_dtbo = fastboot_flash_find_ptn(dtbo_slot[slot]);
++	if (fpt_en_dtbo <= 0) {
++		puts("Get dtbo partition fail
+");
++		return -1;
++	}
++	dev_desc = blk_get_dev("mmc", mmc_get_env_dev());
++	dtbo_size = (dev_desc->blksz)*(fpt_en_dtbo->length);
++	dt_img = malloc(dtbo_size);
++	if (dt_img == NULL) {
++		puts("dt_img init fail
+");
++		return -1;
++	}
++
++	readret = fsl_read_from_partition_multi(NULL,
++						dtbo_slot[slot],
++						0,
++						dtbo_size,
++						dt_img,
++						&num_bytes);
++	if (readret) {
++		printf("fsl_read_from_partition_multi read %s"
++		       " fail, return: %d
+", dtbo_slot[slot],
++		       readret);
++		free(dt_img);
++			return -1;
++	}
++	dt_table = (struct dt_table_header *)dt_img;
++	fdt_count = fdt32_to_cpu(dt_table->dt_entry_count);
++	printf("
+Read %s...	%d dtbs in %s
+",
++	       dtbo_slot[slot], fdt_count, dtbo_slot[slot]);
++	while (fdt_idx < (fdt_count + 1)) {
++		dt_entry = (struct dt_table_entry *)
++			   ((ulong)dt_img +
++			    (fdt32_to_cpu(dt_table->
++					  dt_entries_offset) *
++			     fdt_idx));
++		fdt_size = fdt32_to_cpu(dt_entry->dt_size);
++		dtbo_id = fdt32_to_cpu(dt_entry->id);
++		printf("DTBO ID: %lx (", (ulong)dtbo_id);
++		for (len = 3; len >= 0; len--) {
++			if ((GET_BYTE(dtbo_id, len) > 31) &&
++			    (GET_BYTE(dtbo_id, len) < 127))
++				printf("%c",
++				       GET_BYTE(dtbo_id, len));
++		}
++		printf(")	 size (%d)
+", fdt_size);
++		fdt_blob = (void *)(ulong)dt_img +
++			   fdt32_to_cpu(dt_entry->dt_offset);
++		if (fdt_check_header(fdt_blob) != 0) {
++			puts("image is not a fdt
+");
++			fdt_idx = fdt_count + 1;
++			break;
++		}
++
++		if (fdt_totalsize(fdt_blob) != fdt_size) {
++			printf("fdt size != image size (%d)
+",
++			       fdt_size);
++			fdt_idx = fdt_count + 1;
++			break;
++		}
++
++		nodeoff = fdt_path_offset(fdt_blob, "/");
++		fdt_prop = fdt_get_property(fdt_blob,
++					    nodeoff,
++					    "compatible",
++					    &len);
++		if (len >= 0)
++			printf("FDT compatible: %s
+",
++			       fdt_prop->data);
++
++		fdt_prop = fdt_get_property(fdt_blob,
++					    nodeoff,
++					    "idt,prod-id",
++					    &len);
++		if (len >= 0) {
++			printf("FDT idt,prod-id: %s
+",
++			       fdt_prop->data);
++
++			if (!strncmp(fdt_id, fdt_prop->data,
++				     strlen(fdt_prop->data))) {
++				printf("## Selected Flattened"
++				       " Device Tree: %s
+",
++				       fdt_prop->data);
++				break;
++			}
++		}
++
++		fdt_idx++;
++	}
++	if (fdt_idx > fdt_count) {
++		printf("Can't find ID in %s
+", dtbo_slot[slot]);
++		fdt_idx = 1;
++		free(dt_img);
++		return -1;
++	}
++
++	sprintf(entry_num, "%d", fdt_idx);
++	env_set("entry_idx", entry_num);
++	free(dt_img);
++
++	return fdt_idx;
++}
++
++int set_timing(void *blob, int offset, const char *name,
++	       struct timing_entry *item)
++{
++	const u32 *value;
++	u32 pinfo;
++	int len;
++
++	value = fdt_getprop(blob, offset, name, &len);
++	if (len < 0) {
++		printf("KDTB: could not find property %s
+", name);
++		return len;
++	}
++	pinfo = fdt32_to_cpu(*value);
++	item->typ = pinfo;
++#if DEBUG_INFO
++	printf("%s: %d
+", name, item->typ);
++#endif /* DEBUG_INFO */
++	item->min = item->typ;
++	item->max = item->typ;
++
++	return 0;
++}
++
++int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
++{
++	AvbIOResult readret;
++	struct fastboot_ptentry *fpt_en_dtbo;
++	struct blk_desc *dev_desc;
++	unsigned char *dt_img;
++	struct dt_table_header *dt_table;
++	struct dt_table_entry *dt_entry;
++	const struct fdt_property *fdt_prop;
++	void *blob;
++	size_t num_bytes;
++	size_t dtbo_size;
++	int nodeoff;
++	int len;
++	int ret = -1;
++
++	if ((slot < 0) || (slot > 1)) {
++		puts("dtbo slot selection fail
+");
++		goto partition_err;
++	}
++#if DEBUG_INFO
++	printf("find partition: %s
+", dtbo_slot[slot]);
++#endif /* DEBUG_INFO */
++	fpt_en_dtbo = fastboot_flash_find_ptn(dtbo_slot[slot]);
++	if (fpt_en_dtbo <= 0) {
++		puts("Get dtbo partition fail
+");
++		goto partition_err;
++	}
++	dev_desc = blk_get_dev("mmc", mmc_get_env_dev());
++	dtbo_size = (dev_desc->blksz)*(fpt_en_dtbo->length);
++	dt_img = malloc(dtbo_size);
++	if (dt_img == NULL) {
++		puts("dt_img init fail
+");
++		goto partition_err;
++	}
++
++	readret = fsl_read_from_partition_multi(NULL,
++						dtbo_slot[slot],
++						0,
++						dtbo_size,
++						dt_img,
++						&num_bytes);
++	if (readret) {
++		printf("fsl_read_from_partition_multi read %s"
++		       " fail, return: %d
+", dtbo_slot[slot],
++		       readret);
++		goto timing_out;
++	}
++	dt_table = (struct dt_table_header *)dt_img;
++	dt_entry = (struct dt_table_entry *)
++		   ((ulong)dt_img +
++		    (fdt32_to_cpu(dt_table->dt_entries_offset) *
++		     fdt_idx));
++	blob = (void *)(ulong)dt_img +
++	       fdt32_to_cpu(dt_entry->dt_offset);
++
++	nodeoff = fdt_path_offset(blob, PANEL_PATH);
++	if (nodeoff < 0 ||
++	    !fdtdec_get_is_enabled(blob, nodeoff)) {
++		printf("%s get fail
+", PANEL_PATH);
++		goto timing_out;
++	}
++#if DEBUG_INFO
++	puts("
+"); /* for better console text layout */
++#endif /* DEBUG_INFO */
++	if (set_timing(blob, nodeoff, "clock-frequency", &dt->pixelclock))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "hactive", &dt->hactive))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "hfront-porch", &dt->hfront_porch))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "hback-porch", &dt->hback_porch))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "hsync-len", &dt->hsync_len))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "vactive", &dt->vactive))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "vfront-porch", &dt->vfront_porch))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "vback-porch", &dt->vback_porch))
++		goto timing_out;
++
++	if (set_timing(blob, nodeoff, "vsync-len", &dt->vsync_len))
++		goto timing_out;
++
++#if DEBUG_INFO
++	printf("Parse %s panel timing finish
+
+", dtbo_slot[slot]);
++#endif /* DEBUG_INFO */
++	ret = 0;
++
++timing_out:
++	free(dt_img);
++partition_err:
++
++	return ret;
++}
+diff --git a/include/idt_bdinfo_parser.h b/include/idt_bdinfo_parser.h
+new file mode 100644
+index 0000000000..5a71f078f5
+--- /dev/null
++++ b/include/idt_bdinfo_parser.h
+@@ -0,0 +1,23 @@
++/*
++ * Copyright (C) 2020 IDTECH - All Rights Reserved
++ * Author(s): Arthur Chen <arthur.chen@idtechproducts.com> for IDTECH.
++ *
++ */
++
++#ifndef __IDT_BDINFO_PARSER_H__
++#define __IDT_BDINFO_PARSER_H__
++
++#define BOARD_ID	128
++
++#ifdef CONFIG_IDT_LINUX_DTB
++
++/* find dtbo_slot in emmc storage */
++int get_ab_slot_index(void);
++/* find dtb in dtbo */
++int get_target_dtb_index(int slot, char *fdt_id);
++/* assign mipi timing */
++int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt);
++
++#endif /* CONFIG_IDT_LINUX_DTB */
++
++#endif /* __IDT_BDINFO_PARSER_H__ */

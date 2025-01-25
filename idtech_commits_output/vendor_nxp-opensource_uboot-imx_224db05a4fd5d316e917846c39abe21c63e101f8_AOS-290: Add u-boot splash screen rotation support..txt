@@ -1,0 +1,478 @@
+224db05a4f Arthur Chen 2020-08-10
+
+AOS-290: Add u-boot splash screen rotation support.
+
+    - Supported image form: square resolution with the length
+    limited by display short side resolution and forms about
+    BMP_24BPP, BMP_RLE8 (byte width: 16, 24, 32 [bits]).
+    - Can rotate image in runtime by "setenv sp_rotate <degree>"
+    and u-boot command about "bmp display".
+    - Rotation is depended on the degree number of "sp_rotate"
+    (0, 90, 180, 270) and with inverted clockwise direction.
+
+Change-Id: I69b0b5d2dd321ca6bf402020f76a7174f7a403dc
+
+diff --git a/cmd/bmp.c b/cmd/bmp.c
+index 5744fd7248..3381cf218f 100644
+--- a/cmd/bmp.c
++++ b/cmd/bmp.c
+@@ -21,6 +21,10 @@
+ #include <video.h>
+ #include <video_link.h>
+ #include <asm/byteorder.h>
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <asm/io.h>
++#define IMX8MQ_DCSS_DPR_FRAME_CTRL0		0x32e18070
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ static int bmp_info (ulong addr);
+ 
+@@ -114,6 +118,13 @@ static int do_bmp_display(cmd_tbl_t * cmdtp, int flag, int argc, char * const ar
+ {
+ 	ulong addr;
+ 	int x = 0, y = 0;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	int line_size = 0;
++	bool rotate = false;
++	struct udevice *dev;
++	char *env_value;
++	int degree, ret;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ 	splash_get_pos(&x, &y);
+ 
+@@ -138,8 +149,48 @@ static int do_bmp_display(cmd_tbl_t * cmdtp, int flag, int argc, char * const ar
+ 	default:
+ 		return CMD_RET_USAGE;
+ 	}
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
++	if (!ret) {
++		line_size = video_get_xsize(dev);
++		env_value = env_get("sp_rotate");
++		if (env_value != NULL) {
++			degree = (int)simple_strtol(env_value, NULL, 10);
++			rotate = true;
++		}
++	} else {
++		printf("splash screen rotation is not support
+");
++	}
++	if (rotate) {
++		switch (degree) {
++		case 90:
++			__raw_writel(((line_size * 4) << 16) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		case 180:
++			__raw_writel(((line_size * 4) << 16) | BIT(1) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			rotate = false;
++			break;
++		case 270:
++			__raw_writel(((line_size * 4) << 16) | BIT(1),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		default:
++			__raw_writel(((line_size * 4) << 16),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			rotate = false;
++			break;
++		}
++	} else {
++		__raw_writel(((line_size * 4) << 16),
++			     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++	}
+ 
+-	 return (bmp_display(addr, x, y));
++	return (bmp_display(addr, x, y, rotate));
++#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++	return (bmp_display(addr, x, y));
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ }
+ 
+ static cmd_tbl_t cmd_bmp_sub[] = {
+@@ -232,7 +283,11 @@ static int bmp_info(ulong addr)
+  * Return:      None
+  *
+  */
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++int bmp_display(ulong addr, int x, int y, bool rotate)
++#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ int bmp_display(ulong addr, int x, int y)
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ {
+ #ifdef CONFIG_DM_VIDEO
+ 	struct udevice *dev;
+@@ -269,7 +324,11 @@ int bmp_display(ulong addr, int x, int y)
+ 		    y == BMP_ALIGN_CENTER)
+ 			align = true;
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++		ret = video_bmp_display(dev, addr, x, y, align, rotate);
++#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 		ret = video_bmp_display(dev, addr, x, y, align);
++#endif /* CONFIG_IDT_ROTATION */
+ 	}
+ #elif defined(CONFIG_LCD)
+ 	ret = lcd_display_bitmap(addr, x, y);
+diff --git a/common/splash.c b/common/splash.c
+index 2b9313e03f..e1c9a58c92 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -24,6 +24,10 @@
+ #include <env.h>
+ #include <splash.h>
+ #include <lcd.h>
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <asm/io.h>
++#define IMX8MQ_DCSS_DPR_FRAME_CTRL0		0x32e18070
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ static struct splash_location default_splash_locations[] = {
+ 	{
+@@ -157,6 +161,12 @@ int splash_display(void)
+ 	ulong addr;
+ 	char *s;
+ 	int x = 0, y = 0, ret;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	bool rotate = false;
++	int line_size = 0;
++	struct udevice *dev;
++	int degree;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ 	s = env_get("splashimage");
+ 	if (!s)
+@@ -169,8 +179,48 @@ int splash_display(void)
+ 
+ 	splash_get_pos(&x, &y);
+ 
+-	ret = bmp_display(addr, x, y);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
++	if (!ret) {
++		line_size = video_get_xsize(dev);
++		s = env_get("sp_rotate");
++		if (s != NULL) {
++			degree = (int)simple_strtol(s, NULL, 10);
++			rotate = true;
++		}
++	} else {
++		printf("splash screen rotation is not support
+");
++	}
++	if (rotate) {
++		switch (degree) {
++		case 90:
++			__raw_writel(((line_size * 4) << 16) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		case 180:
++			__raw_writel(((line_size * 4) << 16) | BIT(1) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			rotate = false;
++			break;
++		case 270:
++			__raw_writel(((line_size * 4) << 16) | BIT(1),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		default:
++			__raw_writel(((line_size * 4) << 16),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			rotate = false;
++			break;
++		}
++	} else {
++		__raw_writel(((line_size * 4) << 16),
++			     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++	}
+ 
++	ret = bmp_display(addr, x, y, rotate);
++#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++	ret = bmp_display(addr, x, y);
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	/* Skip banner output on video console if the logo is not at 0,0 */
+ 	if (x || y)
+ 		goto end;
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+index 7063410619..3086ebb1bb 100644
+--- a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+@@ -568,8 +568,14 @@ int display_unlock_warning(void) {
+ 		/* clear screen first */
+ 		video_clear(dev);
+ 		/* Draw the orange warning bmp logo */
++#ifdef CONFIG_IDT_ROTATION
++		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
++					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
++					false);
++#else /* !CONFIG_IDT_ROTATION */
+ 		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
+ 					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS);
++#endif /* CONFIG_IDT_ROTATION */
+ 
+ 		/* Show warning text. */
+ 		if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev)) {
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 0076c097ab..8d4f1c3be6 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -637,6 +637,11 @@ config CFB_CONSOLE
+ 	  default console. The serial console can be forced by setting the
+ 	  environment 'console=serial'.
+ 
++config IDT_ROTATION
++bool "Enable splash screen rotation"
++	help
++	  Enables the splash screen rotation which implemented by idtech.
++
+ config CFB_CONSOLE_ANSI
+ 	bool "Support ANSI escape sequences"
+ 	depends on CFB_CONSOLE
+diff --git a/drivers/video/video_bmp.c b/drivers/video/video_bmp.c
+index e7d340febc..599b6bd6da 100644
+--- a/drivers/video/video_bmp.c
++++ b/drivers/video/video_bmp.c
+@@ -184,9 +184,13 @@ static void video_set_cmap(struct udevice *dev,
+ 		cte++;
+ 	}
+ }
+-
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
++		      bool align, bool rotate)
++#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 		      bool align)
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ {
+ 	struct video_priv *priv = dev_get_uclass_priv(dev);
+ 	ushort *cmap_base = NULL;
+@@ -200,6 +204,9 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 	unsigned colours, bpix, bmp_bpix;
+ 	struct bmp_color_table_entry *palette;
+ 	int hdr_size;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	uchar *idt_bmap = NULL;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ 	if (!bmp || !(bmp->header.signature[0] == 'B' &&
+ 	    bmp->header.signature[1] == 'M')) {
+@@ -282,7 +289,6 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 			break;
+ 		}
+ #endif
+-
+ 		if (bpix == 8)
+ 			byte_width = width;
+ 		else if (bpix == 16)
+@@ -294,30 +300,68 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 
+ 		for (i = 0; i < height; ++i) {
+ 			WATCHDOG_RESET();
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			idt_bmap = bmap;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			for (j = 0; j < width; j++) {
+ 				if (bpix == 8) {
+ 					fb_put_byte(&fb, &bmap);
+ 				} else if (bpix == 16) {
+-					*(uint16_t *)fb = cmap_base[*bmap];
+-					bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					if (rotate) {
++						*(uint16_t *)fb = cmap_base[*idt_bmap];
++						idt_bmap += height;
++					} else {
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++						*(uint16_t *)fb = cmap_base[*bmap];
++						bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 					fb += sizeof(uint16_t) / sizeof(*fb);
+ 				} else if (bpix == 24) {
+ 					/* Only support big endian */
+-					cte = &palette[*bmap];
+-					bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					if (rotate) {
++						cte = &palette[*idt_bmap];
++						idt_bmap += height;
++					} else {
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++						cte = &palette[*bmap];
++						bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 					*(fb++) = cte->red;
+ 					*(fb++) = cte->green;
+ 					*(fb++) = cte->blue;
+ 				} else if (bpix == 32) {
+ 					/* Only support big endian */
+-					cte = &palette[*bmap];
+-					bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					if (rotate) {
++						cte = &palette[*idt_bmap];
++						idt_bmap += height;
++					} else {
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++						cte = &palette[*bmap];
++						bmap++;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 					*(fb++) = cte->blue;
+ 					*(fb++) = cte->green;
+ 					*(fb++) = cte->red;
+ 					*(fb++) = 0;
+ 				}
++
+ 			}
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			if (rotate)
++				bmap++;		/* y -> x */
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 			bmap += (padded_width - width);
+ 			fb -= byte_width + priv->line_length;
+ 		}
+@@ -333,11 +377,24 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 			bmap += (padded_width - width) * 2;
+ 			fb -= width * 2 + priv->line_length;
+ 		}
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++		if (rotate)
++			printf("Not support 90 or 270 degree rotation.
+");
++
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 		break;
+ #endif /* CONFIG_BMP_16BPP */
+ #if defined(CONFIG_BMP_24BPP)
+ 	case 24:
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++		if (rotate && (bpix == 16))
++			printf("Not support 90 or 270 degree rotation.
+");
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 		for (i = 0; i < height; ++i) {
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			idt_bmap = bmap;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			for (j = 0; j < width; j++) {
+ 				if (bpix == 16) {
+ 					/* 16bit 555RGB format */
+@@ -347,13 +404,33 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 					bmap += 3;
+ 					fb += 2;
+ 				} else {
+-					*(fb++) = *(bmap++);
+-					*(fb++) = *(bmap++);
+-					*(fb++) = *(bmap++);
+-					*(fb++) = 0;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					if (rotate) {
++						*(fb++) = *(idt_bmap++);
++						*(fb++) = *(idt_bmap++);
++						*(fb++) = *(idt_bmap++);
++						*(fb++) = 0;
++					} else {
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++						*(fb++) = *(bmap++);
++						*(fb++) = *(bmap++);
++						*(fb++) = *(bmap++);
++						*(fb++) = 0;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++					}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 				}
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++				if (rotate)
++					idt_bmap += (height-1)*3; /* x -> y */
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			}
+-			fb -= priv->line_length + width * (bpix / 8);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			if (rotate)
++				bmap += 3;		/* y -> x */
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
++			fb -= priv->line_length + (width) * (bpix / 8);
+ 			bmap += (padded_width - width) * 3;
+ 		}
+ 		break;
+@@ -362,11 +439,29 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 	case 32:
+ 		for (i = 0; i < height; ++i) {
+ 			for (j = 0; j < width; j++) {
+-				*(fb++) = *(bmap++);
+-				*(fb++) = *(bmap++);
+-				*(fb++) = *(bmap++);
+-				*(fb++) = *(bmap++);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++				if (rotate) {
++					*(fb++) = *(idt_bmap++);
++					*(fb++) = *(idt_bmap++);
++					*(fb++) = *(idt_bmap++);
++					*(fb++) = *(idt_bmap++);
++				} else {
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++					*(fb++) = *(bmap++);
++					*(fb++) = *(bmap++);
++					*(fb++) = *(bmap++);
++					*(fb++) = *(bmap++);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++				}
++				if (rotate)
++					idt_bmap += height*4; /* x -> y */
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			}
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			if (rotate)
++				bmap += 3;		/* y -> x */
++
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			fb -= priv->line_length + width * (bpix / 8);
+ 		}
+ 		break;
+diff --git a/include/lcd.h b/include/lcd.h
+index b9c94cdabb..27eab9e999 100644
+--- a/include/lcd.h
++++ b/include/lcd.h
+@@ -17,7 +17,11 @@
+ #include <asm/byteorder.h>
+ #endif
+ 
++#ifdef CONFIG_IDT_ROTATION
++int bmp_display(ulong addr, int x, int y, bool rotate);
++#else /* !CONFIG_IDT_ROTATION */
+ int bmp_display(ulong addr, int x, int y);
++#endif /* CONFIG_IDT_ROTATION */
+ struct bmp_image *gunzip_bmp(unsigned long addr, unsigned long *lenp,
+ 			     void **alloc_addr);
+ 
+diff --git a/include/video.h b/include/video.h
+index e7c58e86cb..2ed913b553 100644
+--- a/include/video.h
++++ b/include/video.h
+@@ -167,8 +167,13 @@ void video_sync_all(void);
+  *		- if a coordinate is positive it will be used unchnaged.
+  * @return 0 if OK, -ve on error
+  */
++#ifdef CONFIG_IDT_ROTATION
++int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
++		      bool align, bool rotate);
++#else /* !CONFIG_IDT_ROTATION */
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 		      bool align);
++#endif /* CONFIG_IDT_ROTATION */
+ 
+ /**
+  * video_get_xsize() - Get the width of the display in pixels

@@ -1,0 +1,86 @@
+ec911d198c71 George.Huang 2022-05-11
+
+AOS-936: GKI: fix CFI failure at gc02m2_probe
+
+Debug: can add CONFIG_CFI_PERMISSIVE=y to debug CFI issue
+
+Symptom:
+[    6.177948][  T207] ------------[ cut here ]------------
+[    6.184039][  T207] CFI failure (target: gc02m2_probe+0x0/0x4 [gc02m2_camera_mipi]):
+[    6.226246][  T207] WARNING: CPU: 1 PID: 207 at kernel/cfi.c:31 __ubsan_handle_cfi_check_fail+0x54/0x5c
+[    6.235881][  T207]  clk_imx8mq mxc_clk soc_imx8m zram lzo_rle lzo zsmalloc
+[    6.329645][  T207] CPU: 1 PID: 207 Comm: modprobe Tainted: G         C O      5.10.72-00002-gc563aaba8d69-dirty #43
+[    6.340183][  T207] Hardware name: IDTECH IMX8MQ EVT-0 REDWOOD EVT-1 (DT)
+[    6.346982][  T207] pstate: 60400005 (nZCv daif +PAN -UAO -TCO BTYPE=--)
+[    6.353697][  T207] pc : __ubsan_handle_cfi_check_fail+0x54/0x5c
+[    6.359712][  T207] lr : __ubsan_handle_cfi_check_fail+0x54/0x5c
+[    6.365723][  T207] sp : ffffffc012feb810
+[    6.369743][  T207] x29: ffffffc012feb810 x28: 0000000000000100-
+[    6.382372][  T207] x27: ffffffc0096991d0 x26: ffffff80c75683f0-
+[    6.388394][  T207] x25: 000000000000001e x24: ffffffc009697000-
+[    6.394413][  T207] x23: ffffff80c2a98000 x22: 0000000000000001-
+[    6.400436][  T207] x21: 18aafba39062885f x20: ffffffc012301720-
+[    6.406461][  T207] x19: ffffffc009697c60 x18: ffffffc012e010b0-
+[    6.406472][  T207] x17: 0000000000000023 x16: 0000000000000023-
+[    6.406478][  T207] x15: 0000000000000000 x14: 0000000000000400-
+[    6.433088][  T207] x13: 0000000000000004 x12: 00000000c662c000-
+[    6.433096][  T207] x11: 0000000000000000 x10: 0000000000000001-
+[    6.433102][  T207] x9 : ff3d38e25cb84e00 x8 : ff3d38e25cb84e00-
+[    6.471733][  T207] x7 : 312e36202020205b x6 : 0006f3f526634e60-
+[    6.477749][  T207] x5 : 000000008020001d x4 : 0000000000000001-
+[    6.483763][  T207] x3 : 0000000000000008 x2 : ffffff80c2a98000-
+[    6.489777][  T207] x1 : ffffff80c2a98000 x0 : 0000000000000040-
+[    6.495792][  T207] Call trace:
+[    6.498944][  T207]  __ubsan_handle_cfi_check_fail+0x54/0x5c
+[    6.504622][  T207]  __cfi_check_fail+0x38/0x40 [gc02m2_camera_mipi]
+[    6.510986][  T207]  __cfi_check+0x1c0/0x1e8 [gc02m2_camera_mipi]
+[    6.517090][  T207]  i2c_device_probe+0x2f4/0x300
+[    6.521799][  T207]  really_probe+0x26c/0x6d4
+[    6.526159][  T207]  driver_probe_device+0x80/0xc0
+[    6.530952][  T207]  device_driver_attach+0x70/0xb4
+[    6.535832][  T207]  __driver_attach+0xe8/0x1a0
+[    6.540368][  T207]  bus_for_each_dev+0xac/0x124
+[    6.544988][  T207]  driver_attach+0x28/0x38
+[    6.549263][  T207]  bus_add_driver+0x108/0x1e8
+[    6.553796][  T207]  driver_register+0x7c/0x11c
+[    6.558333][  T207]  i2c_register_driver+0x48/0xa4
+[    6.563136][  T207]  init_module+0x24/0xfe8 [gc02m2_camera_mipi]
+[    6.569149][  T207]  do_one_initcall+0x114/0x3a0
+[    6.573773][  T207]  do_init_module+0x60/0x414
+[    6.578220][  T207]  load_module+0x2e28/0x3858
+[    6.582667][  T207]  __arm64_sys_finit_module+0xbc/0xfc
+[    6.587898][  T207]  el0_svc_common.llvm.12335506418401581334+0xd0/0x1e8
+[    6.594604][  T207]  do_el0_svc+0x28/0x94
+[    6.598620][  T207]  el0_svc+0x14/0x24
+[    6.602373][  T207]  el0_sync_handler+0x6c/0xb4
+[    6.606904][  T207]  el0_sync+0x1b4/0x1c0
+[    6.610913][  T207] ---[ end trace f89de325ec733e0a ]---
+[    6.631853][  T207] gc02m2_mipi 1-0037: detect gc02m2 success
+[    6.646416][    T1] Adding 614396k swap on /dev/block/zram0.  Priority:-2 extents:1 across:614396k SS
+[    6.757959][  T207] mxc-mipi-csi2_yav 30a70000.mipi_csi: Registered sensor subdevice: gc02m2_mipi 1-0037
+[    6.768573][  T207] gc02m2_mipi 1-0037: Camera is found
+
+Root Cause:
+  gc02m2_probe function definition and the caller definition are inconsistent
+
+Solution:
+  correct gc02m2_probe function definition
+
+Reference: ov5640_probe function from
+  drivers/media/platform/mxc/capture/ov5640_mipi_v2.c
+Change-Id: I29bcc2d6f09f3028231362173c193ddff342048e
+
+diff --git a/drivers/media/platform/mxc/capture/gc02m2_mipi.c b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+index 00282b29b24f..5054c2b72444 100644
+--- a/drivers/media/platform/mxc/capture/gc02m2_mipi.c
++++ b/drivers/media/platform/mxc/capture/gc02m2_mipi.c
+@@ -715,7 +715,8 @@ static int gc02m2_remove(struct i2c_client *client)
+ 	return 0;
+ }
+ 
+-static int gc02m2_probe(struct i2c_client *client)
++static int gc02m2_probe(struct i2c_client *client,
++			const struct i2c_device_id *id)
+ {
+ 	struct device *dev = &client->dev;
+ 	int ret = 0;

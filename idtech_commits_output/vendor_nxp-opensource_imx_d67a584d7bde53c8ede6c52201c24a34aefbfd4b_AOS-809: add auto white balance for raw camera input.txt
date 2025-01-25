@@ -1,0 +1,314 @@
+d67a584 Jay 2021-12-14
+
+AOS-809: add auto white balance for raw camera input
+
+Base on "White Patch Retinex" method to implement auto white
+balance for raw camera.
+
+Change-Id: Ie55000e19bfe07bd284bdedd8f474597a9c6971d
+
+diff --git a/camera/ImageProcess.cpp b/camera/ImageProcess.cpp
+index e56cb09..18a3aca 100644
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@ -174,7 +174,8 @@ static void v4lconvert_border_bayer_line_to_y(
+ 
+ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char *ydata,
+ 		unsigned char *udata, unsigned char *vdata,
+-		int width, int height, unsigned int src_pixfmt)
++		int width, int height, unsigned int src_pixfmt,
++		WBInfo data)
+ {
+ 	int blue_line = 0, start_with_green = 0, x, y;
+ 	unsigned char *ydst = ydata;
+@@ -191,6 +192,24 @@ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char
+ 				g  = bayer[x+1];
+ 				g += bayer[x+width];
+ 				r  = bayer[x+width+1];
++				if (r > data.max_r)
++					r = 255;
++				else if (r < data.min_r)
++					r = 0;
++				else
++					r = ((r - data.min_r)*255)/(data.max_r - data.min_r);
++				if (b > data.max_b)
++					b = 255;
++				else if (b < data.min_b)
++					b = 0;
++				else
++					b = ((b - data.min_b)*255)/(data.max_b - data.min_b);
++				if (g > data.max_g)
++					g = 255;
++				else if (g < data.min_g)
++					g = 0;
++				else
++					g = ((g - data.min_g)*255)/(data.max_g - data.min_g);
+ 				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
+ 				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
+ 			}
+@@ -207,6 +226,24 @@ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char
+ 				g  = bayer[x+1];
+ 				g += bayer[x+width];
+ 				b  = bayer[x+width+1];
++				if (r > data.max_r)
++					r = 255;
++				else if (r < data.min_r)
++					r = 0;
++				else
++					r = ((r - data.min_r)*255)/(data.max_r - data.min_r);
++				if (b > data.max_b)
++					b = 255;
++				else if (b < data.min_b)
++					b = 0;
++				else
++					b = ((b - data.min_b)*255)/(data.max_b - data.min_b);
++				if (g > data.max_g)
++					g = 255;
++				else if (g < data.min_g)
++					g = 0;
++				else
++					g = ((g - data.min_g)*255)/(data.max_g - data.min_g);
+ 				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
+ 				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
+ 			}
+@@ -222,6 +259,24 @@ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char
+ 				b  = bayer[x+1];
+ 				r  = bayer[x+width];
+ 				g += bayer[x+width+1];
++				if (r > data.max_r)
++					r = 255;
++				else if (r < data.min_r)
++					r = 0;
++				else
++					r = ((r - data.min_r)*255)/(data.max_r - data.min_r);
++				if (b > data.max_b)
++					b = 255;
++				else if (b < data.min_b)
++					b = 0;
++				else
++					b = ((b - data.min_b)*255)/(data.max_b - data.min_b);
++				if (g > data.max_g)
++					g = 255;
++				else if (g < data.min_g)
++					g = 0;
++				else
++					g = ((g - data.min_g)*255)/(data.max_g - data.min_g);
+ 				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
+ 				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
+ 			}
+@@ -239,6 +294,24 @@ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char
+ 				r  = bayer[x+1];
+ 				b  = bayer[x+width];
+ 				g += bayer[x+width+1];
++				if (r > data.max_r)
++					r = 255;
++				else if (r < data.min_r)
++					r = 0;
++				else
++					r = ((r - data.min_r)*255)/(data.max_r - data.min_r);
++				if (b > data.max_b)
++					b = 255;
++				else if (b < data.min_b)
++					b = 0;
++				else
++					b = ((b - data.min_b)*255)/(data.max_b - data.min_b);
++				if (g > data.max_g)
++					g = 255;
++				else if (g < data.min_g)
++					g = 0;
++				else
++					g = ((g - data.min_g)*255)/(data.max_g - data.min_g);
+ 				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
+ 				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
+ 			}
+@@ -351,6 +424,129 @@ static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char
+ 		!start_with_green, !blue_line);
+ }
+ 
++static void find_awb_k(const unsigned char *bayer, int width,
++		       int height, unsigned int src_pixfmt,
++		       WBInfo *data)
++{
++	int blue_line = 0, start_with_green = 0, x, y;
++	unsigned char ydst;
++	int mi_g = 255, ma_g = 0, mi_b = 255, ma_b = 0, mi_r = 255, ma_r =0;
++
++	/* First calculate the u and v planes 2x2 pixels at a time */
++	switch (src_pixfmt) {
++	case V4L2_PIX_FMT_SBGGR8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				b  = bayer[x];
++				g  = bayer[x+1];
++				g += bayer[x+width];
++				r  = bayer[x+width+1];
++				if (mi_g > g)
++					mi_g = g;
++				if (mi_b > b)
++					mi_b = b;
++				if (mi_r > r)
++					mi_r = r;
++				if (g > ma_g)
++					ma_g = g;
++				if (b > ma_b)
++					ma_b = b;
++				if (r > ma_r)
++					ma_r = r;
++			}
++			bayer += 2 * width;
++		}
++		blue_line = 1;
++		break;
++
++	case V4L2_PIX_FMT_SRGGB8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				r  = bayer[x];
++				g  = bayer[x+1];
++				g += bayer[x+width];
++				b  = bayer[x+width+1];
++				if (mi_g > g)
++					mi_g = g;
++				if (mi_b > b)
++					mi_b = b;
++				if (mi_r > r)
++					mi_r = r;
++				if (g > ma_g)
++					ma_g = g;
++				if (b > ma_b)
++					ma_b = b;
++				if (r > ma_r)
++					ma_r = r;
++			}
++			bayer += 2 * width;
++		}
++		break;
++
++	case V4L2_PIX_FMT_SGBRG8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				g  = bayer[x];
++				b  = bayer[x+1];
++				r  = bayer[x+width];
++				g += bayer[x+width+1];
++				if (mi_g > g)
++					mi_g = g;
++				if (mi_b > b)
++					mi_b = b;
++				if (mi_r > r)
++					mi_r = r;
++				if (g > ma_g)
++					ma_g = g;
++				if (b > ma_b)
++					ma_b = b;
++				if (r > ma_r)
++					ma_r = r;
++			}
++			bayer += 2 * width;
++		}
++		blue_line = 1;
++		start_with_green = 1;
++		break;
++
++	case V4L2_PIX_FMT_SGRBG8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				g  = bayer[x];
++				r  = bayer[x+1];
++				b  = bayer[x+width];
++				g += bayer[x+width+1];
++				if (mi_g > g)
++					mi_g = g;
++				if (mi_b > b)
++					mi_b = b;
++				if (mi_r > r)
++					mi_r = r;
++				if (g > ma_g)
++					ma_g = g;
++				if (b > ma_b)
++					ma_b = b;
++				if (r > ma_r)
++					ma_r = r;
++			}
++			bayer += 2 * width;
++		}
++		start_with_green = 1;
++		break;
++	}
++
++	data->min_r = mi_r;
++	data->min_g = mi_g;
++	data->min_b = mi_b;
++	data->max_r = ma_r;
++	data->max_g = ma_g;
++	data->max_b = ma_b;
++}
++
+ ImageProcess* ImageProcess::getInstance()
+ {
+     Mutex::Autolock _l(sLock);
+@@ -1005,6 +1201,7 @@ int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf)
+ 	uint8_t* y_component = NULL;
+ 	uint8_t* u_component = NULL;
+ 	uint8_t* v_component = NULL;
++	WBInfo wbdata;
+ 	unsigned int src_pixfmt;
+ 	bool b10bTo8b = false;
+ 
+@@ -1070,7 +1267,23 @@ int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf)
+ 			raw[i] = rawData[i*2];
+ 	}
+ 
+-	v4lconvert_bayer_to_yuv420(raw, y_component, u_component, v_component, width, height, src_pixfmt);
++	find_awb_k(raw, width, height, src_pixfmt, &wbdata);
++
++	if (wbdata.max_r > wb.max_r)
++		wb.max_r = wbdata.max_r;
++	if (wbdata.max_g > wb.max_g)
++		wb.max_g = wbdata.max_g;
++	if (wbdata.max_b > wb.max_b)
++		wb.max_b = wbdata.max_b;
++	if (wbdata.min_r > wb.min_r)
++		wb.min_r = wbdata.min_r;
++	if (wbdata.min_g > wb.min_g)
++		wb.min_g = wbdata.min_g;
++	if (wbdata.min_b > wb.min_b)
++		wb.min_b = wbdata.min_b;
++
++	v4lconvert_bayer_to_yuv420(raw, y_component, u_component, v_component,
++				   width, height, src_pixfmt, wb);
+ 
+ 	ret = libyuv::I420ToYUY2(y_component, width, u_component,
+ 				 half_width, v_component, half_width,
+diff --git a/camera/ImageProcess.h b/camera/ImageProcess.h
+index 0463ff5..cef0781 100644
+--- a/camera/ImageProcess.h
++++ b/camera/ImageProcess.h
+@@ -28,6 +28,15 @@ namespace fsl {
+ using namespace android;
+ using namespace cameraconfigparser;
+ 
++struct WBInfo {
++    int min_r;
++    int min_g;
++    int min_b;
++    int max_r;
++    int max_g;
++    int max_b;
++};
++
+ typedef int (*hwc_func1)(void* handle);
+ typedef int (*hwc_func3)(void* handle, void* arg1, void* arg2);
+ typedef int (*hwc_func4)(void* handle, void* arg1, void* arg2, void* arg3);
+@@ -94,6 +103,7 @@ private:
+     hwc_func3 mCLBlit;
+     hwc_func1 mCLFlush;
+     hwc_func1 mCLFinish;
++    WBInfo wb;
+ };
+ 
+ }

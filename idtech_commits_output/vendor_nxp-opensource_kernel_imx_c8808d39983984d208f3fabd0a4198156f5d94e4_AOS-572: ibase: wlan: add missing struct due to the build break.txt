@@ -1,0 +1,134 @@
+c8808d399839 George.Huang 2021-04-12
+
+AOS-572: ibase: wlan: add missing struct due to the build break
+
+copy struct from drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_ocb.c
+
+Error Log:
+error: use of undeclared identifier 'qca_wlan_vendor_ocb_set_config_policy'
+error: use of undeclared identifier 'qca_wlan_vendor_ocb_set_utc_time_policy'
+error: use of undeclared identifier 'qca_wlan_vendor_ocb_start_timing_advert_policy'
+error: use of undeclared identifier 'qca_wlan_vendor_ocb_stop_timing_advert_policy'
+error: use of undeclared identifier 'qca_wlan_vendor_dcc_get_stats'
+error: use of undeclared identifier 'qca_wlan_vendor_dcc_clear_stats'
+error: use of undeclared identifier 'qca_wlan_vendor_dcc_update_ndl'
+
+Change-Id: Id3faef0710bbe5e26712eef647b454385766f8f3
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+index 9f7b932516f5..c0fcc256bb8e 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+@@ -6436,6 +6436,112 @@ static void wlan_hdd_cfg80211_link_layer_stats_callback(void *ctx, int indType,
+     return;
+ }
+ 
++#ifndef WLAN_FEATURE_DSRC
++const struct nla_policy qca_wlan_vendor_ocb_set_config_policy[
++		QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_MAX + 1] = {
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_CHANNEL_COUNT] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_SCHEDULE_SIZE] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_CHANNEL_ARRAY] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_SCHEDULE_ARRAY] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_NDL_CHANNEL_ARRAY] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_NDL_ACTIVE_STATE_ARRAY] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_FLAGS] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_DEF_TX_PARAM] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_CONFIG_TA_MAX_DURATION] = {
++		.type = NLA_U32
++	},
++};
++
++const struct nla_policy qca_wlan_vendor_ocb_set_utc_time_policy[
++		QCA_WLAN_VENDOR_ATTR_OCB_SET_UTC_TIME_MAX + 1] = {
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_UTC_TIME_VALUE] = {
++		.type = NLA_BINARY, .len = SIZE_UTC_TIME
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_SET_UTC_TIME_ERROR] = {
++		.type = NLA_BINARY, .len = SIZE_UTC_TIME_ERROR
++	},
++};
++
++const struct nla_policy qca_wlan_vendor_ocb_start_timing_advert_policy[
++		QCA_WLAN_VENDOR_ATTR_OCB_START_TIMING_ADVERT_MAX + 1] = {
++	[QCA_WLAN_VENDOR_ATTR_OCB_START_TIMING_ADVERT_CHANNEL_FREQ] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_START_TIMING_ADVERT_REPEAT_RATE] = {
++		.type = NLA_U32
++	},
++};
++
++const struct nla_policy  qca_wlan_vendor_ocb_stop_timing_advert_policy[
++		QCA_WLAN_VENDOR_ATTR_OCB_STOP_TIMING_ADVERT_MAX + 1] = {
++	[QCA_WLAN_VENDOR_ATTR_OCB_STOP_TIMING_ADVERT_CHANNEL_FREQ] = {
++		.type = NLA_U32
++	},
++};
++
++static const struct nla_policy qca_wlan_vendor_ocb_get_tsf_timer_resp[] = {
++	[QCA_WLAN_VENDOR_ATTR_OCB_GET_TSF_RESP_TIMER_HIGH] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_OCB_GET_TSF_RESP_TIMER_LOW] = {
++		.type = NLA_U32
++	},
++};
++
++const struct nla_policy qca_wlan_vendor_dcc_get_stats[] = {
++	[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_CHANNEL_COUNT] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_REQUEST_ARRAY] = {
++		.type = NLA_BINARY
++	},
++};
++
++static const struct nla_policy qca_wlan_vendor_dcc_get_stats_resp[] = {
++	[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_RESP_CHANNEL_COUNT] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_DCC_GET_STATS_RESP_STATS_ARRAY] = {
++		.type = NLA_BINARY
++	},
++};
++
++const struct nla_policy qca_wlan_vendor_dcc_clear_stats[] = {
++	[QCA_WLAN_VENDOR_ATTR_DCC_CLEAR_STATS_BITMAP] = {
++		.type = NLA_U32
++	},
++};
++
++const struct nla_policy qca_wlan_vendor_dcc_update_ndl[
++		QCA_WLAN_VENDOR_ATTR_DCC_UPDATE_NDL_MAX + 1] = {
++	[QCA_WLAN_VENDOR_ATTR_DCC_UPDATE_NDL_CHANNEL_COUNT] = {
++		.type = NLA_U32
++	},
++	[QCA_WLAN_VENDOR_ATTR_DCC_UPDATE_NDL_CHANNEL_ARRAY] = {
++		.type = NLA_BINARY
++	},
++	[QCA_WLAN_VENDOR_ATTR_DCC_UPDATE_NDL_ACTIVE_STATE_ARRAY] = {
++		.type = NLA_BINARY
++	},
++};
++#endif /* WLAN_FEATURE_DSRC */
++
+ static const struct nla_policy
+ qca_wlan_vendor_ll_ext_policy[QCA_WLAN_VENDOR_ATTR_LL_STATS_EXT_MAX + 1] = {
+ 	[QCA_WLAN_VENDOR_ATTR_LL_STATS_CFG_PERIOD] = {

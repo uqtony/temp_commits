@@ -1,0 +1,69 @@
+e6c9a2fc7847 Jay 2021-11-18
+
+AOS-787: reduce camera resolution to avoid app crash
+
+Camera App will crash when Camera HAL spend long time to transfer
+RAW data to YUY2 format. So, reduce camera resolution to avoid
+it.
+
+Change-Id: I470aed14d39c137d0a40ceb944d58eec465da91d
+
+diff --git a/drivers/media/i2c/s5k5e9.c b/drivers/media/i2c/s5k5e9.c
+index 050cbbf7e4c2..476ef2175f16 100644
+--- a/drivers/media/i2c/s5k5e9.c
++++ b/drivers/media/i2c/s5k5e9.c
+@@ -68,7 +68,7 @@ struct s5k5e9_res {
+ };
+ 
+ struct s5k5e9_res s5k5e9_res[] = {
+-	[0] = {2400, 1440},
++	[0] = {2000, 1200},
+ 	[1] = {1600, 960},
+ 	[2] = {800, 480},
+ };
+@@ -196,32 +196,31 @@ static struct sensor_reg_value s5k5e9_capture_setting[] = {
+ 	{0x0341, 0xF4},
+ 	{0x0342, 0x0C},
+ 	{0x0343, 0x28},
+-	{0x0200, 0x0B},
+-	{0x0201, 0x9C},
+-	{0x0202, 0x00},
+-	{0x0203, 0x02},
++	{0x0202, 0x04},
++	{0x0203, 0xF2},
+ 	{0x30B8, 0x2E},
+ 	{0x30BA, 0x36},
++//	{0x0601, 0x02},
+ };
+ 
+ static struct sensor_reg_value s5k5e9_cap_res_2400_1440_setting[] = {
+-	{0x0344, 0x00},
+-	{0x0345, 0x68},
++	{0x0344, 0x01},
++	{0x0345, 0x30},
+ 
+ 	{0x0346, 0x01},
+-	{0x0347, 0x04},
++	{0x0347, 0x7C},
+ 
+-	{0x0348, 0x09},
+-	{0x0349, 0xC7},
++	{0x0348, 0x08},
++	{0x0349, 0xFF},
+ 
+ 	{0x034A, 0x06},
+-	{0x034B, 0xA3},
++	{0x034B, 0x2B},
+ 
+-	{0x034C, 0x09},
+-	{0x034D, 0x60},
++	{0x034C, 0x07},
++	{0x034D, 0xD0},
+ 
+-	{0x034E, 0x05},
+-	{0x034F, 0xA0},
++	{0x034E, 0x04},
++	{0x034F, 0xB0},
+ };
+ 
+ static struct sensor_reg_value s5k5e9_cap_res_1600_960_setting[] = {

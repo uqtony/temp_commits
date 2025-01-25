@@ -1,0 +1,60 @@
+fed4b03a2d24 Brian Lee 2022-04-07
+
+AOS-900: Force assign BUILT IN SPEAKER as default route
+
+Scenario
+The device plugined USB speaker then reboot device
+
+Symptom
+The media output dialog only show USB speaker
+
+Expect
+The media output dialog should show built-in speaker and USB speaker
+
+Solution
+The AudioService already switched to USB speaker when SystemMediaRoute2Provider init.
+And according to the SystemMediaRoute2Provider init flow, the default route would be USB speaker.
+So, force assign BUILT IN SPEAKER as default route.
+
+Change-Id: I64e3ae67b2d141304def38a5fcd69150f4e0f010
+
+diff --git a/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java b/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
+index 06a977faa6e1..d931b255b632 100644
+--- a/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
++++ b/services/core/java/com/android/server/media/SystemMediaRoute2Provider.java
+@@ -279,7 +279,7 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
+     private void updateProviderState() {
+         MediaRoute2ProviderInfo.Builder builder = new MediaRoute2ProviderInfo.Builder();
+ 
+-        if (mDefaultRoute != null && mDefaultRoute.getType() != mDeviceRoute.getType()) {
++        if (mDefaultRoute != null && !mDefaultRoute.getName().equals(mDeviceRoute.getName())) {
+             builder.addRoute(mDefaultRoute);
+         }
+ 
+@@ -317,10 +317,22 @@ class SystemMediaRoute2Provider extends MediaRoute2Provider {
+                 }
+             }
+             mSelectedRouteId = selectedRoute.getId();
+-            mDefaultRoute = new MediaRoute2Info.Builder(DEFAULT_ROUTE_ID, selectedRoute)
+-                    .setSystemRoute(true)
+-                    .setProviderId(mUniqueId)
+-                    .build();
++            mDefaultRoute = new MediaRoute2Info.Builder( DEFAULT_ROUTE_ID,
++                mContext.getResources().getText(R.string.default_audio_route_name).toString())
++                .setVolumeHandling(mAudioManager.isVolumeFixed()
++                        ? MediaRoute2Info.PLAYBACK_VOLUME_FIXED
++                        : MediaRoute2Info.PLAYBACK_VOLUME_VARIABLE)
++                .setVolume(mAudioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
++                .setVolumeMax(mAudioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC))
++                .setType(TYPE_BUILTIN_SPEAKER)
++                .addFeature(FEATURE_LIVE_AUDIO)
++                .addFeature(FEATURE_LIVE_VIDEO)
++                .addFeature(FEATURE_LOCAL_PLAYBACK)
++                .setConnectionState(MediaRoute2Info.CONNECTION_STATE_CONNECTED)
++                .setProviderId(mUniqueId)
++                .setSystemRoute(true)
++                .build();
++
+             builder.addSelectedRoute(mSelectedRouteId);
+             builder.addTransferableRoute(DEFAULT_ROUTE_ID);
+ 

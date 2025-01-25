@@ -1,0 +1,60 @@
+88559fb68844 George.Huang 2021-02-20
+
+AOS-494: correct 3 gpios base on ibase schematic design
+
+1. bt-power-gpios pin should be GPIO3_01, not GPIO3_05
+2. ECSPI2_SCLK should be RXD
+3. ECSPI2_MOSI should be TXD
+
+ibase:
+UART_WAKE_B_20    < BT_WAKE_B   < NAND_CLE(GPIO3_05)
+UART_TXD_22       < UART4_RXD   < ECSPI2_SCLK
+UART_RXD_32       < UART4_TXD   < ECSPI2_MOSI
+UART_RTS_34       < UART4_CTS   < ECSPI2_MISO
+UART_CTS_36       < UART4_RTS   < ECSPI2_SS0
+W_DIS2_B_54       < M2_BT_DIS_B < NAND_CE0_B(GPIO3_01)
+
+A300:
+UART_WAKE_NC_20   < UART_WAKE_L  < BT_HOST_WAKE(NAND_DQS)
+UART_TX_NC_22     < UART2_BT_RXD < UART2_RXD
+UART_RX_NC_32     < UART2_BT_TXD < UART2_TXD
+UART_RTS_NC_34    < UART_BT_RTS  < UART4_RXD
+UART_CTS_NC_36    < UART_BT_CXS  < UART4_TXD
+BT_ENABLE_L_54(H) < BT_REG_ON(L) < NAND_CLE(GPIO3_IO5)
+
+Change-Id: I4ef41854b735ee7fe6f92b93a8b85d6671693ae3
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index 9e5e45da95a9..acca50e1d412 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -165,7 +165,7 @@ rpmsg_reserved: rpmsg@0xb8000000 {
+ 
+ 	bt_rfkill {
+ 		compatible = "fsl,mxc_bt_rfkill";
+-		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++		bt-power-gpios = <&gpio3 1 GPIO_ACTIVE_LOW>;
+ 		reset-delay-us = <2000>;
+ 		reset-post-delay-ms = <40>;
+ 		status ="okay";
+@@ -785,7 +785,6 @@ &iomuxc {
+ 	pinctrl_hog: hoggrp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_NAND_WP_B_GPIO3_IO18		0x19
+-			MX8MQ_IOMUXC_NAND_CE0_B_GPIO3_IO1		0x19
+ 			MX8MQ_IOMUXC_GPIO1_IO08_GPIO1_IO8		0xd6
+ 			MX8MQ_IOMUXC_I2C3_SCL_GPIO5_IO18		0x16
+ 			MX8MQ_IOMUXC_I2C3_SDA_GPIO5_IO19		0x16
+@@ -975,9 +974,10 @@ MX8MQ_IOMUXC_UART3_RXD_UART3_DCE_RX		0x49
+ 	pinctrl_uart4: uart4grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_ECSPI2_SS0_UART4_DCE_RTS_B		0x49
+-			MX8MQ_IOMUXC_ECSPI2_MOSI_UART4_DTE_RX		0x49
++			MX8MQ_IOMUXC_ECSPI2_MOSI_UART4_DCE_TX		0x49
+ 			MX8MQ_IOMUXC_ECSPI2_MISO_UART4_DCE_CTS_B	0x49
+-			MX8MQ_IOMUXC_ECSPI2_SCLK_UART4_DTE_TX		0x49
++			MX8MQ_IOMUXC_ECSPI2_SCLK_UART4_DCE_RX		0x49
++			MX8MQ_IOMUXC_NAND_CE0_B_GPIO3_IO1		0x19
+ 		>;
+ 	};
+ 

@@ -1,0 +1,111 @@
+c16738271 max.yang 2020-05-28
+
+AOS-187: [Post Sign] Validate signature locally before writing signature
+
+  This script takes a vbmeta image and a 256 bytes signature file, and combine
+  together without checking. If signature not match, user could only flash into
+  device and fail to boot.
+
+  This patch will perform local validation by built-in certificate and input
+  signature, and abort script before real writing image.
+
+  Failure example:
+    Traceback (most recent call last):
+      File "post_sign_vbmeta.py", line 245, in <module>
+        main(sys.argv[1:])
+      File "post_sign_vbmeta.py", line 242, in main
+        args.func(args)
+      File "post_sign_vbmeta.py", line 220, in combine_sign_data
+        raise ValueError('Error verifying data, abort writing: {}'.format(perr))
+    ValueError: Error verifying data, abort writing: RSA operation error
+    140706044830144:error:0407008A:rsa routines:RSA_padding_check_PKCS1_type_1:invalid padding:../crypto/rsa/rsa_pk1.c:67:
+    140706044830144:error:04067072:rsa routines:rsa_ossl_public_decrypt:padding check failed:../crypto/rsa/rsa_ossl.c:582:
+
+Change-Id: I429903a0a89119c3ba5281bb89e829106f3c3725
+
+diff --git a/tools/releasetools/post_sign_vbmeta.py b/tools/releasetools/post_sign_vbmeta.py
+index 911805383..993ff37f4 100644
+--- a/tools/releasetools/post_sign_vbmeta.py
++++ b/tools/releasetools/post_sign_vbmeta.py
+@@ -19,6 +19,7 @@ import struct
+ import argparse
+ import shutil
+ import hashlib
++import tempfile
+ 
+ # TODO: this official should be replaced by real official key after we get it
+ official_key= [
+@@ -169,10 +170,59 @@ def combine_sign_data(args):
+     hdr = AvbVBMetaHeader(f_img.read(AvbVBMetaHeader.SIZE))
+     #print_avb_header(hdr)
+ 
++    # Before write, we should validate the signature with current certificate
++    pubkey_offset = AvbVBMetaHeader.SIZE + hdr.authentication_data_block_size + hdr.public_key_offset
++    pubkey_size   = hdr.public_key_size
++    f_img.seek(pubkey_offset, 0)
++    pubkey_blob   = f_img.read(pubkey_size)
++
++    sig_blob = f_sig.read()
++
++    (num_bits,) = struct.unpack('!I', pubkey_blob[0:4])
++    modulus_blob = pubkey_blob[8:8 + num_bits/8]
++    modulus = 0
++    for b in bytearray(modulus_blob):
++      modulus *= 256
++      modulus += b
++    exponent = 65537
++    asn1_str = ('asn1=SEQUENCE:pubkeyinfo
+'
++                '
+'
++                '[pubkeyinfo]
+'
++                'algorithm=SEQUENCE:rsa_alg
+'
++                'pubkey=BITWRAP,SEQUENCE:rsapubkey
+'
++                '
+'
++                '[rsa_alg]
+'
++                'algorithm=OID:rsaEncryption
+'
++                'parameter=NULL
+'
++                '
+'
++                '[rsapubkey]
+'
++                'n=INTEGER:%s
+'
++                'e=INTEGER:%s
+' % (hex(modulus).rstrip('L'), hex(exponent).rstrip('L')))
++
++    asn1_tmpfile = tempfile.NamedTemporaryFile()
++    asn1_tmpfile.write(asn1_str)
++    asn1_tmpfile.flush()
++    der_tmpfile = tempfile.NamedTemporaryFile()
++    p = subprocess.Popen(
++        ['openssl', 'asn1parse', '-genconf', asn1_tmpfile.name, '-out', der_tmpfile.name, '-noout'])
++    retcode = p.wait()
++    if retcode != 0:
++      raise ValueError('Error generating DER file, abort script')
++
++    p = subprocess.Popen(
++        ['openssl', 'rsautl', '-verify', '-pubin', '-inkey', der_tmpfile.name, '-keyform', 'DER'],
++        stdin=subprocess.PIPE,
++        stdout=subprocess.PIPE,
++        stderr=subprocess.PIPE)
++    (pout, perr) = p.communicate(str(sig_blob))
++    retcode = p.wait()
++    if retcode != 0:
++      raise ValueError('Error verifying data, abort writing: {}'.format(perr))
++
+     # Replace the signature inside vbmeta image
+     f_img.seek(AvbVBMetaHeader.SIZE + hdr.signature_offset, 0)
+     print('Wrting {} into {} at offset {}'.format(sig_bin_path, vbmeta_img_path, AvbVBMetaHeader.SIZE + hdr.signature_offset))
+-    f_img.write(f_sig.read())
++    f_img.write(sig_blob)
+ 
+     print('Writing Done')
+ 

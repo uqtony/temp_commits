@@ -1,0 +1,45 @@
+4816691 owen.wen 2022-04-06
+
+AOS-891: android12: create build rule for socat
+
+provide the function to bridge IDG command from windows docklight to K81 via redwood
+
+socat is downloaded from http://www.dest-unreach.org/socat/
+and follow socat_buildscript_for_android.sh to build socat
+
+g_cdc.ko and g_serial.ko are both for USB gadge device driver
+simulate a COM port when connect to windows and ttyACM on Linux
+I follow https://source.android.com/devices/architecture/kernel/loadable-kernel-modules
+and add g_cdc.ko and g_serial.ko to BOARD_ODM_KERNEL_MODULES
+refer: https://gerrit.idtechproducts.com/plugins/gitiles/android-imx/platform/build/+/refs/heads/idt/android_11_idt_dev/core/Makefile#887
+BTW, kernel objects under /vendor/lib/modules/ will be loaded by init.insmod.sh
+so I put kernel objects in /vendor/odm/lib/modules/
+
+steps:
+1. su
+2. setenfore 0
+3. bringup_test.sh idg_bridge
+4. connect to windows and COM port device should appear at this step
+5. send IDG command from docklight
+
+Change-Id: Ic5ca568f50a1062e4030acf38cf440de7a5472a0
+
+diff --git a/socat/Android.mk b/socat/Android.mk
+new file mode 100644
+index 0000000..ccfb0c5
+--- /dev/null
++++ b/socat/Android.mk
+@@ -0,0 +1,9 @@
++LOCAL_PATH:=$(call my-dir)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := socat
++LOCAL_SRC_FILES := socat
++LOCAL_MODULE_TAGS := optional
++LOCAL_PRODUCT_MODULE := true
++LOCAL_MODULE_CLASS := EXECUTABLES
++include $(BUILD_PREBUILT)
+diff --git a/socat/socat b/socat/socat
+new file mode 100755
+index 0000000..562941a
+Binary files /dev/null and b/socat/socat differ

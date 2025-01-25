@@ -1,0 +1,96 @@
+b4219d6 jenkins 2021-04-23
+
+Download imx-android-11.0.0_2.0.0.tar.gz from nxp.com
+
+Change-Id: If32c563e8d71ae69434744003d233771a49118c4
+
+diff --git a/Android.mk b/Android.mk
+index ce19fe8..2cb4bea 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -15,7 +15,7 @@ else
+ endif
+ 
+ include $(CLEAR_VARS)
+-LOCAL_MODULE := lib_nb_amr_dec_v2_arm9_elinux
++LOCAL_MODULE := lib_mp3_dec_v2_arm12_elinux
+ LOCAL_MODULE_SUFFIX := .so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+@@ -26,28 +26,25 @@ endif
+ ifeq ($(TARGET_ARCH),arm64)
+ LOCAL_MULTILIB := both
+ LOCAL_MODULE_PATH_64 := $(FSL_CODEC_OUT_PATH)/lib64/
+-LOCAL_SRC_FILES_64 := ./lib64/lib_nb_amr_dec_arm_android.so
++LOCAL_SRC_FILES_64 := ./lib64/lib_mp3_dec_arm_android.so
+ LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
+-LOCAL_SRC_FILES_32 := ./lib/lib_nb_amr_dec_v2_arm9_elinux.so
++LOCAL_SRC_FILES_32 := ./lib/lib_mp3_dec_v2_arm12_elinux.so
+ else
+ LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
+-LOCAL_SRC_FILES := lib/lib_nb_amr_dec_v2_arm9_elinux.so
++LOCAL_SRC_FILES := lib/lib_mp3_dec_v2_arm12_elinux.so
+ endif
+ ifeq ($(TARGET_ARCH),arm64)
+ LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
+                           if [ -d lib ]; then \
+-                              ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib/lib_nb_amr_dec.so; \
+                               ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib/lib_aac_dec.so; \
+                               ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib/lib_mp3_dec.so; \
+                           fi; \
+                           if [ -d lib64 ]; then \
+-                              ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib64/lib_nb_amr_dec.so; \
+                               ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib64/lib_aac_dec.so; \
+                               ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib64/lib_mp3_dec.so; \
+                           fi;
+ else
+ LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
+-                          ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib/lib_nb_amr_dec.so; \
+                           ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib/lib_aac_dec.so; \
+                           ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib/lib_mp3_dec.so;
+ endif
+diff --git a/fsl-codec.mk b/fsl-codec.mk
+index 0c935ab..253f2e8 100755
+--- a/fsl-codec.mk
++++ b/fsl-codec.mk
+@@ -28,7 +28,6 @@ endif
+ PRODUCT_COPY_FILES += \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aac_dec_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_aac_dec_v2_arm12_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aacd_wrap_arm12_elinux_android.so:$(FSL_CODEC_OUT_PATH)/lib_aacd_wrap_arm12_elinux_android.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_dec_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp3_dec_v2_arm12_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3d_wrap_arm12_elinux_android.so:$(FSL_CODEC_OUT_PATH)/lib_mp3d_wrap_arm12_elinux_android.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_nb_amr_enc_v2_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_nb_amr_enc_v2_arm11_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wb_amr_enc_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_wb_amr_enc_arm11_elinux.so
+@@ -53,7 +52,6 @@ ifeq ($(TARGET_ARCH),arm64)
+ PRODUCT_COPY_FILES += \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aac_dec_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_aac_dec_v2_arm12_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aacd_wrap_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_aacd_wrap_arm12_elinux_android.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3_dec_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_mp3_dec_v2_arm12_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3d_wrap_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_mp3d_wrap_arm12_elinux_android.so
+ 
+ # copy dspc asrc binaries
+diff --git a/lib/lib_mp4_parser_arm11_elinux.3.0.so b/lib/lib_mp4_parser_arm11_elinux.3.0.so
+index 1bd5eec..cbb636f 100755
+Binary files a/lib/lib_mp4_parser_arm11_elinux.3.0.so and b/lib/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/libhantro_vc8000e.so b/lib/libhantro_vc8000e.so
+index 8ffcff5..31f7198 100755
+Binary files a/lib/libhantro_vc8000e.so and b/lib/libhantro_vc8000e.so differ
+diff --git a/lib64/lib_mp4_parser_arm11_elinux.3.0.so b/lib64/lib_mp4_parser_arm11_elinux.3.0.so
+index 5ae1b0e..23db47b 100755
+Binary files a/lib64/lib_mp4_parser_arm11_elinux.3.0.so and b/lib64/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/libhantro_vc8000e.so b/lib64/libhantro_vc8000e.so
+index da0b750..7b93e04 100755
+Binary files a/lib64/libhantro_vc8000e.so and b/lib64/libhantro_vc8000e.so differ
+diff --git a/release_branch_info.txt b/release_branch_info.txt
+index e084cd4..1aa9712 100644
+--- a/release_branch_info.txt
++++ b/release_branch_info.txt
+@@ -6,4 +6,7 @@ master : master
+ #automotive-10.0.0_2.2.0: MM_04.05.04_2002_L5.4.3
+ #imx_android-10.0_2.3.0 : MM_04.05.05_2005_L5.4.24
+ #imx_android-10.0_2.5.0 : MM_04.05.06_2008_L5.4.47
+-imx_android-11.0_1.0.0 : imx_android-11.0_1.0.0
++#imx_android-11.0_1.0.0 : imx_android-11.0_1.0.0
++#imx_android-10.0_2.6.0 : MM_04.05.07_2011_L5.4.70
++imx_android-11.0_1.2.0 : MM_04.05.07_2011_L5.4.70
++imx_android-11.0_2.0.0 : MM_04.06.00_2012_L5.10.y

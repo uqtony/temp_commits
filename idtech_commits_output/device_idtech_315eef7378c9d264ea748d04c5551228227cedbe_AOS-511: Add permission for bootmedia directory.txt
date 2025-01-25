@@ -1,0 +1,61 @@
+315eef73 jay deng 2021-02-23
+
+AOS-511: Add permission for bootmedia directory
+
+Change-Id: I112a51957ed77d8f559c8827606fda982053205d
+
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 9090af9c..a1080ea6 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -20,6 +20,7 @@ on post-fs-data
+     # create idtechdata directory to mount idtechdata partition
+     mkdir /mnt/vendor/idtechdata 0777 system system
+     mkdir /mnt/vendor/idtechdata/disp_orientation 0777 system system
++    mkdir /mnt/vendor/idtechdata/bootmedia 0777 system system
+     restorecon_recursive /mnt/vendor/idtechdata
+ 
+ service check_modem /system/bin/sh /product/etc/init/hw/check_modem.sh "check_modem"
+diff --git a/imx8m/sepolicy/file.te b/imx8m/sepolicy/file.te
+index f2abffe8..f73a59ca 100644
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@ -6,3 +6,4 @@ type proc_util_clamp, fs_type, proc_type;
+ type sysfs_usb_uevent, sysfs_type, fs_type;
+ type idtech_data_file, file_type, data_file_type, core_data_file_type;
+ type idtech_orientation_data_file, file_type, data_file_type, core_data_file_type;
++type idtech_bootmedia_data_file, file_type, data_file_type, core_data_file_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 482eb149..c3dbb04f 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -26,6 +26,7 @@
+ /idtechdata                                u:object_r:rootfs:s0
+ /mnt/vendor/idtechdata(/.*)?               u:object_r:idtech_data_file:s0
+ /mnt/vendor/idtechdata/orientation(/.*)?   u:object_r:idtech_orientation_data_file:s0
++/mnt/vendor/idtechdata/bootmedia(/.*)?     u:object_r:idtech_bootmedia_data_file:s0
+ 
+ ###############################################
+ # same-process HAL files and their dependencies
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index eb4b9865..7043d8e6 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -1,5 +1,6 @@
+ typeattribute platform_app mlstrustedsubject;
+ typeattribute platform_app system_writes_vendor_properties_violators;
++typeattribute platform_app system_writes_mnt_vendor_violators;
+ 
+ allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
+ allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
+@@ -7,6 +8,10 @@ allow platform_app idtech_data_file:dir { add_name write };
+ allow platform_app ptr_device:chr_file rw_file_perms;
+ allow platform_app vendor_idtech_prop:property_service  { set };
+ allow platform_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
++allow platform_app idtech_bootmedia_data_file:dir { create_dir_perms rw_dir_perms };
++allow platform_app idtech_bootmedia_data_file:file { create_file_perms rw_file_perms };
++allow platform_app idtech_bootmedia_data_file:dir { add_name write };
++allow platform_app mnt_vendor_file:dir { search };
+ 
+ get_prop(platform_app, vendor_idtech_prop)
+ get_prop(platform_app, vendor_default_prop)

@@ -1,0 +1,89 @@
+b609d6af George.Huang 2022-02-15
+
+AOS-864: redood: add check_bringup_stage3_func function
+
+- For HW full-load test:
+  check_func_provision
+  check_func_camera 0         # display_id
+  check_led_status 255        # brightness code
+  check_func_local_video 1    # display_id
+  #check_func_youtube_video 1 # display_id
+  check_func_occupy_cpu 3     # num of cpu threads
+
+Change-Id: Icd1d4935b988baa72a69a6a1bda6bb6053e418a5
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 0ec84887..c01210d7 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -748,6 +748,22 @@ check_bringup_stage2_func() {
+   log_rst "==============================" "======"
+ }
+ 
++check_bringup_stage3_func() {
++  # assume device is rooted/enforce 0/boot_completed
++  log_rst "==== STAGE3_FUNC =============" "======"
++  check_dev_info
++  check_led_status 255
++  check_func_provision
++#  check_func_local_video_provision
++  check_func_camera_provision
++  check_func_local_video 1    # display_id
++  check_func_camera 0         # display_id
++#  check_func_youtube_video 1  # display_id
++#  check_func_occupy_cpu 3     # num of cpu threads
++  sleep 600                   # assume stage3 needs 10min/round
++  log_rst "==============================" "======"
++}
++
+ check_bringup() {
+   test_idx=0
+   [ ! -z $1 ] && test_idx=$1
+@@ -758,6 +774,10 @@ check_bringup() {
+   elif [ $test_idx -eq 2 ]; then
+     check_bringup_stage2_if
+     check_bringup_stage2_func
++  elif [ $test_idx -eq 3 ]; then
++    check_bringup_stage1_func
++    check_bringup_stage2_func
++    check_bringup_stage3_func
+   else
+     check_bringup_stage1_if
+     check_bringup_stage1_func
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+index 326cc271..8ef4b46c 100755
+--- a/imx8m/bringup_test_stageall.sh
++++ b/imx8m/bringup_test_stageall.sh
+@@ -1,8 +1,11 @@
+ #!/bin/bash
+ 
+-# test_idx: 0: all / 1: stage1 / 2: stage2
++# test_idx: 0: all / 1: stage1 / 2: stage2 / 3: full-load
+ test_idx=0
++[ ! -z $1 ] && test_idx=$1
+ test_script="/product/bin/bringup_test.sh"
++base_path=$(dirname $(pwd $0)/$0)
++cd ${base_path}
+ 
+ adb wait-for-device
+ sleep 1
+@@ -11,10 +14,10 @@ SN=`adb shell getprop ro.serialno`
+ adb ${adb_opt} root
+ adb ${adb_opt} shell setenforce 0
+ 
+-if [ -f "./bringup_test.sh" ]; then
++if [ -f "${base_path}/bringup_test.sh" ]; then
+   test_script="/data/local/tmp/bringup_test.sh"
+ #  adb ${adb_opt} shell rm -f /data/local/tmp/*
+-  adb ${adb_opt} push ./bringup_test.sh ${test_script} 2>&1 > /dev/null
++  adb ${adb_opt} push ${base_path}/bringup_test.sh ${test_script} 2>&1 > /dev/null
+   adb ${adb_opt} shell chmod +x ${test_script}
+ fi
+ 
+@@ -24,5 +27,6 @@ adb ${adb_opt} shell ${test_script} check_bringup ${test_idx}
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_test_${test_idx}.txt 2>&1 > /dev/null
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_result_${test_idx}.txt 2>&1 > /dev/null
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_rs232_${test_idx}.txt 2>&1 > /dev/null
++#adb ${adb_opt} shell cat /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
+ adb ${adb_opt} reconnect
+ adb ${adb_opt} wait-for-device

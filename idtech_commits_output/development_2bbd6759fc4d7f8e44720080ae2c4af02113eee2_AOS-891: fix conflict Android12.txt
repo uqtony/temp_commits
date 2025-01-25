@@ -1,0 +1,91 @@
+2bbd6759f owen.wen 2022-02-23
+
+AOS-891: fix conflict Android12
+
+privapp_permissions.py support all partition in this commit
+dfa7971a161517fb4e37ae7d83e066623cbc6cd3
+
+so I just remove the code we added before
+
+Change-Id: Ice34dc77501c9cae94482fcf0302226e06dea287
+
+diff --git a/tools/privapp_permissions/privapp_permissions.py b/tools/privapp_permissions/privapp_permissions.py
+index cd33b517f..6e8451c73 100755
+--- a/tools/privapp_permissions/privapp_permissions.py
++++ b/tools/privapp_permissions/privapp_permissions.py
+@@ -193,13 +193,6 @@ class Resources(object):
+                 'You must either set up your build environment, or specify a '
+                 'device to run against. See --help for more info.')
+ 
+-<<<<<<< HEAD
+-        self.privapp_apks = self._resolve_apks(apks)
+-        self.permissions_dir = self._resolve_sys_path('system/etc/permissions')
+-        self.permissions_product_dir = self._resolve_sys_path('product/etc/permissions')
+-        self.permissions_vendor_dir = self._resolve_sys_path('vendor/etc/permissions')
+-        self.sysconfig_dir = self._resolve_sys_path('system/etc/sysconfig')
+-=======
+         if apks and (partitions == "all" or partitions.find(',') != -1):
+             # override the partition to "system
+             print('
+# Defaulting the target partition to "system". '
+@@ -234,7 +227,6 @@ class Resources(object):
+ 
+         # Always use the one in /system partition,
+         # as that is the only place we will find framework-res.apk
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         self.framework_res_apk = self._resolve_sys_path('system/framework/'
+                                                         'framework-res.apk')
+     @staticmethod
+@@ -448,34 +440,15 @@ class Resources(object):
+         """
+         if not self.adb.serial:
+             priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'],
+-<<<<<<< HEAD
+-                                        'system/priv-app')
+-            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')):
+-                product_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')
+-            else:
+-                product_priv_app_dir = ''
+-            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')):
+-                vendor_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')
+-            else:
+-                vendor_priv_app_dir = ''
+-=======
+                                         partition + '/priv-app')
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         else:
+             try:
+                 priv_app_dir = self.adb.pull(partition + '/priv-app/')
+             except subprocess.CalledProcessError:
+                 raise MissingResourceError(
+-<<<<<<< HEAD
+-                    'Directory "/system/priv-app" could not be pulled from on '
+-                    'device "%s".' % self.adb.serial)
+-
+-        return get_output('find %s %s %s -name "*.apk"' % (priv_app_dir, product_priv_app_dir, vendor_priv_app_dir)).split()
+-=======
+                     'Directory "%s/priv-app" could not be pulled from on '
+                     'device "%s".' % (partition, self.adb.serial))
+         return get_output('find %s -name "*.apk"' % priv_app_dir).split()
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     def _resolve_sys_path(self, file_path):
+         """Resolves a path that is a part of an Android System Image."""
+@@ -644,17 +617,10 @@ def generate_missing_permissions(resources, priv_permissions, partition):
+     # Parse base XML files in /etc dir, permissions listed there don't have
+     # to be re-added
+     base_permissions = {}
+-<<<<<<< HEAD
+-    base_xml_files = itertools.chain(list_xml_files(resources.permissions_dir),
+-                                     list_xml_files(resources.permissions_product_dir),
+-                                     list_xml_files(resources.permissions_vendor_dir),
+-                                     list_xml_files(resources.sysconfig_dir))
+-=======
+     base_xml_files = itertools.chain(
+         list_xml_files(resources.permissions_dirs[partition]),
+         list_xml_files(resources.sysconfig_dirs[partition]))
+ 
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     for xml_file in base_xml_files:
+         parse_config_xml(xml_file, base_permissions)
+ 

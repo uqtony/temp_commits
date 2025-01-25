@@ -1,0 +1,26 @@
+127b5a850e19 owen.wen 2021-12-09
+
+AOS-774: let IRQ always enable
+
+Symptom: IDG response invalid
+RootCause: IRQ pending when disable_irq() and IRQ resent when
+           enable_irq() but K81 only keep the data for 100ms
+           so idg-spi get invalid data everytime enable_irq()
+
+BTW, K81 will sent tamper interrupt anytime so we must enable IRQ always
+
+Change-Id: I7c927669a37991f6cf37e6ecd3784e8361488e22
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 78a76afb81b3..6127fda2f55d 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -515,7 +515,7 @@ idg_spi@0 {
+ 		spi-working-mode = <0>; /* SPI_MODE_0 */
+ 		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
+ 		spi-poweron-gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>; /* power control */
+-		/* idg-keep-sense */
++		idg-keep-sense;
+ 		status = "okay";
+ 	};
+ };

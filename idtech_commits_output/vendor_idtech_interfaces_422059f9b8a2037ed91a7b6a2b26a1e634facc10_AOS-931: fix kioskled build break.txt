@@ -1,0 +1,138 @@
+422059f Jay 2022-03-16
+
+AOS-931: fix kioskled build break
+
+Modify parameter type from std::vector<int8_t>* to
+std::vector<uint8_t>* to fix build break.
+
+Using new method to instead deprecated method, detail as following
+                 New                     deprecated
+  =================================      ===========
+  CharReaderBuilder / CharReader            Reader
+  StreamWriterBuilder / StreamWriter        Writer
+
+Change-Id: I63eddde8a41719d2289ecb0c00d3cd80db8b06a0
+
+diff --git a/kioskled/aidl/Kioskled.cpp b/kioskled/aidl/Kioskled.cpp
+index 4f5cf83..d188ac0 100644
+--- a/kioskled/aidl/Kioskled.cpp
++++ b/kioskled/aidl/Kioskled.cpp
+@@ -104,9 +104,11 @@ ScopedAStatus Kioskled::setLedMode(int8_t idx, const std::string& modedata) {
+              STATUS_BAD_INDEX, "Invalid index"));
+ 
+   Json::Value jsonmode;
+-  Json::Reader reader;
++  Json::String error;
++  Json::CharReaderBuilder builder;
++  const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+ 
+-  reader.parse(modedata, jsonmode);
++  reader->parse(modedata.c_str(), modedata.c_str() + modedata.length(), &jsonmode, &error);
+   std::string mode, delay_on, delay_off;
+ 
+   mode = jsonmode["mode"].asString();
+@@ -173,9 +175,9 @@ ScopedAStatus Kioskled::setLedMode(int8_t idx, const std::string& modedata) {
+   return ScopedAStatus::ok();
+ }
+ 
+-ScopedAStatus Kioskled::getLedModeSize(int8_t idx, std::vector<int8_t>* size) {
+-  std::vector<int8_t> ledmode;
+-  std::vector<int8_t> vec;
++ScopedAStatus Kioskled::getLedModeSize(int8_t idx, std::vector<uint8_t>* size) {
++  std::vector<uint8_t> ledmode;
++  std::vector<uint8_t> vec;
+   int length = 0;
+ 
+   getLedMode(idx, &ledmode);
+@@ -191,7 +193,7 @@ ScopedAStatus Kioskled::getLedModeSize(int8_t idx, std::vector<int8_t>* size) {
+   return ScopedAStatus::ok();
+ }
+ 
+-ScopedAStatus Kioskled::getLedMode(int8_t idx, std::vector<int8_t>* modeinfo) {
++ScopedAStatus Kioskled::getLedMode(int8_t idx, std::vector<uint8_t>* modeinfo) {
+   int ret = 0;
+   std::string modelist;
+   std::string capability;
+@@ -204,7 +206,9 @@ ScopedAStatus Kioskled::getLedMode(int8_t idx, std::vector<int8_t>* modeinfo) {
+   std::string line, pattern = " ", selectPattern = "[";
+   size_t left, right, selectIdx;
+   Json::Value cap, root;
+-  Json::FastWriter writer;
++  Json::StreamWriterBuilder jswBuilder;
++  std::unique_ptr<Json::StreamWriter>writer(jswBuilder.newStreamWriter());
++  std::ostringstream os;
+ 
+   right = modelist.find(pattern);
+   left = 0;
+@@ -224,17 +228,18 @@ ScopedAStatus Kioskled::getLedMode(int8_t idx, std::vector<int8_t>* modeinfo) {
+   }
+ 
+   root["Modes"].append(cap);
+-  capability = writer.write(root);
++  writer->write(root, &os);
++  capability = os.str().c_str();
+ 
+-  std::vector<int8_t> vec(capability.begin(), capability.end());
++  std::vector<uint8_t> vec(capability.begin(), capability.end());
+   *modeinfo = vec;
+ 
+   return ScopedAStatus::ok();
+ }
+ 
+-ScopedAStatus Kioskled::getLedListSize(std::vector<int8_t>* size) {
+-  std::vector<int8_t> ledlist;
+-  std::vector<int8_t> vec;
++ScopedAStatus Kioskled::getLedListSize(std::vector<uint8_t>* size) {
++  std::vector<uint8_t> ledlist;
++  std::vector<uint8_t> vec;
+   int length = 0;
+ 
+   getLedList(&ledlist);
+@@ -249,12 +254,14 @@ ScopedAStatus Kioskled::getLedListSize(std::vector<int8_t>* size) {
+   return ScopedAStatus::ok();
+ }
+ 
+-ScopedAStatus Kioskled::getLedList(std::vector<int8_t>* ledlist) {
++ScopedAStatus Kioskled::getLedList(std::vector<uint8_t>* ledlist) {
+   int count = 0;
+   struct dirent **entry_list;
+   std::string out;
+   Json::Value led, root;
+-  Json::FastWriter writer;
++  Json::StreamWriterBuilder jswBuilder;
++  std::unique_ptr<Json::StreamWriter>writer(jswBuilder.newStreamWriter());
++  std::ostringstream os;
+ 
+   count = scandir(DEF_LED_ROOT_PATH, &entry_list, filter, alphasort);
+   if (count <= 0)
+@@ -269,8 +276,9 @@ ScopedAStatus Kioskled::getLedList(std::vector<int8_t>* ledlist) {
+     root["Leds"].append(led);
+     free(entry);
+   }
+-  out = writer.write(root);
+-  std::vector<int8_t> vec(out.begin(), out.end());
++  writer->write(root, &os);
++  out = os.str().c_str();
++  std::vector<uint8_t> vec(out.begin(), out.end());
+   *ledlist = vec;
+   free(entry_list);
+ 
+diff --git a/kioskled/aidl/Kioskled.h b/kioskled/aidl/Kioskled.h
+index f1166c4..94622b3 100644
+--- a/kioskled/aidl/Kioskled.h
++++ b/kioskled/aidl/Kioskled.h
+@@ -24,10 +24,10 @@ using ::ndk::ScopedAStatus;
+ class Kioskled : public BnKioskled {
+ public:
+ 	ScopedAStatus setLedBrightness(int8_t idx, int8_t onOff) override;
+-	ScopedAStatus getLedListSize(std::vector < int8_t > *size) override;
+-	ScopedAStatus getLedList(std::vector < int8_t > *ledlist) override;
+-	ScopedAStatus getLedModeSize(int8_t idx, std::vector < int8_t > *size) override;
+-	ScopedAStatus getLedMode(int8_t idx, std::vector < int8_t > *modeinfo) override;
++	ScopedAStatus getLedListSize(std::vector < uint8_t > *size) override;
++	ScopedAStatus getLedList(std::vector < uint8_t > *ledlist) override;
++	ScopedAStatus getLedModeSize(int8_t idx, std::vector < uint8_t > *size) override;
++	ScopedAStatus getLedMode(int8_t idx, std::vector < uint8_t > *modeinfo) override;
+ 	ScopedAStatus setLedMode(int8_t idx, const std::string & modedata) override;
+ 
+ private:

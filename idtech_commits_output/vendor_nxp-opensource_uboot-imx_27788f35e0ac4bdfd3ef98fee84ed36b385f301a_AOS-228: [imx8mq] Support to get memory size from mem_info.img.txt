@@ -1,0 +1,420 @@
+27788f35e0 max.yang 2020-07-09
+
+AOS-228: [imx8mq] Support to get memory size from mem_info.img
+
+Change-Id: I2425454537c61682f3e0fafd25bc90cd4ebc854a
+
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index ad5ffce9a6..84dfe97326 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -34,6 +34,7 @@
+ #include <imx_mipi_dsi_bridge.h>
+ #include <mipi_dsi_panel.h>
+ #include <stdio_dev.h>
++#include <idt_ddr_select.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -73,11 +74,18 @@ int board_qspi_init(void)
+ 
+ int dram_init(void)
+ {
++	unsigned int mem_size = PHYS_SDRAM_SIZE;
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	memcpy((void*)&mem_size, (void*)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
++	mem_size *= 1024;
++	printf("idt set to ");
++#endif
++
+ 	/* rom_pointer[1] contains the size of TEE occupies */
+ 	if (rom_pointer[1])
+-		gd->ram_size = PHYS_SDRAM_SIZE - rom_pointer[1];
++		gd->ram_size = mem_size - rom_pointer[1];
+ 	else
+-		gd->ram_size = PHYS_SDRAM_SIZE;
++		gd->ram_size = mem_size;
+ 
+ 	return 0;
+ }
+diff --git a/board/freescale/imx8mq_evk/imx8mq_evk.c b/board/freescale/imx8mq_evk/imx8mq_evk.c
+index 941620eedf..6a386665db 100644
+--- a/board/freescale/imx8mq_evk/imx8mq_evk.c
++++ b/board/freescale/imx8mq_evk/imx8mq_evk.c
+@@ -27,6 +27,7 @@
+ #include "../common/pfuze.h"
+ #include <usb.h>
+ #include <dwc3-uboot.h>
++#include <idt_ddr_select.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -66,11 +67,18 @@ int board_qspi_init(void)
+ 
+ int dram_init(void)
+ {
++	unsigned int mem_size = PHYS_SDRAM_SIZE;
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	memcpy((void*)&mem_size, (void*)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
++	mem_size *= 1024;
++	printf("idt set to ");
++#endif
++
+ 	/* rom_pointer[1] contains the size of TEE occupies */
+ 	if (rom_pointer[1])
+-		gd->ram_size = PHYS_SDRAM_SIZE - rom_pointer[1];
++		gd->ram_size = mem_size - rom_pointer[1];
+ 	else
+-		gd->ram_size = PHYS_SDRAM_SIZE;
++		gd->ram_size = mem_size;
+ 
+ 	return 0;
+ }
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index d1dd952777..cd4ae222a4 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -2,9 +2,8 @@
+ #include <asm/arch/ddr.h>
+ #include <errno.h>
+ #include <mmc.h>
+-#include <persist_idt.h>
++#include <idt_ddr_select.h>
+ 
+-#define _DEBUG 0
+ /*
+  *  !!! IMPORTANT !!!
+  * 1. Since we should design a big-enough data struct to put all necessary
+@@ -28,38 +27,16 @@
+ */
+ 
+ extern int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device);
+-struct idt_dram_hdr {
+-	unsigned int drate;
+-	unsigned int type;
+-	unsigned int offset;
+-	unsigned int ary_size;
+-};
+-struct idt_mem_obj {
+-	uint8_t platform[BDINFO_DATA_SIZE];
+-	uint8_t feature[BDINFO_DATA_SIZE];
+-	unsigned int obj_offset;
+-	unsigned int obj_size;
+-};
+-struct idt_mem_root {
+-	unsigned int total;
+-	struct idt_mem_obj mem_obj_ary[];
+-};
+-
+-#define UUU_MEM_OBJ_ADDR 0x81a000  // find a large-enough space on sram
+-#define BLOCK_SIZE  512
+-#define BDINFO_BLOCK_BASE 16384
+-#define ROOT_HDR_BLOCK_BASE 20480
+-#define HDR_SIZE  BLOCK_SIZE/sizeof(struct idt_dram_hdr)
+-
+-char buf_ddrc_cfg[BLOCK_SIZE * 2]            __attribute__((section(".data")));
+-char buf_ddrphy_cfg[BLOCK_SIZE * 4]          __attribute__((section(".data")));
+-char buf_ddrphy_trained_csr[BLOCK_SIZE * 12] __attribute__((section(".data")));
+-char buf_ddrphy_pie[BLOCK_SIZE * 10]         __attribute__((section(".data")));
+-
+-char buf_fsp_msg0[BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg1[BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg2[BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg3[BLOCK_SIZE*2] __attribute__((section(".data")));
++
++char buf_ddrc_cfg[IDT_BLOCK_SIZE * 2]            __attribute__((section(".data")));
++char buf_ddrphy_cfg[IDT_BLOCK_SIZE * 4]          __attribute__((section(".data")));
++char buf_ddrphy_trained_csr[IDT_BLOCK_SIZE * 12] __attribute__((section(".data")));
++char buf_ddrphy_pie[IDT_BLOCK_SIZE * 10]         __attribute__((section(".data")));
++
++char buf_fsp_msg0[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg1[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg2[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg3[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
+ 
+ struct blk_desc* init_mmc_blk(void)
+ {
+@@ -80,41 +57,55 @@ struct blk_desc* init_mmc_blk(void)
+ }
+ 
+ void idt_read_block(struct blk_desc * dev_desc, unsigned int start_off, struct idt_dram_hdr* hdr, char* buf) {
+-	int carry  = (((hdr->ary_size) * sizeof(struct dram_cfg_param)) % BLOCK_SIZE) == 0 ? 0 : 1;
+-	int blocks =  ((hdr->ary_size) * sizeof(struct dram_cfg_param)  / BLOCK_SIZE) + carry;
+-#if _DEBUG
++	int carry  = (((hdr->ary_size) * sizeof(struct dram_cfg_param)) % IDT_BLOCK_SIZE) == 0 ? 0 : 1;
++	int blocks =  ((hdr->ary_size) * sizeof(struct dram_cfg_param)  / IDT_BLOCK_SIZE) + carry;
++#if _DEBUG_IDT_DDR
+ 	printf("IDTech: read %d times from %d
+", blocks, start_off + hdr->offset);
+ #endif
+ 	for (int i=0; i<blocks; i++) {
+-		blk_dread(dev_desc, start_off + hdr->offset + i, 1, buf + (i*BLOCK_SIZE));
++		blk_dread(dev_desc, start_off + hdr->offset + i, 1, buf + (i*IDT_BLOCK_SIZE));
+ 	}
+ }
+ 
+ unsigned int read_mem_root_block(struct blk_desc * dev_desc) {
+ 	struct idt_mem_root* p_root = NULL;
+ 	struct BoardInfoData* p_bdinfo = NULL;
+-	char bdinfo[BLOCK_SIZE] = "";
+-	char root_buf[BLOCK_SIZE] = "";
++	char bdinfo[IDT_BLOCK_SIZE] = "";
++	char root_buf[IDT_BLOCK_SIZE] = "";
+ 	blk_dread(dev_desc, BDINFO_BLOCK_BASE, 1, (void*) bdinfo);
+ 	blk_dread(dev_desc, ROOT_HDR_BLOCK_BASE, 1, (void*) root_buf);
+ 	p_root = (struct idt_mem_root*)root_buf;
+ 	p_bdinfo = (struct BoardInfoData*)bdinfo;
+ 
+-#if _DEBUG
+-	printf("IDTech New:bdinfo.mb_model: %s
+", p_bdinfo->mb_model);
+-	printf("IDTech New:bdinfo.mb_plc: %s
+", p_bdinfo->mb_plc);
++#if _DEBUG_IDT_DDR
++	printf("IDTech: bdinfo.som_model: %s
+", p_bdinfo->som_model);
++	printf("IDTech: bdinfo.som_plc:   %s
+", p_bdinfo->som_plc);
++	printf("IDTech: bdinfo.som_rev:   %s
+", p_bdinfo->som_rev);
++	printf("IDTech: bdinfo.mb_model:  %s
+", p_bdinfo->mb_model);
++	printf("IDTech: bdinfo.mb_plc:    %s
+", p_bdinfo->mb_plc);
++	printf("IDTech: bdinfo.mb_rev:    %s
+", p_bdinfo->mb_rev);
++	printf("IDTech: bdinfo.dev_ddr:   %s
+", p_bdinfo->dev_ddr);
+ #endif
+ 	for (int i=0; i<p_root->total; i++) {
+-#if _DEBUG
+-		printf("IDTech New:index: %u
+", i);
+-		printf("IDTech New:obj.platform: %s
+", p_root->mem_obj_ary[i].platform);
+-		printf("IDTech New:obj.feature: %s
+", p_root->mem_obj_ary[i].feature);
+-		printf("IDTech New:obj.offset: %u
+", p_root->mem_obj_ary[i].obj_offset);
+-		printf("IDTech New:obj.size: %u
+", p_root->mem_obj_ary[i].obj_size);
++#if _DEBUG_IDT_DDR
++		printf("IDTech: index: %u
+", i);
++		printf("IDTech: obj.m_som_model: %s
+", p_root->mem_obj_ary[i].m_som_model);
++		printf("IDTech: obj.m_som_plc:   %s
+", p_root->mem_obj_ary[i].m_som_plc);
++		printf("IDTech: obj.m_mb_model:  %s
+", p_root->mem_obj_ary[i].m_mb_model);
++		printf("IDTech: obj.m_mb_plc:    %s
+", p_root->mem_obj_ary[i].m_mb_plc);
++		printf("IDTech: obj.m_ddr_t:     %s
+", p_root->mem_obj_ary[i].m_ddr_t);
++		printf("IDTech: obj.offset:      %u
+", p_root->mem_obj_ary[i].obj_offset);
++		printf("IDTech: obj.size:        %u
+", p_root->mem_obj_ary[i].obj_size);
+ #endif
+-		if (memcmp(p_bdinfo->mb_model, p_root->mem_obj_ary[i].platform, BDINFO_DATA_SIZE) != 0)
++		if (memcmp(p_bdinfo->som_model, p_root->mem_obj_ary[i].m_som_model, BDINFO_DATA_SIZE) != 0)
++			continue;
++		if (memcmp(p_bdinfo->som_plc,   p_root->mem_obj_ary[i].m_som_plc,   BDINFO_DATA_SIZE) != 0)
++			continue;
++		if (memcmp(p_bdinfo->mb_model,  p_root->mem_obj_ary[i].m_mb_model,  BDINFO_DATA_SIZE) != 0)
+ 			continue;
+-		if (memcmp(p_bdinfo->mb_plc, p_root->mem_obj_ary[i].feature, BDINFO_DATA_SIZE) != 0)
++		if (memcmp(p_bdinfo->mb_plc,    p_root->mem_obj_ary[i].m_mb_plc,    BDINFO_DATA_SIZE) != 0)
++			continue;
++		if (memcmp(p_bdinfo->dev_ddr,   p_root->mem_obj_ary[i].m_ddr_t,     BDINFO_DATA_SIZE) != 0)
+ 			continue;
+ 		printf("idt: using dram index %u
+", i);
+ 		return p_root->mem_obj_ary[i].obj_offset;
+@@ -127,22 +118,29 @@ unsigned int read_mem_root_block(struct blk_desc * dev_desc) {
+ void idt_spl_dram_init(void)
+ {
+ 	struct dram_timing_info t_data;
+-	struct idt_dram_hdr hdr[HDR_SIZE] = {};
++	char hdr_buf[IDT_BLOCK_SIZE] = {};
++	struct idt_dram_hdr* hdr = NULL;
+ 	struct dram_fsp_msg fsp_ary[4] = {};
+ 	unsigned int* idx = NULL;
++	unsigned int* ddr_size = NULL;
+ 
+ 	// uuu version, we put mem object before loading SPL; Normal boot should read from emmc
+ #ifdef CONFIG_FASTBOOT_UUU_SUPPORT
+ 	printf("IDT: uuu get mem object...
+");
+-	memcpy((void*)hdr, (void*)UUU_MEM_OBJ_ADDR, BLOCK_SIZE);
++	memcpy((void*)hdr_buf, (void*)UUU_MEM_OBJ_ADDR, IDT_BLOCK_SIZE);
+ #else
+ 	struct blk_desc *dev_desc = init_mmc_blk();
+ 	unsigned dram_data_offset = read_mem_root_block(dev_desc);
+ 	unsigned int hdr_offset = ROOT_HDR_BLOCK_BASE + dram_data_offset;
+-	blk_dread(dev_desc, hdr_offset, 1, (void*) hdr);
++	blk_dread(dev_desc, hdr_offset, 1, (void*) hdr_buf);
+ #endif
+ 
+-#if _DEBUG
++	// composed by 1*unsigned int (size) + 10*struct idt_dram_hdr
++	ddr_size = (unsigned int*)hdr_buf;
++	hdr = (struct idt_dram_hdr*)(hdr_buf + sizeof(unsigned int));
++
++#if _DEBUG_IDT_DDR
++	printf("IDTech: got data mem_size(KB): %u
+", *ddr_size);
+         for (int i=0; i<10; i++) {
+ 	        printf("IDTech: got data %d %d %d %d
+", hdr[i].drate, hdr[i].type, hdr[i].offset, hdr[i].ary_size);
+         }
+@@ -150,15 +148,15 @@ void idt_spl_dram_init(void)
+ 
+ 	// Handling mem object data, uuu read from sram, normal boot read from emmc
+ #ifdef CONFIG_FASTBOOT_UUU_SUPPORT
+-	t_data.ddrc_cfg           = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[0].offset * BLOCK_SIZE);
+-	t_data.ddrphy_cfg         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[1].offset * BLOCK_SIZE);
+-	t_data.ddrphy_trained_csr = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[7].offset * BLOCK_SIZE);
+-	t_data.ddrphy_pie         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[8].offset * BLOCK_SIZE);
+-
+-	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[3].offset * BLOCK_SIZE);
+-	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[4].offset * BLOCK_SIZE);
+-	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[5].offset * BLOCK_SIZE);
+-	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[6].offset * BLOCK_SIZE);
++	t_data.ddrc_cfg           = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[0].offset * IDT_BLOCK_SIZE);
++	t_data.ddrphy_cfg         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[1].offset * IDT_BLOCK_SIZE);
++	t_data.ddrphy_trained_csr = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[7].offset * IDT_BLOCK_SIZE);
++	t_data.ddrphy_pie         = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[8].offset * IDT_BLOCK_SIZE);
++
++	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[3].offset * IDT_BLOCK_SIZE);
++	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[4].offset * IDT_BLOCK_SIZE);
++	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[5].offset * IDT_BLOCK_SIZE);
++	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *) (((void*)UUU_MEM_OBJ_ADDR) + hdr[6].offset * IDT_BLOCK_SIZE);
+ #else   // !CONFIG_FASTBOOT_UUU_SUPPORT
+ 	idt_read_block(dev_desc, hdr_offset, &hdr[0], buf_ddrc_cfg);
+ 	idt_read_block(dev_desc, hdr_offset, &hdr[1], buf_ddrphy_cfg);
+@@ -216,4 +214,7 @@ void idt_spl_dram_init(void)
+ 	t_data.fsp_table[3] = idx[3];
+ 
+ 	ddr_init(&t_data);
++
++	// pass mem size to uboot
++	memcpy((void*)DEV_MEM_SIZE_BASE, (void*)ddr_size, sizeof(unsigned int));
+ }
+diff --git a/include/idt_ddr_select.h b/include/idt_ddr_select.h
+new file mode 100644
+index 0000000000..1ca3044cdd
+--- /dev/null
++++ b/include/idt_ddr_select.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2020 ID TECH
++ */
++
++#include <persist_idt.h>
++
++#ifndef __IDT_DDR_SELECT_H__
++#define __IDT_DDR_SELECT_H__
++
++#define _DEBUG_IDT_DDR 0
++
++// SRAM: 0x007E0000 ~ 0x0081FFFF
++#define DEV_MEM_SIZE_BASE 0x81ff00  // pass mem size to uboot at tail of sram
++#define UUU_MEM_OBJ_ADDR  0x81a000  // an enough space on sram for uuu loading mem object
++
++#define IDT_BLOCK_SIZE  512
++#define BDINFO_BLOCK_BASE 16384   // board_info start from emmc: 8M
++#define ROOT_HDR_BLOCK_BASE 20480 // mem_info start from emmc: 10M
++
++struct idt_dram_hdr {
++	unsigned int drate;
++	unsigned int type;
++	unsigned int offset;
++	unsigned int ary_size;
++};
++
++struct idt_mem_obj {
++	uint8_t m_som_model[BDINFO_DATA_SIZE];
++	uint8_t m_som_plc[BDINFO_DATA_SIZE];
++	uint8_t m_mb_model[BDINFO_DATA_SIZE];
++	uint8_t m_mb_plc[BDINFO_DATA_SIZE];
++	uint8_t m_ddr_t[BDINFO_DATA_SIZE];
++	unsigned int obj_offset;
++	unsigned int obj_size;
++};
++
++struct idt_mem_root {
++	unsigned int total;
++	struct idt_mem_obj mem_obj_ary[];
++};
++
++#endif //__IDT_DDR_SELECT_H__
+diff --git a/include/persist_idt.h b/include/persist_idt.h
+index 41af5bffa5..5e6f8ba05e 100644
+--- a/include/persist_idt.h
++++ b/include/persist_idt.h
+@@ -42,6 +42,9 @@ typedef struct BoardInfoData {
+ 
+ 	/* IDT's serial number format: 000K000005. */
+ 	uint8_t dev_serial[BDINFO_DATA_SIZE];
++
++	/* device ddr vendor and size info: KTG2G, MIC3G, etc. */
++	uint8_t dev_ddr[BDINFO_DATA_SIZE];
+ } BoardInfoData;
+ 
+ /* Return codes used for I/O operations.
+diff --git a/lib/persist_idt/persist_idt.c b/lib/persist_idt/persist_idt.c
+index d60f6196e6..ba7dd5b6d7 100644
+--- a/lib/persist_idt/persist_idt.c
++++ b/lib/persist_idt/persist_idt.c
+@@ -27,7 +27,8 @@ bool is_bdinfo_var(char *cmd)
+ 			!strcmp_l1("mb-model", cmd) ||
+ 			!strcmp_l1("mb-plc", cmd) ||
+ 			!strcmp_l1("mb-rev", cmd) ||
+-			!strcmp_l1("dev-serial", cmd))
++			!strcmp_l1("dev-serial", cmd) ||
++			!strcmp_l1("dev-ddr", cmd))
+ 				return true;
+ 	return false;
+ }
+@@ -62,7 +63,7 @@ bool bdinfo_data_verify_and_byteswap(const BoardInfoData* src, BoardInfoData* de
+ 	return true;
+ }
+ 
+-// Ex: idt,prod-id = "idt_<som_model>_<som_plc>-<som_rev>_<mb_model>_<mb_plc>-<mb_rev>"
++// Ex: idt,prod-id = "idt_<som_model>_<som_plc>-<som_rev>_<mb_model>_<mb_plc>-<mb_rev>_<dev_ddr>"
+ bool get_dtb_id(char *id_buf, size_t id_buf_size) {
+ 	if (! id_buf || id_buf_size <= 0) {
+ 		printf("Error: wrong input buffer or size
+");
+@@ -74,13 +75,14 @@ bool get_dtb_id(char *id_buf, size_t id_buf_size) {
+ 		printf("Error: bdinfo read failed: %s
+", response);
+ 		return false;
+ 	}
+-	snprintf(id_buf, id_buf_size, "idt_%s_%s-%s_%s_%s-%s ", \
++	snprintf(id_buf, id_buf_size, "idt_%s_%s-%s_%s_%s-%s_%s ", \
+ 			(char *)bdinfo_data.som_model, \
+ 			(char *)bdinfo_data.som_plc, \
+ 			(char *)bdinfo_data.som_rev, \
+ 			(char *)bdinfo_data.mb_model, \
+ 			(char *)bdinfo_data.mb_plc, \
+-			(char *)bdinfo_data.mb_rev);
++			(char *)bdinfo_data.mb_rev, \
++			(char *)bdinfo_data.dev_ddr);
+ //	printf("Info: test %s %d %d
+", id_buf, strlen(id_buf), id_buf_size);
+ 	return true;
+ }
+@@ -223,6 +225,11 @@ IdtInfoResult handle_bdinfo_var(bool do_set, char *cmd, char *arg, char *buffer,
+ 		snprintf(var, BDINFO_DATA_SIZE, "%s", (char *)bdinfo_data.dev_serial);
+ 		strncat(sub_msg, var, sub_msg_len);
+ 	}
++	else if (!strcmp_l1("dev-ddr", cmd)) {
++		if (do_set) strlcpy((char *)bdinfo_data.dev_ddr, arg, BDINFO_DATA_SIZE);
++		snprintf(var, BDINFO_DATA_SIZE, "%s", (char *)bdinfo_data.dev_ddr);
++		strncat(sub_msg, var, sub_msg_len);
++	}
+ 	else {
+ 		strlcpy(buffer, "FAILIDTINFO_RESULT_ERROR_NO_SUCH_CMD ", size);
+ 		ret = IDTINFO_RESULT_ERROR_NO_SUCH_CMD;

@@ -1,0 +1,266 @@
+f9e04d116a3b jay deng 2021-03-30
+
+AOS-524: Modify device tree for ibr210 21 inch display
+
+DCSS output with HDMI and LCDIF output with MIPI-DSI
+LCDIF bandwith(497664000) = width(1920) x height(1080) x BPP(4) x frame_rate(60).
+
+pixel clock(135168000) = h_total(2048) x v_total(1100) x frame_rate(60).
+One channe input with channel A and DSI channel lane as 4.
+Dual channel output, so setup flag ti,support-dual-lvds-link.
+
+Change-Id: I8590d2a2ece1352e5f2be4db344072b4e12a3f62
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index 8c639620b287..4a0afcc68dcc 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -250,6 +250,7 @@ wm8524: audio-codec {
+ 	};
+ 
+ 	sound-hdmi {
++		status = "okay";
+ 		compatible = "fsl,imx8mq-evk-cdnhdmi",
+ 				"fsl,imx-audio-cdnhdmi";
+ 		model = "imx-audio-hdmi";
+@@ -302,17 +303,10 @@ lvds_backlight0: lvds_backlight@0 {
+ 					80 81 82 83 84 85 86 87 88 89
+ 					90 91 92 93 94 95 96 97 98 99
+ 					100>;
++		enable-gpios = <&gpio4 23 GPIO_ACTIVE_HIGH>;
+ 		default-brightness-level = <70>;
+ 	};
+ 
+-	hms_lcd {
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_hmslcd>;
+-		compatible = "hms_lcd";
+-		lcd_en_gpio    = <&gpio4 25 1>;
+-		bl_power_gpio  = <&gpio4 23 1>;
+-	};
+-
+ 	hms_3g {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_hms3g>;
+@@ -418,10 +412,30 @@ csi2_mipi_ep: endpoint@1 {
+ 	};
+ };
+ 
++&dphy {
++	status = "okay";
++};
++
+ &mipi_dsi {
+-	port@1 {
+-		mipi_dsi_bridge_adv: endpoint {
+-			remote-endpoint = <&adv7535_in>;
++	status = "okay";
++	fsl,clock-drop-level = <2>;
++
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port@0 {
++			reg = <0>;
++			mipi_dsi_bridge_in: endpoint {
++				remote-endpoint = <&lcdif_out>;
++			};
++		};
++
++		port@1 {
++			reg = <1>;
++			mipi_dsi_bridge_out: endpoint {
++				remote-endpoint = <&dsi_lvds_bridge_in>;
++			};
+ 		};
+ 	};
+ };
+@@ -521,77 +535,48 @@ codec: rt5640@1c {
+ 		ibr210-config;
+ 	};
+ 
+-	adv_bridge: adv7535@3d {
+-		compatible = "adi,adv7535";
+-		reg = <0x3d>;
+-		adi,addr-cec = <0x3b>;
+-		adi,dsi-lanes = <4>;
+-		pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
+-		interrupt-parent = <&gpio5>;
+-		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+-		status = "disabled";
++	dsi_lvds_bridge: sn65dsi84@2c {
++		compatible = "ti,sn65dsi83";
++		reg = <0x2c>;
++		ti,dsi-lanes = <4>;
++		ti,lvds-format = <2>;
++		ti,lvds-bpp = <24>;
++		ti,width-mm = <476>;
++		ti,height-mm = <271>;
++		ti,support-dual-lvds-link;
++		enable-gpios = <&gpio4 25 1>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++		status = "okay";
+ 
+-		port {
+-			adv7535_in: endpoint {
+-				remote-endpoint = <&mipi_dsi_bridge_adv>;
++		display-timings {
++			native-mode = <&lvds0_21inch>;
++
++			/* IBR 21 inch */
++			lvds0_21inch: timing@0 {
++				clock-frequency = <135168000>;
++				hactive = <1920>;
++				vactive = <1080>;
++				hfront-porch = <48>;
++				hback-porch = <48>;
++				hsync-len = <32>;
++				vback-porch = <8>;
++				vfront-porch = <8>;
++				vsync-len = <4>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
+ 			};
+ 		};
+-	};
+-};
+-
+-#if 0
+-&i2c3 {
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c3>;
+-	status = "okay";
+-
+-	synaptics_dsx_ts: synaptics_dsx_ts@20 {
+-		compatible = "synaptics_dsx";
+-		reg = <0x20>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
+-		interrupt-parent = <&gpio5>;
+-		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+-		synaptics,diagonal-rotation;
+-		status = "disabled";
+-	};
+-
+-	ak4458_1: ak4458@10 {
+-		compatible = "asahi-kasei,ak4458";
+-		reg = <0x10>;
+-	};
+-
+-	ak4458_2: ak4458@12 {
+-		compatible = "asahi-kasei,ak4458";
+-		reg = <0x12>;
+-	};
+-
+-	ak5558: ak5558@13 {
+-		compatible = "asahi-kasei,ak5558";
+-		reg = <0x13>;
+-		ak5558,pdn-gpio = <&gpio3 17 GPIO_ACTIVE_HIGH>;
+-	};
+-
+-	ak4497: ak4497@11 {
+-		compatible = "asahi-kasei,ak4497";
+-		reg = <0x11>;
+-		ak4497,pdn-gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>;
+-	};
+ 
+-	adv_bridge: adv7535@3d {
+-		compatible = "adi,adv7535";
+-		reg = <0x3d>;
+-		adi,addr-cec = <0x3b>;
+-		adi,dsi-lanes = <4>;
+-		pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
+-		interrupt-parent = <&gpio5>;
+-		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
+-
+-		status = "disabled";
++		port@0 {
++			dsi_lvds_bridge_in: endpoint {
++				remote-endpoint = <&mipi_dsi_bridge_out>;
++			};
++		};
+ 	};
+ };
+-#endif
+ 
+ &i2c2 {
+ 	clock-frequency = <100000>;
+@@ -781,6 +766,11 @@ MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10		0x16
+ 			MX8MQ_IOMUXC_NAND_DATA05_GPIO3_IO11		0x16
+ 			MX8MQ_IOMUXC_NAND_DATA06_GPIO3_IO12		0x16
+ 			MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13		0x16
++			MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11		0x16
++			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x16
++			MX8MQ_IOMUXC_SAI2_RXD0_GPIO4_IO23		0x16
++			MX8MQ_IOMUXC_SAI2_TXFS_GPIO4_IO24		0x16
++			MX8MQ_IOMUXC_SAI2_TXC_GPIO4_IO25		0x16
+ 		>;
+ 	};
+ 
+@@ -1078,19 +1068,9 @@ MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3		0x16
+ 		>;
+ 	};
+ 
+-	pinctrl_hmslcd: hmslcdgrp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11		0x16
+-			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x16
+-			MX8MQ_IOMUXC_SAI2_RXD0_GPIO4_IO23		0x16
+-			MX8MQ_IOMUXC_SAI2_TXC_GPIO4_IO25		0x16
+-		>;
+-	};
+-
+ 	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO01_PWM1_OUT		0x1c
+-			MX8MQ_IOMUXC_SAI2_TXFS_GPIO4_IO24		0x16
+ 		>;
+ 	};
+ 
+@@ -1117,7 +1097,6 @@ MX8MQ_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x16
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;
+-	enable = <&gpio4 24 1>;
+ 	status = "okay";
+ };
+ 
+@@ -1137,12 +1116,33 @@ &dcss {
+ 	status = "okay";
+ 
+ 	port@0 {
++		reg = <0>;
+ 		dcss_out: endpoint {
+ 			  remote-endpoint = <&hdmi_in>;
+ 		};
+ 	};
+ };
+ 
++&lcdif {
++	status = "okay";
++	max-memory-bandwidth = <497664000>; /* 1920x1080-32@60 */
++
++	assigned-clocks = <&clk IMX8MQ_CLK_LCDIF_PIXEL>,
++			  <&clk IMX8MQ_VIDEO_PLL1_BYPASS>,
++			  <&clk IMX8MQ_VIDEO_PLL1_REF_SEL>,
++			  <&clk IMX8MQ_VIDEO_PLL1>;
++	assigned-clock-parents = <&clk IMX8MQ_VIDEO_PLL1_OUT>,
++				 <&clk IMX8MQ_VIDEO_PLL1>,
++				 <&clk IMX8MQ_CLK_27M>;
++	assigned-clock-rate = <126000000>, <0>, <0>, <1134000000>;
++
++	port@0 {
++		lcdif_out: endpoint {
++			remote-endpoint = <&mipi_dsi_bridge_in>;
++		};
++	};
++};
++
+ &hdmi {
+ 	compatible = "cdn,imx8mq-hdmi";
+ 	lane-mapping = <0xe4>;

@@ -1,0 +1,59 @@
+83f97592 owen.wen 2019-12-20
+
+create device owner and device policy file
+
+change the device policy and device owner default file path from
+/data/system/device_policies.xml
+/data/system/device_owner_2.xml
+to
+/system/device_policies.xml
+/system/device_owner_2.xml
+
+so we can device it during build time instead of add dpm command(and add sepolicy) in init.rc
+
+Change-Id: I8282af3b9e52798feb4eda56a6809a3ed8efe4fc
+
+diff --git a/common/deviceowner/device_owner_2.xml b/common/deviceowner/device_owner_2.xml
+new file mode 100644
+index 00000000..5adaa8e4
+--- /dev/null
++++ b/common/deviceowner/device_owner_2.xml
+@@ -0,0 +1,5 @@
++<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
++<root>
++<device-owner package="com.idtech.deviceadmin" name="" component="com.idtech.deviceadmin/com.idtech.deviceadmin.AdminReceiver" userRestrictionsMigrated="true" />
++<device-owner-context userId="0" />
++</root>
+diff --git a/common/deviceowner/device_policies.xml b/common/deviceowner/device_policies.xml
+new file mode 100644
+index 00000000..b7baba48
+--- /dev/null
++++ b/common/deviceowner/device_policies.xml
+@@ -0,0 +1,12 @@
++<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
++<policies setup-complete="true" provisioning-state="3">
++<admin name="com.idtech.deviceadmin/com.idtech.deviceadmin.AdminReceiver">
++<policies flags="0" />
++<strong-auth-unlock-timeout value="0" />
++<user-restrictions no_add_managed_profile="true" />
++<default-enabled-user-restrictions>
++<restriction value="no_add_managed_profile" />
++</default-enabled-user-restrictions>
++</admin>
++<lock-task-features value="16" />
++</policies>
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 966b96a1..64f96e55 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -47,7 +47,9 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/deviceowner/device_policies.xml:$(TARGET_COPY_OUT_SYSTEM)/device_policies.xml \
++    device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_SYSTEM)/device_owner_2.xml \
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \

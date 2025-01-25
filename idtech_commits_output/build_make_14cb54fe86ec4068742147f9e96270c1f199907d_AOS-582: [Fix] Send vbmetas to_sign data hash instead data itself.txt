@@ -1,0 +1,56 @@
+14cb54fe8 max.yang 2021-04-22
+
+AOS-582: [Fix] Send vbmetas to_sign data hash instead data itself
+
+Symptom: Failed to sign vbmeta image by web service
+Root Cause: vbmeta to_sign data exceeded 4096 bytes, reject by web service
+Solution: Transfer data to hash, and ask ca to sign hash without hashing it
+
+Change-Id: I15cf77922f2e1ab8abb1018fc3b9ca4115ed5ebe
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index a2f32daf6..8ac2ce608 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -17,9 +17,10 @@ import post_sign_vbmeta
+ import idt_web_service
+ from xml.etree import ElementTree
+ from distutils.spawn import find_executable
++from hashlib import sha256
+ 
+ # VERSION: Android Ver.Major.Minor
+-OTATOOL_VERSION = "11.01.004"
++OTATOOL_VERSION = "11.01.005"
+ 
+ WS = None
+ idt_key_map = {}
+@@ -98,8 +99,8 @@ def idt_write_ota_certs(output_zip):
+   common.ZipWriteStr(output_zip, "BOOT/RAMDISK/system/etc/security/otacerts.zip", temp_file.getvalue())
+   common.ZipWriteStr(output_zip, "SYSTEM/etc/security/otacerts.zip", temp_file.getvalue())
+ 
+-def sign_by_ca(data, key):
+-  sig_hex = WS.doSign(key, data.encode('hex'))
++def sign_by_ca(data, key, is_hash = 0):
++  sig_hex = WS.doSign(key, data.encode('hex'), is_hash)
+   sig = sig_hex.decode('hex')
+   assert len(sig) == 256
+ 
+@@ -378,7 +379,9 @@ def create_released_vbmeta(sign_env, output_zip, tmp_dir):
+   with open(tmp_dir + "/IMAGES/vbmeta.img-to_sign", "r") as f_tosign, \
+        open(tmp_dir + "/IMAGES/vbmeta.img-sig", "w") as f_sig:
+     data_to_sign = f_tosign.read()
+-    signature = sign_by_ca(data_to_sign, "AVBKey")
++    h = sha256()
++    h.update(data_to_sign)
++    signature = sign_by_ca(h.hexdigest().decode('hex'), "AVBKey", is_hash = 1)
+     f_sig.write(signature)
+ 
+   # combine vbmeta.img-partial, vbmeta.img-sig
+@@ -500,6 +503,7 @@ def main(argv):
+   common.ZipClose(input_zip)
+   common.ZipClose(output_zip)
+ 
++  print("*************************************")
+   print("Signing process successfully finished")
+ 
+ if __name__ == '__main__':

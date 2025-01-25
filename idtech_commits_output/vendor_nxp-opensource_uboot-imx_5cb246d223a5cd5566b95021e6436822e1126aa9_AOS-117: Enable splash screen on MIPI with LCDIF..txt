@@ -1,0 +1,202 @@
+5cb246d223 Arthur Chen 2020-07-01
+
+AOS-117: Enable splash screen on MIPI with LCDIF.
+
+    - change target logo file to be symbolic link because the making rule is
+    "$(srctree)/$(src)/logos/$(VENDOR).bmp" in tools/Makefile.
+    - move the bootflow about display after MIPI initialized.
+    - remove colorbar creating.
+    - both show the splash screen on MIPI with LCDIF and HDMI with DCSS directly.
+    - match display color mapping for MIPI panel module.
+    - add screen clean logic for covering the image noise in logo preparing about
+    data scaling depending different display resolution.
+
+Change-Id: I9527ba28dfb96f3ad3d71ac692c872b44a0737e9
+
+diff --git a/arch/arm/mach-imx/imx8m/video_common.c b/arch/arm/mach-imx/imx8m/video_common.c
+index 36a4d6db8b..605b5e9d36 100644
+--- a/arch/arm/mach-imx/imx8m/video_common.c
++++ b/arch/arm/mach-imx/imx8m/video_common.c
+@@ -846,7 +846,6 @@ void *mipi_video_hw_init(void)
+ 	}
+ 	/* Wipe framebuffer */
+ 	memset(fb, 0, mipi_panel.memSize);
+-	imx8m_create_color_bar((void *)((uint64_t) fb), &mipi_gmode);
+ 	/* Start LCDIF */
+ 	imx8m_lcdif_display_init((uint64_t) fb, &mipi_gmode);
+ 	mipi_panel.frameAdrs = (ulong) fb;
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index 299208710b..ad5ffce9a6 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -598,13 +598,12 @@ void do_enable_mipi(void)
+ 	ret = imx_mipi_dsi_bridge_enable();
+ }
+ 
+-void do_enable_lcdif_fb(void)
++void do_enable_fb(void)
+ {
+-	GraphicDevice *pGD_mipi;
+ 	int ret;
+ 
+ 	ret = imx8m_mipi_fb_init(&mipi_displays[0].mode, mipi_displays[0].pixfmt);
+-	pGD_mipi = mipi_video_hw_init();
++	drv_video_init();
+ }
+ 
+ int board_init(void)
+@@ -641,7 +640,7 @@ int board_late_init(void)
+ 	entry_idx = get_dtbo_mipi_dsi_timing();
+ 	if (entry_idx > 0) {
+ 		do_enable_mipi();
+-		do_enable_lcdif_fb();
++		do_enable_fb();
+ 	}
+ 
+ 	return 0;
+diff --git a/common/stdio.c b/common/stdio.c
+index ee22c1fd58..c612857917 100644
+--- a/common/stdio.c
++++ b/common/stdio.c
+@@ -370,7 +370,7 @@ int stdio_add_devices(void)
+ # if defined(CONFIG_LCD)
+ 	drv_lcd_init ();
+ # endif
+-# if defined(CONFIG_VIDEO) || defined(CONFIG_CFB_CONSOLE)
++# if (defined(CONFIG_VIDEO) || defined(CONFIG_CFB_CONSOLE)) && !defined(CONFIG_HX8394F)
+ 	drv_video_init ();
+ # endif
+ #endif /* CONFIG_DM_VIDEO */
+diff --git a/drivers/video/cfb_console.c b/drivers/video/cfb_console.c
+index 4ffb92a217..eaaa5d4eb8 100644
+--- a/drivers/video/cfb_console.c
++++ b/drivers/video/cfb_console.c
+@@ -225,6 +225,8 @@ void console_cursor(int state);
+ #endif
+ #endif
+ 
++#define IDT_VIDEO_CLEAN_OFFSET	(VIDEO_ROWS + ((video_logo_height/2)+(video_logo_height+20)))*VIDEO_COLS)
++
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ /* Locals */
+@@ -232,6 +234,8 @@ static GraphicDevice *pGD;	/* Pointer to Graphic array */
+ 
+ static void *video_fb_address;	/* frame buffer address */
+ static void *video_console_address;	/* console buffer start address */
++static bool is_bgr;
++static bool is_sec_disp;
+ 
+ static int video_logo_height = VIDEO_LOGO_HEIGHT;
+ 
+@@ -1818,11 +1822,17 @@ static void plot_logo_or_black(void *screen, int x, int y, int black)
+ 							 (b >> 3)));
+ 				break;
+ 			case GDF_32BIT_X888RGB:
+-				*(u32 *) dest =
+-					SWAP32((u32) (
+-							(r << 16) |
+-							(g <<  8) |
+-							 b));
++				if (is_bgr) {
++					*(u32 *) dest =
++						SWAP32((u32) ((b << 16) |
++							      (g <<  8) |
++							       r));
++				} else {
++					*(u32 *) dest =
++						SWAP32((u32) ((r << 16) |
++							      (g <<  8) |
++							       b));
++				}
+ 				break;
+ 			case GDF_24BIT_888RGB:
+ #ifdef VIDEO_FB_LITTLE_ENDIAN
+@@ -2015,11 +2025,13 @@ void video_clear(void)
+ #endif
+ }
+ 
+-static int cfg_video_init(void)
++static int cfg_video_init(GraphicDevice *target_pGD)
+ {
+ 	unsigned char color8;
++	int i, j;
++	u32 *pointer;
+ 
+-	pGD = video_hw_init();
++	pGD = target_pGD;
+ 	if (pGD == NULL)
+ 		return -1;
+ 
+@@ -2118,6 +2130,20 @@ static int cfg_video_init(void)
+ 	if (cfb_do_flush_cache)
+ 		flush_cache(VIDEO_FB_ADRS, VIDEO_SIZE);
+ 
++	/* clean image noise created by logo preparing in second usage */
++	if (is_sec_disp) {
++		pointer = (u32 *)(video_fb_address + (IDT_VIDEO_CLEAN_OFFSET);
++		for (i = 0; i < VIDEO_ROWS; i++) {
++			for (j = 0; j < VIDEO_COLS; j++) {
++				*pointer = 0x00000000;
++				pointer++;
++			}
++		}
++		if (cfb_do_flush_cache)
++			flush_cache(VIDEO_FB_ADRS, VIDEO_SIZE);
++
++	}
++
+ 	return 0;
+ }
+ 
+@@ -2136,14 +2162,29 @@ int drv_video_init(void)
+ 	struct stdio_dev console_dev;
+ 	bool have_keyboard;
+ 	bool __maybe_unused keyboard_ok = false;
++	GraphicDevice *pGD_first;
++#if defined(CONFIG_HX8394F)
++	GraphicDevice *pGD_second;
++#endif /* CONFIG_HX8394F */
+ 
+ 	/* Check if video initialization should be skipped */
+ 	if (board_video_skip())
+ 		return 0;
+ 
+ 	/* Init video chip - returns with framebuffer cleared */
+-	if (cfg_video_init() == -1)
++	is_bgr = false;
++	is_sec_disp = false;
++	pGD_first = video_hw_init();
++	if (cfg_video_init(pGD_first) == -1)
++		return 0;
++
++#if defined(CONFIG_HX8394F)
++	is_bgr = true;
++	is_sec_disp = true;
++	pGD_second = mipi_video_hw_init();
++	if (cfg_video_init(pGD_second) == -1)
+ 		return 0;
++#endif /* CONFIG_HX8394F */
+ 
+ 	if (board_cfb_skip())
+ 		return 0;
+diff --git a/tools/logos/freescale.bmp b/tools/logos/freescale.bmp
+deleted file mode 100644
+index 43e0591c8e..0000000000
+Binary files a/tools/logos/freescale.bmp and /dev/null differ
+diff --git a/tools/logos/freescale.bmp b/tools/logos/freescale.bmp
+new file mode 120000
+index 0000000000..d2192980ab
+--- /dev/null
++++ b/tools/logos/freescale.bmp
+@@ -0,0 +1 @@
++./idtech_logo.bmp
+\ No newline at end of file
+diff --git a/tools/logos/idtech_logo.bmp b/tools/logos/idtech_logo.bmp
+new file mode 100644
+index 0000000000..6af3f5b792
+Binary files /dev/null and b/tools/logos/idtech_logo.bmp differ
+diff --git a/tools/logos/nxp.bmp b/tools/logos/nxp.bmp
+new file mode 100644
+index 0000000000..43e0591c8e
+Binary files /dev/null and b/tools/logos/nxp.bmp differ

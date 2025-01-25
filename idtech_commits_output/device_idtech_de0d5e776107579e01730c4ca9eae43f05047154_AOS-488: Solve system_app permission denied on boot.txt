@@ -1,0 +1,22 @@
+de0d5e77 George.Huang 2021-04-07
+
+AOS-488: Solve system_app permission denied on boot
+
+Error Log:
+avc: denied { write } for comm="ch.amsconnector" name="com.idtech.amsconnector-WeiiPQJt" dev="dm-8" ino=245057 scontext=u:r:system_app:s0 tcontext=u:object_r:apk_data_file:s0 tclass=dir permissive=0
+avc: denied { write } for comm="ech.deviceadmin" name="com.idtech.deviceadmin-FHENzYC_a" dev="dm-8" ino=245047 scontext=u:r:system_app:s0 tcontext=u:object_r:apk_data_file:s0 tclass=dir permissive=0
+
+Change-Id: Ibbe35f743cd1d5c57d9f76bbfa286da9a4fa33a7
+
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index 1d5800b1..42dbaf54 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -16,6 +16,7 @@ allow system_app ota_package_file:dir rw_dir_perms;
+ allow system_app ota_package_file:file { create_file_perms relabelfrom };
+ allow system_app media_rw_data_file:file relabelto;
+ allow system_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
++allow system_app apk_data_file:dir { write };
+ 
+ get_prop(system_app, vendor_default_prop)
+ set_prop(system_app, vendor_idtech_prop)

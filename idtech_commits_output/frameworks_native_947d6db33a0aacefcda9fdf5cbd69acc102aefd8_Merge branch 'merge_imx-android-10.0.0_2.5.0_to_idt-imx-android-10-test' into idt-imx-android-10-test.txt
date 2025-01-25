@@ -1,0 +1,40 @@
+947d6db33a jenkins 2020-10-23
+
+Merge branch 'merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: I3220bc7b6772cdbe6c302a40fbeb38ab364c741c
+
+diff --cc services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+index efb3f05b7e,b9c5fa7e30..f91e5af979
+--- a/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
++++ b/services/surfaceflinger/DisplayHardware/FramebufferSurface.cpp
+@@@ -66,22 -99,12 +100,29 @@@ FramebufferSurface::FramebufferSurface(
+          mPreviousBuffer() {
+      ALOGV("Creating for display %s", to_string(displayId).c_str());
+  
+ +    // performance improve for HDMI display
+ +    bool hdmiPerformanceImprove = (property_get_int32("ro.idt.hdmi_performance_improve", int32_t(0)) == 1);
+ +
+      mName = "FramebufferSurface";
+      mConsumer->setConsumerName(mName);
+++<<<<<<< HEAD
+ +    if (hdmiPerformanceImprove) {
+ +        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
+ +                                           GRALLOC_USAGE_HW_RENDER |
+ +                                           GRALLOC_USAGE_HW_COMPOSER |
+ +                                           GRALLOC_USAGE_HW_TEXTURE |
+ +                                           GRALLOC_USAGE_PRIVATE_0);
+ +    } else {
+ +        mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
+ +                                           GRALLOC_USAGE_HW_RENDER |
+ +                                           GRALLOC_USAGE_HW_COMPOSER);
+ +    }
+++=======
++     mConsumer->setConsumerUsageBits(GRALLOC_USAGE_HW_FB |
++                                        GRALLOC_USAGE_HW_RENDER |
++                                        GRALLOC_USAGE_HW_COMPOSER |
++                                        GetPlatformPrivateUsage());
+++>>>>>>> merge_imx-android-10.0.0_2.5.0_to_idt-imx-android-10-test
+      const auto& activeConfig = mHwc.getActiveConfig(displayId);
+      mConsumer->setDefaultBufferSize(activeConfig->getWidth(),
+              activeConfig->getHeight());

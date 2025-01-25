@@ -1,0 +1,46 @@
+dfaed09627b0 George.Huang 2020-07-29
+
+AOS-273: arm64: dts: remove duplicate MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8 definition
+
+- MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8 is for DSI_RESET
+- ALC5640_INT should be re-defined later
+- it will fix display problem
+- error log:
+[    3.561320] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_probe] hm_panel_probe() begin!
+[    3.570730] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_probe] hm_panel_probe() video mode =2, lanes = 4!
+[    3.581801] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_probe] hm_panel_probe() read vm from DTS!
+[    3.592185] gpio-8 (reset): gpiod_direction_output: tried to set a GPIO tied to an IRQ as output          << error happened
+[    3.600984] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_probe] Get panel reset -5 only!  << wrong return value
+[    3.610494] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_probe] hm_panel_probe() end!
+[    3.619772] imx-drm 32c00000.bus:display-subsystem: bound 32e10000.dsi_controller (ops imx_sec_dsim_ops)
+[    3.633126] [drm] Initialized imx-drm 1.0.0 20120507 for 32c00000.bus:display-subsystem on minor 1
+[    3.654462] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_prepare] hm_panel_prepare()!
+[    3.654470] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_enable] hm_panel_enable(), begin!
+
+[    3.654476] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_enable] hm_panel_init_proc begin()!
+[    3.656702] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_enable] hm_panel_init_proc() end!
+[    3.656729] panel-himax-hx8394f 32e10000.dsi_controller.0: [drm:hm_panel_enable] Interface color format set to 0x77
+
+Change-Id: I2d238ada21b77717171343919103862d717a90bd
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 341552191651..445709fb03cf 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -307,7 +307,6 @@ &iomuxc {
+ 	imx8mn-evk {
+ 		pinctrl_hog_1: hoggrp-1 {
+ 			fsl,pins = <
+-				MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
+ 				MX8MN_IOMUXC_NAND_DATA00_GPIO3_IO6		0x19  //GPIO_04
+ 				MX8MN_IOMUXC_GPIO1_IO15_GPIO1_IO15		0x19  //GPIO_05, DNI
+ 				MX8MN_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x151 //LTE_VBAT_EN
+@@ -893,8 +892,6 @@ rt5640: rt5640@1c {
+ 		compatible = "realtek,rt5640";
+ 		reg = <0x1c>;
+ 		 /* For headphone detection: AUD_nMUTE, ALC5640_INT */
+-		interrupt-parent = <&gpio1>;
+-		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
+ 		realtek,jack-detect-source = <2>; /* JD1 */
+ 	};
+ 

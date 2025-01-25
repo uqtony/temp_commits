@@ -1,0 +1,67 @@
+46647fb Jay 2022-04-12
+
+AOS-897: fix sensor service crash issue
+
+Sometime, Zygote will restart when trigger bugreport process, it is
+due to sensor service cannot get event from sensor HAL.
+
+According NXP fusion sensor HAL to modify sensor HAL API pollEvents
+code flow.
+
+API pollEvents shall get data by readEvents function first.
+If still has some buffer then get more data by poll, otherwise
+return directly.
+
+Change-Id: Id0bd8d9e4f3b7a615d56ee5662d06184335d3f21
+
+diff --git a/sensors.cpp b/sensors.cpp
+index 44c6589..1deb799 100644
+--- a/sensors.cpp
++++ b/sensors.cpp
+@@ -1192,13 +1192,6 @@ int sensors_poll_context_t::pollEvents(sensors_event_t* data, int count)
+ 	int n = 0;
+ 
+ 	do {
+-		if (count) {
+-			n = poll(mPollFds, numFds, nbEvents ? 0 : -1);
+-			if (n < 0) {
+-				STLOGE("poll() failed (%s)", strerror(errno));
+-				return -errno;
+-			}
+-		}
+ 		for (int i=0 ; count && i<numSensorDrivers ; i++) {
+ 			SensorBase* const sensor(mSensors[i]);
+ 			if((mPollFds[i].revents & POLLIN) || (sensor->hasPendingEvents()))
+@@ -1212,16 +1205,25 @@ int sensors_poll_context_t::pollEvents(sensors_event_t* data, int count)
+ 				data += nb;
+ 			}
+ 		}
++		if (count) {
++			do {
++				n = poll(mPollFds, numFds, nbEvents ? 0 : -1);
++			} while(n < 0 && errno == EINTR);
++			if (n < 0) {
++				STLOGE("poll() failed (%s)", strerror(errno));
++				return -errno;
++			}
+ #if (ANDROID_VERSION >= ANDROID_JBMR2)
+-		if(mPollFds[flushFD].revents & POLLIN && count) {
+-			if (read(mPollFds[flushFD].fd, data, sizeof(struct sensors_event_t)) > 0) {
+-				count--;
+-				nbEvents++;
+-				data++;
++			if(mPollFds[flushFD].revents & POLLIN) {
++				if (read(mPollFds[flushFD].fd, data, sizeof(struct sensors_event_t)) > 0) {
++					count--;
++					nbEvents++;
++					data++;
++				}
++				mPollFds[flushFD].revents = 0;
+ 			}
+-			mPollFds[flushFD].revents = 0;
+-		}
+ #endif
++		}
+ 	} while (n && count);
+ 
+ 	return nbEvents;

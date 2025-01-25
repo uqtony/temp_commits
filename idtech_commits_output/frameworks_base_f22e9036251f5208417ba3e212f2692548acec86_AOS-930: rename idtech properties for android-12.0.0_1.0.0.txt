@@ -1,0 +1,134 @@
+f22e9036251f George.Huang 2022-03-31
+
+AOS-930: rename idtech properties for android-12.0.0_1.0.0
+
+- rename from ro.boot.idt_ to ro.boot.idt.
+  rename from ro.idt. to ro.vendor.idt.
+  rename from persist.idt. to persist.vendor.idt.
+
+Change-Id: Id7e37d0b6fb76a303928071b0a9a07a4a30b2751
+
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index ba64797c2911..428c507d677b 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -519,7 +519,7 @@ status_t BootAnimation::readyToRun() {
+     char key[PROPERTY_KEY_MAX] = {0};
+     char value[PROPERTY_VALUE_MAX];
+ 
+-    strcpy(key, "ro.boot.idt_orientation");
++    strcpy(key, "ro.boot.idt.orientation");
+ 
+     if (isDefaultDisplay) {
+         property_get(key, value, "0");
+diff --git a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+index 5bbede8f96f7..09be6e4ee0d4 100644
+--- a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
++++ b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+@@ -263,7 +263,7 @@ public class ApkSignatureSchemeV2Verifier {
+                        v2_arrayOffset + apkSignatureSchemeBlock.limit());
+         final int APK_SIGNATURE_SCHEME_IDTECH_BLOCK_ID = 0x88888888;
+ 
+-        if (SystemProperties.get("ro.idt.signature_of_signature").contains("true")) {
++        if (SystemProperties.get("ro.vendor.idt.signature_of_signature").contains("true")) {
+             ByteBuffer apkIdtechSignatureSchemeBlock = findApkSignatureSchemeBlock(apkSigningBlock,
+                     APK_SIGNATURE_SCHEME_IDTECH_BLOCK_ID);
+             if (apkIdtechSignatureSchemeBlock != null) {
+diff --git a/libs/WindowManager/Shell/src/com/android/wm/shell/common/DisplayLayout.java b/libs/WindowManager/Shell/src/com/android/wm/shell/common/DisplayLayout.java
+index 7dfa85631b86..ae2a4b20c505 100644
+--- a/libs/WindowManager/Shell/src/com/android/wm/shell/common/DisplayLayout.java
++++ b/libs/WindowManager/Shell/src/com/android/wm/shell/common/DisplayLayout.java
+@@ -459,7 +459,7 @@ public class DisplayLayout {
+             }
+             return context.getResources().getBoolean(R.bool.config_showNavigationBar);
+         } else if (displayId == Display.SECONDARY_DISPLAY) {
+-            final String navBarOverride = SystemProperties.get("persist.idt.secondary_display.navigation_bar.enable");
++            final String navBarOverride = SystemProperties.get("persist.vendor.idt.secondary_display.navigation_bar.enable");
+             return ("0".equals(navBarOverride)? false: true);
+         } else {
+             boolean isUntrustedVirtualDisplay = info.type == Display.TYPE_VIRTUAL
+diff --git a/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java b/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+index 593184392d72..90306e31377b 100644
+--- a/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
++++ b/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+@@ -478,7 +478,7 @@ public class PackageInstallerActivity extends AlertActivity {
+ 
+             // IDT added to disbale on pci* build, configurable by AMS on non-pci build
+             if (SystemProperties.get("ro.product.name").contains("pci") ||
+-                SystemProperties.getInt("persist.idt.enable_externalsource", 0) == 0) {
++                SystemProperties.getInt("persist.vendor.idt.enable_externalsource", 0) == 0) {
+                 showDialogInner(DLG_UNKNOWN_SOURCES_RESTRICTED_FOR_USER);
+                 return;
+             }
+diff --git a/services/core/java/com/android/server/wm/DisplayPolicy.java b/services/core/java/com/android/server/wm/DisplayPolicy.java
+index a9f8fac448bb..5db0f507cbc7 100644
+--- a/services/core/java/com/android/server/wm/DisplayPolicy.java
++++ b/services/core/java/com/android/server/wm/DisplayPolicy.java
+@@ -637,7 +637,7 @@ public class DisplayPolicy {
+             }
+         } else if (displayId == Display.SECONDARY_DISPLAY) {
+             mHasStatusBar = false;
+-            final String navBarOverride = SystemProperties.get("persist.idt.secondary_display.navigation_bar.enable");
++            final String navBarOverride = SystemProperties.get("persist.vendor.idt.secondary_display.navigation_bar.enable");
+             mHasNavigationBar = ("0".equals(navBarOverride)? false: true);
+         } else {
+             mHasStatusBar = false;
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index 24373a09b389..635128853a05 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -261,12 +261,12 @@ public class DisplayRotation {
+         // and create mSettingsObserver and mOrientationListener for multiple displays
+         final ContentResolver resolver = mContext.getContentResolver();
+         if (isDefaultDisplay) {
+-            mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
++            mUserRotation = SystemProperties.getInt("ro.boot.idt.orientation", 0)/90;
+             Settings.System.putIntForUser(resolver, Settings.System.USER_ROTATION,
+                     mUserRotation, UserHandle.USER_CURRENT);
+         } else {
+             final int displayId = displayContent.getDisplayId();
+-            StringBuilder key = new StringBuilder("ro.boot.idt_orientation_disp_");
++            StringBuilder key = new StringBuilder("ro.boot.idt.orientation_disp_");
+             key.append(String.valueOf(displayId + 1));
+             mUserRotation = SystemProperties.getInt(key.toString(), 0)/90;
+             switch (displayId) {
+@@ -437,7 +437,7 @@ public class DisplayRotation {
+      */
+     boolean updateRotationUnchecked(boolean forceUpdate) {
+         // check if IDT lock orientation property been set
+-        boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
++        boolean lock_orientation = SystemProperties.getInt("persist.vendor.idt.lock_orientation", 0) == 1;
+         if (lock_orientation) {
+             return false;
+         }
+@@ -1695,7 +1695,7 @@ public class DisplayRotation {
+ 
+         @Override
+         public void onChange(boolean selfChange) {
+-            boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
++            boolean lock_orientation = SystemProperties.getInt("persist.vendor.idt.lock_orientation", 0) == 1;
+             if (lock_orientation) return;
+             if (updateSettings()) {
+                 mService.updateRotation(true /* alwaysSendConfiguration */,
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 4637e7c32d4e..4e1846fde6a9 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -3534,7 +3534,7 @@ public class WindowManagerService extends IWindowManager.Stub
+         synchronized (mGlobalLock) {
+             if (mDisplayEnabled) {
+                 // if extend boot animation property be set, we have to set "service.bootanim.exit" here.
+-                boolean extendBootAnim = (SystemProperties.getInt("ro.idt.extend_boot_anim", 0) == 1);
++                boolean extendBootAnim = (SystemProperties.getInt("ro.vendor.idt.extend_boot_anim", 0) == 1);
+                 if (!mBootAnimationStopped && extendBootAnim) {
+                     Trace.asyncTraceBegin(TRACE_TAG_WINDOW_MANAGER, "Stop bootanim", 0);
+                     // stop boot animation
+@@ -3596,7 +3596,7 @@ public class WindowManagerService extends IWindowManager.Stub
+                 }
+             }
+             // check property to see if we need to extend boot animation.
+-            boolean extendBootAnim = (SystemProperties.getInt("ro.idt.extend_boot_anim", 0) == 1);
++            boolean extendBootAnim = (SystemProperties.getInt("ro.vendor.idt.extend_boot_anim", 0) == 1);
+             if (!mBootAnimationStopped && !extendBootAnim) {
+                 Trace.asyncTraceBegin(TRACE_TAG_WINDOW_MANAGER, "Stop bootanim", 0);
+                 // stop boot animation

@@ -1,0 +1,215 @@
+e04c66726d38 Brian Lee 2021-12-01
+
+AOS-798: Add media output controller on QuickSettings
+
+Add media output controller on QuickSettings.
+It could let users switch media output.
+
+Change-Id: I4e415220beb0ad3eff6132b8a2d64fa72d017b1a
+
+diff --git a/packages/SystemUI/res/values/strings.xml b/packages/SystemUI/res/values/strings.xml
+index 824521ecd1e7..277885a4976f 100644
+--- a/packages/SystemUI/res/values/strings.xml
++++ b/packages/SystemUI/res/values/strings.xml
+@@ -1022,6 +1022,8 @@
+     <!-- QuickSettings: Text to prompt the user to stop an ongoing recording [CHAR LIMIT=20] -->
+     <string name="quick_settings_screen_record_stop">Stop</string>
+ 
++    <string name="quick_settings_media_output">Media Output</string>
++
+     <!-- Default name for the media device shown in the output switcher when the name is not available [CHAR LIMIT=30] -->
+     <string name="media_seamless_remote_device">Device</string>
+ 
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java b/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
+index c182a58a28c4..42e12a3deedc 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
+@@ -37,6 +37,7 @@ import com.android.systemui.qs.tiles.DndTile;
+ import com.android.systemui.qs.tiles.FlashlightTile;
+ import com.android.systemui.qs.tiles.HotspotTile;
+ import com.android.systemui.qs.tiles.LocationTile;
++import com.android.systemui.qs.tiles.MediaOutputTile;
+ import com.android.systemui.qs.tiles.NfcTile;
+ import com.android.systemui.qs.tiles.NightDisplayTile;
+ import com.android.systemui.qs.tiles.RotationLockTile;
+@@ -78,6 +79,7 @@ public class QSFactoryImpl implements QSFactory {
+     private final Provider<GarbageMonitor.MemoryTile> mMemoryTileProvider;
+     private final Provider<UiModeNightTile> mUiModeNightTileProvider;
+     private final Provider<ScreenRecordTile> mScreenRecordTileProvider;
++    private final Provider<MediaOutputTile> mMediaOutputTileProvider;
+ 
+     private final Lazy<QSHost> mQsHostLazy;
+ 
+@@ -102,6 +104,7 @@ public class QSFactoryImpl implements QSFactory {
+             Provider<NfcTile> nfcTileProvider,
+             Provider<GarbageMonitor.MemoryTile> memoryTileProvider,
+             Provider<UiModeNightTile> uiModeNightTileProvider,
++            Provider<MediaOutputTile> mediaOutputTileProvider,
+             Provider<ScreenRecordTile> screenRecordTileProvider) {
+         mQsHostLazy = qsHostLazy;
+         mWifiTileProvider = wifiTileProvider;
+@@ -123,6 +126,7 @@ public class QSFactoryImpl implements QSFactory {
+         mNfcTileProvider = nfcTileProvider;
+         mMemoryTileProvider = memoryTileProvider;
+         mUiModeNightTileProvider = uiModeNightTileProvider;
++        mMediaOutputTileProvider = mediaOutputTileProvider;
+         mScreenRecordTileProvider = screenRecordTileProvider;
+     }
+ 
+@@ -175,6 +179,8 @@ public class QSFactoryImpl implements QSFactory {
+                 return mUiModeNightTileProvider.get();
+             case "screenrecord":
+                 return mScreenRecordTileProvider.get();
++            case "mediaoutput":
++                return mMediaOutputTileProvider.get();
+         }
+ 
+         // Custom tiles
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java b/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java
+new file mode 100644
+index 000000000000..eae92a0da83e
+--- /dev/null
++++ b/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java
+@@ -0,0 +1,141 @@
++package com.android.systemui.qs.tiles;
++
++import android.content.Intent;
++import android.provider.Settings;
++import android.media.session.MediaController;
++import android.media.session.MediaSession.Token;
++import android.media.session.MediaSessionManager;
++import android.media.session.PlaybackState;
++import android.service.quicksettings.Tile;
++
++import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
++import com.android.systemui.R;
++import com.android.systemui.R.drawable;
++import com.android.systemui.plugins.qs.QSTile.BooleanState;
++import com.android.systemui.qs.QSHost;
++import com.android.systemui.qs.tileimpl.QSTileImpl;
++
++import com.android.settingslib.media.MediaOutputSliceConstants;
++
++import javax.inject.Inject;
++
++import java.util.ArrayList;
++import java.util.List;
++
++public class MediaOutputTile extends QSTileImpl<BooleanState> {
++    private static final String TAG = "MediaOutputTile";
++
++    private final Icon mIcon = ResourceIcon.get(com.android.internal.R.drawable.ic_media_seamless);
++    private String mLabel = mContext.getString(R.string.quick_settings_media_output);
++    private MediaController mMediaController = null;
++
++    @Inject
++    public MediaOutputTile(QSHost host) {
++        super(host);
++    }
++
++    @Override
++    protected void handleDestroy() {
++        super.handleDestroy();
++    }
++
++    @Override
++    public BooleanState newTileState() {
++        return new BooleanState();
++    }
++
++    @Override
++    public void handleSetListening(boolean listening) {
++        super.handleSetListening(listening);
++    }
++
++    @Override
++    protected void handleUserSwitch(int newUserId) {
++    }
++
++    @Override
++    public Intent getLongClickIntent() {
++        return new Intent(Settings.ACTION_MEDIA_CONTROLS_SETTINGS);
++    }
++
++    @Override
++    protected void handleClick() {
++        String packageName = "";
++        Token sessionToken = null;
++
++        if (mMediaController != null) {
++            packageName = mMediaController.getPackageName();
++            sessionToken = mMediaController.getSessionToken();
++        }
++
++        mContext.sendBroadcast(new Intent()
++            .setAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
++
++        mContext.sendBroadcast(new Intent()
++            .setAction(MediaOutputSliceConstants.ACTION_LAUNCH_MEDIA_OUTPUT_DIALOG)
++            .setPackage(MediaOutputSliceConstants.SYSTEMUI_PACKAGE_NAME)
++            .putExtra(MediaOutputSliceConstants.EXTRA_PACKAGE_NAME, packageName)
++            .putExtra(MediaOutputSliceConstants.KEY_MEDIA_SESSION_TOKEN, sessionToken));
++    }
++
++    @Override
++    public CharSequence getTileLabel() {
++        return mLabel;
++    }
++
++    @Override
++    protected void handleUpdateState(BooleanState state, Object arg) {
++        MediaSessionManager mediaSessionManager = mContext.getSystemService(MediaSessionManager.class);
++
++        final List<String> remoteMediaSessionLists = new ArrayList<>();
++        for (MediaController controller : mediaSessionManager.getActiveSessions(null)) {
++            final MediaController.PlaybackInfo pi = controller.getPlaybackInfo();
++            if (pi == null) {
++                // do nothing
++                continue;
++            }
++            final PlaybackState playbackState = controller.getPlaybackState();
++            if (playbackState == null) {
++                // do nothing
++                continue;
++            }
++
++            // Log.d(TAG, "getActiveLocalMediaController() package name : "
++            //         + controller.getPackageName()
++            //         + ", play back type : " + pi.getPlaybackType() + ", play back state : "
++            //         + playbackState.getState());
++
++            state.value = (playbackState.getState() == PlaybackState.STATE_PLAYING)? true: false;
++
++            if (pi.getPlaybackType() == MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE) {
++                if (!remoteMediaSessionLists.contains(controller.getPackageName())) {
++                    remoteMediaSessionLists.add(controller.getPackageName());
++                }
++                continue;
++            }
++            if (pi.getPlaybackType() == MediaController.PlaybackInfo.PLAYBACK_TYPE_LOCAL) {
++                if (mMediaController == null
++                        && !remoteMediaSessionLists.contains(controller.getPackageName())) {
++                            mMediaController = controller;
++                }
++            }
++        }
++
++        state.icon = mIcon;
++        // TODO: show connected device
++        // state.label = mLabel + " 
+HDMI";
++        state.label = mLabel;
++        state.contentDescription = mLabel;
++        state.state = state.value ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE;
++    }
++
++    @Override
++    public int getMetricsCategory() {
++        return MetricsEvent.PANEL_MEDIA_OUTPUT;
++    }
++
++    @Override
++    protected String composeChangeAnnouncement() {
++        return mLabel;
++    }
++}

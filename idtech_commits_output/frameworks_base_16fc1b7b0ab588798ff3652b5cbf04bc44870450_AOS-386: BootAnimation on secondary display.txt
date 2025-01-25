@@ -1,0 +1,85 @@
+16fc1b7b0ab5 AndrewS 2020-11-04
+
+AOS-386: BootAnimation on secondary display
+
+Change-Id: Ia64997cd1ec692e725788187d52e008a10697567
+
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index 22bc8fe4c3c8..cb6be0039c15 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1380,7 +1380,8 @@ public final class DisplayManagerService extends SystemService {
+         }
+         // For multiple display, need to configure display for each display device.
+         LogicalDisplay configureDisplay = findLogicalDisplayForDeviceLocked(device);
+-        configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
++        final boolean displayEnabled = (mWindowManagerInternal == null)?false:mWindowManagerInternal.ismDisplayEnabledLocked();
++        configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF, displayEnabled);
+         final int viewportType;
+         // Update the corresponding viewport.
+         if ((info.flags & DisplayDeviceInfo.FLAG_DEFAULT_DISPLAY) != 0) {
+diff --git a/services/core/java/com/android/server/display/LogicalDisplay.java b/services/core/java/com/android/server/display/LogicalDisplay.java
+index 78af8cf63279..da33213dd772 100644
+--- a/services/core/java/com/android/server/display/LogicalDisplay.java
++++ b/services/core/java/com/android/server/display/LogicalDisplay.java
+@@ -350,9 +350,11 @@ final class LogicalDisplay {
+      */
+     public void configureDisplayLocked(SurfaceControl.Transaction t,
+             DisplayDevice device,
+-            boolean isBlanked) {
++            boolean isBlanked,
++            boolean displayEnabled) {
+         // Set the layer stack.
+-        device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : mLayerStack);
++        final int selectedLayer = displayEnabled?mLayerStack:0;
++        device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : selectedLayer);
+ 
+         // Set the color mode and allowed display mode.
+         if (device == mPrimaryDisplayDevice) {
+diff --git a/services/core/java/com/android/server/wm/ActivityTaskManagerService.java b/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+index 223205377bb9..7581c49facd2 100644
+--- a/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
++++ b/services/core/java/com/android/server/wm/ActivityTaskManagerService.java
+@@ -4482,6 +4482,10 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
+             if (values == null && mWindowManager != null) {
+                 // sentinel: fetch the current configuration from the window manager
+                 values = mWindowManager.computeNewConfiguration(DEFAULT_DISPLAY);
++                final int displayCount = mWindowManager.mRoot.mChildren.size();
++                for (int i = 1; i < displayCount; ++i) {
++                    mWindowManager.computeNewConfiguration(i);
++                }
+             }
+ 
+             if (mWindowManager != null) {
+diff --git a/services/core/java/com/android/server/wm/WindowManagerInternal.java b/services/core/java/com/android/server/wm/WindowManagerInternal.java
+index b407ac5e60cf..1a367bfe92c1 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerInternal.java
++++ b/services/core/java/com/android/server/wm/WindowManagerInternal.java
+@@ -292,6 +292,11 @@ public abstract class WindowManagerInternal {
+     */
+     public abstract boolean isKeyguardShowingAndNotOccluded();
+ 
++    /**
++     * @return Whether the display been enabled.
++     */
++    public abstract boolean ismDisplayEnabledLocked();
++
+     /**
+      * Gets the frame of a window given its token.
+      *
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 341fa3ada2f8..15cbc866544c 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -7283,6 +7283,11 @@ public class WindowManagerService extends IWindowManager.Stub
+             return WindowManagerService.this.isKeyguardShowingAndNotOccluded();
+         }
+ 
++        @Override
++        public boolean ismDisplayEnabledLocked() {
++            return WindowManagerService.this.mDisplayEnabled;
++        }
++
+         @Override
+         public void showGlobalActions() {
+             WindowManagerService.this.showGlobalActions();

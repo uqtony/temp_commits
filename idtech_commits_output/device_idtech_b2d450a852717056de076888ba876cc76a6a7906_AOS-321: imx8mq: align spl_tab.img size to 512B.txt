@@ -1,0 +1,19 @@
+b2d450a8 George.Huang 2020-09-03
+
+AOS-321: imx8mq: align spl_tab.img size to 512B
+
+Align spl_tab.img size with partition size will help
+clean-up the tail of this partition, and is not necessary
+to erase partiton before flashing it.
+
+spl_tab partition size is defined in:
+  vendor/nxp-opensource/uboot-imx/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+
+spl_tab image size is adjusted by:
+  $ dd if=/dev/zero bs=1 count=$((512-$(stat -c %s spl_tab.img))) >> spl_tab.img
+
+Change-Id: I931e9da1ec121ab8248d2b3f81f2c1d7ce861105
+
+diff --git a/common/prebuilts/spl_tab.img b/common/prebuilts/spl_tab.img
+index b6fa118e..b047c84f 100644
+Binary files a/common/prebuilts/spl_tab.img and b/common/prebuilts/spl_tab.img differ

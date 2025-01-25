@@ -1,0 +1,264 @@
+f307d30e max.yang 2020-09-16
+
+AOS-326: Support for mem_info ab partition and flashing process
+
+  1. mem_info expanded to AB partitions
+  2. move misc partition forward so that offset won't change when
+     dtbo/boot adjusting
+  3. We expect board_info/mem_info/misc should fix location and not
+     changing in the future. SPL will read fixed offset to get data
+  4. uuu uses u-boot directly, fastboot flashing script should update
+     board_info/mem_info/spl+bootloader before flashing all images
+  5. fix fastboot flashing super image
+
+Change-Id: I0110f7e2ec610d8524b374808f308ed28e0bc8df
+
+diff --git a/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt b/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
+index 4219c188..a5ad6293 100644
+--- a/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
++++ b/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
+@@ -12,11 +12,18 @@
+             "type_guid": "brillo_vendor_specific"
+         },
+         {
++            "ab": true,
+             "label": "mem_info",
+             "size": "1 MiB",
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "misc",
++            "size": "4 MiB",
++            "guid": "auto",
++            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
++        },
+         {
+             "ab": true,
+             "label": "bootloader",
+@@ -45,12 +52,6 @@
+             "guid": "auto",
+             "type_guid": "0f2778c4-5cc1-4300-8670-6c88b7e57ed6"
+         },
+-        {
+-            "label": "misc",
+-            "size": "4 MiB",
+-            "guid": "auto",
+-            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
+-        },
+         {
+             "label": "metadata",
+             "size": "2 MiB",
+diff --git a/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt b/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
+index 36ebd95a..231868e2 100644
+--- a/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
++++ b/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt
+@@ -12,11 +12,18 @@
+             "type_guid": "brillo_vendor_specific"
+         },
+         {
++            "ab": true,
+             "label": "mem_info",
+             "size": "1 MiB",
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "misc",
++            "size": "4 MiB",
++            "guid": "auto",
++            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
++        },
+         {
+             "ab": true,
+             "label": "bootloader",
+@@ -38,12 +45,6 @@
+             "guid": "auto",
+             "type_guid": "bb499290-b57e-49f6-bf41-190386693794"
+         },
+-        {
+-            "label": "misc",
+-            "size": "4 MiB",
+-            "guid": "auto",
+-            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
+-        },
+         {
+             "label": "metadata",
+             "size": "2 MiB",
+diff --git a/common/partition/device-partitions-14.4GB-ab.bpt b/common/partition/device-partitions-14.4GB-ab.bpt
+index 0a0de496..12ec97db 100644
+--- a/common/partition/device-partitions-14.4GB-ab.bpt
++++ b/common/partition/device-partitions-14.4GB-ab.bpt
+@@ -12,11 +12,18 @@
+             "type_guid": "brillo_vendor_specific"
+         },
+         {
++            "ab": true,
+             "label": "mem_info",
+             "size": "1 MiB",
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "misc",
++            "size": "4 MiB",
++            "guid": "auto",
++            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
++        },
+         {
+             "ab": true,
+             "label": "dtbo",
+@@ -38,12 +45,6 @@
+             "guid": "auto",
+             "type_guid": "0f2778c4-5cc1-4300-8670-6c88b7e57ed6"
+         },
+-        {
+-            "label": "misc",
+-            "size": "4 MiB",
+-            "guid": "auto",
+-            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
+-        },
+         {
+             "label": "metadata",
+             "size": "2 MiB",
+diff --git a/common/partition/device-partitions-14.4GB-ab_super.bpt b/common/partition/device-partitions-14.4GB-ab_super.bpt
+index 283b8be3..92746506 100644
+--- a/common/partition/device-partitions-14.4GB-ab_super.bpt
++++ b/common/partition/device-partitions-14.4GB-ab_super.bpt
+@@ -12,11 +12,18 @@
+             "type_guid": "brillo_vendor_specific"
+         },
+         {
++            "ab": true,
+             "label": "mem_info",
+             "size": "1 MiB",
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "misc",
++            "size": "4 MiB",
++            "guid": "auto",
++            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
++        },
+         {
+             "ab": true,
+             "label": "dtbo",
+@@ -31,12 +38,6 @@
+             "guid": "auto",
+             "type_guid": "bb499290-b57e-49f6-bf41-190386693794"
+         },
+-        {
+-            "label": "misc",
+-            "size": "4 MiB",
+-            "guid": "auto",
+-            "type_guid": "6b2378b0-0fbc-4aa9-a4f6-4d6e17281c47"
+-        },
+         {
+             "label": "metadata",
+             "size": "2 MiB",
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 86468e87..7489221a 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -506,6 +506,7 @@ set vendor_partition=vendor%1
+ set product_partition=product%1
+ set vbmeta_partition=vbmeta%1
+ set dtbo_partition=dtbo%1
++set mem_info_partition=mem_info%1
+ goto :eof
+ 
+ :check_board_info
+@@ -645,7 +646,12 @@ if %support_board_info% == 1 (
+     call :flash_partition board_info || set /A error_level=1 && goto :exit
+ )
+ if %support_mem_info% == 1 (
+-    call :flash_partition mem_info || set /A error_level=1 && goto :exit
++    if not [%slot%] == [] (
++        call :flash_partition mem_info%slot% || set /A error_level=1 && goto :exit
++    ) else (
++        call :flash_partition mem_info_a || set /A error_level=1 && goto :exit
++        call :flash_partition mem_info_b || set /A error_level=1 && goto :exit
++    )
+ )
+ :: full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+ %fastboot_tool% reboot bootloader
+@@ -688,6 +694,7 @@ if %support_dualslot% == 0 (
+ ::super partition does not have a/b slot, handle it individually
+ if %support_dynamic_partition% == 1 (
+     call :flash_partition %super_partition% || set /A error_level=1 && goto :exit
++)
+ if %write_bdinfo_serial% == 1 (
+     %fastboot_tool% oem setvar dev-serial %serialno_str%
+ )
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index ec119320..947a3e7c 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -202,6 +202,7 @@ function flash_partition_name
+     product_partition="product"${1}
+     vbmeta_partition="vbmeta"${1}
+     dtbo_partition="dtbo"${1}
++    mem_info_partition="mem_info"${1}
+ }
+ 
+ function check_board_info
+@@ -348,7 +349,15 @@ function flash_android
+     fi
+ 
+     if [ ${support_mem_info} -eq 1 ]; then
+-        flash_partition "mem_info"
++        if [ "${slot}" != "" ]; then
++            mem_info_partition="mem_info"${slot}
++            flash_partition ${mem_info_partition}
++        else
++            mem_info_partition="mem_info_a"
++            flash_partition ${mem_info_partition}
++            mem_info_partition="mem_info_b"
++            flash_partition ${mem_info_partition}
++        fi
+     fi
+ 
+     # full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index c3fe6e4b..208d6296 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -878,6 +878,7 @@ set product_partition=product%1
+ set vbmeta_partition=vbmeta%1
+ set dtbo_partition=dtbo%1
+ if %support_dual_bootloader% == 1 set dual_bootloader_partition=bootloader%1
++if %support_mem_info% == 1 set mem_info_partition=mem_info%1
+ goto :eof
+ 
+ :check_board_info
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index bc428499..484cdd8e 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -250,6 +250,9 @@ function flash_partition_name
+     if [ ${support_dual_bootloader} -eq 1 ]; then
+         dual_bootloader_partition=bootloader${1}
+     fi
++    if [ ${support_mem_info} -eq 1 ]; then
++        mem_info_partition=mem_info${1}
++    fi
+ }
+ 
+ function check_board_info
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 53203269..51528a6d 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -104,9 +104,9 @@ BOARD_GPU_LIBDRM := libdrm_imx
+ 
+ AB_OTA_UPDATER := true
+ ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl mem_info
+ else
+-AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl
++AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl mem_info
+ endif
+ TARGET_NO_RECOVERY := true
+ BOARD_USES_RECOVERY_AS_BOOT := true

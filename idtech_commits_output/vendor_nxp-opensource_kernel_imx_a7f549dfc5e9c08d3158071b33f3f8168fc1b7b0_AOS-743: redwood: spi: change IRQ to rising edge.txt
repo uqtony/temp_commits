@@ -1,0 +1,132 @@
+a7f549dfc5e9 owen.wen 2021-10-21
+
+AOS-743: redwood: spi: change IRQ to rising edge
+
+Symptom: data read from K81 are all garbage data
+RootCause: IRQ type was falling edge, and K81 doesn't maintain the data
+           after K81_DAV pull low
+Solution: follow K81 designe, change IRQ type to rising edge
+
+And I also assign chipselect pin to cs_gpiod, let spi driver control
+the chipselect
+
+Change-Id: I3d3624a901e174072e3b52d5e3ff13ec2ed0fe7d
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 748031dd5a62..6c0f35556cd8 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -469,7 +469,7 @@ idg_spi@0 {
+ 		reg = <0>;
+ 		compatible = "idtech,idg-spi";
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
++		interrupts = <10 IRQ_TYPE_EDGE_RISING>;
+ 		spi-max-frequency = <4000000>; /* 4 MHz */
+ 		spi-bits-per-word = <8>; /* 8 bits */
+ 		spi-working-mode = <0>; /* SPI_MODE_0 */
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index f18f7f34263f..6a8c87ec8b33 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -337,7 +337,6 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ #endif /* IDG_DEBUG_INFO */
+ #endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
+ 	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
+@@ -352,7 +351,6 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 	m.spi = idg_tty;
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(idg_tty, &m);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 	mutex_unlock(&idg_dev->lock);
+ 
+ ttyv5_write_out:
+@@ -534,7 +532,6 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ #endif /* IDG_DEBUG_INFO */
+ #endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
+ 	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
+@@ -549,7 +546,6 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	m.spi = idg_tty;
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(idg_tty, &m);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 	mutex_unlock(&idg_dev->lock);
+ 
+ tty_write_out:
+@@ -671,7 +667,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	x->speed_hz = idg_dev->clock_freq;
+ 	x->bits_per_word = idg_dev->bits_per_word;
+ 	mutex_lock(&idg_dev->lock);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	m.spi = spi;
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -747,8 +742,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				spin_unlock_irq(&idg_dev->spi_lock);
+ 				spi_message_add_tail(x_s, &m_s);
+ 				status_s = spi_sync(spi, &m_s);
+-				gpiod_set_value_cansleep(idg_dev->spi_cs,
+-							 CS_CLEAR);
+ 				mutex_unlock(&idg_dev->lock);
+ #if IDG_DEBUG_INFO
+ 				dev_info(&spi->dev, "second re read "
+@@ -823,8 +816,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				spin_unlock_irq(&idg_dev->spi_lock);
+ 				spi_message_add_tail(x_s, &m_s);
+ 				status_s = spi_sync(spi, &m_s);
+-				gpiod_set_value_cansleep(idg_dev->spi_cs,
+-							 CS_CLEAR);
+ 				mutex_unlock(&idg_dev->lock);
+ #if IDG_DEBUG_INFO
+ 				dev_info(&spi->dev, "second re read "
+@@ -914,7 +905,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			spin_unlock_irq(&idg_dev->spi_lock);
+ 			spi_message_add_tail(x_s, &m_s);
+ 			status_s = spi_sync(spi, &m_s);
+-			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 			mutex_unlock(&idg_dev->lock);
+ #if IDG_DEBUG_INFO
+ 			dev_info(&spi->dev, "second read (%d bytes)
+",
+@@ -1189,8 +1179,8 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	idg_dev->bits_per_word = spi->bits_per_word;
+ 	idg_spi_tty = spi;
+ 
+-	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_HIGH);
+-	if (!idg_dev->spi_cs) {
++	spi->cs_gpiod = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_HIGH);
++	if (!spi->cs_gpiod) {
+ 		dev_err(&spi->dev, "chipselect is not exist
+");
+ 		err = -ENODATA;
+ 		goto idg_dev_error;
+@@ -1280,7 +1270,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ idg_tty_error:
+ 	misc_deregister(&idg_spi_tty_misc);
+ idg_gpio_error:
+-	kfree(idg_dev->spi_cs);
++	kfree(spi->cs_gpiod);
+ idg_dev_error:
+ 	kfree(idg_dev);
+ setup_error:
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index 9310034e70cc..266dd42df1a4 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -79,8 +79,6 @@
+ struct idg_spi_device {
+ 				/* spi related */
+ 	struct spi_device	*spi_dev;
+-				/* CS control by gpio */
+-	struct gpio_desc	*spi_cs;
+ 	int			clock_freq;
+ 	int			idg_irq;
+ 	int			poweron_gpio;

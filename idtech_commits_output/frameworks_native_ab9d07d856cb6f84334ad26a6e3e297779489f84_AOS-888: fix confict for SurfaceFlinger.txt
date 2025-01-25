@@ -1,0 +1,47 @@
+ab9d07d856 AndrewS 2022-02-25
+
+AOS-888: fix confict for SurfaceFlinger
+
+Change-Id: Ie4e82c4670a5e66060c87ceb264c9a2447380ed1
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 28dba4fd66..90c8a69993 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -644,17 +644,8 @@ std::vector<PhysicalDisplayId> SurfaceFlinger::getPhysicalDisplayIds() const {
+ 
+     std::vector<PhysicalDisplayId> displayIds;
+     displayIds.reserve(mPhysicalDisplayTokens.size());
+-<<<<<<< HEAD
+     for (const auto id : mPhysicalDisplayIdList) {
+         displayIds.push_back(id);
+-=======
+-    displayIds.push_back(*internalDisplayId);
+-
+-    for (const auto& [id, token] : mPhysicalDisplayTokens) {
+-        if (id != *internalDisplayId) {
+-            displayIds.push_back(id);
+-        }
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     }
+ 
+     return displayIds;
+diff --git a/services/surfaceflinger/SurfaceFlinger.h b/services/surfaceflinger/SurfaceFlinger.h
+index ade6eb947c..07c0342ced 100644
+--- a/services/surfaceflinger/SurfaceFlinger.h
++++ b/services/surfaceflinger/SurfaceFlinger.h
+@@ -1282,13 +1282,9 @@ private:
+     // this may only be written from the main thread with mStateLock held
+     // it may be read from other threads with mStateLock held
+     std::map<wp<IBinder>, sp<DisplayDevice>> mDisplays GUARDED_BY(mStateLock);
+-<<<<<<< HEAD
+-    std::unordered_map<DisplayId, sp<IBinder>> mPhysicalDisplayTokens GUARDED_BY(mStateLock);
+-    std::list<PhysicalDisplayId> mPhysicalDisplayIdList GUARDED_BY(mStateLock);
+-=======
+     std::unordered_map<PhysicalDisplayId, sp<IBinder>> mPhysicalDisplayTokens
+             GUARDED_BY(mStateLock);
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
++    std::list<PhysicalDisplayId> mPhysicalDisplayIdList GUARDED_BY(mStateLock);
+ 
+     struct {
+         DisplayIdGenerator<GpuVirtualDisplayId> gpu;

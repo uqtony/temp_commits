@@ -1,0 +1,104 @@
+2f3bd314 AndrewS 2021-03-16
+
+AOS-543: change audio_policy_engine configuration files for BigCypress
+
+move all stream attributes to STRATEGY_REROUTING.
+modify mk to pack audio_policy_engine configuration files to image.
+
+Change-Id: I6a4813b2aa5c3340cdd8199513e722b8abd27451
+
+diff --git a/imx8m/bigcypress_8mq/audio_policy_engine_product_strategies.xml b/imx8m/bigcypress_8mq/audio_policy_engine_product_strategies.xml
+index a7388da4..79187adb 100644
+--- a/imx8m/bigcypress_8mq/audio_policy_engine_product_strategies.xml
++++ b/imx8m/bigcypress_8mq/audio_policy_engine_product_strategies.xml
+@@ -24,37 +24,22 @@
+          This strategy will only have higher priority than phone if force for system is set to
+          enforced. -->
+ 
+-    <ProductStrategy name="STRATEGY_PHONE">
+-        <AttributesGroup streamType="AUDIO_STREAM_VOICE_CALL" volumeGroup="voice_call">
+-            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION"/> </Attributes>
+-        </AttributesGroup>
++    <ProductStrategy name="STRATEGY_REROUTING">
+         <AttributesGroup streamType="AUDIO_STREAM_BLUETOOTH_SCO" volumeGroup="bluetooth_sco">
+             <Attributes> <Flags value="AUDIO_FLAG_SCO"/> </Attributes>
+         </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <ProductStrategy name="STRATEGY_SONIFICATION">
+         <AttributesGroup streamType="AUDIO_STREAM_RING" volumeGroup="ring">
+             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_TELEPHONY_RINGTONE"/> </Attributes>
+         </AttributesGroup>
+         <AttributesGroup streamType="AUDIO_STREAM_ALARM" volumeGroup="alarm">
+             <Attributes> <Usage value="AUDIO_USAGE_ALARM"/> </Attributes>
+         </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <ProductStrategy name="STRATEGY_ENFORCED_AUDIBLE">
+         <AttributesGroup streamType="AUDIO_STREAM_ENFORCED_AUDIBLE" volumeGroup="enforced_audible">
+             <Attributes> <Flags value="AUDIO_FLAG_AUDIBILITY_ENFORCED"/> </Attributes>
+         </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <ProductStrategy name="STRATEGY_ACCESSIBILITY">
+         <AttributesGroup streamType="AUDIO_STREAM_ACCESSIBILITY" volumeGroup="accessibility">
+             <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_ACCESSIBILITY"/> </Attributes>
+         </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <ProductStrategy name="STRATEGY_SONIFICATION_RESPECTFUL">
+         <AttributesGroup streamType="AUDIO_STREAM_NOTIFICATION" volumeGroup="notification">
+             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION"/> </Attributes>
+             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_REQUEST"/> </Attributes>
+@@ -62,6 +47,14 @@
+             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_COMMUNICATION_DELAYED"/> </Attributes>
+             <Attributes> <Usage value="AUDIO_USAGE_NOTIFICATION_EVENT"/> </Attributes>
+         </AttributesGroup>
++        <AttributesGroup streamType="AUDIO_STREAM_DTMF" volumeGroup="dtmf">
++            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/> </Attributes>
++        </AttributesGroup>
++        <!-- Used to identify the volume of audio streams exclusively transmitted through the  speaker
++             (TTS) of the device -->
++        <AttributesGroup streamType="AUDIO_STREAM_TTS" volumeGroup="tts">
++            <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
++        </AttributesGroup>
+     </ProductStrategy>
+ 
+     <ProductStrategy name="STRATEGY_MEDIA">
+@@ -81,19 +74,8 @@
+         <AttributesGroup streamType="AUDIO_STREAM_SYSTEM" volumeGroup="system">
+             <Attributes> <Usage value="AUDIO_USAGE_ASSISTANCE_SONIFICATION"/> </Attributes>
+         </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <ProductStrategy name="STRATEGY_DTMF">
+-        <AttributesGroup streamType="AUDIO_STREAM_DTMF" volumeGroup="dtmf">
+-            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING"/> </Attributes>
+-        </AttributesGroup>
+-    </ProductStrategy>
+-
+-    <!-- Used to identify the volume of audio streams exclusively transmitted through the  speaker
+-         (TTS) of the device -->
+-    <ProductStrategy name="STRATEGY_TRANSMITTED_THROUGH_SPEAKER">
+-        <AttributesGroup streamType="AUDIO_STREAM_TTS" volumeGroup="tts">
+-            <Attributes> <Flags value="AUDIO_FLAG_BEACON"/> </Attributes>
++        <AttributesGroup streamType="AUDIO_STREAM_VOICE_CALL" volumeGroup="voice_call">
++            <Attributes> <Usage value="AUDIO_USAGE_VOICE_COMMUNICATION"/> </Attributes>
+         </AttributesGroup>
+     </ProductStrategy>
+ 
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index 86fe8864..ded93c3b 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -69,6 +69,10 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml \
+     $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
+     $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_configuration.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_default_stream_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_default_stream_volumes.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_product_strategies.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_product_strategies.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_engine_stream_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_engine_stream_volumes.xml \
+     $(IMX_DEVICE_PATH)/input-port-associations.xml:$(TARGET_COPY_OUT_VENDOR)/etc/input-port-associations.xml \
+     $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.nxp \
+     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \

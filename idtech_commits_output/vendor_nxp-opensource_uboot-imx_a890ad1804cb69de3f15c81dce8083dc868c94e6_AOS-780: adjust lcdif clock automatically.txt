@@ -1,0 +1,54 @@
+a890ad1804 Jay 2022-01-27
+
+AOS-780: adjust lcdif clock automatically
+
+According display-timing to adjust lcdif clock automatically.
+
+Change-Id: I084f537a5c44c499624d1a8d4edd221417d71776
+
+diff --git a/arch/arm/mach-imx/imx8m/clock_imx8mq.c b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+index 79f4d31d3a..7a65facf2b 100644
+--- a/arch/arm/mach-imx/imx8m/clock_imx8mq.c
++++ b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+@@ -416,6 +416,21 @@ void mxs_set_lcdclk(u32 base_addr, u32 freq)
+ 			     CLK_ROOT_PRE_DIV(CLK_ROOT_PRE_DIV8));
+ }
+ 
++void idt_mxs_set_lcdclk(u32 freq)
++{
++	int div;
++
++	div = mxc_get_clock(MXC_LCDIF_PIXEL_CLK) / freq;
++	div++;
++
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 0);
++	clock_set_target_val(LCDIF_PIXEL_CLK_ROOT, CLK_ROOT_ON |
++				 div |
++			     CLK_ROOT_SOURCE_SEL(1));
++	clock_enable(LCDIF_PIXEL_CLK_ROOT, 1);
++
++}
++
+ void init_wdog_clk(void)
+ {
+ 	clock_enable(CCGR_WDOG1, 0);
+@@ -578,7 +593,6 @@ void init_mipi_clk(void)
+ 
+ 	clock_enable(LCDIF_PIXEL_CLK_ROOT, 0); /* IMX8MQ_CLK_DSI_AHB */
+ 	clock_set_target_val(LCDIF_PIXEL_CLK_ROOT, CLK_ROOT_ON |
+-			     BIT(3) | BIT(1) | BIT(0) |
+ 			     CLK_ROOT_SOURCE_SEL(1));
+ 	clock_enable(LCDIF_PIXEL_CLK_ROOT, 1);
+ }
+diff --git a/drivers/video/nxp/imx/mipi_dsi_northwest.c b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+index aec53ecb64..25ff143327 100644
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest.c
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+@@ -768,6 +768,7 @@ static int imx8mq_mipi_dsi_dphy_init(struct mipi_dsi_northwest_info *mipi_dsi)
+ 	/*  req_bit_clk is PLL out, clk_byte is 1/8th of the req_bit_clk
+ 	 *  We need meet clk_byte_freq >= dpi_pclk_freq * DPI_pixel_size / ( 8 * (cfg_num_lanes + 1))
+ 	 */
++	idt_mxs_set_lcdclk(mipi_dsi->timings.pixelclock.typ);
+ 
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
+ 	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);

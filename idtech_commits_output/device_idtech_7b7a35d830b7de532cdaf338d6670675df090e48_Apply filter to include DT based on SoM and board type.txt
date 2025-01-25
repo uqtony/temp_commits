@@ -1,0 +1,36 @@
+7b7a35d8 Sergii Postulga 2019-11-19
+
+Apply filter to include DT based on SoM and board type
+
+Change-Id: I5517d96c912b5b01e2770f539ff49fde78b7f82b
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index df1ff79a..0033d3b4 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -28,7 +28,11 @@ $(error kernel arch not supported at present)
+ endif
+ 
+ # Include all IDT DTS's
+-idt_dts_list:=$(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
++LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
++idt_dts_list:=$(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(LOWER_BOARD_SOC_TYPE)*evk* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++idt_dts_list+=$(shell ls $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/idt_$(BOARD_SOM_TYPE)*$(LOWER_BOARD_TYPE)* | xargs -n 1 basename | sed 's/\(.*\)\..*//')
++
+ $(foreach idt_dts,$(idt_dts_list),$(eval TARGET_BOARD_DTS_CONFIG += $(idt_dts):$(idt_dts).dtb))
+ 
+ MKDTIMG := $(HOST_OUT_EXECUTABLES)/mkdtimg
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index 754dc313..36662d81 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -3,6 +3,7 @@
+ #
+ 
+ BOARD_SOC_TYPE := IMX8MQ
++BOARD_SOM_TYPE := a300
+ BOARD_TYPE := VP6820
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro

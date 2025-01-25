@@ -1,0 +1,39 @@
+cb2adde2b George.Huang 2020-12-07
+
+AOS-415: support to pack uuu tools for target-file.zip
+
+Change-Id: Iac4aaea076e3cafd2096519a2255d033d900c554
+
+diff --git a/core/Makefile b/core/Makefile
+index 2e7e78385..45fcddb36 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4201,6 +4201,7 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
+ 	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
+ 	cp $(PRODUCT_OUT)/lpmake* $(zip_root)/IMAGES/
++	cp $(PRODUCT_OUT)/uuu* $(zip_root)/IMAGES/
+ 	# U-boot
+ 	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
+ 	# For dual bootloader option
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index 62542b35a..244883d8a 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -97,6 +97,7 @@ def CopyUserImages(input_tmp, output_zip):
+        and not image.endswith(".imx") and not image.endswith(".bat") \
+        and not image.startswith("spl") \
+        and not image.startswith("lpmake") \
++       and not image.startswith("uuu") \
+        and not image == "mem_info.txt":
+       continue
+     if image == "recovery-two-step.img":
+@@ -108,7 +109,7 @@ def CopyUserImages(input_tmp, output_zip):
+         continue
+     logger.info("writing %s to archive...", os.path.join("IMAGES", image))
+     perm = 0o644
+-    if image.endswith(".sh") or image.startswith("lpmake"):
++    if image.endswith(".sh") or image.startswith("lpmake") or image.startswith("uuu"):
+       perm = 0o755
+     common.ZipWrite(output_zip, os.path.join(images_path, image), image, perm)
+ 

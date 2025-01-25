@@ -1,0 +1,26 @@
+00cb0fbc8c6a AndrewS 2021-02-03
+
+AOS-525: power on transmitter device only when device not been powered up
+
+when frameworks call setPowerMode to power on display, it will end up
+here to enable drm bridge, and will call adv7511_power_on() in this
+function, but calling adv7511_power_on() will power cycle HDMI display,
+add a condition here to call adv7511_power_on() only when transmitter
+device not been powered on.
+
+Change-Id: I3dbb07e8dbe7290162a47ca14418f634b1de87af
+
+diff --git a/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c b/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
+index 772d8f2e2958..0a3fa43e71ce 100644
+--- a/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
++++ b/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
+@@ -878,7 +878,8 @@ static void adv7511_bridge_enable(struct drm_bridge *bridge)
+ {
+ 	struct adv7511 *adv = bridge_to_adv7511(bridge);
+ 
+-	adv7511_power_on(adv);
++	if (!adv->powered)
++		adv7511_power_on(adv);
+ }
+ 
+ static void adv7511_bridge_disable(struct drm_bridge *bridge)

@@ -1,0 +1,75 @@
+ab30e975e71d Arthur Chen 2020-07-21
+
+AOS-269: arm64: dtsi: a100 evt-0: Add IDG_SPI support.
+
+Change-Id: I3d230073ea65d8dd02ed0b4d2467d0930353caf5
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 3277e2515e65..ecf657b94e9c 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -438,16 +438,6 @@ pinctrl_ecspi2_cs: ecspi2cs {
+ 				MX8MN_IOMUXC_ECSPI2_SS0_GPIO5_IO13		0x40000
+ 			>;
+ 		};
+-
+-		#else
+-		pinctrl_uart3: uart3grp {
+-			fsl,pins = <
+-				MX8MN_IOMUXC_ECSPI1_SCLK_UART3_DCE_RX		0x140
+-				MX8MN_IOMUXC_ECSPI1_MOSI_UART3_DCE_TX		0x140
+-				MX8MN_IOMUXC_ECSPI1_SS0_UART3_DCE_RTS_B		0x140
+-				MX8MN_IOMUXC_ECSPI1_MISO_UART3_DCE_CTS_B	0x140
+-			>;
+-		};
+ 		#endif
+ 
+ 		pinctrl_ecspi1: ecspi1grp {
+@@ -1046,18 +1036,26 @@ &uart2 { /* console */
+ };
+ 
+ &ecspi1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1>;
+ 	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ 
+-	spidev0: spi@0 {
++	/* for ttyIDG & ttyIDGV5 device entry */
++	idg_spi@0 {
+ 		reg = <0>;
+-		compatible = "rohm,dh2228fv";
+-		spi-max-frequency = <500000>;
++		compatible = "idtech,idg-spi";
++		interrupt-parent = <&gpio3>;
++		interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
++		spi-max-frequency = <4000000>; /* 4 MHz */
++		spi-bits-per-word = <8>; /* 8 bits */
++		spi-working-mode = <0>; /* SPI_MODE_0 */
++		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
++		/* idg-keep-sense */
++		status = "okay";
+ 	};
+-
+ };
+ 
+ #if USE_ECSPI2
+@@ -1076,15 +1074,6 @@ spidev1: spi@0 {
+ 		spi-max-frequency = <500000>;
+ 	};
+ };
+-#else
+-&uart3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart3>;
+-	assigned-clocks = <&clk IMX8MN_CLK_UART3>;
+-	assigned-clock-parents = <&clk IMX8MN_SYS_PLL1_80M>;
+-	fsl,uart-has-rtscts;
+-	status = "okay";
+-};
+ #endif
+ 
+ &usdhc1 {

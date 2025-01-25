@@ -1,0 +1,38 @@
+01feb936ede6 tonyshih 2022-01-17
+
+AOS-860: redwood: try to cool down the device, not just shut it down when device temperature is over 90C
+
+Symptoms: Unattended device would power off and cannot recover if overheat.
+Root Causes: Thermal driver would power off device when reach to critical
+temperature.
+Solutions:
+1. Current bootloader already has mechanism to wait device cooling down.
+2. Not power off device but restart instead when overheat.
+
+Change-Id: Id25ee0212b26a310993048594caa2bb39f4f40e6
+
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index 21db445599ec..16adb1f8c1ee 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -347,11 +347,15 @@ static void thermal_emergency_poweroff_func(struct work_struct *work)
+ 	 * We have reached here after the emergency thermal shutdown
+ 	 * Waiting period has expired. This means orderly_poweroff has
+ 	 * not been able to shut off the system for some reason.
+-	 * Try to shut down the system immediately using kernel_power_off
++	 *
++	 * 1. The devices are usuaslly unattended and they do not recover if shutdown.
++	 * 2. Bootloader would detect device`s temperature and wait until device cooling down.
++	 * Try to restart the device instead, not power off.
++	 * Try to restart the system immediately using kernel_restart
+ 	 * if populated
+ 	 */
+-	WARN(1, "Attempting kernel_power_off: Temperature too high
+");
+-	kernel_power_off();
++	WARN(1, "Attempting kernel_restart: Temperature too high
+");
++	kernel_restart(NULL);
+ 
+ 	/*
+ 	 * Worst of the worst case trigger emergency restart

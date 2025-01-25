@@ -1,0 +1,124 @@
+e2204821e491 George.Huang 2021-04-20
+
+AOS-572: qcacld-2.0: Fix CFI warnings on wlan_hdd_change_country_code_callback
+
+- remove duplicate function:  wlan_hdd_change_country_code_cb()
+  only keep similar function: wlan_hdd_change_country_code_callback()
+
+- correct wlan_hdd_change_country_code_callback() return type from void* to void
+
+- callback function references: tCsrRssiCallback / tCsrTsmStatsCallback / hdd_filter_cb_t
+
+- Error Log:
+  ------------[ cut here ]------------
+  CFI failure (target: wlan_hdd_change_country_code_callback.cfi_jt+0x0/0x4 [wlan]):
+  WARNING: CPU: 3 PID: 248 at kernel/cfi.c:29 __ubsan_handle_cfi_check_fail+0x4c/0x54
+  Modules linked in: synaptics_dsx_i2c wlan
+  CPU: 3 PID: 248 Comm: VosMCThread Tainted: G        W         5.4.47-00007-g3886c90a86
+  Hardware name: IDTECH IMX8MQ EVT-0 IBR210 EVT-0 (DT)
+  pstate: 60400005 (nZCv daif +PAN -UAO)
+  pc : __ubsan_handle_cfi_check_fail+0x4c/0x54
+  lr : __ubsan_handle_cfi_check_fail+0x4c/0x54
+  sp : ffff800012ecba30
+  x29: ffff800012ecba30 x28: ffff8000097626a7
+  x27: ffff800009836150 x26: ffff800009853cf0
+  x25: ffff800009853c48 x24: ffff0000b455a748
+  x23: ffff800009853c18 x22: ffff800009481000
+  x21: 4c550309df1cf4c1 x20: ffff8000098dfb50
+  x19: ffff800009483cd8 x18: ffff0000b6ddc438
+  x17: 0000000000000041 x16: ffff80001143585c
+  x15: ffff800012064af7 x14: 78302b746a5f6966
+  x13: 632e6b6361626c6c x12: 0000000000000000
+  x11: 0000000000000000 x10: 00000000ffffffff
+  x9 : 602c89ba97248900 x8 : 602c89ba97248900
+  x7 : 206572756c696166 x6 : ffff8000129a669a
+  x5 : 0000000000000000 x4 : 0000000000000004
+  x3 : ffff80001145fda4 x2 : fffffffffffffbb2
+  x1 : 0000000000000000 x0 : 0000000000000052
+  Call trace:
+   __ubsan_handle_cfi_check_fail+0x4c/0x54
+   __cfi_check_fail+0x30/0x38 [wlan]
+   __cfi_check+0x2088/0x2504 [wlan]
+   sme_HandleChangeCountryCode+0x2f8/0x2fc [wlan]
+   sme_ProcessMsg+0x39c/0x1604 [wlan]
+   VosMCThread+0x3f0/0x668 [wlan]
+   kthread+0x14c/0x15c
+   ret_from_fork+0x10/0x18
+  ---[ end trace 31898c885d60ad7a ]---
+
+Change-Id: Ic6686a68930dc39f5b77c304fff7f8bae753cd93
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_cfg80211.h b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_cfg80211.h
+index 9def269d5537..1fce88559f39 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_cfg80211.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_cfg80211.h
+@@ -2985,7 +2985,6 @@ int wlan_hdd_cfg80211_send_tdls_discover_req(struct wiphy *wiphy,
+ extern void wlan_hdd_cfg80211_update_replayCounterCallback(void *callbackContext,
+                             tpSirGtkOffloadGetInfoRspParams pGtkOffloadGetInfoRsp);
+ #endif
+-void* wlan_hdd_change_country_code_cb(void *pAdapter);
+ void hdd_select_cbmode(hdd_adapter_t *pAdapter, v_U8_t operationChannel,
+                 uint16_t *ch_width);
+ void hdd_select_mon_cbmode(hdd_adapter_t *adapter, v_U8_t operation_channel,
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
+index 94d3a8d6577e..3070256dd75a 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/inc/wlan_hdd_wext.h
+@@ -468,7 +468,7 @@ VOS_STATUS iw_set_tdls_params(struct net_device *dev, struct iw_request_info *in
+ #ifdef WLAN_FEATURE_PACKET_FILTERING
+ int wlan_hdd_set_mc_addr_list(hdd_adapter_t *pAdapter, v_U8_t set);
+ #endif
+-void* wlan_hdd_change_country_code_callback(void *pAdapter);
++void wlan_hdd_change_country_code_callback(void *pAdapter);
+ 
+ VOS_STATUS  wlan_hdd_set_powersave(hdd_adapter_t *pAdapter, int mode);
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+index c0fcc256bb8e..7760f1260a24 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+@@ -19984,15 +19984,6 @@ static int wlan_hdd_cfg80211_change_bss (struct wiphy *wiphy,
+ 
+     return ret;
+ }
+-/* FUNCTION: wlan_hdd_change_country_code_cd
+-*  to wait for country code completion
+-*/
+-void* wlan_hdd_change_country_code_cb(void *pAdapter)
+-{
+-    hdd_adapter_t *call_back_pAdapter = pAdapter;
+-    complete(&call_back_pAdapter->change_country_code);
+-    return NULL;
+-}
+ 
+ /*
+  * FUNCTION: __wlan_hdd_cfg80211_change_iface
+@@ -20155,7 +20146,7 @@ static int __wlan_hdd_cfg80211_change_iface(struct wiphy *wiphy,
+                 init_completion(&pAdapter->change_country_code);
+                 hstatus = sme_ChangeCountryCode(pHddCtx->hHal,
+                                      (void *)(tSmeChangeCountryCallback)
+-                                      wlan_hdd_change_country_code_cb,
++                                      wlan_hdd_change_country_code_callback,
+                                       pConfig->apCntryCode, pAdapter,
+                                       pHddCtx->pvosContext,
+                                       eSIR_FALSE, eSIR_TRUE);
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
+index e15fc19edcfb..17a098b884f3 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_wext.c
+@@ -4230,13 +4230,13 @@ VOS_STATUS wlan_hdd_enter_lowpower(hdd_context_t *pHddCtx)
+ }
+ 
+ 
+-void* wlan_hdd_change_country_code_callback(void *pAdapter)
++void wlan_hdd_change_country_code_callback(void *pAdapter)
+ {
+ 
+     hdd_adapter_t *call_back_pAdapter = pAdapter;
+     complete(&call_back_pAdapter->change_country_code);
+ 
+-    return NULL;
++    return;
+ }
+ 
+ /**

@@ -1,0 +1,53 @@
+5f321e5b5 max.yang 2019-12-09
+
+AOS-42: [Target-file] Support to build system.map and vendor.map alone with building images
+
+When building target-files, we couldn't get system.map file from a system image.
+We have to build another system.img alone with system.map, and result to inconsistent images
+from out/ and target-file's IMAGES/ folder.
+
+This patch let build script generate system.img and system.map together, so that we could just
+include them into target-files.
+
+Change-Id: I3621d0f7ea0b57c153f79645b56d922254159e25
+
+diff --git a/core/Makefile b/core/Makefile
+index 93d2c9738..a81fe12bc 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -1577,6 +1577,7 @@ define build-systemimage-target
+   @mkdir -p $(dir $(1)) $(systemimage_intermediates) && rm -rf $(systemimage_intermediates)/system_image_info.txt
+   $(call generate-userimage-prop-dictionary, $(systemimage_intermediates)/system_image_info.txt, \
+       skip_fsck=true)
++  $(hide) echo "system_block_list=$(systemimage_intermediates)/system.map" >> $(systemimage_intermediates)/system_image_info.txt
+   $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+       build/make/tools/releasetools/build_image.py \
+       $(TARGET_OUT) $(systemimage_intermediates)/system_image_info.txt $(1) $(TARGET_OUT) \
+@@ -2025,6 +2026,7 @@ define build-vendorimage-target
+   @mkdir -p $(TARGET_OUT_VENDOR)
+   @mkdir -p $(vendorimage_intermediates) && rm -rf $(vendorimage_intermediates)/vendor_image_info.txt
+   $(call generate-userimage-prop-dictionary, $(vendorimage_intermediates)/vendor_image_info.txt, skip_fsck=true)
++  $(hide) echo "vendor_block_list=$(vendorimage_intermediates)/vendor.map" >> $(vendorimage_intermediates)/vendor_image_info.txt
+   $(if $(BOARD_VENDOR_KERNEL_MODULES), \
+     $(call build-image-kernel-modules,$(BOARD_VENDOR_KERNEL_MODULES),$(TARGET_OUT_VENDOR),vendor/,$(call intermediates-dir-for,PACKAGING,depmod_vendor)))
+   $(hide) PATH=$(foreach p,$(INTERNAL_USERIMAGES_BINARY_PATHS),$(p):)$$PATH \
+diff --git a/tools/releasetools/build_image.py b/tools/releasetools/build_image.py
+index ca96d01cc..3b7b9fc1d 100755
+--- a/tools/releasetools/build_image.py
++++ b/tools/releasetools/build_image.py
+@@ -747,6 +747,7 @@ def ImagePropFromGlobalDict(glob_dict, mount_point):
+     copy_prop("system_extfs_inode_count", "extfs_inode_count")
+     if not copy_prop("system_extfs_rsv_pct", "extfs_rsv_pct"):
+       d["extfs_rsv_pct"] = "0"
++    copy_prop("system_block_list", "block_list")
+   elif mount_point == "system_other":
+     # We inherit the selinux policies of /system since we contain some of its
+     # files.
+@@ -799,6 +800,7 @@ def ImagePropFromGlobalDict(glob_dict, mount_point):
+     copy_prop("vendor_extfs_inode_count", "extfs_inode_count")
+     if not copy_prop("vendor_extfs_rsv_pct", "extfs_rsv_pct"):
+       d["extfs_rsv_pct"] = "0"
++    copy_prop("vendor_block_list", "block_list")
+   elif mount_point == "product":
+     copy_prop("avb_product_hashtree_enable", "avb_hashtree_enable")
+     copy_prop("avb_product_add_hashtree_footer_args",

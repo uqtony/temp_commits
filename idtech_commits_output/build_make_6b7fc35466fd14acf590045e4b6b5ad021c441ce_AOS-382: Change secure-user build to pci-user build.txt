@@ -1,0 +1,85 @@
+6b7fc3546 max.yang 2020-11-05
+
+AOS-382: Change secure-user build to pci-user build
+
+  1. Condition based on "secure" should change to "pci"
+  2. For "pcidev" build, adding adbd back to system
+     - by findstring condition, "pcidev" could found string "pci"
+
+Change-Id: I3e58f623fd28c674bffd8a1f5b2935485a49db1f
+
+diff --git a/target/product/base_system.mk b/target/product/base_system.mk
+index 788d8c5f5..940ee87e0 100644
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@ -14,13 +14,18 @@
+ # limitations under the License.
+ #
+ 
+-# install adbd if string TARGET_PRODUCT contains no secure
+-ifneq (secure,$(findstring secure, $(TARGET_PRODUCT)))
++# install adbd if string TARGET_PRODUCT contains no pci
++ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+     adbd \
+     monkey \
+     WallpaperBackup
+ endif
++# adbd removed by above, for pcidev build, add it back
++ifeq (pcidev,$(findstring pcidev, $(TARGET_PRODUCT)))
++PRODUCT_PACKAGES += \
++    adbd
++endif
+ 
+ # Base modules and settings for the system partition.
+ PRODUCT_PACKAGES += \
+@@ -330,8 +335,8 @@ PRODUCT_UPDATABLE_BOOT_LOCATIONS := \
+     /apex/com.android.conscrypt/javalib/conscrypt.jar \
+     /apex/com.android.media/javalib/updatable-media.jar
+ 
+-# copy usb rc files if string TARGET_PRODUCT contains no secure
+-ifneq (secure,$(findstring secure, $(TARGET_PRODUCT)))
++# copy usb rc files if string TARGET_PRODUCT contains no pci
++ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
+ PRODUCT_COPY_FILES += \
+     system/core/rootdir/init.usb.rc:root/init.usb.rc \
+     system/core/rootdir/init.usb.configfs.rc:root/init.usb.configfs.rc
+diff --git a/target/product/handheld_product.mk b/target/product/handheld_product.mk
+index e99743eb0..504201e7a 100644
+--- a/target/product/handheld_product.mk
++++ b/target/product/handheld_product.mk
+@@ -20,7 +20,7 @@
+ # does, use base_vendor.mk).
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/media_product.mk)
+ 
+-ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+     frameworks-base-overlays \
+     OneTimeInitializer \
+diff --git a/target/product/handheld_system.mk b/target/product/handheld_system.mk
+index f9868b177..7087ffece 100644
+--- a/target/product/handheld_system.mk
++++ b/target/product/handheld_system.mk
+@@ -31,7 +31,7 @@ $(call inherit-product-if-exists, external/hyphenation-patterns/patterns.mk)
+ $(call inherit-product-if-exists, frameworks/base/data/keyboards/keyboards.mk)
+ $(call inherit-product-if-exists, frameworks/webview/chromium/chromium.mk)
+ 
+-ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+     BasicDreams \
+     screenrecord \
+diff --git a/target/product/telephony_product.mk b/target/product/telephony_product.mk
+index 15c726ec8..ebfe7daeb 100644
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@ -17,7 +17,7 @@
+ # This is the list of modules that are specific to products that have telephony
+ # hardware, and install to the product partition.
+ 
+-ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
++ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+     EmergencyInfo \
+     Dialer

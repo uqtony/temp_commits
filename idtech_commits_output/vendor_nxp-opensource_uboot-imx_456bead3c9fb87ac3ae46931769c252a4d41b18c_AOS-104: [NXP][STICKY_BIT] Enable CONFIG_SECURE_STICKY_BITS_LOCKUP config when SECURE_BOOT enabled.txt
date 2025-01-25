@@ -1,0 +1,34 @@
+456bead3c9 max.yang 2020-03-09
+
+AOS-104: [NXP][STICKY_BIT] Enable CONFIG_SECURE_STICKY_BITS_LOCKUP config when SECURE_BOOT enabled
+
+  1. NXP confirmed this is a must config to enable
+  2. Fix build break:
+     Build break log on vp6820_8mq_secure-user:
+     arch/arm/mach-imx/imx8m/soc.c:326:23: error: ‘CONFIG_IMX_UNIQUE_ID’ undeclared \
+     (first use in this function); did you mean ‘CONFIG_IMX_VIDEO_SKIP’?
+        if (!is_uid_matched(CONFIG_IMX_UNIQUE_ID))
+                           ^~~~~~~~~~~~~~~~~~~~
+  3. Above workaround patch is used to lock up some bits in SPL, so that users could not
+     write fuse directly (normal case should unlock through CST tool's sign bootloader)
+  4. The CONFIG_IMX_UNIQUE_ID will seldom be used because we have to build u-boot manually
+     for it and force device run into else condition.
+
+  Reference:
+    https://community.nxp.com/thread/525317
+
+Change-Id: I11a661c4fa05924a6296163d21a2760ccce531ce
+
+diff --git a/Makefile b/Makefile
+index c78ffe1f2f..f39ee9c8b5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -387,7 +387,7 @@ KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
+ KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
+ 
+ ifeq ($(SECURE_BOOT), 1)
+-	KBUILD_CPPFLAGS += -DCONFIG_SECURE_BOOT
++	KBUILD_CPPFLAGS += -DCONFIG_SECURE_BOOT -DCONFIG_SECURE_STICKY_BITS_LOCKUP
+ endif
+ # Read UBOOTRELEASE from include/config/uboot.release (if it exists)
+ UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)

@@ -1,0 +1,61 @@
+9374daf2 owen.wen 2020-01-17
+
+AOS-109: add key and property for IDtech sig checking
+
+upload key pair which is used for verify the signature of signature
+add property which is used for control signature of signature and online checking
+
+below is the way how the key pair generated
+KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+keyGen.initialize(1024);
+KeyPair keyPair = keyGen.genKeyPair();
+PrivateKey privateKey = keyPair.getPrivate();
+PublicKey publicKey = keyPair.getPublic();
+
+// Store Public Key.
+X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(
+                publicKey.getEncoded());
+FileOutputStream fos = new FileOutputStream(path + "/public.key");
+fos.write(x509EncodedKeySpec.getEncoded());
+fos.close();
+// Store Private Key.
+PKCS8EncodedKeySpec pkcs8EncodedKeySpec = new PKCS8EncodedKeySpec(
+                privateKey.getEncoded());
+fos = new FileOutputStream(path + "/private.key");
+fos.write(pkcs8EncodedKeySpec.getEncoded());
+fos.close();
+
+Change-Id: Iebc4c769b9cd3cc3213ded1ed3429e44592bf662
+
+diff --git a/common/security/signature_of_signature.private.key b/common/security/signature_of_signature.private.key
+new file mode 100644
+index 00000000..f4242165
+Binary files /dev/null and b/common/security/signature_of_signature.private.key differ
+diff --git a/common/security/signature_of_signature.public.key b/common/security/signature_of_signature.public.key
+new file mode 100644
+index 00000000..3a59eade
+Binary files /dev/null and b/common/security/signature_of_signature.public.key differ
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 62435ab5..943c7c38 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -1,3 +1,7 @@
+ on early-boot
+     # Approve Apps permissions
+     setprop ro.idt.app_perm_approve true
++    # apk off-line check, verify if the app signed by IDTech key
++    setprop ro.idt.signature_of_signature false
++    # apk on-line check, verify if the app signature digest exist on AMS
++    setprop ro.idt.signature_online_check false
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 63277c18..b879a492 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -51,6 +51,7 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/deviceowner/device_policies.xml:$(TARGET_COPY_OUT_SYSTEM)/device_policies.xml \
+     device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_SYSTEM)/device_owner_2.xml \
+     device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/runtime_allowed.xml \
++    device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_SYSTEM)/etc/signature_of_signature.public.key
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \

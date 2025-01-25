@@ -1,0 +1,66 @@
+914d060b11 Arthur Chen 2020-11-17
+
+AOS-401: Clean building warning about previous changes.
+
+    -for 2.5 release.
+
+Change-Id: I7ddba9358b540932875be189bb06cd7c72bf79ac
+
+diff --git a/common/board_r.c b/common/board_r.c
+index 33167448e8..a3dd130c8e 100644
+--- a/common/board_r.c
++++ b/common/board_r.c
+@@ -69,6 +69,7 @@
+ #endif
+ #ifdef CONFIG_IDT_BOARD_INFO_PARSER
+ #include <idt_bdinfo_parser.h>
++#include <persist_idt.h>
+ #endif
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+diff --git a/drivers/idt/bdinfo_parser/linux_dtb.c b/drivers/idt/bdinfo_parser/linux_dtb.c
+index 56e281e49b..229a8ffe9c 100644
+--- a/drivers/idt/bdinfo_parser/linux_dtb.c
++++ b/drivers/idt/bdinfo_parser/linux_dtb.c
+@@ -79,8 +79,7 @@ int get_ab_slot_index(void)
+ #endif /* DEBUG_INFO */
+ 		free(misc_img);
+ 	} else {
+-		printf("fastboot_flash_find_ptn misc fail: %d
+
+",
+-		       fpt_en_misc);
++		printf("fastboot_flash_find_ptn misc fail
+
+");
+ 		ret = -1;
+ 	}
+ 
+@@ -101,14 +100,12 @@ int get_target_dtb_index(int slot, char *fdt_id)
+ 	struct fastboot_ptentry *fpt_en_dtbo;
+ 	struct blk_desc *dev_desc;
+ 	const struct fdt_property *fdt_prop;
+-	const u32 *value;
+ 	unsigned char *dt_img;
+ 	char *fdt_blob;
+ 	size_t num_bytes;
+ 	size_t dtbo_size;
+ 	u32 dtbo_id;
+ 	u32 fdt_size;
+-	u32 pinfo;
+ 	int len;
+ 	int nodeoff;
+ 	int fdt_count;
+@@ -257,12 +254,10 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	unsigned char *dt_img;
+ 	struct dt_table_header *dt_table;
+ 	struct dt_table_entry *dt_entry;
+-	const struct fdt_property *fdt_prop;
+ 	void *blob;
+ 	size_t num_bytes;
+ 	size_t dtbo_size;
+ 	int nodeoff;
+-	int len;
+ 	int ret = -1;
+ 
+ 	if ((slot < 0) || (slot > 1)) {

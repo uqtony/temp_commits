@@ -1,0 +1,27 @@
+e5dfbbd3 owen.wen 2020-12-10
+
+AOS-426: video rotation fix, disable 3D composition overlay
+
+Symptom: video didn't rotate as expectation when display rotate 90 or 270 degrees
+Root Cause: NXP 3D composition problem
+Solution: disable 3D composition
+
+below is the thread about this symptom
+https://community.nxp.com/t5/NXP-ID-Tech-Qisda-Portal-190925/IMX8MQ-rotate-video-via-user-rotation-got-some-problem/m-p/1193448#M408
+
+Change-Id: I477f6751ffb8c92a20c7ae7fd2b6e046a9c29614
+
+diff --git a/imx8m/bigcypress_8mq/init.rc b/imx8m/bigcypress_8mq/init.rc
+index 736250a0..e26d3cc2 100644
+--- a/imx8m/bigcypress_8mq/init.rc
++++ b/imx8m/bigcypress_8mq/init.rc
+@@ -180,6 +180,9 @@ on early-boot
+     setprop wifi.direct.interface p2p-dev-wlan0
+     start vendor.wifi_hal_legacy
+ 
++    # disable 3D composition overlay to fix video rotate problem
++    setprop hwc.enable.overlay 0
++
+ on boot
+     start audioserver
+     start mediadrm

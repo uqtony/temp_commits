@@ -1,0 +1,45 @@
+b30a51f6 Arthur Chen 2019-12-03
+
+AOS-41: Patch for idtech multi-DTB in DTBO image rule to vp6820_mn with i.mx8mn
+
+Change-Id: I15a88a040e1051bae1925196fa31f00e082cfa88
+
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index 474f02fb..708d1f77 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -27,6 +27,11 @@ else
+ $(error kernel arch not supported at present)
+ endif
+ 
++ifeq ($(BOARD_SOC_TYPE), IMX8MN)
++IMX8MN_RAM := -ddr4
++IMX8MN_TYPE := -trusty
++endif
++
+ TARGET_MTDTBOIMAGE_CONFIG_PATH=$(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/arch/$(TARGET_KERNEL_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/
+ # Include all IDT DTS's
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+@@ -55,8 +60,8 @@ $(BOARD_PREBUILT_DTBOIMAGE): $(KERNEL_BIN) $(DTS_SRC) | $(MKDTIMG) $(AVBTOOL)
+ 		echo $$DTB >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \
+ 		echo "" >> $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg ; \
+ 	done
+-	$(MKDTIMG) create $(PRODUCT_OUT)/dtbo-imx8mq.img $(TARGET_MTDTBOIMAGE_CONFIG_PATH)fsl-imx8mq-evk.dtb; \
+-	$(AVBTOOL) add_hash_footer --image $(PRODUCT_OUT)/dtbo-imx8mq.img  \
++	$(MKDTIMG) create $(PRODUCT_OUT)/dtbo-$(LOWER_BOARD_SOC_TYPE).img $(TARGET_MTDTBOIMAGE_CONFIG_PATH)fsl-$(LOWER_BOARD_SOC_TYPE)$(IMX8MN_RAM)-evk$(IMX8MN_TYPE).dtb; \
++	$(AVBTOOL) add_hash_footer --image $(PRODUCT_OUT)/dtbo-$(LOWER_BOARD_SOC_TYPE).img  \
+ 		--partition_name dtbo \
+ 		--partition_size $(BOARD_DTBOIMG_PARTITION_SIZE); \
+ 	$(MKDTIMG) cfg_create $(PRODUCT_OUT)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img $(TARGET_MTDTBOIMAGE_CONFIG_PATH)idt_dtbo_image.cfg; \
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index 741f9e18..c9d6be82 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -3,6 +3,7 @@
+ #
+ 
+ BOARD_SOC_TYPE := IMX8MN
++BOARD_SOM_TYPE := a100
+ BOARD_TYPE := VP6820
+ BOARD_HAVE_VPU := false
+ HAVE_FSL_IMX_GPU2D := false

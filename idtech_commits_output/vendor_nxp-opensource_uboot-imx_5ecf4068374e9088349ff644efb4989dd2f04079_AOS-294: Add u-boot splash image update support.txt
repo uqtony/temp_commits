@@ -1,0 +1,351 @@
+5ecf406837 Jay 2020-08-13
+
+AOS-294: Add u-boot splash image update support
+
+Supported u-boot to loading splash from userdata partition.
+Currently, it will loading splash.bmp from /data/idtech
+and display it. If fail to load splash.bmp from /data/idtech
+then it will display default splash image.
+
+Patch set 3
+
+Change-Id: I8f16da3b5e6d52114db5b37007b73748d7904ce8
+
+diff --git a/common/splash.c b/common/splash.c
+index e1c9a58c92..03c068e643 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -29,6 +29,16 @@
+ #define IMX8MQ_DCSS_DPR_FRAME_CTRL0		0x32e18070
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
++#ifdef CONFIG_IDT_SPLASH_SUPPORT
++#include <mmc.h>
++#include <fb_fsl.h>
++
++#define SPLASH_LOC_TABLE_SIZE	1
++#define SPLASH_DEV_LEN			8
++#define SPLASH_NAME				"mmc_fs"
++#define SPLASH_PARTITION_NAME	"userdata"
++#endif
++
+ static struct splash_location default_splash_locations[] = {
+ 	{
+ 		.name = "sf",
+@@ -86,11 +96,45 @@ static inline int splash_video_logo_load(void) { return -ENOSYS; }
+ 
+ __weak int splash_screen_prepare(void)
+ {
+-	if (CONFIG_IS_ENABLED(SPLASH_SOURCE))
++#ifdef CONFIG_IDT_SPLASH_SUPPORT
++	int ret = -1;
++#endif
++
++	if (CONFIG_IS_ENABLED(SPLASH_SOURCE)) {
++#ifdef CONFIG_IDT_SPLASH_SUPPORT
++		char buf[SPLASH_DEV_LEN];
++		struct splash_location location;
++		struct fastboot_ptentry *ptn;
++
++		memset(buf, 0x00, sizeof(buf));
++		fastboot_setup();
++		ptn = fastboot_flash_find_ptn(SPLASH_PARTITION_NAME);
++		if (ptn) {
++			snprintf(buf, sizeof(buf), "%d:%x",
++				 mmc_get_env_dev(),
++				 ptn->partition_index);
++			location.name = SPLASH_NAME;
++			location.storage = SPLASH_STORAGE_MMC;
++			location.flags = SPLASH_STORAGE_FS;
++			location.devpart = buf;
++			location.ubivol = NULL;
++
++			ret = splash_source_load(&location,
++						SPLASH_LOC_TABLE_SIZE);
++		}
++#else
+ 		return splash_source_load(default_splash_locations,
+ 					  ARRAY_SIZE(default_splash_locations));
++#endif
++	}
+ 
++#ifdef CONFIG_IDT_SPLASH_SUPPORT
++	if (ret)
++		ret = splash_video_logo_load();
++	return ret;
++#else
+ 	return splash_video_logo_load();
++#endif
+ }
+ 
+ #ifdef CONFIG_SPLASH_SCREEN_ALIGN
+diff --git a/configs/imx8mn_a100_devboard_android_defconfig b/configs/imx8mn_a100_devboard_android_defconfig
+index 537e514e59..f666bc2e62 100644
+--- a/configs/imx8mn_a100_devboard_android_defconfig
++++ b/configs/imx8mn_a100_devboard_android_defconfig
+@@ -135,6 +135,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mn_a100_devboard_android_dual_defconfig b/configs/imx8mn_a100_devboard_android_dual_defconfig
+index c6b91cdac3..225f921d89 100644
+--- a/configs/imx8mn_a100_devboard_android_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_dual_defconfig
+@@ -135,6 +135,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mn_ddr4_evk_android_defconfig b/configs/imx8mn_ddr4_evk_android_defconfig
+index 19f5915e58..e4fe11ed99 100644
+--- a/configs/imx8mn_ddr4_evk_android_defconfig
++++ b/configs/imx8mn_ddr4_evk_android_defconfig
+@@ -135,6 +135,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mp_a200_devboard_android_defconfig b/configs/imx8mp_a200_devboard_android_defconfig
+index aac419ed48..cf0ecb0342 100644
+--- a/configs/imx8mp_a200_devboard_android_defconfig
++++ b/configs/imx8mp_a200_devboard_android_defconfig
+@@ -148,6 +148,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mp_a200_devboard_android_dual_defconfig b/configs/imx8mp_a200_devboard_android_dual_defconfig
+index 69d807ce78..a60e691b06 100644
+--- a/configs/imx8mp_a200_devboard_android_dual_defconfig
++++ b/configs/imx8mp_a200_devboard_android_dual_defconfig
+@@ -148,6 +148,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mp_evk_android_defconfig b/configs/imx8mp_evk_android_defconfig
+index a4bd89e62d..3147cd9aa4 100644
+--- a/configs/imx8mp_evk_android_defconfig
++++ b/configs/imx8mp_evk_android_defconfig
+@@ -148,6 +148,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+index f2d38638b0..884539c92c 100644
+--- a/configs/imx8mq_a300_devboard_android_defconfig
++++ b/configs/imx8mq_a300_devboard_android_defconfig
+@@ -128,6 +128,8 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+index ee942e4e7a..893d1ff059 100644
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -128,6 +128,8 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/imx8mq_evk_android_defconfig b/configs/imx8mq_evk_android_defconfig
+index 443f47b142..6039bf07d6 100644
+--- a/configs/imx8mq_evk_android_defconfig
++++ b/configs/imx8mq_evk_android_defconfig
+@@ -128,6 +128,8 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/vp6820_8mn_evk_android_dual_defconfig b/configs/vp6820_8mn_evk_android_dual_defconfig
+index 791e34feaa..fc4a88a9e8 100644
+--- a/configs/vp6820_8mn_evk_android_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_dual_defconfig
+@@ -135,6 +135,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/vp6820_8mp_evk_android_dual_defconfig b/configs/vp6820_8mp_evk_android_dual_defconfig
+index ffc0fb5b5f..50e7049d07 100644
+--- a/configs/vp6820_8mp_evk_android_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_dual_defconfig
+@@ -148,6 +148,8 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/configs/vp6820_8mq_evk_android_dual_defconfig b/configs/vp6820_8mq_evk_android_dual_defconfig
+index 784015cd5d..4c41f06b4d 100644
+--- a/configs/vp6820_8mq_evk_android_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_dual_defconfig
+@@ -128,6 +128,8 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
+ 
+ CONFIG_LZ4=y
+ CONFIG_BCB_SUPPORT=y
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 8d4f1c3be6..46aee0f992 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -817,4 +817,25 @@ config VIDEO_ADV7535
+ 	Say Y here if you want to enable support for ADI ADV7535
+ 	DSI to HDMI connector, currently only support 1920x1080.
+ 
++config SPLASH_SOURCE
++	bool "Enable specific splash image support"
++	depends on DM_VIDEO
++	default n
++	help
++	Say Y here if you want to display splash image from specific devices
++	and filename. When enable this config, must setup environment variable
++	splashsource to indecaide which access method want to use
++	(etc setenv splashsource mmc_fs). You also can modify
++	CONFIG_EXTRA_ENV_SETTINGS.
++
++config IDT_SPLASH_SUPPORT
++	bool "Enable IDTech splash support"
++	depends on SPLASH_SOURCE
++	default n
++	help
++	Say Y here if you want to choice target mmc device for splash automatically.
++	When enable this config, must setup environment variable splashfile to
++	indicate which file want to use (etc setenv splashfile idtech/splash.bmp).
++	You also can modify CONFIG_EXTRA_ENV_SETTINGS.
++
+ endmenu
+diff --git a/include/configs/imx8mn_a100_android.h b/include/configs/imx8mn_a100_android.h
+index 223bac35e3..cc76ac8f40 100644
+--- a/include/configs/imx8mn_a100_android.h
++++ b/include/configs/imx8mn_a100_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"fdt_high=0xffffffffffffffff "		\
+@@ -68,4 +70,5 @@
+ 
+ #define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
+ 
++
+ #endif /* IMX8MN_A100_ANDROID_H */
+diff --git a/include/configs/imx8mn_evk_android.h b/include/configs/imx8mn_evk_android.h
+index 1473359a62..215504d880 100644
+--- a/include/configs/imx8mn_evk_android.h
++++ b/include/configs/imx8mn_evk_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"fdt_high=0xffffffffffffffff "		\
+diff --git a/include/configs/imx8mp_a200_android.h b/include/configs/imx8mp_a200_android.h
+index 3f76dbcdc0..67638165fc 100644
+--- a/include/configs/imx8mp_a200_android.h
++++ b/include/configs/imx8mp_a200_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"fdt_high=0xffffffffffffffff "		\
+diff --git a/include/configs/imx8mp_evk_android.h b/include/configs/imx8mp_evk_android.h
+index 9abc360f63..92ca7500d6 100644
+--- a/include/configs/imx8mp_evk_android.h
++++ b/include/configs/imx8mp_evk_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"fdt_high=0xffffffffffffffff "		\
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+index 664e9f8769..19255e00b6 100644
+--- a/include/configs/imx8mq_a300_android.h
++++ b/include/configs/imx8mq_a300_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"fdt_high=0xffffffffffffffff "		\
+diff --git a/include/configs/imx8mq_evk_android.h b/include/configs/imx8mq_evk_android.h
+index f9c564610b..0b1e7b1449 100644
+--- a/include/configs/imx8mq_evk_android.h
++++ b/include/configs/imx8mq_evk_android.h
+@@ -29,6 +29,8 @@
+ #endif /* CONFIG_IMX_HAB */
+ 
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashsource=mmc_fs "		\
++	"splashfile=idtech/\splash.bmp "		\
+ 	"splashpos=m,m "			\
+ 	"splashimage=0x50000000 "		\
+ 	"sp_rotate=90 "			\

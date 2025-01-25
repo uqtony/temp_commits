@@ -1,0 +1,93 @@
+ab41295ad69b jay deng 2021-02-24
+
+AOS-529: Modify device tree configuration for rt5640
+
+Add audio-codec property into sound-rt5640 device node.
+sai3 interface has been link with rt5640, so must
+remove sound-bt-sco device node.
+
+Change-Id: I4f5dbd8ec7604fc2faa057d4ea51e60da6f48b1f
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+index acca50e1d412..518fa238b39e 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_ibr210_evt-0.dtsi
+@@ -175,11 +175,17 @@ sound-rt5640 {
+ 		compatible = "fsl,imx-audio-rt5640";
+ 		model = "rt5640-audio";
+ 		audio-cpu = <&sai3>;
+-		audio-routing = "Line Out Jack", "HPOL",
+-				"Line Out Jack", "HPOR",
+-				"IN1P", "Line In Jack",
+-				"IN2P", "Line In Jack";
+-				//"Stereo ADC L1 Mux","IN1P",
++		audio-codec = <&codec>;
++		audio-routing =
++			"Headphone", "HPOL",
++			"Headphone", "HPOR",
++			"Speaker", "SPOLP",
++			"Speaker", "SPOLN",
++			"Line Out", "LOUTL",
++			"Line Out", "LOUTR",
++			"MICBIAS1", "Headphone Mic",
++			"IN2P", "MICBIAS1";
++		status = "okay";
+ 	};
+ 
+ 	brcmfmac: brcmfmac {
+@@ -243,25 +249,6 @@ wm8524: audio-codec {
+ 		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+ 	};
+ 
+-	sound-bt-sco {
+-		compatible = "simple-audio-card";
+-		simple-audio-card,name = "bt-sco-audio";
+-		simple-audio-card,format = "dsp_a";
+-		simple-audio-card,bitclock-inversion;
+-		simple-audio-card,frame-master = <&btcpu>;
+-		simple-audio-card,bitclock-master = <&btcpu>;
+-
+-		btcpu: simple-audio-card,cpu {
+-			sound-dai = <&sai3>;
+-			dai-tdm-slot-num = <2>;
+-			dai-tdm-slot-width = <16>;
+-		};
+-
+-		simple-audio-card,codec {
+-			sound-dai = <&bt_sco_codec 1>;
+-		};
+-	};
+-
+ 	sound-hdmi {
+ 		compatible = "fsl,imx8mq-evk-cdnhdmi",
+ 				"fsl,imx-audio-cdnhdmi";
+@@ -531,7 +518,7 @@ codec: rt5640@1c {
+ 		reg = <0x1c>;
+ 		clocks = <&clk IMX8MQ_CLK_SAI3_ROOT>;
+ 		clock-names = "mclk";
+-		amic-mono;
++		ibr210-config;
+ 	};
+ 
+ 	adv_bridge: adv7535@3d {
+diff --git a/sound/soc/codecs/rt5640.c b/sound/soc/codecs/rt5640.c
+index 2e45e6825c56..b16b28688c6f 100644
+--- a/sound/soc/codecs/rt5640.c
++++ b/sound/soc/codecs/rt5640.c
+@@ -2694,9 +2694,11 @@ static int rt5640_probe(struct snd_soc_component *component)
+ 	}
+ 
+ #if IDTECH_CUSTOMIZED_DESIGN
+-	ret = snd_soc_component_set_jack(component, jack, NULL);
+-	if (ret < 0)
+-		dev_err(component->dev, "ASoC: Failed to set_jack: %d
+", ret);
++	if (!device_property_read_bool(component->dev, "ibr210-config")) {
++		ret = snd_soc_component_set_jack(component, jack, NULL);
++		if (ret < 0)
++			dev_err(component->dev, "ASoC: Failed to set_jack: %d
+", ret);
++	}
+ 
+ #endif /* IDTECH_CUSTOMIZED_DESIGN */
+ 

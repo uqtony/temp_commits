@@ -1,0 +1,45 @@
+4211adf873 George.Huang 2020-04-29
+
+AOS-123: Print warning log if boot from secondary spl
+
+Change-Id: I6f43f99299ad0033e3eabb6dc53b1ebd7565586d
+
+diff --git a/lib/avb/fsl/fsl_avb_ab_flow.c b/lib/avb/fsl/fsl_avb_ab_flow.c
+index 81dd70bd81..76cdceea4f 100644
+--- a/lib/avb/fsl/fsl_avb_ab_flow.c
++++ b/lib/avb/fsl/fsl_avb_ab_flow.c
+@@ -2,6 +2,7 @@
+  * Copyright 2018 NXP
+  */
+ 
++#include <asm/io.h>
+ #include <common.h>
+ #include <fb_fsl.h>
+ #include <fsl_avb.h>
+@@ -443,6 +444,14 @@ end:
+ 		return 0;
+ }
+ #else /* CONFIG_PARSE_CONTAINER */
++#ifdef CONFIG_IDT_BACKUP_SPL
++#define SRC_GPR10 0x30390098
++#define PERSIST_SECONDARY_BOOT (1<<30)
++bool mmcboot_secondary(void)
++{
++	return (bool)(readl(SRC_GPR10) & PERSIST_SECONDARY_BOOT);
++}
++#endif
+ #ifdef CONFIG_IDT_DUAL_SPL
+ int check_hwpart_with_current_slot(struct mmc *mmc, size_t target_slot)
+ {
+@@ -528,6 +537,10 @@ int mmc_load_image_raw_sector_dual_uboot(
+ 	target_slot =
+ 	    (ab_data.slots[1].priority > ab_data.slots[0].priority) ? 1 : 0;
+ 
++#ifdef CONFIG_IDT_BACKUP_SPL
++	if (mmcboot_secondary())
++		printf("WARN: boot from secondary spl
+");
++#endif
+ #ifdef CONFIG_IDT_DUAL_SPL
+ 	if (check_hwpart_with_current_slot(mmc, target_slot) == 0)
+ 		do_reset(NULL, 0, 0, NULL);

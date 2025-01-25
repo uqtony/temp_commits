@@ -1,0 +1,248 @@
+7a406c45 George.Huang 2020-07-02
+
+AOS-239: imx8mn: [RIL]To add some SE policy rules for RIL to use the relevant system resources.
+
+Change-Id: Ia73472a2a739da096ef7d3a950cad99e2860b863
+
+diff --git a/imx8m/evk_a100/sepolicy/device.te b/imx8m/evk_a100/sepolicy/device.te
+new file mode 100644
+index 00000000..91ac6479
+--- /dev/null
++++ b/imx8m/evk_a100/sepolicy/device.te
+@@ -0,0 +1 @@
++type rild_device, dev_type;
+diff --git a/imx8m/evk_a100/sepolicy/file_contexts b/imx8m/evk_a100/sepolicy/file_contexts
+index 31094e7e..2c8110ba 100644
+--- a/imx8m/evk_a100/sepolicy/file_contexts
++++ b/imx8m/evk_a100/sepolicy/file_contexts
+@@ -41,3 +41,11 @@
+ 
+ #Neural Network HAL service
+ /vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
++
++#quectel port
++/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
++/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
++/vendor/bin/hw/rild              u:object_r:rild_exec:s0
++#/system/socket/rild              u:object_r:rild_socket:s0
++#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
++/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/evk_a100/sepolicy/property_contexts b/imx8m/evk_a100/sepolicy/property_contexts
+new file mode 100644
+index 00000000..2e0ec0f1
+--- /dev/null
++++ b/imx8m/evk_a100/sepolicy/property_contexts
+@@ -0,0 +1,3 @@
++vendor.rild.                        u:object_r:radio_prop:s0
++rild.                               u:object_r:radio_prop:s0
++net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/evk_a100/sepolicy/rild.te b/imx8m/evk_a100/sepolicy/rild.te
+new file mode 100644
+index 00000000..6efa9e26
+--- /dev/null
++++ b/imx8m/evk_a100/sepolicy/rild.te
+@@ -0,0 +1,83 @@
++# rild - radio interface layer daemon
++#type rild, domain;
++#hal_server_domain(rild, hal_telephony)
++#net_domain(rild)
++
++# type_transition must be private policy the domain_trans rules could stay
++# public, but conceptually should go with this
++#type rild_exec, exec_type, vendor_file_type, file_type;
++#init_daemon_domain(rild)
++typeattribute rild vendor_executes_system_violators;
++
++allow rild init:dir { search read open };
++allow rild init:lnk_file read;
++allow rild init:file read;
++allow rild kernel:dir search;
++allow rild kernel:system module_request;
++allow rild kernel:lnk_file read;
++allow rild kernel:file read;
++allow rild rild_device:chr_file { read write ioctl open getattr create };
++allow rild ppp_device:chr_file { read write ioctl open };
++allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
++allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
++allow rild shell_exec:file { read execute open execute_no_trans getattr map };
++allow rild sysfs_wake_lock:file { open read write };
++allow rild system_file:file { read open getattr execute_no_trans };
++allow rild sysfs:file write;
++allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
++allow rild device:dir { write add_name };
++allow rild rootfs:dir { read open };
++allow rild hwservicemanager:dir search;
++allow rild hwservicemanager:file read;
++allow rild hwservicemanager:lnk_file read;
++allow rild logd:dir { search read open };
++allow rild logd:file read;
++allow rild logd:lnk_file read;
++allow rild servicemanager:dir { search read };
++allow rild servicemanager:file read;
++allow rild servicemanager:lnk_file read;
++allow rild ueventd:dir { search read open };
++allow rild ueventd:file read;
++allow rild ueventd:lnk_file read;
++allow rild vendor_init:dir { search read open };
++allow rild vendor_init:lnk_file read;
++allow rild vendor_init:file read;
++allow rild vndservicemanager:dir search;
++allow rild vndservicemanager:file read;
++allow rild vndservicemanager:lnk_file read;
++allow rild watchdogd:dir search;
++allow rild watchdogd:lnk_file read;
++allow rild watchdogd:file read;
++allow rild watchdogd:dir { read open };
++allow rild hal_bootctl_default:dir search;
++allow rild hal_bootctl_default:lnk_file read;
++allow rild hal_keymaster_default:dir search;
++allow rild vold:dir search;
++
++# property service
++# The property permissions that Quectel requested, but too over
++#set_prop(rild, net_radio_prop)
++#set_prop(rild, default_prop)
++#set_prop(rild, system_prop)
++# TODO: remove auditallow once if rild related functions are fully tested.
++userdebug_or_eng(
++  auditallow rild net_radio_prop:property_service set;
++  auditallow rild default_prop:property_service set;
++  auditallow rild system_prop:property_service set;
++)
++# The property permissions that hardware/ril exactly used
++set_prop(rild, radio_prop)
++set_prop(rild, net_dns_prop)
++get_prop(rild, exported_default_prop)
++
++allow rild tty_device:chr_file rw_file_perms;
++
++# Allow rild to create and use netlink sockets.
++allow rild self:netlink_socket create_socket_perms_no_ioctl;
++allow rild self:netlink_generic_socket create_socket_perms_no_ioctl;
++allow rild self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
++
++# Access to wake locks
++wakelock_use(rild)
++
++allow rild self:socket create_socket_perms_no_ioctl;
+diff --git a/imx8m/vp6820_8mn/sepolicy/device.te b/imx8m/vp6820_8mn/sepolicy/device.te
+new file mode 100644
+index 00000000..91ac6479
+--- /dev/null
++++ b/imx8m/vp6820_8mn/sepolicy/device.te
+@@ -0,0 +1 @@
++type rild_device, dev_type;
+diff --git a/imx8m/vp6820_8mn/sepolicy/file_contexts b/imx8m/vp6820_8mn/sepolicy/file_contexts
+index 31094e7e..2c8110ba 100644
+--- a/imx8m/vp6820_8mn/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mn/sepolicy/file_contexts
+@@ -41,3 +41,11 @@
+ 
+ #Neural Network HAL service
+ /vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
++
++#quectel port
++/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
++/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
++/vendor/bin/hw/rild              u:object_r:rild_exec:s0
++#/system/socket/rild              u:object_r:rild_socket:s0
++#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
++/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/vp6820_8mn/sepolicy/property_contexts b/imx8m/vp6820_8mn/sepolicy/property_contexts
+new file mode 100644
+index 00000000..2e0ec0f1
+--- /dev/null
++++ b/imx8m/vp6820_8mn/sepolicy/property_contexts
+@@ -0,0 +1,3 @@
++vendor.rild.                        u:object_r:radio_prop:s0
++rild.                               u:object_r:radio_prop:s0
++net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/vp6820_8mn/sepolicy/rild.te b/imx8m/vp6820_8mn/sepolicy/rild.te
+new file mode 100644
+index 00000000..6efa9e26
+--- /dev/null
++++ b/imx8m/vp6820_8mn/sepolicy/rild.te
+@@ -0,0 +1,83 @@
++# rild - radio interface layer daemon
++#type rild, domain;
++#hal_server_domain(rild, hal_telephony)
++#net_domain(rild)
++
++# type_transition must be private policy the domain_trans rules could stay
++# public, but conceptually should go with this
++#type rild_exec, exec_type, vendor_file_type, file_type;
++#init_daemon_domain(rild)
++typeattribute rild vendor_executes_system_violators;
++
++allow rild init:dir { search read open };
++allow rild init:lnk_file read;
++allow rild init:file read;
++allow rild kernel:dir search;
++allow rild kernel:system module_request;
++allow rild kernel:lnk_file read;
++allow rild kernel:file read;
++allow rild rild_device:chr_file { read write ioctl open getattr create };
++allow rild ppp_device:chr_file { read write ioctl open };
++allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
++allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
++allow rild shell_exec:file { read execute open execute_no_trans getattr map };
++allow rild sysfs_wake_lock:file { open read write };
++allow rild system_file:file { read open getattr execute_no_trans };
++allow rild sysfs:file write;
++allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
++allow rild device:dir { write add_name };
++allow rild rootfs:dir { read open };
++allow rild hwservicemanager:dir search;
++allow rild hwservicemanager:file read;
++allow rild hwservicemanager:lnk_file read;
++allow rild logd:dir { search read open };
++allow rild logd:file read;
++allow rild logd:lnk_file read;
++allow rild servicemanager:dir { search read };
++allow rild servicemanager:file read;
++allow rild servicemanager:lnk_file read;
++allow rild ueventd:dir { search read open };
++allow rild ueventd:file read;
++allow rild ueventd:lnk_file read;
++allow rild vendor_init:dir { search read open };
++allow rild vendor_init:lnk_file read;
++allow rild vendor_init:file read;
++allow rild vndservicemanager:dir search;
++allow rild vndservicemanager:file read;
++allow rild vndservicemanager:lnk_file read;
++allow rild watchdogd:dir search;
++allow rild watchdogd:lnk_file read;
++allow rild watchdogd:file read;
++allow rild watchdogd:dir { read open };
++allow rild hal_bootctl_default:dir search;
++allow rild hal_bootctl_default:lnk_file read;
++allow rild hal_keymaster_default:dir search;
++allow rild vold:dir search;
++
++# property service
++# The property permissions that Quectel requested, but too over
++#set_prop(rild, net_radio_prop)
++#set_prop(rild, default_prop)
++#set_prop(rild, system_prop)
++# TODO: remove auditallow once if rild related functions are fully tested.
++userdebug_or_eng(
++  auditallow rild net_radio_prop:property_service set;
++  auditallow rild default_prop:property_service set;
++  auditallow rild system_prop:property_service set;
++)
++# The property permissions that hardware/ril exactly used
++set_prop(rild, radio_prop)
++set_prop(rild, net_dns_prop)
++get_prop(rild, exported_default_prop)
++
++allow rild tty_device:chr_file rw_file_perms;
++
++# Allow rild to create and use netlink sockets.
++allow rild self:netlink_socket create_socket_perms_no_ioctl;
++allow rild self:netlink_generic_socket create_socket_perms_no_ioctl;
++allow rild self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
++
++# Access to wake locks
++wakelock_use(rild)
++
++allow rild self:socket create_socket_perms_no_ioctl;

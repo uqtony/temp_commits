@@ -1,0 +1,72 @@
+65df06a1b271 George.Huang 2020-06-30
+
+[A100]Camera sensor ov5640 device-tree setting
+
+Change-Id: I3532287df4f5721d83186f96a11261cc1f3d6877
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index df04eae36a45..4bd9e4497647 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -739,6 +739,30 @@ adv7535_from_dsim: endpoint {
+ 			};
+ 		};
+ 	};
++
++	ov5640: ov5640_mipi@3c {
++		compatible = "ovti,ov5640_mipi_v3";
++		reg = <0x3c>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_csi_pwn>, <&pinctrl_csi_rst>;
++		clocks = <&clk IMX8MN_CLK_CLKO1>;
++		clock-names = "csi_mclk";
++		assigned-clocks = <&clk IMX8MN_CLK_CLKO1>;
++		assigned-clock-parents = <&clk IMX8MN_CLK_24M>;
++		assigned-clock-rates = <24000000>;
++		csi_id = <0>;
++		pwn-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
++		mclk = <24000000>;
++		mclk_source = <0>;
++		mipi_csi;
++		status = "okay";
++
++		port {
++			ov5640_ep: endpoint {
++				remote-endpoint = <&mipi1_sensor_ep>;
++			};
++		};
++	};
+ };
+ 
+ &i2c3 {
+@@ -791,30 +815,6 @@ ak4497: ak4497@11 {
+ 		status = "disabled";
+ 	};
+ 
+-	ov5640: ov5640_mipi@3c {
+-		compatible = "ovti,ov5640_mipi_v3";
+-		reg = <0x3c>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi_pwn>, <&pinctrl_csi_rst>;
+-		clocks = <&clk IMX8MN_CLK_CLKO1>;
+-		clock-names = "csi_mclk";
+-		assigned-clocks = <&clk IMX8MN_CLK_CLKO1>;
+-		assigned-clock-parents = <&clk IMX8MN_CLK_24M>;
+-		assigned-clock-rates = <24000000>;
+-		csi_id = <0>;
+-		pwn-gpios = <&gpio1 7 GPIO_ACTIVE_LOW>;
+-		mclk = <24000000>;
+-		mclk_source = <0>;
+-		mipi_csi;
+-		status = "okay";
+-
+-		port {
+-			ov5640_ep: endpoint {
+-				remote-endpoint = <&mipi1_sensor_ep>;
+-			};
+-		};
+-	};
+-
+ 	typec_hd3ss3220: hd3ss3220@67 {
+ 		compatible = "ti,hd3ss3220";
+ 		reg = <0x67>;

@@ -1,0 +1,136 @@
+d165dd6f8f60 Sergii Postulga 2021-05-20
+
+arm64: dts: Add IDTech device tree for phanbell
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: Iee41c0d01de2dbbd45b982f1506b5dd8819c88bb
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index edff89ff52f3..2c76ee5bec6f 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -216,4 +216,5 @@ dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_evt-0_evk_evk-0_mic3g.dtb \
+ 			 idt_imx8mp_evt-0_evk_evk-0_mic6g.dtb \
+ 			 idt_imx8mp_evt-0_evk_ov5640-0_mic6g.dtb \
+ 			 idt_imx8mq_evt-0_ibr210_evt-0_mic3g.dtb \
+-			 idt_imx8mq_evt-0_ibr210_hdmi-0_mic3g.dtb
++			 idt_imx8mq_evt-0_ibr210_hdmi-0_mic3g.dtb \
++			 idt_imx8mq_evt-0_phanbell_evt-0_ktc4g.dts
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_phanbell_evt-0_ktc4g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_phanbell_evt-0_ktc4g.dts
+new file mode 100644
+index 000000000000..effdd2b89fe4
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_phanbell_evt-0_ktc4g.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright 2018 NXP
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include "imx8mq-phanbell.dts"
++
++/ {
++	model = "Google IMX8MQ Coral";
++	idt,prod-id = "idt_coral_evt-0_phanbell_evt-0_ktc4g";
++};
++
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts b/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
+index a3b9d615a3b4..f031413d04eb 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
+@@ -8,6 +8,86 @@
+ #include "imx8mq.dtsi"
+ #include <dt-bindings/interrupt-controller/irq.h>
+ 
++/ {
++	firmware {
++		android {
++			compatible = "android,firmware";
++			/* default emmc node used for GSI */
++			boot_devices = "soc@0/30800000.bus/30b40000.mmc";
++			/* sd card node which used if androidboot.boot_device_root=mmcblk1 */
++			boot_devices_mmcblk1 = "soc@0/30800000.bus/30b50000.mmc";
++			/* emmc node which used if androidboot.boot_device_root=mmcblk0 */
++			boot_devices_mmcblk0 = "soc@0/30800000.bus/30b40000.mmc";
++			fstab {
++				compatible = "android,fstab";
++				system {
++					compatible = "android,system";
++					dev = "system";
++					type = "ext4";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,avb_keys=/avb,logical,first_stage_mount";
++				};
++				system_ext {
++					compatible = "android,system_ext";
++					dev = "system_ext";
++					type = "ext4";
++					mnt_flags = "noatime,ro,errors=panic";
++					fsmgr_flags = "wait,slotselect,avb,logical,first_stage_mount";
++				};
++				vendor {
++					compatible = "android,vendor";
++					dev = "vendor";
++					type = "ext4";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,logical,first_stage_mount";
++				};
++				product {
++					compatible = "android,product";
++					dev = "product";
++					type = "ext4";
++					mnt_flags = "noatime,errors=panic,ro,barrier=1,inode_readahead_blks=8";
++					fsmgr_flags = "wait,slotselect,avb,logical,first_stage_mount";
++				};
++				metadata {
++					compatible = "android,metadata";
++					dev = "/dev/block/by-name/metadata";
++					type = "ext4";
++					mnt_flags = "noatime,nosuid,nodev,discard,sync";
++					fsmgr_flags = "wait,formattable,first_stage_mount,check";
++				};
++			};
++			vbmeta {
++				/*we need use FirstStageMountVBootV2 if we enable avb*/
++				compatible = "android,vbmeta";
++				/*parts means the partition witch can be mount in first stage*/
++				parts = "vbmeta,dtbo,boot,system,vendor,product";
++			};
++		};
++	};
++};
++
++/ {
++	trusty {
++		compatible = "android,trusty-smc-v1";
++		ranges;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		use-gicv3-workaround;
++		trusty-irq {
++			use-gicv3-workaround;
++			compatible = "android,trusty-irq-v1";
++			interrupt-ranges = < 0 15 0>;
++			ipi-range = <8 15 8>;
++		};
++		trusty-virtio {
++			compatible = "android,trusty-virtio-v1";
++		};
++		trusty-log {
++			compatible = "android,trusty-log-v1";
++		};
++	};
++};
++
+ / {
+ 	model = "Google i.MX8MQ Phanbell";
+ 	compatible = "google,imx8mq-phanbell", "fsl,imx8mq";

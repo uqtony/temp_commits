@@ -1,0 +1,133 @@
+2c97fe579 max.yang 2021-03-10
+
+AOS-532: [Sign] Implement for post sign tool's dual login
+
+  1. The web_service's signing api needs dual control for access right
+  2. The first signing request needs user1/user2/socket_id so that it
+     could map socket_id and connections to HSM
+  3. signing requests start from second should bring socket_id so that
+     web service could re-use connections to do sign operations
+
+Change-Id: I4f826447f3b277ddc4b3e1c1b8850f4fa99a4346
+
+diff --git a/tools/releasetools/idt_web_service.py b/tools/releasetools/idt_web_service.py
+new file mode 100644
+index 000000000..35ca294bb
+--- /dev/null
++++ b/tools/releasetools/idt_web_service.py
+@@ -0,0 +1,114 @@
++import sys
++import requests
++import json
++import getpass
++import random
++
++class web_service(object):
++  """A class that wraps IDTECH signing web service
++  """
++
++  def __init__(self):
++    # init for signing parameters
++    self.HOST_URL = "http://192.168.1.58:5001/"
++    self.SIGN_API = "api/sign/apk"
++    self.AUTH_API = "api/auth/login"
++    self.WSCA = "ANDROID PKI"
++    self.WSHS = "1"
++    self.WSRG = "4"
++    self.WSZA = "1"
++    self.socket_id = random.randint(1, 10000)
++
++    # init for dual login
++    self.user1   = None
++    self.passwd1 = None
++    self.token1  = None
++    self.user2   = None
++    self.passwd2 = None
++    self.token2  = None
++
++  def send_request(self, host_url, raw_data, hdr):
++    r = requests.post(host_url, data=raw_data, headers=hdr)
++    return r
++
++  def doAuth(self, account, passwd):
++    auth_header = { "accept" : "*/*",
++                    "Content-Type" : "application/json"
++                  }
++    auth_body   = { "username": account,
++                    "password": passwd
++                  }
++
++    res = self.send_request(self.HOST_URL + self.AUTH_API, json.dumps(auth_body), auth_header)
++    if res.json()["isSuccess"] is False:
++      raise RuntimeError("Login fail: {}".format(res.json()["msg"]))
++
++    print("Login Success ------")
++    return res.json()["data"]["token"]
++
++  def dual_login(self):
++    print("--------------------------------------
+Starting Dual Login")
++    self.user1   = raw_input("Account1 [First User]:")
++    self.passwd1 = getpass.getpass("Password:")
++    self.token1  = self.doAuth(self.user1, self.passwd1)
++    self.user2   = raw_input("Account2 [Second User]:")
++    self.passwd2 = getpass.getpass("Password:")
++    self.token2  = self.doAuth(self.user2, self.passwd2)
++
++  def doSign(self, RT, RF):
++    sign_header = { "accept" : "*/*",
++                    "Content-Type": "application/json",
++                    "Authorization": self.token1
++                  }
++    sign_body   = { "socketId": self.socket_id,
++                    "rt": RT,
++                    "rf": RF,
++                    "ca": self.WSCA,
++                    "hs": self.WSHS,
++                    "rg": self.WSRG,
++                    "za": self.WSZA,
++                  }
++    res = self.send_request(self.HOST_URL + self.SIGN_API, json.dumps(sign_body), sign_header)
++    return res.json()["data"]["ag"]
++
++  def regist_socket(self):
++    # first signing request to regist socket_id with dual account/passwd
++    # RT/RF could be random string
++    reg_header = {  "accept" : "*/*",
++                    "Content-Type": "application/json",
++                    "Authorization": self.token1
++                 }
++    reg_body   = {  "user1": { "username" : self.user1,
++                               "password" : self.passwd1
++                             },
++                    "user2": { "username" : self.user2,
++                               "password" : self.passwd2
++                             },
++                    "rt": "SYS_Release",
++                    "rf": "3132333435363738", # hex of "12345678"
++                    "ca": self.WSCA,
++                    "hs": self.WSHS,
++                    "rg": self.WSRG,
++                    "za": self.WSZA,
++                    "socketId": self.socket_id
++                 }
++
++    res = self.send_request(self.HOST_URL + self.SIGN_API, json.dumps(reg_body), reg_header)
++    if res.json()["isSuccess"] is False:
++      raise RuntimeError("Fail to create connections: {}".format(res.json()["msg"]))
++
++    # Clear passwd once regist success
++    self.user1 = None
++    self.passwd1 = None
++    self.user2 = None
++    self.passwd2 = None
++
++def main(argv):
++    ws = web_service()
++    ws.dual_login()
++    ws.regist_socket()
++    print("Got signature: {}".format(ws.doSign("SYS_Release", "3132333435363738")))
++    return
++
++if __name__ == "__main__":
++  main(sys.argv[1:])

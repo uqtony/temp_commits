@@ -1,0 +1,263 @@
+ae10bea Arthur Chen 2019-12-18
+
+AOS-34: Add idg_spi_client source for transaction mode, Receive-only mode and Send-only mode.
+
+Change-Id: I27766db5e7a21a83b5cd73fec00a06e5be3a5782
+
+diff --git a/idg_spi_client/Android.mk b/idg_spi_client/Android.mk
+new file mode 100644
+index 0000000..6f831db
+--- /dev/null
++++ b/idg_spi_client/Android.mk
+@@ -0,0 +1,9 @@
++LOCAL_PATH:=$(call my-dir)
++include $(CLEAR_VARS)
++
++LOCAL_MODULE_TAGS := optional
++LOCAL_SRC_FILES:=\
++main.c
++
++LOCAL_MODULE := idg_spi_client
++include $(BUILD_EXECUTABLE)
+diff --git a/idg_spi_client/main.c b/idg_spi_client/main.c
+new file mode 100644
+index 0000000..aebc771
+--- /dev/null
++++ b/idg_spi_client/main.c
+@@ -0,0 +1,217 @@
++/*
++ * IDG socket client for idg_spi_service
++ *
++ * Copyright (c) 2019 ID TECH.
++ * Author Arthur Chen <arthur.chen@idtechproducts.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ */
++
++#include <stdio.h>
++#include <stdbool.h>
++#include <sys/socket.h>
++#include <arpa/inet.h>
++#include <poll.h>
++#include <unistd.h>
++#include <string.h>
++#include <errno.h>
++#include <stdlib.h>
++#include <pthread.h>
++#define LOCAL_HOST "127.0.0.1"
++#define W_PORT 281
++#define R_PORT 8080
++#define MAX_BUFFER_SIZE 256
++
++enum {
++	Transaction = 0,
++	Receive_only = 1,
++	Send_only = 2
++};
++
++static bool single = false;
++
++bool hexcheck(char *cmd)
++{
++	int i;
++	printf("%s
+", cmd);
++	for (i = 0; i < (int)strlen(cmd); i++) {
++		if (((cmd[i] - 48) < 0) || ((cmd[i] - 102) > 0)) {
++			return false;
++		} else {
++			if ((cmd[i] > 57) && (cmd[i] < 65)) {
++				return false;
++			} else if ((cmd[i] > 70) && (cmd[i] < 97)) {
++				return false;
++			}
++		}
++	}
++	return true;
++}
++
++void *get_socket()
++{
++	int get_socket_fd, new_socket, ret, i;
++	struct sockaddr_in address;
++	int opt = 1;
++	int get_size = 0;
++	int addrlen = sizeof(address);
++	char buffer[MAX_BUFFER_SIZE] = {};
++	struct pollfd fds = {0, 0, 0};
++
++	/* Creating socket file descriptor */
++	if ((get_socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
++		perror("socket");
++		goto get_soc_out;
++	}
++
++	if (setsockopt(get_socket_fd,
++	               SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT | SO_LINGER,
++		       &opt, sizeof(opt))) {
++		perror("setsockopt");
++		goto get_soc_out;
++	}
++	address.sin_family = AF_INET;
++	address.sin_addr.s_addr = INADDR_ANY;
++	address.sin_port = htons( R_PORT );
++
++	if (bind(get_socket_fd, (struct sockaddr *)&address,
++		 sizeof(address)) < 0) {
++		perror("bind");
++		goto get_soc_out;
++	}
++	if (listen(get_socket_fd, 3) < 0)
++	{
++		perror("listen");
++		goto get_soc_out;
++	}
++	while (1) {
++		if ((new_socket = accept(get_socket_fd,
++					 (struct sockaddr *)&address,
++					 (socklen_t*)&addrlen)) < 0) {
++			perror("accept");
++			break;
++		}
++		fds.fd = new_socket;
++		fds.events = POLLIN;
++		ret = poll(&fds, 1, 100);
++		if (ret > 0) {
++			get_size = recv(new_socket, buffer,
++					MAX_BUFFER_SIZE, MSG_DONTWAIT);
++			puts("socket get: ");
++			for (i = 0; i < get_size; i++) {
++				if (buffer[i] > 31)
++					printf("%c", buffer[i]);
++				else
++					printf(" 0x%.2X ", buffer[i]);
++			}
++			puts("
+");
++			if (single)
++				break;
++		}
++		close(new_socket);
++	}
++get_soc_out:
++	pthread_exit(NULL);
++}
++
++int main(int argc, char const *argv[])
++{
++	int sock = 0;
++	bool is_hex = false;
++	bool is_even = false;
++	int mode = 0;
++	struct sockaddr_in target_addr;
++	char buffer[MAX_BUFFER_SIZE] = {};
++	pthread_t read_th;
++
++	switch (argc) {
++	case 1:
++		mode = Transaction;
++		puts("Transaction mode
+");
++		break;
++	case 2:
++		if (*argv[1] == 's') {
++			mode = Send_only;
++			puts("Send only mode
+");
++			break;
++		}
++		if (*argv[1] == 'g') {
++			mode = Receive_only;
++			puts("Receive only mode
+");
++			break;
++		}
++		if (*argv[1] == 'p') {
++			single = true;
++			mode = Transaction;
++			puts("Single Transaction mode
+");
++			break;
++		}
++		if (*argv[1] == 'w') {
++			single = true;
++			mode = Send_only;
++			puts("Single Send only mode
+");
++			break;
++		}
++		if (*argv[1] == 'r') {
++			single = true;
++			mode = Receive_only;
++			puts("Single Receive only mode
+");
++			break;
++		}
++	default:
++		puts("Usage:
+"
++		     "	Transaction mode: 		idg_spi_client
+"
++		     "	Send only mode: 		idg_spi_client s
+"
++		     "	Receive only mode: 		idg_spi_client g
+"
++		     "	Single Transaction mode: 	idg_spi_client p
+"
++		     "	Single Send only mode: 		idg_spi_client w
+"
++		     "	Single Receive only mode: 	idg_spi_client r
+");
++		return -1;
++		break;
++	}
++	memset(&target_addr, 0, sizeof(target_addr));
++	target_addr.sin_family = AF_INET;
++	target_addr.sin_addr.s_addr = inet_addr(LOCAL_HOST);
++	target_addr.sin_port = htons(W_PORT);
++	if (mode != Send_only) {
++		pthread_create(&read_th, NULL, get_socket, NULL);
++		puts("Wait socket...
+");
++	}
++	while (1) {
++		if (mode != Receive_only) {
++			if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
++				perror("socket");
++				break;
++			}
++			do {
++				puts("Please enter IDG command"
++				     "(hex number only, no space):
+");
++				scanf("%s", buffer);
++				if ((strlen(buffer)%2) == 0)
++					is_even = true;
++
++				is_hex = hexcheck(buffer);
++				if (!(is_hex & is_even)) {
++					is_even = false;
++					puts("please enter correct value
+");
++				}
++			} while(!(is_hex & is_even));
++			if (connect(sock, (struct sockaddr *)&target_addr,
++				    sizeof(target_addr)) < 0) {
++				perror("connect");
++				break;
++			}
++			send(sock , buffer, strlen(buffer), MSG_DONTWAIT);
++			puts("data socket sent
+");
++			close(sock);
++			if (single)
++				break;
++		}
++	}
++	if (mode != Send_only)
++		pthread_join(read_th, NULL);
++
++	return 0;
++}

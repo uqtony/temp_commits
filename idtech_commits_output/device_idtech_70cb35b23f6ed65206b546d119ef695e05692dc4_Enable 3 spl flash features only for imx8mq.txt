@@ -1,0 +1,72 @@
+70cb35b2 George.Huang 2020-06-04
+
+Enable 3 spl flash features only for imx8mq
+
+  support_idt_dual_spl=1;
+  support_idt_backup_spl=1;
+  support_idt_spl_table=1;
+
+Change-Id: Ia4fa49686ba4035bb26cd50850131b04619dfbca
+
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index cd8615c9..06e89eaa 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -47,9 +47,9 @@ set /A support_trusty=0
+ set /A support_dynamic_partition=0
+ set /A support_board_info=0
+ set /A write_bdinfo_serial=0
+-set /A support_idt_dual_spl=1
+-set /A support_idt_backup_spl=1
+-set /A support_idt_spl_table=1
++set /A support_idt_dual_spl=0
++set /A support_idt_backup_spl=0
++set /A support_idt_spl_table=0
+ set boot_partition=boot
+ set recovery_partition=recovery
+ set system_partition=system
+@@ -156,6 +156,13 @@ set som_model=%soc_name%
+ :: force to use dual as uboot_feature if user doesn't assign it
+ if [%uboot_feature%] == [] set uboot_feature=-dual
+ 
++:: enable these 3 features only for imx8mq
++if [%soc_name%] == [imx8mq] (
++    set /A support_idt_dual_spl=1
++    set /A support_idt_backup_spl=1
++    set /A support_idt_spl_table=1
++)
++
+ :: avoid substring judgement error
+ set uboot_feature_test=A%uboot_feature%
+ 
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 39a6a6c5..7d49da23 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -460,9 +460,9 @@ support_trusty=0
+ support_dynamic_partition=0
+ support_board_info=0
+ write_bdinfo_serial=0
+-support_idt_dual_spl=1
+-support_idt_backup_spl=1
+-support_idt_spl_table=1
++support_idt_dual_spl=0
++support_idt_backup_spl=0
++support_idt_spl_table=0
+ boot_partition="boot"
+ recovery_partition="recovery"
+ system_partition="system"
+@@ -577,6 +577,13 @@ som_model="${soc_name}"
+ # force to use dual as uboot_feature if user doesn't assign it
+ [ -z "$uboot_feature" ] && uboot_feature="-dual"
+ 
++# enable these 3 features only for imx8mq
++if [[ "${som_name}" == "imx8mq" ]]; then
++    support_idt_dual_spl=1;
++    support_idt_backup_spl=1;
++    support_idt_spl_table=1;
++fi
++
+ # Process of the uboot_feature parameter
+ if [[ "${uboot_feature}" = *"trusty"* ]] || [[ "${uboot_feature}" = *"secure"* ]]; then
+     support_trusty=1;

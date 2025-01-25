@@ -1,0 +1,46 @@
+b538dea583 Arthur Chen 2019-11-26
+
+AOS-12: Enable 1GB RAM size setting for evk.
+
+Change-Id: I43cf2b49313f93fe462d0d7b340444cf98e329fe
+
+diff --git a/board/freescale/imx8mq_evk/Kconfig b/board/freescale/imx8mq_evk/Kconfig
+index 3f3bddf324..281fdc9ba8 100644
+--- a/board/freescale/imx8mq_evk/Kconfig
++++ b/board/freescale/imx8mq_evk/Kconfig
+@@ -9,6 +9,9 @@ config SYS_VENDOR
+ config SYS_CONFIG_NAME
+ 	default "imx8mq_evk"
+ 
++config IDT_RAM_1GB
++	bool "Enable 1 GB size of system ram setting"
++
+ source "board/freescale/common/Kconfig"
+ 
+ endif
+diff --git a/configs/vp6820_8mq_evk_ram1GB_android_defconfig b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+index 0b626160b4..8091a30c85 100644
+--- a/configs/vp6820_8mq_evk_ram1GB_android_defconfig
++++ b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+@@ -84,3 +84,4 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_LIBAVB=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_REGEX=n
++CONFIG_IDT_RAM_1GB=y
+diff --git a/include/configs/imx8mq_evk.h b/include/configs/imx8mq_evk.h
+index 4b04801fd4..f3b777de5a 100644
+--- a/include/configs/imx8mq_evk.h
++++ b/include/configs/imx8mq_evk.h
+@@ -206,7 +206,12 @@
+ 
+ #define CONFIG_SYS_SDRAM_BASE           0x40000000
+ #define PHYS_SDRAM                      0x40000000
++
++#ifdef CONFIG_IDT_RAM_1GB
++#define PHYS_SDRAM_SIZE			0x40000000 /* 1GB DDR */
++#else
+ #define PHYS_SDRAM_SIZE			0xC0000000 /* 3GB DDR */
++#endif
+ 
+ #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
+ #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \

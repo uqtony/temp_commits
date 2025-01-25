@@ -1,0 +1,2875 @@
+1bbd5d9b8b George.Huang 2021-05-03
+
+AOS-592: [post_merge] fix conflicts
+
+Change-Id: I96c1a4f89d0f50676f1cd42b2885b255cb1d51f4
+
+diff --git a/board/freescale/imx8mn_a100/Makefile b/board/freescale/imx8mn_a100/Makefile
+index ba3872f8c6..53c663c370 100644
+--- a/board/freescale/imx8mn_a100/Makefile
++++ b/board/freescale/imx8mn_a100/Makefile
+@@ -18,5 +18,6 @@ else
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
+ endif
+ obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing.o
++obj-$(CONFIG_IMX8M_DDR3L) += ddr3l_timing.o
+ endif
+ endif
+diff --git a/board/freescale/imx8mp_a200/Makefile b/board/freescale/imx8mp_a200/Makefile
+index d781937291..5e28af20a7 100644
+--- a/board/freescale/imx8mp_a200/Makefile
++++ b/board/freescale/imx8mp_a200/Makefile
+@@ -9,4 +9,5 @@ obj-y += imx8mp_a200.o
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
++obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing.o
+ endif
+diff --git a/board/freescale/imx8mp_a200/imx8mp_a200.c b/board/freescale/imx8mp_a200/imx8mp_a200.c
+index 5dcd0f7a78..188f636f67 100644
+--- a/board/freescale/imx8mp_a200/imx8mp_a200.c
++++ b/board/freescale/imx8mp_a200/imx8mp_a200.c
+@@ -64,6 +64,17 @@ int board_early_init_f(void)
+ int ft_board_setup(void *blob, bd_t *bd)
+ {
+ #ifdef CONFIG_IMX8M_DRAM_INLINE_ECC
++#ifdef CONFIG_TARGET_IMX8MP_DDR4_EVK
++	int rc;
++	phys_addr_t ecc_start = 0x120000000;
++	size_t ecc_size = 0x20000000;
++
++	rc = add_res_mem_dt_node(blob, "ecc", ecc_start, ecc_size);
++	if (rc < 0) {
++		printf("Could not create ecc reserved-memory node.
+");
++		return rc;
++	}
++#else
+ 	int rc;
+ 	phys_addr_t ecc0_start = 0xb0000000;
+ 	phys_addr_t ecc1_start = 0x130000000;
+@@ -87,6 +98,7 @@ int ft_board_setup(void *blob, bd_t *bd)
+ 		printf("Could not create ecc2 reserved-memory node.
+");
+ 		return rc;
+ 	}
++#endif
+ #endif
+ 
+ 	return 0;
+@@ -348,9 +360,9 @@ static struct dwc3_device dwc3_device_data = {
+ 	.power_down_scale = 2,
+ };
+ 
+-int usb_gadget_handle_interrupts(void)
++int usb_gadget_handle_interrupts(int index)
+ {
+-	dwc3_uboot_handle_interrupt(0);
++	dwc3_uboot_handle_interrupt(index);
+ 	return 0;
+ }
+ 
+diff --git a/board/freescale/imx8mp_a200/lpddr4_timing.c b/board/freescale/imx8mp_a200/lpddr4_timing.c
+index cc9c6926be..d3ab61a67e 100644
+--- a/board/freescale/imx8mp_a200/lpddr4_timing.c
++++ b/board/freescale/imx8mp_a200/lpddr4_timing.c
+@@ -11,18 +11,51 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d400304, 0x1 },
+ 	{ 0x3d400030, 0x1 },
+ 	{ 0x3d400000, 0xa3080020 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x3d400020, 0x223 },
++	{ 0x3d400024, 0x124f800 },
++	{ 0x3d400064, 0x4900a8 },
++	{ 0x3d400070, 0x1027f90 },
++	{ 0x3d400074, 0x790 },
++	{ 0x3d4000d0, 0xc0030495 },
++	{ 0x3d4000d4, 0x770000 },
++	{ 0x3d4000dc, 0xc40024 },
++#else
+ 	{ 0x3d400020, 0x1323 },
+ 	{ 0x3d400024, 0x1e84800 },
+-	{ 0x3d400064, 0x7a0118 },
++	{ 0x3d400064, 0x7a017c },
+ #ifdef CONFIG_IMX8M_DRAM_INLINE_ECC
+-	{ 0x3d400070, 0x01027f44 },
++	{ 0x3d400070, 0x1027f54 },
++#else
++	{ 0x3d400070, 0x1027f10 },
+ #endif
++	{ 0x3d400074, 0x7b0 },
+ 	{ 0x3d4000d0, 0xc00307a3 },
+ 	{ 0x3d4000d4, 0xc50000 },
+ 	{ 0x3d4000dc, 0xf4003f },
++#endif
+ 	{ 0x3d4000e0, 0x330000 },
+-	{ 0x3d4000e8, 0x460048 },
+-	{ 0x3d4000ec, 0x150048 },
++	{ 0x3d4000e8, 0x660048 },
++	{ 0x3d4000ec, 0x160048 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x3d400100, 0x1618141a },
++	{ 0x3d400104, 0x504a6 },
++	{ 0x3d40010c, 0x909000 },
++	{ 0x3d400110, 0xb04060b },
++	{ 0x3d400114, 0x2030909 },
++	{ 0x3d400118, 0x1010006 },
++	{ 0x3d40011c, 0x301 },
++	{ 0x3d400130, 0x20500 },
++	{ 0x3d400134, 0xb100002 },
++	{ 0x3d400138, 0xad },
++	{ 0x3d400144, 0x78003c },
++	{ 0x3d400180, 0x2580012 },
++	{ 0x3d400184, 0x1e0493e },
++	{ 0x3d400188, 0x0 },
++	{ 0x3d400190, 0x4938208 },
++	{ 0x3d400194, 0x80303 },
++	{ 0x3d4001b4, 0x1308 },
++#else
+ 	{ 0x3d400100, 0x2028222a },
+ 	{ 0x3d400104, 0x807bf },
+ 	{ 0x3d40010c, 0xe0e000 },
+@@ -32,7 +65,7 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d40011c, 0x501 },
+ 	{ 0x3d400130, 0x20800 },
+ 	{ 0x3d400134, 0xe100002 },
+-	{ 0x3d400138, 0x120 },
++	{ 0x3d400138, 0x184 },
+ 	{ 0x3d400144, 0xc80064 },
+ 	{ 0x3d400180, 0x3e8001e },
+ 	{ 0x3d400184, 0x3207a12 },
+@@ -40,6 +73,7 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d400190, 0x49f820e },
+ 	{ 0x3d400194, 0x80303 },
+ 	{ 0x3d4001b4, 0x1f0e },
++#endif
+ 	{ 0x3d4001a0, 0xe0400018 },
+ 	{ 0x3d4001a4, 0xdf00e4 },
+ 	{ 0x3d4001a8, 0x80000000 },
+@@ -47,6 +81,30 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d4001c0, 0x1 },
+ 	{ 0x3d4001c4, 0x1 },
+ 	{ 0x3d4000f4, 0xc99 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x3d400108, 0x60c1514 },
++	{ 0x3d400200, 0x16 },
++	{ 0x3d40020c, 0x0 },
++	{ 0x3d400210, 0x1f1f },
++	{ 0x3d400204, 0x80808 },
++	{ 0x3d400214, 0x7070707 },
++	{ 0x3d400218, 0x68070707 },
++	{ 0x3d40021c, 0xf08 },
++	{ 0x3d400250, 0x1f05 },
++	{ 0x3d400254, 0x1f },
++	{ 0x3d400264, 0x90003ff },
++	{ 0x3d40026c, 0x20003ff },
++	{ 0x3d400400, 0x111 },
++	{ 0x3d400408, 0x72ff },
++	{ 0x3d400494, 0x1000e00 },
++	{ 0x3d400498, 0x3ff0000 },
++	{ 0x3d40049c, 0x1000e00 },
++	{ 0x3d4004a0, 0x3ff0000 },
++	{ 0x3d402020, 0x21 },
++	{ 0x3d402024, 0x30d400 },
++	{ 0x3d402050, 0x20d000 },
++	{ 0x3d402064, 0xc001c },
++#else
+ 	{ 0x3d400108, 0x9121c1c },
+ #ifdef CONFIG_IMX8M_DRAM_INLINE_ECC
+ 	{ 0x3d400200, 0x13 },
+@@ -64,26 +122,27 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d400218, 0x68070707 },
+ #endif
+ 	{ 0x3d40021c, 0xf08 },
+-	{ 0x3d400250, 0x00001705 },
++	{ 0x3d400250, 0x1705 },
+ 	{ 0x3d400254, 0x2c },
+ 	{ 0x3d40025c, 0x4000030 },
+ 	{ 0x3d400264, 0x900093e7 },
+ 	{ 0x3d40026c, 0x2005574 },
+ 	{ 0x3d400400, 0x111 },
+-       { 0x3d400404, 0x72ff },
++	{ 0x3d400404, 0x72ff },
+ 	{ 0x3d400408, 0x72ff },
+ 	{ 0x3d400494, 0x2100e07 },
+ 	{ 0x3d400498, 0x620096 },
+ 	{ 0x3d40049c, 0x1100e07 },
+ 	{ 0x3d4004a0, 0xc8012c },
+-	{ 0x3d402020, 0x21 },
+-	{ 0x3d402024, 0x7d00 },
+-	{ 0x3d402050, 0x20d040 },
+-	{ 0x3d402064, 0xc001c },
++	{ 0x3d402020, 0x1021 },
++	{ 0x3d402024, 0x30d400 },
++	{ 0x3d402050, 0x20d000 },
++	{ 0x3d402064, 0xc0026 },
++#endif
+ 	{ 0x3d4020dc, 0x840000 },
+-	{ 0x3d4020e0, 0x310000 },
+-	{ 0x3d4020e8, 0x66004d },
+-	{ 0x3d4020ec, 0x16004d },
++	{ 0x3d4020e0, 0x330000 },
++	{ 0x3d4020e8, 0x660048 },
++	{ 0x3d4020ec, 0x160048 },
+ 	{ 0x3d402100, 0xa040305 },
+ 	{ 0x3d402104, 0x30407 },
+ 	{ 0x3d402108, 0x203060b },
+@@ -94,21 +153,28 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d40211c, 0x301 },
+ 	{ 0x3d402130, 0x20300 },
+ 	{ 0x3d402134, 0xa100002 },
+-	{ 0x3d402138, 0x1d },
++	{ 0x3d402138, 0x27 },
+ 	{ 0x3d402144, 0x14000a },
+ 	{ 0x3d402180, 0x640004 },
+ 	{ 0x3d402190, 0x3818200 },
+ 	{ 0x3d402194, 0x80303 },
+ 	{ 0x3d4021b4, 0x100 },
+ 	{ 0x3d4020f4, 0xc99 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
+ 	{ 0x3d403020, 0x21 },
+-	{ 0x3d403024, 0x30d400 },
+-	{ 0x3d403050, 0x20d040 },
++	{ 0x3d403024, 0xc3500 },
++	{ 0x3d403050, 0x20d000 },
+ 	{ 0x3d403064, 0x30007 },
++#else
++	{ 0x3d403020, 0x1021 },
++	{ 0x3d403024, 0xc3500 },
++	{ 0x3d403050, 0x20d000 },
++	{ 0x3d403064, 0x3000a },
++#endif
+ 	{ 0x3d4030dc, 0x840000 },
+-	{ 0x3d4030e0, 0x310000 },
+-	{ 0x3d4030e8, 0x66004d },
+-	{ 0x3d4030ec, 0x16004d },
++	{ 0x3d4030e0, 0x330000 },
++	{ 0x3d4030e8, 0x660048 },
++	{ 0x3d4030ec, 0x160048 },
+ 	{ 0x3d403100, 0xa010102 },
+ 	{ 0x3d403104, 0x30404 },
+ 	{ 0x3d403108, 0x203060b },
+@@ -119,12 +185,13 @@ struct dram_cfg_param ddr_ddrc_cfg[] = {
+ 	{ 0x3d40311c, 0x301 },
+ 	{ 0x3d403130, 0x20300 },
+ 	{ 0x3d403134, 0xa100002 },
+-	{ 0x3d403138, 0x8 },
++	{ 0x3d403138, 0xa },
+ 	{ 0x3d403144, 0x50003 },
+ 	{ 0x3d403180, 0x190004 },
+ 	{ 0x3d403190, 0x3818200 },
+ 	{ 0x3d403194, 0x80303 },
+ 	{ 0x3d4031b4, 0x100 },
++	{ 0x3d4030f4, 0xc99 },
+ 	{ 0x3d400028, 0x0 },
+ };
+ 
+@@ -196,7 +263,11 @@ struct dram_cfg_param ddr_ddrphy_cfg[] = {
+ 	{ 0x7055, 0x1ff },
+ 	{ 0x8055, 0x1ff },
+ 	{ 0x9055, 0x1ff },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x200c5, 0xa },
++#else
+ 	{ 0x200c5, 0x18 },
++#endif
+ 	{ 0x1200c5, 0x7 },
+ 	{ 0x2200c5, 0x7 },
+ 	{ 0x2002e, 0x2 },
+@@ -275,7 +346,11 @@ struct dram_cfg_param ddr_ddrphy_cfg[] = {
+ 	{ 0x20018, 0x3 },
+ 	{ 0x20075, 0x4 },
+ 	{ 0x20050, 0x0 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x20008, 0x258 },
++#else
+ 	{ 0x20008, 0x3e8 },
++#endif
+ 	{ 0x120008, 0x64 },
+ 	{ 0x220008, 0x19 },
+ 	{ 0x20088, 0x9 },
+@@ -1062,6 +1137,38 @@ struct dram_cfg_param ddr_ddrphy_trained_csr[] = {
+ 
+ /* P0 message block paremeter for training firmware */
+ struct dram_cfg_param ddr_fsp0_cfg[] = {
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0xd0000, 0x0 },
++	{ 0x54003, 0x960 },
++	{ 0x54004, 0x2 },
++	{ 0x54005, 0x2228 },
++	{ 0x54006, 0x14 },
++	{ 0x54008, 0x131f },
++	{ 0x54009, 0xc8 },
++	{ 0x5400b, 0x2 },
++	{ 0x5400f, 0x100 },
++	{ 0x54012, 0x310 },
++	{ 0x54019, 0x24c4 },
++	{ 0x5401a, 0x33 },
++	{ 0x5401b, 0x4866 },
++	{ 0x5401c, 0x4800 },
++	{ 0x5401e, 0x16 },
++	{ 0x5401f, 0x24c4 },
++	{ 0x54020, 0x33 },
++	{ 0x54021, 0x4866 },
++	{ 0x54022, 0x4800 },
++	{ 0x54024, 0x16 },
++	{ 0x5402b, 0x1000 },
++	{ 0x5402c, 0x3 },
++	{ 0x54032, 0xc400 },
++	{ 0x54033, 0x3324 },
++	{ 0x54034, 0x6600 },
++	{ 0x54035, 0x48 },
++	{ 0x54036, 0x48 },
++	{ 0x54037, 0x1600 },
++	{ 0x54038, 0xc400 },
++	{ 0x54039, 0x3324 },
++#else
+ 	{ 0xd0000, 0x0 },
+ 	{ 0x54003, 0xfa0 },
+ 	{ 0x54004, 0x2 },
+@@ -1092,6 +1199,7 @@ struct dram_cfg_param ddr_fsp0_cfg[] = {
+ 	{ 0x54037, 0x1600 },
+ 	{ 0x54038, 0xf400 },
+ 	{ 0x54039, 0x333f },
++#endif
+ 	{ 0x5403a, 0x6600 },
+ 	{ 0x5403b, 0x48 },
+ 	{ 0x5403c, 0x48 },
+@@ -1114,28 +1222,28 @@ struct dram_cfg_param ddr_fsp1_cfg[] = {
+ 	{ 0x54012, 0x310 },
+ 	{ 0x54019, 0x84 },
+ 	{ 0x5401a, 0x33 },
+-	{ 0x5401b, 0x4846 },
++	{ 0x5401b, 0x4866 },
+ 	{ 0x5401c, 0x4800 },
+-	{ 0x5401e, 0x15 },
++	{ 0x5401e, 0x16 },
+ 	{ 0x5401f, 0x84 },
+ 	{ 0x54020, 0x33 },
+-	{ 0x54021, 0x4846 },
++	{ 0x54021, 0x4866 },
+ 	{ 0x54022, 0x4800 },
+-	{ 0x54024, 0x15 },
++	{ 0x54024, 0x16 },
+ 	{ 0x5402b, 0x1000 },
+ 	{ 0x5402c, 0x3 },
+ 	{ 0x54032, 0x8400 },
+ 	{ 0x54033, 0x3300 },
+-	{ 0x54034, 0x4600 },
++	{ 0x54034, 0x6600 },
+ 	{ 0x54035, 0x48 },
+ 	{ 0x54036, 0x48 },
+-	{ 0x54037, 0x1500 },
++	{ 0x54037, 0x1600 },
+ 	{ 0x54038, 0x8400 },
+ 	{ 0x54039, 0x3300 },
+-	{ 0x5403a, 0x4600 },
++	{ 0x5403a, 0x6600 },
+ 	{ 0x5403b, 0x48 },
+ 	{ 0x5403c, 0x48 },
+-	{ 0x5403d, 0x1500 },
++	{ 0x5403d, 0x1600 },
+ 	{ 0xd0000, 0x1 },
+ };
+ 
+@@ -1154,34 +1262,66 @@ struct dram_cfg_param ddr_fsp2_cfg[] = {
+ 	{ 0x54012, 0x310 },
+ 	{ 0x54019, 0x84 },
+ 	{ 0x5401a, 0x33 },
+-	{ 0x5401b, 0x4846 },
++	{ 0x5401b, 0x4866 },
+ 	{ 0x5401c, 0x4800 },
+-	{ 0x5401e, 0x15 },
++	{ 0x5401e, 0x16 },
+ 	{ 0x5401f, 0x84 },
+ 	{ 0x54020, 0x33 },
+-	{ 0x54021, 0x4846 },
++	{ 0x54021, 0x4866 },
+ 	{ 0x54022, 0x4800 },
+-	{ 0x54024, 0x15 },
++	{ 0x54024, 0x16 },
+ 	{ 0x5402b, 0x1000 },
+ 	{ 0x5402c, 0x3 },
+ 	{ 0x54032, 0x8400 },
+ 	{ 0x54033, 0x3300 },
+-	{ 0x54034, 0x4600 },
++	{ 0x54034, 0x6600 },
+ 	{ 0x54035, 0x48 },
+ 	{ 0x54036, 0x48 },
+-	{ 0x54037, 0x1500 },
++	{ 0x54037, 0x1600 },
+ 	{ 0x54038, 0x8400 },
+ 	{ 0x54039, 0x3300 },
+-	{ 0x5403a, 0x4600 },
++	{ 0x5403a, 0x6600 },
+ 	{ 0x5403b, 0x48 },
+ 	{ 0x5403c, 0x48 },
+-	{ 0x5403d, 0x1500 },
++	{ 0x5403d, 0x1600 },
+ 	{ 0xd0000, 0x1 },
+ };
+ 
+ /* P0 2D message block paremeter for training firmware */
+ struct dram_cfg_param ddr_fsp0_2d_cfg[] = {
+ 	{ 0xd0000, 0x0 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x54003, 0x960 },
++	{ 0x54004, 0x2 },
++	{ 0x54005, 0x2228 },
++	{ 0x54006, 0x14 },
++	{ 0x54008, 0x61 },
++	{ 0x54009, 0xc8 },
++	{ 0x5400b, 0x2 },
++	{ 0x5400f, 0x100 },
++	{ 0x54010, 0x1f7f },
++	{ 0x54012, 0x310 },
++	{ 0x54019, 0x24c4 },
++	{ 0x5401a, 0x33 },
++	{ 0x5401b, 0x4866 },
++	{ 0x5401c, 0x4800 },
++	{ 0x5401e, 0x16 },
++	{ 0x5401f, 0x24c4 },
++	{ 0x54020, 0x33 },
++	{ 0x54021, 0x4866 },
++	{ 0x54022, 0x4800 },
++	{ 0x54024, 0x16 },
++	{ 0x5402b, 0x1000 },
++	{ 0x5402c, 0x3 },
++	{ 0x54032, 0xc400 },
++	{ 0x54033, 0x3324 },
++	{ 0x54034, 0x6600 },
++	{ 0x54035, 0x48 },
++	{ 0x54036, 0x48 },
++	{ 0x54037, 0x1600 },
++	{ 0x54038, 0xc400 },
++	{ 0x54039, 0x3324 },
++#else
+ 	{ 0x54003, 0xfa0 },
+ 	{ 0x54004, 0x2 },
+ 	{ 0x54005, 0x2228 },
+@@ -1189,7 +1329,6 @@ struct dram_cfg_param ddr_fsp0_2d_cfg[] = {
+ 	{ 0x54008, 0x61 },
+ 	{ 0x54009, 0xc8 },
+ 	{ 0x5400b, 0x2 },
+-	{ 0x5400d, 0x100 },
+ 	{ 0x5400f, 0x100 },
+ 	{ 0x54010, 0x1f7f },
+ 	{ 0x54012, 0x310 },
+@@ -1213,6 +1352,7 @@ struct dram_cfg_param ddr_fsp0_2d_cfg[] = {
+ 	{ 0x54037, 0x1600 },
+ 	{ 0x54038, 0xf400 },
+ 	{ 0x54039, 0x333f },
++#endif
+ 	{ 0x5403a, 0x6600 },
+ 	{ 0x5403b, 0x48 },
+ 	{ 0x5403c, 0x48 },
+@@ -1640,67 +1780,58 @@ struct dram_cfg_param ddr_phy_pie[] = {
+ 	{ 0x90155, 0x20 },
+ 	{ 0x90156, 0x2aa },
+ 	{ 0x90157, 0x9 },
+-	{ 0x90158, 0x0 },
+-	{ 0x90159, 0x400 },
+-	{ 0x9015a, 0x10e },
+-	{ 0x9015b, 0x8 },
+-	{ 0x9015c, 0xe8 },
+-	{ 0x9015d, 0x109 },
+-	{ 0x9015e, 0x0 },
+-	{ 0x9015f, 0x8140 },
+-	{ 0x90160, 0x10c },
+-	{ 0x90161, 0x10 },
+-	{ 0x90162, 0x8138 },
+-	{ 0x90163, 0x10c },
+-	{ 0x90164, 0x8 },
+-	{ 0x90165, 0x7c8 },
+-	{ 0x90166, 0x101 },
+-	{ 0x90167, 0x8 },
+-	{ 0x90168, 0x448 },
++	{ 0x90158, 0x8 },
++	{ 0x90159, 0xe8 },
++	{ 0x9015a, 0x109 },
++	{ 0x9015b, 0x0 },
++	{ 0x9015c, 0x8140 },
++	{ 0x9015d, 0x10c },
++	{ 0x9015e, 0x10 },
++	{ 0x9015f, 0x8138 },
++	{ 0x90160, 0x104 },
++	{ 0x90161, 0x8 },
++	{ 0x90162, 0x448 },
++	{ 0x90163, 0x109 },
++	{ 0x90164, 0xf },
++	{ 0x90165, 0x7c0 },
++	{ 0x90166, 0x109 },
++	{ 0x90167, 0x0 },
++	{ 0x90168, 0xe8 },
+ 	{ 0x90169, 0x109 },
+-	{ 0x9016a, 0xf },
+-	{ 0x9016b, 0x7c0 },
++	{ 0x9016a, 0x47 },
++	{ 0x9016b, 0x630 },
+ 	{ 0x9016c, 0x109 },
+-	{ 0x9016d, 0x0 },
+-	{ 0x9016e, 0xe8 },
++	{ 0x9016d, 0x8 },
++	{ 0x9016e, 0x618 },
+ 	{ 0x9016f, 0x109 },
+-	{ 0x90170, 0x47 },
+-	{ 0x90171, 0x630 },
++	{ 0x90170, 0x8 },
++	{ 0x90171, 0xe0 },
+ 	{ 0x90172, 0x109 },
+-	{ 0x90173, 0x8 },
+-	{ 0x90174, 0x618 },
++	{ 0x90173, 0x0 },
++	{ 0x90174, 0x7c8 },
+ 	{ 0x90175, 0x109 },
+ 	{ 0x90176, 0x8 },
+-	{ 0x90177, 0xe0 },
+-	{ 0x90178, 0x109 },
++	{ 0x90177, 0x8140 },
++	{ 0x90178, 0x10c },
+ 	{ 0x90179, 0x0 },
+-	{ 0x9017a, 0x7c8 },
++	{ 0x9017a, 0x478 },
+ 	{ 0x9017b, 0x109 },
+-	{ 0x9017c, 0x8 },
+-	{ 0x9017d, 0x8140 },
+-	{ 0x9017e, 0x10c },
+-	{ 0x9017f, 0x0 },
+-	{ 0x90180, 0x478 },
+-	{ 0x90181, 0x109 },
+-	{ 0x90182, 0x0 },
+-	{ 0x90183, 0x1 },
+-	{ 0x90184, 0x8 },
+-	{ 0x90185, 0x8 },
+-	{ 0x90186, 0x4 },
+-	{ 0x90187, 0x8 },
+-	{ 0x90188, 0x8 },
+-	{ 0x90189, 0x7c8 },
+-	{ 0x9018a, 0x101 },
+-	{ 0x90006, 0x0 },
+-	{ 0x90007, 0x0 },
+-	{ 0x90008, 0x8 },
++	{ 0x9017c, 0x0 },
++	{ 0x9017d, 0x1 },
++	{ 0x9017e, 0x8 },
++	{ 0x9017f, 0x8 },
++	{ 0x90180, 0x4 },
++	{ 0x90181, 0x0 },
++	{ 0x90006, 0x8 },
++	{ 0x90007, 0x7c8 },
++	{ 0x90008, 0x109 },
+ 	{ 0x90009, 0x0 },
+-	{ 0x9000a, 0x0 },
+-	{ 0x9000b, 0x0 },
++	{ 0x9000a, 0x400 },
++	{ 0x9000b, 0x106 },
+ 	{ 0xd00e7, 0x400 },
+ 	{ 0x90017, 0x0 },
+ 	{ 0x9001f, 0x29 },
+-	{ 0x90026, 0x6a },
++	{ 0x90026, 0x68 },
+ 	{ 0x400d0, 0x0 },
+ 	{ 0x400d1, 0x101 },
+ 	{ 0x400d2, 0x105 },
+@@ -1710,9 +1841,16 @@ struct dram_cfg_param ddr_phy_pie[] = {
+ 	{ 0x400d6, 0x20a },
+ 	{ 0x400d7, 0x20b },
+ 	{ 0x2003a, 0x2 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x2000b, 0x4b },
++	{ 0x2000c, 0x96 },
++	{ 0x2000d, 0x5dc },
++#else
++	{ 0x200be, 0x3 },
+ 	{ 0x2000b, 0x7d },
+ 	{ 0x2000c, 0xfa },
+ 	{ 0x2000d, 0x9c4 },
++#endif
+ 	{ 0x2000e, 0x2c },
+ 	{ 0x12000b, 0xc },
+ 	{ 0x12000c, 0x19 },
+@@ -1732,6 +1870,12 @@ struct dram_cfg_param ddr_phy_pie[] = {
+ 	{ 0x90013, 0x6152 },
+ 	{ 0x20010, 0x5a },
+ 	{ 0x20011, 0x3 },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	{ 0x120010, 0x5a },
++	{ 0x120011, 0x3 },
++	{ 0x220010, 0x5a },
++	{ 0x220011, 0x3 },
++#endif
+ 	{ 0x40080, 0xe0 },
+ 	{ 0x40081, 0x12 },
+ 	{ 0x40082, 0xe0 },
+@@ -1815,8 +1959,13 @@ struct dram_cfg_param ddr_phy_pie[] = {
+ 
+ struct dram_fsp_msg ddr_dram_fsp_msg[] = {
+ 	{
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++		/* P0 2400mts 1D */
++		.drate = 2400,
++#else
+ 		/* P0 4000mts 1D */
+ 		.drate = 4000,
++#endif
+ 		.fw_type = FW_1D_IMAGE,
+ 		.fsp_cfg = ddr_fsp0_cfg,
+ 		.fsp_cfg_num = ARRAY_SIZE(ddr_fsp0_cfg),
+@@ -1836,8 +1985,13 @@ struct dram_fsp_msg ddr_dram_fsp_msg[] = {
+ 		.fsp_cfg_num = ARRAY_SIZE(ddr_fsp2_cfg),
+ 	},
+ 	{
+-		/* P0 4000mts 2D */
+-		.drate = 4000,
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++                /* P0 2400mts 2D */
++                .drate = 2400,
++#else
++                /* P0 4000mts 2D */
++                .drate = 4000,
++#endif
+ 		.fw_type = FW_2D_IMAGE,
+ 		.fsp_cfg = ddr_fsp0_2d_cfg,
+ 		.fsp_cfg_num = ARRAY_SIZE(ddr_fsp0_2d_cfg),
+@@ -1856,20 +2010,39 @@ struct dram_timing_info dram_timing = {
+ 	.ddrphy_trained_csr_num = ARRAY_SIZE(ddr_ddrphy_trained_csr),
+ 	.ddrphy_pie = ddr_phy_pie,
+ 	.ddrphy_pie_num = ARRAY_SIZE(ddr_phy_pie),
+-	.fsp_table = { 4000, 400, 100, },
++#ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
++	.fsp_table = { 2400, 400, 100, },
++#else
++        .fsp_table = { 4000, 400, 100, },
++#endif
+ };
+ 
++#ifndef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
+ #ifdef CONFIG_IMX8M_DRAM_INLINE_ECC
+ void board_dram_ecc_scrub(void)
+ {
+-	/* add inline scrb function MPlus spcific */
+-	/* scrub 0-1.75G */
+-	ddrc_inline_ecc_scrub(0x0, 0x1bffffff);
+-	/* scrub 2-3.75G */
+-	ddrc_inline_ecc_scrub(0x20000000, 0x3bffffff);
+-	/* scrub 4-5.75G */
+-	ddrc_inline_ecc_scrub(0x40000000, 0x5bffffff);
+-	/* set scruber read range 0-6G */
+-	ddrc_inline_ecc_scrub_end(0x0, 0x5fffffff);
++	ddrc_inline_ecc_scrub(0x0,0x3ffffff);
++	ddrc_inline_ecc_scrub(0x20000000,0x23ffffff);
++	ddrc_inline_ecc_scrub(0x40000000,0x43ffffff);
++	ddrc_inline_ecc_scrub(0x4000000,0x7ffffff);
++	ddrc_inline_ecc_scrub(0x24000000,0x27ffffff);
++	ddrc_inline_ecc_scrub(0x44000000,0x47ffffff);
++	ddrc_inline_ecc_scrub(0x8000000,0xbffffff);
++	ddrc_inline_ecc_scrub(0x28000000,0x2bffffff);
++	ddrc_inline_ecc_scrub(0x48000000,0x4bffffff);
++	ddrc_inline_ecc_scrub(0xc000000,0xfffffff);
++	ddrc_inline_ecc_scrub(0x2c000000,0x2fffffff);
++	ddrc_inline_ecc_scrub(0x4c000000,0x4fffffff);
++	ddrc_inline_ecc_scrub(0x10000000,0x13ffffff);
++	ddrc_inline_ecc_scrub(0x30000000,0x33ffffff);
++	ddrc_inline_ecc_scrub(0x50000000,0x53ffffff);
++	ddrc_inline_ecc_scrub(0x14000000,0x17ffffff);
++	ddrc_inline_ecc_scrub(0x34000000,0x37ffffff);
++	ddrc_inline_ecc_scrub(0x54000000,0x57ffffff);
++	ddrc_inline_ecc_scrub(0x18000000,0x1bffffff);
++	ddrc_inline_ecc_scrub(0x38000000,0x3bffffff);
++	ddrc_inline_ecc_scrub(0x58000000,0x5bffffff);
++	ddrc_inline_ecc_scrub_end(0x0,0x5fffffff);
+ }
+ #endif
++#endif
+diff --git a/board/freescale/imx8mp_a200/spl.c b/board/freescale/imx8mp_a200/spl.c
+index b26f5321bb..2c5334d3ac 100644
+--- a/board/freescale/imx8mp_a200/spl.c
++++ b/board/freescale/imx8mp_a200/spl.c
+@@ -26,6 +26,7 @@
+ #include <asm/arch/ddr.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
++extern void idt_spl_dram_init(void);
+ 
+ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ {
+@@ -187,19 +188,32 @@ int power_init_board(void)
+ 	/* BUCKxOUT_DVS0/1 control BUCK123 output */
+ 	pmic_reg_write(p, PCA9450_BUCK123_DVS, 0x29);
+ 
++#ifdef CONFIG_IMX8M_LPDDR4
+ 	/*
+ 	 * increase VDD_SOC to typical value 0.95V before first
+ 	 * DRAM access, set DVS1 to 0.85v for suspend.
+ 	 * Enable DVS control through PMIC_STBY_REQ and
+ 	 * set B1_ENMODE=1 (ON by PMIC_ON_REQ=H)
+ 	 */
++#ifdef CONFIG_IMX8M_VDD_SOC_850MV
++	/* set DVS0 to 0.85v for special case*/
++	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS0, 0x14);
++#else
+ 	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS0, 0x1C);
++#endif
+ 	pmic_reg_write(p, PCA9450_BUCK1OUT_DVS1, 0x14);
+ 	pmic_reg_write(p, PCA9450_BUCK1CTRL, 0x59);
+ 
+ 	/* Kernel uses OD/OD freq for SOC */
+ 	/* To avoid timing risk from SOC to ARM,increase VDD_ARM to OD voltage 0.95v */
+ 	pmic_reg_write(p, PCA9450_BUCK2OUT_DVS0, 0x1C);
++#elif defined(CONFIG_IMX8M_DDR4)
++	/* DDR4 runs at 3200MTS, uses default ND 0.85v for VDD_SOC and VDD_ARM */
++	pmic_reg_write(p, PCA9450_BUCK1CTRL, 0x59);
++
++	/* Set NVCC_DRAM to 1.2v for DDR4 */
++	pmic_reg_write(p, PCA9450_BUCK6OUT, 0x18);
++#endif
+ 
+ 	/* set WDOG_B_CFG to cold reset */
+ 	pmic_reg_write(p, PCA9450_RESET_CTRL, 0xA1);
+@@ -210,6 +224,16 @@ int power_init_board(void)
+ 
+ void spl_board_init(void)
+ {
++	/* Set GIC clock to 500Mhz for OD VDD_SOC. Kernel driver does not allow to change it.
++	 * Should set the clock after PMIC setting done.
++	 * Default is 400Mhz (system_pll1_800m with div = 2) set by ROM for ND VDD_SOC
++	 */
++#ifdef CONFIG_IMX8M_LPDDR4
++	clock_enable(CCGR_GIC, 0);
++	clock_set_target_val(GIC_CLK_ROOT, CLK_ROOT_ON | CLK_ROOT_SOURCE_SEL(5));
++	clock_enable(CCGR_GIC, 1);
++#endif
++
+ 	puts("Normal Boot
+");
+ }
+ 
+@@ -252,7 +276,11 @@ void board_init_f(ulong dummy)
+ 	power_init_board();
+ 
+ 	/* DDR initialization */
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	idt_spl_dram_init();
++#else
+ 	spl_dram_init();
++#endif
+ 
+ 	board_init_r(NULL, 0);
+ }
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index 98524e3d32..0ced4523aa 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -124,9 +124,9 @@ static struct dwc3_device dwc3_device_data = {
+ 	.power_down_scale = 2,
+ };
+ 
+-int usb_gadget_handle_interrupts(void)
++int usb_gadget_handle_interrupts(int index)
+ {
+-	dwc3_uboot_handle_interrupt(0);
++	dwc3_uboot_handle_interrupt(index);
+ 	return 0;
+ }
+ 
+diff --git a/configs/bigcypress_8mq_evk_android_defconfig b/configs/bigcypress_8mq_evk_android_defconfig
+index 65ace37b06..51d4d60611 100644
+--- a/configs/bigcypress_8mq_evk_android_defconfig
++++ b/configs/bigcypress_8mq_evk_android_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,27 +128,21 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+diff --git a/configs/bigcypress_8mq_evk_android_dual_defconfig b/configs/bigcypress_8mq_evk_android_dual_defconfig
+index 4a412f6e85..1ffecd77e8 100644
+--- a/configs/bigcypress_8mq_evk_android_dual_defconfig
++++ b/configs/bigcypress_8mq_evk_android_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,29 +128,22 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
+diff --git a/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig b/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
+index 7bf32d46fd..a9888dec8f 100644
+--- a/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -130,27 +130,16 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_defconfig b/configs/imx8mn_a100_devboard_android_defconfig
+index d81efab3ff..76f7658f64 100644
+--- a/configs/imx8mn_a100_devboard_android_defconfig
++++ b/configs/imx8mn_a100_devboard_android_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -135,23 +135,18 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+diff --git a/configs/imx8mn_a100_devboard_android_dual_defconfig b/configs/imx8mn_a100_devboard_android_dual_defconfig
+index de5df1f755..4ab174f524 100644
+--- a/configs/imx8mn_a100_devboard_android_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -135,28 +135,20 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_defconfig b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+index 794eef4409..cff972ffeb 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -137,24 +137,13 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+index 2e96e170ff..f7b5d9c6c7 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -137,28 +137,16 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+index 49affd6f95..d70a172bc0 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -137,26 +137,15 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
+-CONFIG_SPL_MMC_WRITE=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+diff --git a/configs/imx8mn_a100_devboard_android_uuu_defconfig b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+index 11a22ad464..dcf7017700 100644
+--- a/configs/imx8mn_a100_devboard_android_uuu_defconfig
++++ b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -75,8 +75,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=y
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -128,9 +128,8 @@ CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+ CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mp_a200_devboard_android_defconfig b/configs/imx8mp_a200_devboard_android_defconfig
+index e9642a5d12..f79fbcc841 100644
+--- a/configs/imx8mp_a200_devboard_android_defconfig
++++ b/configs/imx8mp_a200_devboard_android_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -148,23 +148,18 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+diff --git a/configs/imx8mp_a200_devboard_android_dual_defconfig b/configs/imx8mp_a200_devboard_android_dual_defconfig
+index 59a96ef1b7..4efae839ee 100644
+--- a/configs/imx8mp_a200_devboard_android_dual_defconfig
++++ b/configs/imx8mp_a200_devboard_android_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -148,28 +148,20 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_defconfig b/configs/imx8mp_a200_devboard_android_trusty_defconfig
+index ca25d0f968..88887aa27f 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -150,24 +150,13 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
+-CONFIG_SPL_MMC_WRITE=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig b/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
+index 401c7972d0..673921d695 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -150,28 +150,16 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
+index 74c6cd56f1..e7ed1ed2ad 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -150,26 +150,15 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
+-CONFIG_SPL_MMC_WRITE=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+diff --git a/configs/imx8mp_a200_devboard_android_uuu_defconfig b/configs/imx8mp_a200_devboard_android_uuu_defconfig
+index fe6fafce59..e7fde2dad0 100644
+--- a/configs/imx8mp_a200_devboard_android_uuu_defconfig
++++ b/configs/imx8mp_a200_devboard_android_uuu_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -142,9 +142,8 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+index fd3388540d..c161d9d776 100644
+--- a/configs/imx8mq_a300_devboard_android_defconfig
++++ b/configs/imx8mq_a300_devboard_android_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,24 +128,18 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+index 333c5166f3..f886ef013e 100644
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,28 +128,21 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_defconfig b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+index 579e66f4ee..988496aa36 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -130,26 +130,15 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
+-CONFIG_SPL_MMC_WRITE=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+index 895f1e8aa8..c1bb3311dc 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -130,27 +130,16 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_IDT_DUAL_SPL=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+index 2bc31a19be..6b85542c6e 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -130,28 +130,17 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
+-CONFIG_SPL_MMC_WRITE=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+diff --git a/configs/imx8mq_a300_devboard_android_uuu_defconfig b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+index 818d807281..38ca912395 100644
+--- a/configs/imx8mq_a300_devboard_android_uuu_defconfig
++++ b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -125,9 +125,9 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
++
+ CONFIG_IDT_RAM_2GB=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_defconfig b/configs/kingscanyon_8mq_ibr210_android_defconfig
+index bd41fd6ed1..d0b1339ba5 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,29 +128,23 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_TEMP_TCN75=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
++CONFIG_TEMP_TCN75=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+index 501b17c918..9cf9d05655 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -128,33 +128,26 @@ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_TEMP_TCN75=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
++CONFIG_TEMP_TCN75=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig b/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
+index c4f4ce9328..2d07e221f6 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -125,10 +125,9 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
+diff --git a/configs/vp6820_8mn_ddr4_evk_android_defconfig b/configs/vp6820_8mn_ddr4_evk_android_defconfig
+index a27648810b..7149f7efab 100644
+--- a/configs/vp6820_8mn_ddr4_evk_android_defconfig
++++ b/configs/vp6820_8mn_ddr4_evk_android_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-ddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-ddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-ddr4-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -133,31 +133,25 @@ CONFIG_RESET_DISPMIX=y
+ CONFIG_VIDEO_IMX_SEC_DSI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+-CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0xBA
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x1A0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
++CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig b/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
+index d0a7adaddb..7fb3d85eba 100644
+--- a/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-ddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-ddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-ddr4-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -75,8 +75,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=y
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -128,9 +128,8 @@ CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+ CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mn_evk_android_defconfig b/configs/vp6820_8mn_evk_android_defconfig
+index 9aed52231a..3d1021eaf7 100644
+--- a/configs/vp6820_8mn_evk_android_defconfig
++++ b/configs/vp6820_8mn_evk_android_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -133,31 +133,25 @@ CONFIG_RESET_DISPMIX=y
+ CONFIG_VIDEO_IMX_SEC_DSI=y
+ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+-CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0xBA
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x1A0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
++CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
++CONFIG_IDT_ROTATION=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/vp6820_8mn_evk_android_dual_defconfig b/configs/vp6820_8mn_evk_android_dual_defconfig
+index b259b4fb55..907a23db18 100644
+--- a/configs/vp6820_8mn_evk_android_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -74,8 +74,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=n
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -132,33 +132,25 @@ CONFIG_DM_RESET=y
+ CONFIG_RESET_DISPMIX=y
+ CONFIG_VIDEO_IMX_SEC_DSI=y
+ CONFIG_DM_VIDEO=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+-CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0xBA
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x1A0
++CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_IDT_ROTATION=y
+ CONFIG_FB_ADDR=0x7F000000
+-
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+ CONFIG_IDT_DUAL_SPL=y
+diff --git a/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig b/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
+index 50f9e7fd78..6797d3f6f4 100644
+--- a/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
++++ b/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -75,8 +75,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=y
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -128,10 +128,9 @@ CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+ CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_IDT_RAM_1GB=y
+diff --git a/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig b/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
+index 9e7c90098a..5eb022c85e 100644
+--- a/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
++++ b/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mn-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mn-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -75,8 +75,8 @@ CONFIG_USB_FUNCTION_FASTBOOT=y
+ CONFIG_CMD_FASTBOOT=y
+ CONFIG_ANDROID_BOOT_IMAGE=y
+ CONFIG_FASTBOOT_UUU_SUPPORT=y
+-CONFIG_FASTBOOT_BUF_ADDR=0x44800000
+-CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_BUF_ADDR=0x42800000
++CONFIG_FASTBOOT_BUF_SIZE=0xc800000
+ CONFIG_FASTBOOT_FLASH=y
+ 
+ CONFIG_DM_I2C=y
+@@ -128,9 +128,8 @@ CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+ CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mp_evk_android_defconfig b/configs/vp6820_8mp_evk_android_defconfig
+index c001d1650f..05e1c620a4 100644
+--- a/configs/vp6820_8mp_evk_android_defconfig
++++ b/configs/vp6820_8mp_evk_android_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -148,25 +148,19 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/vp6820_8mp_evk_android_dual_defconfig b/configs/vp6820_8mp_evk_android_dual_defconfig
+index 0ff3090f91..e1724ee18e 100644
+--- a/configs/vp6820_8mp_evk_android_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -148,29 +148,21 @@ CONFIG_DM_VIDEO=y
+ CONFIG_VIDEO_LCD_RAYDIUM_RM67191=y
+ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_IDT_MULTIPLE_DDR=y
+diff --git a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+index 04b3588507..35fbd0fe30 100644
+--- a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -150,28 +150,16 @@ CONFIG_VIDEO_ADV7535=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+-CONFIG_SPL_MMC_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x320
+ CONFIG_AVB_WARNING_LOGO_ROWS=0xc0
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mp_evk_android_uuu_defconfig b/configs/vp6820_8mp_evk_android_uuu_defconfig
+index 85e219eed6..5aadb6f1e7 100644
+--- a/configs/vp6820_8mp_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mp_evk_android_uuu_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -142,9 +142,8 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig b/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
+index 85e219eed6..5aadb6f1e7 100644
+--- a/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
++++ b/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
+@@ -27,7 +27,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage-8mp-lpddr4.cfg"
+ CONFIG_DEFAULT_FDT_FILE="imx8mp-evk.dtb"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+@@ -142,9 +142,8 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/vp6820_8mq_evk_android_defconfig b/configs/vp6820_8mq_evk_android_defconfig
+index 35cc15bf89..465078309b 100644
+--- a/configs/vp6820_8mq_evk_android_defconfig
++++ b/configs/vp6820_8mq_evk_android_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -127,32 +127,26 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+-CONFIG_VIDEO_IMX_NW_DSI=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F00000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_VIDEO_IMX_NW_DSI=y
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
++CONFIG_FB_ADDR=0x7F00000
+ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+diff --git a/configs/vp6820_8mq_evk_android_dual_defconfig b/configs/vp6820_8mq_evk_android_dual_defconfig
+index ceedb63b17..4284409844 100644
+--- a/configs/vp6820_8mq_evk_android_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -127,34 +127,27 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+-CONFIG_VIDEO_IMX_NW_DSI=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+-CONFIG_SPLASH_SOURCE=y
+-CONFIG_IDT_SPLASH_SUPPORT=y
+-CONFIG_IDT_ROTATION=y
+-CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
+-CONFIG_FB_ADDR=0x7F000000
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_VIDEO_IMX_NW_DSI=y
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
++CONFIG_SPLASH_SOURCE=y
++CONFIG_IDT_SPLASH_SUPPORT=y
++CONFIG_IDT_ROTATION=y
++CONFIG_IDT_SPLASH_PREENABLE_SUPPORT=y
++CONFIG_FB_ADDR=0x7F000000
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
+diff --git a/configs/vp6820_8mq_evk_android_trusty_dual_defconfig b/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+index 1510cc957e..eac00233cf 100644
+--- a/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -127,34 +127,23 @@ CONFIG_USB_DWC3_GADGET=y
+ CONFIG_VIDEO_IMX8M_DCSS=y
+ CONFIG_VIDEO_IMX8M_HDMI=y
+ CONFIG_DM_VIDEO=y
+-CONFIG_VIDEO_IMX_NW_DSI=y
+-CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+-CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_DUAL_BOOTLOADER=y
+-CONFIG_SPL_MMC_WRITE=y
+-CONFIG_CMD_MMC_RPMB=y
+-CONFIG_SUPPORT_EMMC_RPMB=y
+ CONFIG_IMX_TRUSTY_OS=y
+-CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
+-CONFIG_LOAD_KEY_FROM_RPMB=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
+ 
++CONFIG_VIDEO_IMX_NW_DSI=y
++CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
++CONFIG_BACKLIGHT_GPIO=y
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+diff --git a/configs/vp6820_8mq_evk_android_uuu_defconfig b/configs/vp6820_8mq_evk_android_uuu_defconfig
+index 601dca00ef..aa47232a22 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -125,10 +125,9 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_NR_DRAM_BANKS=2
+diff --git a/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig b/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
+index aa294ab0b8..1a9d169291 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -125,10 +125,9 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig b/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
+index ea11676071..480c147465 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -125,10 +125,9 @@ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++CONFIG_CMD_BOOTA=n
+ 
+ CONFIG_IDT_BACKUP_SPL=y
+ CONFIG_IDT_RAM_4GB=y
+diff --git a/configs/vp6820_8mq_evk_ram1GB_android_defconfig b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+index 948339f11a..e18023bdb9 100644
+--- a/configs/vp6820_8mq_evk_ram1GB_android_defconfig
++++ b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+@@ -26,7 +26,7 @@ CONFIG_FIT_EXTERNAL_OFFSET=0x3000
+ CONFIG_SPL_LOAD_FIT=y
+ CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
+ CONFIG_OF_SYSTEM_SETUP=y
+-CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg, ANDROID_SUPPORT"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg"
+ CONFIG_BOARD_LATE_INIT=y
+ CONFIG_BOARD_EARLY_INIT_F=y
+ CONFIG_SPL_BOARD_INIT=y
+@@ -130,18 +130,13 @@ CONFIG_DM_VIDEO=y
+ CONFIG_SYS_WHITE_ON_BLACK=y
+ 
+ CONFIG_LZ4=y
+-CONFIG_BCB_SUPPORT=y
+-CONFIG_ANDROID_RECOVERY=y
+-CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
+-CONFIG_FSL_FASTBOOT=y
+-CONFIG_FASTBOOT_LOCK=y
+-CONFIG_CMD_BOOTA=y
+-CONFIG_LIBAVB=y
+-CONFIG_AVB_SUPPORT=y
+ CONFIG_APPEND_BOOTARGS=y
+ CONFIG_AVB_WARNING_LOGO=y
+ CONFIG_AVB_WARNING_LOGO_COLS=0x1E0
+ CONFIG_AVB_WARNING_LOGO_ROWS=0x60
+ CONFIG_VIRTUAL_AB_SUPPORT=y
++CONFIG_ANDROID_SUPPORT=y
++CONFIG_ANDROID_AB_SUPPORT=y
++
+ CONFIG_IDT_RAM_1GB=y
+diff --git a/include/configs/imx8mn_a100.h b/include/configs/imx8mn_a100.h
+index 931b74f5f8..db55e1bb82 100644
+--- a/include/configs/imx8mn_a100.h
++++ b/include/configs/imx8mn_a100.h
+@@ -198,14 +198,12 @@
+ 
+ #define CONFIG_SYS_SDRAM_BASE           0x40000000
+ #define PHYS_SDRAM                      0x40000000
+-#ifdef CONFIG_IDT_RAM_1GB
+-#define PHYS_SDRAM_SIZE			0x40000000 /* 1GB DDR */
+-#else
+-#define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
+-#endif
+ 
+-#define CONFIG_SYS_MEMTEST_START    PHYS_SDRAM
+-#define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_SIZE >> 1))
++/* IDT: default 1GB ddr, will dynamically get */
++#define PHYS_SDRAM_SIZE			0x40000000
++
++#define CONFIG_SYS_MEMTEST_START	0x60000000
++#define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_SIZE >> 2))
+ 
+ #define CONFIG_MXC_UART_BASE		UART2_BASE_ADDR
+ 
+diff --git a/include/configs/imx8mn_a100_android.h b/include/configs/imx8mn_a100_android.h
+index c098cbaf8a..22071091eb 100644
+--- a/include/configs/imx8mn_a100_android.h
++++ b/include/configs/imx8mn_a100_android.h
+@@ -7,16 +7,12 @@
+ #ifndef IMX8MN_A100_ANDROID_H
+ #define IMX8MN_A100_ANDROID_H
+ 
+-#define CONFIG_ANDROID_AB_SUPPORT
+ #define CONFIG_IDT_VALID_AVBKEY
+-#ifdef CONFIG_ANDROID_AB_SUPPORT
+-#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+-#endif
+ #define FSL_FASTBOOT_FB_DEV "mmc"
+ 
+ #ifdef CONFIG_SYS_MALLOC_LEN
+ #undef CONFIG_SYS_MALLOC_LEN
+-#define CONFIG_SYS_MALLOC_LEN           (64 * SZ_1M)
++#define CONFIG_SYS_MALLOC_LEN           (32 * SZ_1M)
+ #endif
+ 
+ #undef CONFIG_EXTRA_ENV_SETTINGS
+@@ -46,7 +42,8 @@
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+-#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER)
++#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER) || \
++    !defined(CONFIG_SPL_BUILD)
+ #undef CONFIG_FSL_CAAM_KB
+ #endif
+ 
+@@ -67,6 +64,18 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
++
++#ifdef CONFIG_ID_ATTESTATION
++#define ATTESTATION_ID_BRAND "Android"
++#define ATTESTATION_ID_DEVICE "evk_8mn"
++#define ATTESTATION_ID_MANUFACTURER "nxp"
++#define ATTESTATION_ID_MODEL "EVK_8MN"
++#ifdef CONFIG_ATTESTATION_ID_PRODUCT
++#undef CONFIG_ATTESTATION_ID_PRODUCT
++#endif
++#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mn"
++#endif
++
+ #endif
+ 
+ #endif /* IMX8MN_A100_ANDROID_H */
+diff --git a/include/configs/imx8mp_a200.h b/include/configs/imx8mp_a200.h
+index 50dbc508b5..9850e1ccce 100644
+--- a/include/configs/imx8mp_a200.h
++++ b/include/configs/imx8mp_a200.h
+@@ -36,19 +36,6 @@
+ 
+ #define CONFIG_SYS_I2C
+ 
+-#if defined(CONFIG_NAND_BOOT)
+-#define CONFIG_SPL_NAND_SUPPORT
+-#define CONFIG_SPL_DMA
+-#define CONFIG_SPL_NAND_MXS
+-#define CONFIG_SPL_NAND_BASE
+-#define CONFIG_SPL_NAND_IDENT
+-#define CONFIG_SYS_NAND_U_BOOT_OFFS 	0x4000000 /* Put the FIT out of first 64MB boot area */
+-
+-/* Set a redundant offset in nand FIT mtdpart. The new uuu will burn full boot image (not only FIT part) to the mtdpart, so we check both two offsets */
+-#define CONFIG_SYS_NAND_U_BOOT_OFFS_REDUND \
+-	(CONFIG_SYS_NAND_U_BOOT_OFFS + CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR * 512 - 0x8400)
+-#endif
+-
+ #endif
+ 
+ #define CONFIG_CMD_READ
+@@ -90,7 +77,29 @@
+ 	"emmc_dev=2 "\
+ 	"sd_dev=1 " \
+ 
++
++#ifdef CONFIG_NAND_BOOT
++#define MFG_NAND_PARTITION "mtdparts=gpmi-nand:64m(nandboot),16m(nandfit),32m(nandkernel),16m(nanddtb),8m(nandtee),-(nandrootfs)"
++#endif
++
+ /* Initial environment variables */
++#if defined(CONFIG_NAND_BOOT)
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	CONFIG_MFG_ENV_SETTINGS \
++	"splashimage=0x50000000 " \
++	"fdt_addr=0x43000000 "			\
++	"fdt_high=0xffffffffffffffff " \
++	"mtdparts=" MFG_NAND_PARTITION " " \
++	"console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200 " \
++	"bootargs=console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200 ubi.mtd=nandrootfs "  \
++		"root=ubi0:nandrootfs rootfstype=ubifs "		     \
++		MFG_NAND_PARTITION \
++		" " \
++	"bootcmd=nand read ${loadaddr} 0x5000000 0x2000000;"\
++		"nand read ${fdt_addr} 0x7000000 0x100000;"\
++		"booti ${loadaddr} - ${fdt_addr}"
++
++#else
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
+ 	CONFIG_MFG_ENV_SETTINGS \
+ 	JAILHOUSE_ENV \
+@@ -157,6 +166,7 @@
+ 			   "fi; " \
+ 		   "fi; " \
+ 	   "fi;"
++#endif
+ 
+ /* Link Definitions */
+ #define CONFIG_LOADADDR			0x40480000
+@@ -187,7 +197,11 @@
+ #define PHYS_SDRAM			0x40000000
+ #define PHYS_SDRAM_SIZE			0xC0000000	/* 3 GB */
+ #define PHYS_SDRAM_2			0x100000000
++#ifdef CONFIG_TARGET_IMX8MP_DDR4_EVK
++#define PHYS_SDRAM_2_SIZE		0x40000000	/* 1 GB */
++#else
+ #define PHYS_SDRAM_2_SIZE		0xC0000000	/* 3 GB */
++#endif
+ 
+ #define CONFIG_SYS_MEMTEST_START	0x60000000
+ #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
+@@ -206,7 +220,11 @@
+ #define CONFIG_IMX_BOOTAUX
+ #define CONFIG_FSL_USDHC
+ 
++#ifdef CONFIG_TARGET_IMX8MP_DDR4_EVK
++#define CONFIG_SYS_FSL_USDHC_NUM	1
++#else
+ #define CONFIG_SYS_FSL_USDHC_NUM	2
++#endif
+ #define CONFIG_SYS_FSL_ESDHC_ADDR	0
+ 
+ #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
+diff --git a/include/configs/imx8mp_a200_android.h b/include/configs/imx8mp_a200_android.h
+index f791fec6ae..272eb20b89 100644
+--- a/include/configs/imx8mp_a200_android.h
++++ b/include/configs/imx8mp_a200_android.h
+@@ -7,11 +7,7 @@
+ #ifndef IMX8MP_A200_ANDROID_H
+ #define IMX8MP_A200_ANDROID_H
+ 
+-#define CONFIG_ANDROID_AB_SUPPORT
+ #define CONFIG_IDT_VALID_AVBKEY
+-#ifdef CONFIG_ANDROID_AB_SUPPORT
+-#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+-#endif
+ #define FSL_FASTBOOT_FB_DEV "mmc"
+ 
+ #ifdef CONFIG_SYS_MALLOC_LEN
+@@ -45,7 +41,8 @@
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+-#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER)
++#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER) || \
++    !defined(CONFIG_SPL_BUILD)
+ #undef CONFIG_FSL_CAAM_KB
+ #endif
+ 
+@@ -66,6 +63,18 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
++
++#ifdef CONFIG_ID_ATTESTATION
++#define ATTESTATION_ID_BRAND "Android"
++#define ATTESTATION_ID_DEVICE "evk_8mp"
++#define ATTESTATION_ID_MANUFACTURER "nxp"
++#define ATTESTATION_ID_MODEL "EVK_8MP"
++#ifdef CONFIG_ATTESTATION_ID_PRODUCT
++#undef CONFIG_ATTESTATION_ID_PRODUCT
++#endif
++#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mp"
++#endif
++
+ #endif
+ 
+ #endif /* IMX8MP_A200_ANDROID_H */
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+index 3c526234bf..ae22b160f6 100644
+--- a/include/configs/imx8mq_a300_android.h
++++ b/include/configs/imx8mq_a300_android.h
+@@ -7,11 +7,7 @@
+ #ifndef IMX8MQ_A300_ANDROID_H
+ #define IMX8MQ_A300_ANDROID_H
+ 
+-#define CONFIG_ANDROID_AB_SUPPORT
+ #define CONFIG_IDT_VALID_AVBKEY
+-#ifdef CONFIG_ANDROID_AB_SUPPORT
+-#define CONFIG_SYSTEM_RAMDISK_SUPPORT
+-#endif
+ #define FSL_FASTBOOT_FB_DEV "mmc"
+ 
+ #ifdef CONFIG_SYS_MALLOC_LEN
+@@ -28,6 +24,10 @@
+ #define UBOOT_DELAY_TIME 1	/* seconds */
+ #endif /* CONFIG_IMX_HAB */
+ 
++#ifdef CONFIG_VIDEO_IMX_NW_DSI
++#define CONFIG_VIDEO_MXS
++#endif /* CONFIG_VIDEO_IMX_NW_DSI */
++
+ #define CONFIG_EXTRA_ENV_SETTINGS		\
+ 	"splashsource=mmc_fs "		\
+ 	"splashfile=bootmedia/\splash.bmp "		\
+@@ -46,7 +46,8 @@
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+-#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER)
++#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER) || \
++    !defined(CONFIG_SPL_BUILD)
+ #undef CONFIG_FSL_CAAM_KB
+ #endif
+ 
+@@ -67,6 +68,18 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
++
++#ifdef CONFIG_ID_ATTESTATION
++#define ATTESTATION_ID_BRAND "Android"
++#define ATTESTATION_ID_DEVICE "evk_8mq"
++#define ATTESTATION_ID_MANUFACTURER "nxp"
++#define ATTESTATION_ID_MODEL "EVK_8MQ"
++#ifdef CONFIG_ATTESTATION_ID_PRODUCT
++#undef CONFIG_ATTESTATION_ID_PRODUCT
++#endif
++#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mq"
++#endif
++
+ #endif
+ 
+ #endif /* IMX8MQ_A300_ANDROID_H */

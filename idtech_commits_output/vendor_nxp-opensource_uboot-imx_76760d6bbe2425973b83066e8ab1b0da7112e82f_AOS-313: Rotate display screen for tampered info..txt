@@ -1,0 +1,663 @@
+76760d6bbe Arthur Chen 2020-09-17
+
+AOS-313: Rotate display screen for tampered info.
+
+    - add library for image processing named "image_idt".
+    - add customized function about warning info rotated showing.
+    - use software middle area screen rotation in 0, 90 degree
+    with side of square in min(wdith, height).
+    - use hardware filping function to implement 180 & 270 degree orientation.
+    - add parameter about warning flag to bmp display function to separate
+    warning info screen producing usage.
+    - remove include config definition.
+
+Change-Id: I4aa10476d98105986d73542f3015028c76860316
+
+diff --git a/cmd/bmp.c b/cmd/bmp.c
+index 3a2f26c8ca..eea112cd3f 100644
+--- a/cmd/bmp.c
++++ b/cmd/bmp.c
+@@ -189,7 +189,7 @@ static int do_bmp_display(cmd_tbl_t * cmdtp, int flag, int argc, char * const ar
+ 			     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+ 	}
+ 
+-	return (bmp_display(addr, x, y, rotate));
++	return (bmp_display(addr, x, y, rotate, false));
+ #else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	return (bmp_display(addr, x, y));
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+@@ -286,7 +286,7 @@ static int bmp_info(ulong addr)
+  *
+  */
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+-int bmp_display(ulong addr, int x, int y, bool rotate)
++int bmp_display(ulong addr, int x, int y, bool rotate, bool warning)
+ #else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ int bmp_display(ulong addr, int x, int y)
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+@@ -327,7 +327,7 @@ int bmp_display(ulong addr, int x, int y)
+ 			align = true;
+ 
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+-		ret = video_bmp_display(dev, addr, x, y, align, rotate);
++		ret = video_bmp_display(dev, addr, x, y, align, rotate, warning);
+ #else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 		ret = video_bmp_display(dev, addr, x, y, align);
+ #endif /* CONFIG_IDT_ROTATION */
+diff --git a/common/splash.c b/common/splash.c
+index a9cf9a6b63..9cfdfa4705 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -264,8 +264,8 @@ int splash_display(void)
+ 			     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
+ 	}
+ 
+-	ret = bmp_display(addr, x, y, rotate);
+-#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++	ret = bmp_display(addr, x, y, rotate, false);
++#else /* !defined(CONFIG_IDT_ROTATION) || !defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	ret = bmp_display(addr, x, y);
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	/* Skip banner output on video console if the logo is not at 0,0 */
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+index 3086ebb1bb..8827853d3d 100644
+--- a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+@@ -39,6 +39,11 @@
+ #include "video_font_data.h"
+ #endif
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <image_idt.h>
++#include <persist_idt.h>
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ int fastboot_flash_find_index(const char *name);
+ 
+ #if defined(CONFIG_IMX_TRUSTY_OS) && !defined(CONFIG_ARM64)
+@@ -558,11 +563,80 @@ int display_lock(FbLockState lock, int verify) {
+ 
+ }
+ 
++#if defined(CONFIG_AVB_WARNING_LOGO) && defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++int idt_display_unlock_warning()
++{
++	int ret;
++	struct udevice *dev;
++	char *binfo_rotate = NULL;
++	int degree = 0;
++
++	binfo_rotate = get_disp_rotation();
++	if (binfo_rotate != NULL) {
++		degree = (int)simple_strtol(binfo_rotate, NULL, 10);
++		free(binfo_rotate);
++	}
++
++	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
++	if (!ret) {
++		/* clear screen first */
++		idt_image_clear(dev);
++		/* Draw the orange warning bmp logo */
++		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
++					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
++					false, true);
++		/* Show warning text. */
++		if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev)) {
++			printf("no text console device found!
+");
++			return -1;
++		}
++		/* Adjust the cursor postion, the (x, y) are hard-coded here. */
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 6);
++		vidconsole_put_string(dev, "The bootloader is unlocked and software");
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 7);
++		vidconsole_put_string(dev, "integrity cannot be guaranteed. Any data");
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 8);
++		vidconsole_put_string(dev, "stored on the device may be available to");
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 9);
++		vidconsole_put_string(dev, "attackers. Do not store any sensitive data");
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 10);
++		vidconsole_put_string(dev, "on the device.");
++		/* Jump one line to show the link */
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 13);
++		vidconsole_put_string(dev, "Visit this link on another device:");
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 14);
++		vidconsole_put_string(dev, "g.co/ABH");
++
++		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
++						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 20);
++		vidconsole_put_string(dev, "PRESS POWER BUTTON TO CONTINUE...");
++		/* sync frame buffer */
++		idt_image_rotate(dev->parent, degree);
++
++		return 0;
++	} else {
++		printf("no video device found!
+");
++		return -1;
++	}
++}
++#endif /* defined(CONFIG_AVB_WARNING_LOGO) && defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ #ifdef CONFIG_AVB_WARNING_LOGO
+ int display_unlock_warning(void) {
+ 	int ret;
+ 	struct udevice *dev;
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	return idt_display_unlock_warning();
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+ 	if (!ret) {
+ 		/* clear screen first */
+@@ -571,7 +645,7 @@ int display_unlock_warning(void) {
+ #ifdef CONFIG_IDT_ROTATION
+ 		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
+ 					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
+-					false);
++					false, false);
+ #else /* !CONFIG_IDT_ROTATION */
+ 		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
+ 					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS);
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
+index bca912fcea..94a9f48347 100644
+--- a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.h
+@@ -70,6 +70,9 @@ void set_fastboot_lock_disable(void);
+ 
+ int display_lock(FbLockState lock, int verify);
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++int idt_display_unlock_warning();
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ int display_unlock_warning(void);
+ 
+ bool valid_tos(void);
+diff --git a/drivers/video/video-uclass.c b/drivers/video/video-uclass.c
+index 3d658e61d7..6aa30312f1 100644
+--- a/drivers/video/video-uclass.c
++++ b/drivers/video/video-uclass.c
+@@ -17,6 +17,9 @@
+ #ifdef CONFIG_SANDBOX
+ #include <asm/sdl.h>
+ #endif
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <image_idt.h>
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ /*
+  * Theory of operation:
+@@ -235,6 +238,9 @@ static int video_post_probe(struct udevice *dev)
+ 		priv->line_length = priv->xsize * VNBYTES(priv->bpix);
+ 
+ 	priv->fb_size = priv->line_length * priv->ysize;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	ret = idt_fb_init(priv->fb_size);
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ 	/* Set up colors  */
+ 	video_set_default_colors(dev, false);
+@@ -264,6 +270,13 @@ static int video_post_probe(struct udevice *dev)
+ 		snprintf(drv, sizeof(drv), "vidconsole%d", priv->rot);
+ 	}
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	if (ret >= 0) {
++		target_fb = priv->fb;
++		priv->fb = idt_fb;
++	}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ 	str = strdup(name);
+ 	if (!str)
+ 		return -ENOMEM;
+diff --git a/drivers/video/video_bmp.c b/drivers/video/video_bmp.c
+index 7706453ba4..b2ac9b5cc0 100644
+--- a/drivers/video/video_bmp.c
++++ b/drivers/video/video_bmp.c
+@@ -11,7 +11,9 @@
+ #include <video.h>
+ #include <watchdog.h>
+ #include <asm/unaligned.h>
+-
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <image_idt.h>
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ #ifdef CONFIG_VIDEO_BMP_RLE8
+ #define BMP_RLE8_ESCAPE		0
+ #define BMP_RLE8_EOL		0
+@@ -186,8 +188,8 @@ static void video_set_cmap(struct udevice *dev,
+ }
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+-		      bool align, bool rotate)
+-#else /* !defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++		      bool align, bool rotate, bool warning)
++#else /* !defined(CONFIG_IDT_ROTATION) || !defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 		      bool align)
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+@@ -273,6 +275,10 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 		height = priv->ysize - y;
+ 
+ 	bmap = (uchar *)bmp + get_unaligned_le32(&bmp->header.data_offset);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	if ((!warning) && (target_fb))
++		priv->fb = target_fb;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	fb = (uchar *)(priv->fb +
+ 		(y + height - 1) * priv->line_length + x * bpix / 8);
+ 
+@@ -428,7 +434,7 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 				}
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ 				if (rotate)
+-					idt_bmap += (height-1)*3; /* x -> y */
++					idt_bmap += (height - 1)*3; /* x -> y */
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			}
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+@@ -444,6 +450,9 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ #if defined(CONFIG_BMP_32BPP)
+ 	case 32:
+ 		for (i = 0; i < height; ++i) {
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++			idt_bmap = bmap;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			for (j = 0; j < width; j++) {
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ 				if (rotate) {
+@@ -460,12 +469,12 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ 				}
+ 				if (rotate)
+-					idt_bmap += height*4; /* x -> y */
++					idt_bmap += (height - 1)*4; /* x -> y */
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			}
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ 			if (rotate)
+-				bmap += 3;		/* y -> x */
++				bmap += 4;		/* y -> x */
+ 
+ #endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 			fb -= priv->line_length + width * (bpix / 8);
+@@ -477,6 +486,10 @@ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 	};
+ 
+ 	video_sync(dev, false);
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	if ((!warning) && (idt_fb))
++		priv->fb = idt_fb;
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 
+ 	return 0;
+ }
+diff --git a/include/configs/imx8mq_evk_android.h b/include/configs/imx8mq_evk_android.h
+index 0b1e7b1449..d4ef5d1d9d 100644
+--- a/include/configs/imx8mq_evk_android.h
++++ b/include/configs/imx8mq_evk_android.h
+@@ -70,6 +70,5 @@
+ #endif
+ 
+ #define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
+-#define CONFIG_IDT_ROTATION
+ 
+ #endif /* IMX8MQ_EVK_ANDROID_H */
+diff --git a/include/image_idt.h b/include/image_idt.h
+new file mode 100644
+index 0000000000..7a74b7133b
+--- /dev/null
++++ b/include/image_idt.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2020 ID TECH
++ */
++
++
++#include <dm.h>
++#include <dm/device.h>
++#include <video.h>
++#include <mapmem.h>
++#include <watchdog.h>
++#include <asm/unaligned.h>
++#include <asm/io.h>
++#define IMX8MQ_DCSS_DPR_FRAME_CTRL0		0x32e18070
++
++#ifndef __IMAGE_IDT_H__
++#define __IMAGE_IDT_H__
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* for external frame buffer */
++extern void *idt_fb;
++/* for screen rendering frame buffer pointer */
++extern void *target_fb;
++
++/* for allocating external frame buffer */
++int idt_fb_init(int size);
++/* for screen updating with external frame buffer */
++void idt_image_sync(struct udevice *dev);
++/* for screen clean with external frame buffer */
++void idt_image_clear(struct udevice *dev);
++/*
++ * for screen rotation work with external frame buffer.
++ * effect area: middle square created by short side of resolution.
++ */
++int idt_image_rotate(struct udevice *dev, int degree);
++
++#ifdef __cplusplus
++}
++#endif
++#endif /* __IMAGE_IDT_H__ */
+diff --git a/include/lcd.h b/include/lcd.h
+index 27eab9e999..2e418efd1f 100644
+--- a/include/lcd.h
++++ b/include/lcd.h
+@@ -18,7 +18,7 @@
+ #endif
+ 
+ #ifdef CONFIG_IDT_ROTATION
+-int bmp_display(ulong addr, int x, int y, bool rotate);
++int bmp_display(ulong addr, int x, int y, bool rotate, bool warning);
+ #else /* !CONFIG_IDT_ROTATION */
+ int bmp_display(ulong addr, int x, int y);
+ #endif /* CONFIG_IDT_ROTATION */
+diff --git a/include/video.h b/include/video.h
+index 2ed913b553..11402e4a1e 100644
+--- a/include/video.h
++++ b/include/video.h
+@@ -169,7 +169,7 @@ void video_sync_all(void);
+  */
+ #ifdef CONFIG_IDT_ROTATION
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+-		      bool align, bool rotate);
++		      bool align, bool rotate, bool warning);
+ #else /* !CONFIG_IDT_ROTATION */
+ int video_bmp_display(struct udevice *dev, ulong bmp_image, int x, int y,
+ 		      bool align);
+diff --git a/lib/Makefile b/lib/Makefile
+index 21df7086a7..769a83a62d 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -60,6 +60,7 @@ obj-$(CONFIG_TPM_V2) += tpm-v2.o
+ endif
+ 
+ obj-$(CONFIG_$(SPL_)RSA) += rsa/
++obj-$(CONFIG_IDT_ROTATION) += image_idt/
+ obj-y += persist_idt/
+ obj-y += verifiedstate_idt/
+ obj-$(CONFIG_SHA1) += sha1.o
+diff --git a/lib/image_idt/Makefile b/lib/image_idt/Makefile
+new file mode 100644
+index 0000000000..c0bcb0b708
+--- /dev/null
++++ b/lib/image_idt/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_IDT_ROTATION) += image_idt.o
+diff --git a/lib/image_idt/image_idt.c b/lib/image_idt/image_idt.c
+new file mode 100644
+index 0000000000..c8c2c75477
+--- /dev/null
++++ b/lib/image_idt/image_idt.c
+@@ -0,0 +1,171 @@
++/*
++ * Copyright (C) 2020 ID Tech
++ */
++
++#include <common.h>
++#include <stdlib.h>
++#include <linux/string.h>
++#include <image_idt.h>
++
++void *idt_fb;
++
++void *target_fb;
++
++int idt_fb_init(int size)
++{
++	int ret;
++
++	idt_fb = malloc(size);
++	if (idt_fb != NULL)
++		ret = 0;
++	else
++		ret = -1;
++
++	return ret;
++}
++
++void idt_image_clear(struct udevice *dev)
++{
++	struct video_priv *priv = dev_get_uclass_priv(dev);
++
++	if (priv != NULL) {
++		priv->fb = target_fb;
++		switch (priv->bpix) {
++		case VIDEO_BPP16:
++			if (IS_ENABLED(CONFIG_VIDEO_BPP16)) {
++				u16 *ppix = priv->fb;
++				u16 *end = priv->fb + priv->fb_size;
++
++				while (ppix < end)
++					*ppix++ = priv->colour_bg;
++				break;
++			}
++		case VIDEO_BPP32:
++			if (IS_ENABLED(CONFIG_VIDEO_BPP32)) {
++				u32 *ppix = priv->fb;
++				u32 *end = priv->fb + priv->fb_size;
++
++				while (ppix < end)
++					*ppix++ = priv->colour_bg;
++				break;
++			}
++		default:
++			memset(priv->fb, priv->colour_bg, priv->fb_size);
++			break;
++		}
++		priv->fb = idt_fb;
++	} else {
++		printf("idt_image_clear failed
+");
++	}
++}
++
++void idt_image_sync(struct udevice *dev)
++{
++	struct video_priv *priv = dev_get_uclass_priv(dev);
++	int fb_size;
++
++	if (priv != NULL) {
++		fb_size = priv->fb_size;
++		priv->fb = target_fb;
++		memcpy(target_fb, idt_fb, fb_size);
++		video_sync(dev, false);
++		priv->fb = idt_fb;
++	} else {
++		printf("idt_image_sync failed
+");
++	}
++}
++
++int idt_image_rotate(struct udevice *dev, int degree)
++{
++	struct video_priv *priv = dev_get_uclass_priv(dev);
++	uchar *fb;
++	int i, j, ret;
++	int line_length;
++	int fb_size;
++	int width = video_get_xsize(dev);
++	int height = video_get_ysize(dev);
++	int offset = 0;
++	int base = 0;
++	int count = 0;
++	int ro_count = 0;
++	uchar *img;
++	uchar *ract_img;
++	uchar *target;
++
++	if (priv != NULL) {
++		if (width >= height) {
++			offset = width - height;
++			base = height;
++		} else {
++			offset = height - width;
++			base = width;
++		}
++		line_length = priv->line_length;
++		fb_size = priv->fb_size;
++		switch (degree) {
++		case 90:
++			__raw_writel((line_length << 16) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		case 180:
++			__raw_writel((line_length << 16) | BIT(1) | BIT(0),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			idt_image_sync(dev);
++			ret = 0;
++			goto image_rotate_out;
++			break;
++		case 270:
++			__raw_writel((line_length << 16) | BIT(1),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			break;
++		default:
++			__raw_writel((line_length << 16),
++				     IMX8MQ_DCSS_DPR_FRAME_CTRL0);
++			idt_image_sync(dev);
++			ret = 0;
++			goto image_rotate_out;
++			break;
++		}
++
++		img = malloc(fb_size);
++		memcpy(img, idt_fb, fb_size);
++		ract_img = malloc(base*base*4);
++		for (i = 0; i < base; ++i) {
++			ro_count += offset*2;
++			for (j = 0; j < base; j++) {
++				ract_img[count++] = img[ro_count++];
++				ract_img[count++] = img[ro_count++];
++				ract_img[count++] = img[ro_count++];
++				ract_img[count++] = img[ro_count++];
++			}
++			ro_count += offset*2;
++		}
++		priv->fb = target_fb;
++		fb = (uchar *)(priv->fb);
++		ro_count = 0;
++		target = ract_img;
++		for (i = 0; i < base; ++i) {
++			count = ro_count;
++			fb += offset*2;
++			for (j = 0; j < base; j++) {
++				*(fb++) = target[count++];
++				*(fb++) = target[count++];
++				*(fb++) = target[count++];
++				*(fb++) = target[count++];
++				count += 4*(base - 1);
++			}
++			fb += offset*2;
++			ro_count += 4;
++		}
++		video_sync(dev, false);
++		free(img);
++		free(ract_img);
++		ret = 0;
++	} else {
++		printf("idt_image_rotate failed
+");
++		ret = -1;
++	}
++
++image_rotate_out:
++	return ret;
++}
+diff --git a/lib/verifiedstate_idt/idt_red_warning.c b/lib/verifiedstate_idt/idt_red_warning.c
+index e810ffaeda..1498f04c8e 100644
+--- a/lib/verifiedstate_idt/idt_red_warning.c
++++ b/lib/verifiedstate_idt/idt_red_warning.c
+@@ -17,25 +17,40 @@
+ #include "video_font_data.h"
+ #endif
+ 
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++#include <image_idt.h>
++#include <persist_idt.h>
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
++
+ void idt_show_red_warning_and_shutdown(void)
+ {
+ #ifdef CONFIG_AVB_WARNING_LOGO
+ 	int ret = 0, count = 0;
+ 	struct udevice *dev;
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++	char *binfo_rotate = NULL;
++	int degree = 0;
+ 
++	binfo_rotate = get_disp_rotation();
++	if (binfo_rotate != NULL) {
++		degree = (int)simple_strtol(binfo_rotate, NULL, 10);
++		free(binfo_rotate);
++	}
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+ 	if (!ret) {
+ 		/* clear screen first */
+-		video_clear(dev);
+-#ifdef CONFIG_IDT_ROTATION
+ 		/* Draw the red warning bmp logo */
++#ifdef CONFIG_IDT_ROTATION
++		idt_image_clear(dev);
+ 		ret = bmp_display((ulong)red_warning_logo_bitmap,
+ 					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
+-					false);
+-#else
++					false, true);
++#else /* !CONFIG_IDT_ROTATION */
++		video_clear(dev);
+ 		ret = bmp_display((ulong)red_warning_logo_bitmap,
+ 					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS);
+-#endif
++#endif /* CONFIG_IDT_ROTATION */
+ 		/* Show warning text. */
+ 		if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev)) {
+ 			printf("no text console device found!
+");
+@@ -60,8 +75,11 @@ void idt_show_red_warning_and_shutdown(void)
+ 						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 20);
+ 		vidconsole_put_string(dev, "PRESS POWER BUTTON TO SHUTDOWN...");
+ 		/* sync frame buffer */
++#if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
++		idt_image_rotate(dev->parent, degree);
++#else /* !defined(CONFIG_IDT_ROTATION) || !defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 		video_sync_all();
+-
++#endif /* defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS) */
+ 	} else {
+ 		printf("no video device found!
+");
+ 	}
+@@ -73,8 +91,8 @@ void idt_show_red_warning_and_shutdown(void)
+ 	}
+ 	do_poweroff(NULL, 0, 0, NULL);
+ 
+-#else   /* CONFIG_AVB_WARNING_LOGO */
++#else   /* !CONFIG_AVB_WARNING_LOGO */
+ 	/* UUU no need, just return */
+ 	return;
+-#endif
++#endif /* CONFIG_AVB_WARNING_LOGO */
+ }

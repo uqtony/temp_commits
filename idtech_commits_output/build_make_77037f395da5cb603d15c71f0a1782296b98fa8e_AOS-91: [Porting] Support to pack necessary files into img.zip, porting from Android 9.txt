@@ -1,0 +1,37 @@
+77037f395 max.yang 2020-03-09
+
+AOS-91: [Porting] Support to pack necessary files into img.zip, porting from Android 9
+
+  Porting from change:
+     https://gerrit.idtechproducts.com/plugins/gitiles/android-imx/platform/build/+/449b2352b
+
+  Some pattern removed because of conflicts, added them back.
+
+Change-Id: I3b43c37f2fd05c48522c6fc347c5b0a514478fd2
+
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index e01b5e8ec..428cf634a 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -93,7 +93,8 @@ def CopyUserImages(input_tmp, output_zip):
+   for image in sorted(os.listdir(images_path)):
+     if OPTIONS.bootable_only and image not in ("boot.img", "recovery.img"):
+       continue
+-    if not image.endswith(".img"):
++    if not image.endswith(".img") and not image.endswith(".sh") \
++       and not image.endswith(".imx") and not image.endswith(".bat"):
+       continue
+     if image == "recovery-two-step.img":
+       continue
+@@ -103,7 +104,10 @@ def CopyUserImages(input_tmp, output_zip):
+       if image in dynamic_images:
+         continue
+     logger.info("writing %s to archive...", os.path.join("IMAGES", image))
+-    common.ZipWrite(output_zip, os.path.join(images_path, image), image)
++    perm = 0o644
++    if image.endswith(".sh"):
++      perm = 0o755
++    common.ZipWrite(output_zip, os.path.join(images_path, image), image, perm)
+ 
+ 
+ def WriteSuperImages(input_tmp, output_zip):

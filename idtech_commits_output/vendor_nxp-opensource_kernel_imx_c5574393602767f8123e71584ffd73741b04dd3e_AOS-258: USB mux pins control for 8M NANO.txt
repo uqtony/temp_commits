@@ -1,0 +1,93 @@
+c55743936027 AndrewS 2020-07-17
+
+AOS-258: USB mux pins control for 8M NANO
+
+drivers/usb/chipidea/core.c:
+usb mux/demux pins init.
+
+drivers/usb/chipidea/otg.c:
+config usb mux/demux pins while id switch detected.
+
+include/linux/usb/chipidea.h:
+add usb mux/demux pins in struct ci_hdrc_platform_data.
+
+Change-Id: Ib6717a6759e1ce6f37fab32846518c1647788bde
+
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 782d5fa724de..1cb583485ab2 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -54,6 +54,7 @@
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/pinctrl/consumer.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/otg.h>
+@@ -813,6 +814,15 @@ static int ci_get_platdata(struct device *dev,
+ 			platdata->pins_device = p;
+ 	}
+ 
++	/* get usb mux pin and init as high (active low). */
++	platdata->usb_mux = devm_gpiod_get(dev, "usbmux", GPIOD_OUT_HIGH);
++	if (IS_ERR(platdata->usb_mux))
++		platdata->usb_mux = NULL;
++	/* get usb demux pin and init as low (TypeC device). */
++	platdata->usb_demux = devm_gpiod_get(dev, "usbdemux", GPIOD_OUT_LOW);
++	if (IS_ERR(platdata->usb_demux))
++		platdata->usb_demux = NULL;
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index c944f2f905a2..b064c395a129 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -16,6 +16,7 @@
+ #include <linux/usb/otg.h>
+ #include <linux/usb/gadget.h>
+ #include <linux/usb/chipidea.h>
++#include <linux/gpio/consumer.h>
+ 
+ #include "ci.h"
+ #include "bits.h"
+@@ -185,6 +186,22 @@ void ci_handle_id_switch(struct ci_hdrc *ci)
+ 
+ 	mutex_lock(&ci->mutex);
+ 	role = ci_otg_role(ci);
++
++	/* config usb mux/demux pins accordingly. */
++	if (role == CI_ROLE_GADGET) {
++		/* switch to TypeC device */
++		if (ci->platdata->usb_mux != NULL)
++			gpiod_set_value_cansleep(ci->platdata->usb_mux, 1);
++		if (ci->platdata->usb_demux != NULL)
++			gpiod_set_value_cansleep(ci->platdata->usb_demux, 0);
++	} else {
++		/* switch to TypeC OTG */
++		if (ci->platdata->usb_mux != NULL)
++			gpiod_set_value_cansleep(ci->platdata->usb_mux, 0);
++		if (ci->platdata->usb_demux != NULL)
++			gpiod_set_value_cansleep(ci->platdata->usb_demux, 1);
++	}
++
+ 	if (role != ci->role) {
+ 		dev_dbg(ci->dev, "switching from %s to %s
+",
+ 			ci_role(ci)->name, ci->roles[role]->name);
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 17e9b62f4660..061e469787fc 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -91,6 +91,9 @@ struct ci_hdrc_platform_data {
+ 	struct pinctrl_state *pins_default;
+ 	struct pinctrl_state *pins_host;
+ 	struct pinctrl_state *pins_device;
++	/* IDT USB type c mux for 8M-NANO */
++	struct gpio_desc *usb_mux;
++	struct gpio_desc *usb_demux;
+ };
+ 
+ /* Default offset of capability registers */

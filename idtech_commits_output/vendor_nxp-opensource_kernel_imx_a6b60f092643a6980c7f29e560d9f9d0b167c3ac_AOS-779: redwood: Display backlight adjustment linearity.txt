@@ -1,0 +1,58 @@
+a6b60f092643 George.Huang 2021-10-26
+
+AOS-779: redwood: Display backlight adjustment linearity
+
+- Reference: https://www.ti.com/lit/ds/symlink/lm3697.pdf
+
+- keep 8-bit control brightness (0~256)
+  Table 15. Control A Brightness LSB (Address 0x20)
+  keep Bits [2:0] as 0x0 by default
+  # i2cget -fy 1 0x36 0x20
+  0x00
+
+- keep exponential brightness
+  Table 9. Control A and B Brightness Configuration (Address 0x16)
+  keep Bit [0] as 0 (exponential by default) not 1 (linear)
+  # i2cget -fy 1 0x36 0x16
+  0x00
+
+- map exponential brightness code (0-256) to linear level (64)
+  64 x 0.125 =  8: split   0-160 by  8 levels:   0  20 ... 160
+  64 x 0.125 =  8: split 160-192 by  8 levels: 160 164 ... 192
+  64 x 0.25  = 16: split 192-224 by 16 levels: 192 194 ... 224
+  64 x 0.50  = 32: split 224-256 by 32 levels: 224 225 ... 256
+
+- test command to get current brightness code
+  # cat /sys/class/backlight/backlight/brightness
+  2~64
+  # i2cget -fy 1 0x36 0x21
+  0x14~0xff (20~255)
+
+Change-Id: Iff43fd01d3533c0fe7f21fb1f9da4299e4c1b816
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 5907c3f141ae..f2c21be65408 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -321,11 +321,16 @@ backlight: backlight {
+ 		compatible = "led-backlight";
+ 		leds = <&lcd_bl>;
+ 
+-		brightness-levels = <0   15  31  47  63  79  95  111 127 135
+-				     143 151 159 167 175 183 191 195 199 203
+-				     207 211 215 219 223 227 231 235 239 243
+-				     247 251 255>;
+-		default-brightness-level = <20>;
++		brightness-levels = <0
++					 10  20  60  80 100 120 140 160
++					164 168 172 176 180 184 188 192
++					194 196 198 200 202 204 206 208
++					210 212 214 216 218 220 222 224
++					225 226 227 228 229 230 231 232
++					233 234 235 236 237 238 239 240
++					241 242 243 244 245 246 247 248
++					249 250 251 252 253 254 255 256>;
++		default-brightness-level = <50>;
+ 	};
+ 
+ 	gpio-leds {

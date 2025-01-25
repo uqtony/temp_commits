@@ -1,0 +1,53 @@
+6cd38795 max.yang 2020-03-23
+
+AOS-108: [Sign][Dual] Support to build spl and bootloader images separately
+
+Change-Id: I034d7db42fa8a441d105a34400cffb0c70593bce
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index d49ab938..47515cd1 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -131,13 +131,25 @@ endif
+ CST_PATH := ./vendor/idtech/cst
+ 
+ define sign_imx_uboot
+-       echo IDTech sign uboot process $(1)...; \
+-       $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
+-       cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
+-       cp $(UBOOT_BIN) $(CST_PATH)/flash.bin; \
+-       $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH); \
+-       mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/u-boot-$(strip $(1))-signed.imx; \
+-       rm $(CST_PATH)/flash.bin;
++        echo IDTech sign uboot process $(1) with feature $(2)...; \
++        cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
++        if [ $(2) = "dual" ]; then \
++            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
++            cp $(UBOOT_COLLECTION)/spl-$(strip $(1)).bin $(CST_PATH)/flash.bin; \
++            $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH) $(UBOOT_COLLECTION)/spl-$(strip $(1)).bin; \
++            mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/spl-$(strip $(1))-signed.bin; \
++	    cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
++            cp $(UBOOT_COLLECTION)/bootloader-$(strip $(1)).img $(CST_PATH)/flash.bin; \
++            $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH) $(UBOOT_COLLECTION)/bootloader-$(strip $(1)).img; \
++            mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/bootloader-$(strip $(1))-signed.img; \
++            rm $(CST_PATH)/flash.bin; \
++        else \
++            $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
++            cp $(UBOOT_COLLECTION)/u-boot-$(strip $(1)).imx $(CST_PATH)/flash.bin; \
++            $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH) $(UBOOT_COLLECTION)/u-boot-$(strip $(1)).imx; \
++            mv $(PRODUCT_OUT)/signed_uboot.imx $(PRODUCT_OUT)/u-boot-$(strip $(1))-signed.imx; \
++            rm $(CST_PATH)/flash.bin; \
++        fi;
+ endef
+ 
+ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+@@ -163,7 +175,8 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		fi; \
+ 		install -D $(UBOOT_COLLECTION)/u-boot-$$UBOOT_PLATFORM.imx $(UBOOT_BIN); \
+ 		if [ "`echo $$ubootplat | cut -d':' -f3`" = "signed" ]; then \
+-		    $(call sign_imx_uboot, $$UBOOT_PLATFORM) \
++		    FEATURE=`echo $$UBOOT_PLATFORM | rev | cut -d '-' -f1 | rev`; \
++		    $(call sign_imx_uboot, $$UBOOT_PLATFORM, $$FEATURE) \
+ 		fi; \
+ 	done > $(UBOOT_OUT)/sig_info.txt 2>&1
+ 	cat $(UBOOT_OUT)/sig_info.txt

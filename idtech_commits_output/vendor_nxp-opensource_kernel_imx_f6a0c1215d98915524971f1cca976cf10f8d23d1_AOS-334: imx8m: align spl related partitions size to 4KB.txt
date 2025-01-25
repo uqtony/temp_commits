@@ -1,0 +1,39 @@
+f6a0c1215d98 George.Huang 2020-09-18
+
+AOS-334: imx8m: align spl related partitions size to 4KB
+
+Reference change from bootloader:
+  https://gerrit.idtechproducts.com/c/android-imx/uboot-imx/+/4606
+
+Change-Id: I3711f0df54c2dbe48a0fe3f1b9a7a6f805b4a4d6
+
+diff --git a/drivers/mmc/core/block.c b/drivers/mmc/core/block.c
+index b0d328cdf14e..965fbcbde616 100644
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -2869,7 +2869,10 @@ static int mmc_blk_probe(struct mmc_card *card)
+ {
+ 	struct mmc_blk_data *md, *part_md;
+ 	char cap_str[10];
++	size_t factor = (4096/512);
+ 	size_t spl_offset = 0;
++	size_t spl_length = 0;
++	size_t spl_length_4k_aligned = 0;
+ 
+ 	/*
+ 	 * Check that the card supports the command class(es) we need.
+@@ -2924,9 +2927,11 @@ static int mmc_blk_probe(struct mmc_card *card)
+ 				/* secondary spl: 4096 sectors=2048K, 4096 sectors=2048K */
+ 				spl_offset = 0;
+ 			}
++			spl_length = 4096 - spl_offset;
++			spl_length_4k_aligned = (size_t)(spl_length / factor) * factor;
+ 			pr_info("IDTech added partition at offset %zu sectors
+", spl_offset);
+-			add_partition(part_md->disk, 1, 0    + spl_offset, 4096 - spl_offset, 0, NULL);
+-			add_partition(part_md->disk, 2, 4096 + spl_offset, 4096 - spl_offset, 0, NULL);
++			add_partition(part_md->disk, 1, 0    + spl_offset, spl_length_4k_aligned, 0, NULL);
++			add_partition(part_md->disk, 2, 4096 + spl_offset, spl_length_4k_aligned, 0, NULL);
+ 		}
+ 	}
+ 

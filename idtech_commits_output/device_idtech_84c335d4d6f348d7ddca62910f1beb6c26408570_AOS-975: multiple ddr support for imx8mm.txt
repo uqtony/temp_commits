@@ -1,0 +1,70 @@
+84c335d4 AndrewS 2022-04-14
+
+AOS-975: multiple ddr support for imx8mm
+
+Change-Id: I2fa07be99d4f5b012b2b9e097a1ff0281199a8f7
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index a91bc949..20ef7c73 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -126,7 +126,7 @@ CST_PATH := ./vendor/idtech/cst
+ 
+ define pad_imx_uboot
+         PLATFORM=`echo $(1) | cut -d'-' -f1`; \
+-        if [ "$$PLATFORM" = "imx8mq" ]; then \
++        if [ "$$PLATFORM" = "imx8mq" -o "$$PLATFORM" = "imx8mm" ]; then \
+             SPL_PARTITION_SIZE=2060288; \
+             BOOTLOADER_PARTITION_SIZE=4194304; \
+             UBOOT_PARTITION_SIZE=2060288; \
+@@ -157,6 +157,8 @@ define sign_imx_uboot
+         PRINT_HAB=`echo print_fit_hab`; \
+         if [ "$$PLATFORM" = "imx8mq" ]; then \
+             TGT_SOC=`echo iMX8MQ`; \
++        elif [ "$$PLATFORM" = "imx8mm" ]; then \
++            TGT_SOC=`echo iMX8MM`; \
+         elif [ "$$PLATFORM" = "imx8mp" ]; then \
+             TGT_SOC=`echo iMX8MP`; \
+         elif [ "$$PLATFORM" = "imx8mn" ]; then \
+diff --git a/common/prebuilts/mem_info.img b/common/prebuilts/mem_info.img
+index 4d381ed6..21cb9a58 100644
+Binary files a/common/prebuilts/mem_info.img and b/common/prebuilts/mem_info.img differ
+diff --git a/common/prebuilts/mem_info.txt b/common/prebuilts/mem_info.txt
+index 24de9e8f..81f0f964 100644
+--- a/common/prebuilts/mem_info.txt
++++ b/common/prebuilts/mem_info.txt
+@@ -8,4 +8,5 @@ a300-evt-devboard-evt-ktc4g-188-33
+ imx8mq-evt-ibr210-evt-mic3g-221-33
+ imx8mq-evt-redwood-evt-ktc2g-254-33
+ imx8mq-evt-redwood-evt-ktc4g-287-33
+-imx8mq-evt-phanbell-evt-ktc4g-320-31
++imx8mm-evt-redwood-evt-ktc2g-320-33
++imx8mm-evt-redwood-evt-mic2g-353-33
+diff --git a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+index 242d7fdb..b603c5c7 100644
+--- a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
++++ b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+@@ -3,10 +3,10 @@ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target for imx8mm_evk with LPDDR4 on board
+ ifeq ($(LOW_MEMORY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mm:imx8mm_evk_1g_ddr_android_defconfig
++  TARGET_BOOTLOADER_CONFIG := imx8mm:imx8mm_evk_1g_ddr_android_defconfig
+ else
+   TARGET_BOOTLOADER_CONFIG := imx8mm-lpddr4:redwood_8mm_evk_android_defconfig:signed
+-  TARGET_BOOTLOADER_CONFIG := imx8mm-lpddr4-dual:redwood_8mm_evk_android_dual_defconfig:signed
++  TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-dual:redwood_8mm_evk_android_dual_defconfig:signed
+ endif
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-trusty:redwood_8mm_evk_android_trusty_defconfig
+@@ -14,8 +14,8 @@ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ endif
+ 
+ # u-boot target used by uuu for imx8mm_evk with LPDDR4 on board
+-TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-mic2g:redwood_8mm_evk_android_uuu_mic2g_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-ktc2g:redwood_8mm_evk_android_uuu_ktc2g_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-mic2g:redwood_8mm_evk_android_uuu_mic2g_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mm-lpddr4-evk-uuu-ktc2g:redwood_8mm_evk_android_uuu_ktc2g_defconfig:signed
+ 
+ # imx8mm kernel defconfig
+ ifeq ($(IMX8MM_USES_GKI),true)

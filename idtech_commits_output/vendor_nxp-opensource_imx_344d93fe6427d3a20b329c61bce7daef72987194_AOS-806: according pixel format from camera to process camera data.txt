@@ -1,0 +1,486 @@
+344d93f Jay 2021-12-08
+
+AOS-806: according pixel format from camera to process camera data
+
+Get pixel format from camera and according pixel format to process
+camera data. We do not need camera property any more.
+Currently, camera HAL only support YUYV / MJPEG /
+RAW(Bayer pattern 8 and 10 bits).
+If you want to support other pixel format, you should add convert
+function into ImageProcess::handleFrame related function.
+
+Change-Id: Ide3ba3b6303ec5c423824add18bf7190833c3ec6
+
+diff --git a/camera/CameraDeviceHWLImpl.cpp b/camera/CameraDeviceHWLImpl.cpp
+index e53a0d3..523d5f6 100644
+--- a/camera/CameraDeviceHWLImpl.cpp
++++ b/camera/CameraDeviceHWLImpl.cpp
+@@ -222,41 +222,10 @@ status_t CameraDeviceHwlImpl::initSensorStaticData()
+     int availFormats[MAX_SENSOR_FORMAT];
+     memset(sensorFormats, 0, sizeof(sensorFormats));
+     memset(availFormats, 0, sizeof(availFormats));
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("persist.idt.camera_format", value, "");
+ 
+     // Don't support enum format, now hard code here.
+-    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+-        sensorFormats[index] = v4l2_fourcc('M', 'J', 'P', 'G');
+-        availFormats[index++] = v4l2_fourcc('M', 'J', 'P', 'G');
+-    } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
+-        sensorFormats[index] = v4l2_fourcc('B', 'G', '1', '0');
+-        availFormats[index++] = v4l2_fourcc('B', 'G', '1', '0');
+-    } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
+-        sensorFormats[index] = v4l2_fourcc('G', 'B', '1', '0');
+-        availFormats[index++] = v4l2_fourcc('G', 'B', '1', '0');
+-    } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
+-        sensorFormats[index] = v4l2_fourcc('B', 'A', '1', '0');
+-        availFormats[index++] = v4l2_fourcc('B', 'A', '1', '0');
+-    } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
+-        sensorFormats[index] = v4l2_fourcc('R', 'G', '1', '0');
+-        availFormats[index++] = v4l2_fourcc('R', 'G', '1', '0');
+-    } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
+-        sensorFormats[index] = v4l2_fourcc('B', 'A', '8', '1');
+-        availFormats[index++] = v4l2_fourcc('B', 'A', '8', '1');
+-    } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
+-        sensorFormats[index] = v4l2_fourcc('G', 'B', 'R', 'G');
+-        availFormats[index++] = v4l2_fourcc('G', 'B', 'R', 'G');
+-    } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
+-        sensorFormats[index] = v4l2_fourcc('G', 'R', 'B', 'G');
+-        availFormats[index++] = v4l2_fourcc('G', 'R', 'B', 'G');
+-    } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
+-        sensorFormats[index] = v4l2_fourcc('R', 'G', 'G', 'B');
+-        availFormats[index++] = v4l2_fourcc('R', 'G', 'G', 'B');
+-    } else {
+-        sensorFormats[index] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-        availFormats[index++] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-    }
++    sensorFormats[index] = v4l2_fourcc('Y', 'U', 'Y', 'V');
++    availFormats[index++] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+     mSensorFormatCount =
+         changeSensorFormats(sensorFormats, mSensorFormats, index);
+     if (mSensorFormatCount == 0) {
+diff --git a/camera/CameraDeviceSessionHWLImpl.cpp b/camera/CameraDeviceSessionHWLImpl.cpp
+index badcf43..c1d14b4 100644
+--- a/camera/CameraDeviceSessionHWLImpl.cpp
++++ b/camera/CameraDeviceSessionHWLImpl.cpp
+@@ -94,22 +94,6 @@ status_t CameraDeviceSessionHwlImpl::Initialize(
+     if (pDev == NULL)
+         return BAD_VALUE;
+ 
+-    // get camera format from property
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("persist.idt.camera_format", value, "");
+-    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+-        mMJPEG_format = true;
+-    } else if (!strncmp(value, "BGGR10", strlen("BGGR10")) ||
+-               !strncmp(value, "GBRG10", strlen("GBRG10")) ||
+-               !strncmp(value, "GRBG10", strlen("GRBG10")) ||
+-               !strncmp(value, "RGGB10", strlen("RGGB10")) ||
+-               !strncmp(value, "BGGR8", strlen("BGGR8")) ||
+-               !strncmp(value, "GBRG8", strlen("GBRG8")) ||
+-               !strncmp(value, "GRBG8", strlen("GRBG8")) ||
+-               !strncmp(value, "RGGB8", strlen("RGGB8"))) {
+-        mRAW_format = true;
+-    }
+-
+     m_meta = pDev->m_meta->Clone();
+ 
+     ALOGI("Initialize, meta %p, entry count %d", static_metadata_.get(), static_metadata_->GetEntryCount());
+@@ -683,7 +667,7 @@ status_t CameraDeviceSessionHwlImpl::ProcessCapturedBuffer(ImxStreamBuffer *srcB
+         if (dstBuf->mStream->format() == HAL_PIXEL_FORMAT_BLOB) {
+             mJpegBuilder->reset();
+             mJpegBuilder->setMetadata(&requestMeta);
+-            if (mMJPEG_format || mRAW_format) {
++            if (srcBuf->mStream->sensorFormat() != V4L2_PIX_FMT_YUYV) {
+                 fsl::ImageProcess *imageProcess = fsl::ImageProcess::getInstance();
+                 CscHw csc_hw = NONE;
+                 imageProcess->handleFrame(*dstBuf, *srcBuf, csc_hw);
+diff --git a/camera/CameraDeviceSessionHWLImpl.h b/camera/CameraDeviceSessionHWLImpl.h
+index 48ffcc5..c46f0af 100644
+--- a/camera/CameraDeviceSessionHWLImpl.h
++++ b/camera/CameraDeviceSessionHWLImpl.h
+@@ -297,9 +297,6 @@ private:
+     int recordIdx;
+     int callbackIdx;
+ 
+-    bool mMJPEG_format = false;
+-    bool mRAW_format = false;
+-
+     std::unique_ptr<HalCameraMetadata> mSettings;
+ 
+     CscHw mCamBlitCopyType;
+diff --git a/camera/CameraUtils.cpp b/camera/CameraUtils.cpp
+index e48d966..75b230a 100644
+--- a/camera/CameraUtils.cpp
++++ b/camera/CameraUtils.cpp
+@@ -87,46 +87,33 @@ int32_t changeSensorFormats(int *src, int *dst, int len)
+ 
+ 
+ 
+-int getCaptureMode(int fd, int width, int height)
++int getCaptureMode(int fd, int width, int height, uint32_t *sensor_format)
+ {
+     int index = 0;
+     int ret = 0;
+     int capturemode = 0;
+     struct v4l2_frmsizeenum cam_frmsize;
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("persist.idt.camera_format", value, "");
++    struct v4l2_fmtdesc fmt;
+ 
+     if (fd < 0) {
+         ALOGW("!!! %s, fd %d", __func__, fd);
+         return 0;
+     }
+ 
+-    while (ret == 0) {
++    fmt.index = 0;
++    fmt.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
++    ret = ioctl(fd, VIDIOC_ENUM_FMT, &fmt);
++    if (ret)
++        cam_frmsize.pixel_format = V4L2_PIX_FMT_YUYV;
++    else
++        cam_frmsize.pixel_format = fmt.pixelformat;
++    ret = 0;
++    while(ret == 0) {
+         cam_frmsize.index = index++;
+-        if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('M', 'J', 'P', 'G');
+-        } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('B', 'G', '1', '0');
+-        } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('G', 'B', '1', '0');
+-        } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('B', 'A', '1', '0');
+-        } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('R', 'G', '1', '0');
+-        } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('B', 'A', '8', '1');
+-        } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('G', 'B', 'R', 'G');
+-        } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('G', 'R', 'B', 'G');
+-        } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
+-            cam_frmsize.pixel_format = v4l2_fourcc('R', 'G', 'G', 'B');
+-        } else {
+-            cam_frmsize.pixel_format = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-        }
+         ret = ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &cam_frmsize);
+         if ((cam_frmsize.discrete.width == (uint32_t)width) && (cam_frmsize.discrete.height == (uint32_t)height) && (ret == 0)) {
+             capturemode = cam_frmsize.index;
++            *sensor_format = cam_frmsize.pixel_format;
+             break;
+         }
+     }
+@@ -154,29 +141,7 @@ int convertPixelFormatToV4L2Format(PixelFormat format, bool invert)
+             break;
+ 
+         case HAL_PIXEL_FORMAT_YCbCr_422_I:
+-            char value[PROPERTY_VALUE_MAX];
+-            property_get("persist.idt.camera_format", value, "");
+-            if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+-                nFormat = v4l2_fourcc('M', 'J', 'P', 'G');
+-            } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
+-                nFormat = v4l2_fourcc('B', 'G', '1', '0');
+-            } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
+-                nFormat = v4l2_fourcc('G', 'B', '1', '0');
+-            } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
+-                nFormat = v4l2_fourcc('B', 'A', '1', '0');
+-            } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
+-                nFormat = v4l2_fourcc('R', 'G', '1', '0');
+-            } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
+-                nFormat = v4l2_fourcc('B', 'A', '8', '1');
+-            } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
+-                nFormat = v4l2_fourcc('G', 'B', 'R', 'G');
+-            } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
+-                nFormat = v4l2_fourcc('G', 'R', 'B', 'G');
+-            } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
+-                nFormat = v4l2_fourcc('R', 'G', 'G', 'B');
+-            } else {
+-                nFormat = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-            }
++            nFormat = v4l2_fourcc('Y', 'U', 'Y', 'V');
+             break;
+         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+             nFormat = v4l2_fourcc('N', 'V', '1', '6');
+diff --git a/camera/CameraUtils.h b/camera/CameraUtils.h
+index 69b158d..a7ede99 100644
+--- a/camera/CameraUtils.h
++++ b/camera/CameraUtils.h
+@@ -125,6 +125,8 @@ public:
+     int32_t format() {return mFormat;}
+     uint64_t usage() {return mUsage;}
+     int32_t id() {return mId;}
++    uint32_t sensorFormat(void) {return mSensor_format; }
++    void setSensorFormat(uint32_t format) {mSensor_format = format; }
+ 
+ public:
+     uint32_t mWidth = 0;
+@@ -132,6 +134,7 @@ public:
+     int32_t mFormat = 0;
+     uint64_t mUsage = 0;
+     int32_t mId = 0;
++    uint32_t mSensor_format = 0;
+ };
+ 
+ struct SensorSet
+@@ -165,7 +168,7 @@ typedef struct tag_nxp_srream_buffer {
+     ImxStream *mStream;
+ } ImxStreamBuffer;
+ 
+-int getCaptureMode(int fd, int width, int height);
++int getCaptureMode(int fd, int width, int height, uint32_t *sensor_format);
+ int convertPixelFormatToV4L2Format(PixelFormat format, bool invert = false);
+ int32_t changeSensorFormats(int *src, int *dst, int len);
+ int getFps(int width, int height, int defValue);
+diff --git a/camera/ImageProcess.cpp b/camera/ImageProcess.cpp
+index c7e751a..e56cb09 100644
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@ -374,29 +374,6 @@ ImageProcess::ImageProcess()
+     mIpuFd = open("/dev/mxc_ipu", O_RDWR, 0);
+     mPxpFd = open("/dev/pxp_device", O_RDWR, 0);
+ 
+-    // get camera format from property
+-    char value[PROPERTY_VALUE_MAX];
+-    property_get("persist.idt.camera_format", value, "");
+-    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+-        mMJPEG_format = true;
+-    } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
+-        mRAW_format = BGGR_10BITS;
+-    } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
+-        mRAW_format = GBRG_10BITS;
+-    } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
+-        mRAW_format = GRBG_10BITS;
+-    } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
+-        mRAW_format = RGGB_10BITS;
+-    } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
+-        mRAW_format = BGGR_8BITS;
+-    } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
+-        mRAW_format = GBRG_8BITS;
+-    } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
+-        mRAW_format = GRBG_8BITS;
+-    } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
+-        mRAW_format = RGGB_8BITS;
+-    }
+-
+     //When open pxp device, need allocate a channel at the same time.
+     int32_t ret = -1;
+     if (mPxpFd > 0) {
+@@ -567,10 +544,24 @@ int ImageProcess::handleFrame(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf,
+         dstBuf.mVirtAddr, dstBuf.mPhyAddr, dstBuf.mSize, dstBuf.mStream->width(), dstBuf.mStream->height(), dstBuf.mStream->format());
+ 
+     if (dstBuf.mStream->format() == HAL_PIXEL_FORMAT_BLOB) {
+-        if (mMJPEG_format)
++        switch(srcBuf.mStream->sensorFormat()) {
++        case V4L2_PIX_FMT_MJPEG:
+             ret = convertMJPGToYUY2(srcBuf);
+-        if (mRAW_format)
+-            convertRAWToYUY2(srcBuf, mRAW_format);
++            break;
++        case V4L2_PIX_FMT_SBGGR8:
++        case V4L2_PIX_FMT_SGBRG8:
++        case V4L2_PIX_FMT_SGRBG8:
++        case V4L2_PIX_FMT_SRGGB8:
++        case V4L2_PIX_FMT_SBGGR10:
++        case V4L2_PIX_FMT_SGBRG10:
++        case V4L2_PIX_FMT_SGRBG10:
++        case V4L2_PIX_FMT_SRGGB10:
++            convertRAWToYUY2(srcBuf);
++            break;
++        case V4L2_PIX_FMT_YUYV:
++        default:
++            break;
++        }
+         return ret;
+     }
+ 
+@@ -1002,7 +993,7 @@ err_out:
+ 
+ // This function will convert Bayer pattern stream to YUY2 stream and store it in input buffer
+ // srcBuf: input frame from RAW stream
+-int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf, int format)
++int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf)
+ {
+ 	int ret = 0, i=0;
+ 	ImxStream *src = srcBuf.mStream;
+@@ -1015,6 +1006,7 @@ int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf, int format)
+ 	uint8_t* u_component = NULL;
+ 	uint8_t* v_component = NULL;
+ 	unsigned int src_pixfmt;
++	bool b10bTo8b = false;
+ 
+ 	y_component = (uint8_t*)malloc(width * height);
+ 	if (!y_component) {
+@@ -1040,36 +1032,44 @@ int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf, int format)
+ 
+ 	rawData = (uint8_t *)srcBuf.mVirtAddr;
+ 
++	switch (srcBuf.mStream->sensorFormat()) {
++		case V4L2_PIX_FMT_SBGGR8:
++		case V4L2_PIX_FMT_SGBRG8:
++		case V4L2_PIX_FMT_SGRBG8:
++		case V4L2_PIX_FMT_SRGGB8:
++			break;
++
++		case V4L2_PIX_FMT_SBGGR10:
++			src_pixfmt = V4L2_PIX_FMT_SBGGR8;
++			b10bTo8b = true;
++			break;
++		case V4L2_PIX_FMT_SGBRG10:
++			src_pixfmt = V4L2_PIX_FMT_SGBRG8;
++			b10bTo8b = true;
++			break;
++		case V4L2_PIX_FMT_SGRBG10:
++			src_pixfmt = V4L2_PIX_FMT_SGRBG8;
++			b10bTo8b = true;
++			break;
++		case V4L2_PIX_FMT_SRGGB10:
++			src_pixfmt = V4L2_PIX_FMT_SRGGB8;
++			b10bTo8b = true;
++			break;
++		default:
++			goto err_out;
++			break;
++	}
++
++	if (!b10bTo8b)
++		src_pixfmt = srcBuf.mStream->sensorFormat();
++
+ 	for(i=0; i<width*height; i++) {
+-		if (format == BGGR_10BITS ||
+-			format == GBRG_10BITS ||
+-			format == GRBG_10BITS ||
+-			format == RGGB_10BITS)
++		if (b10bTo8b)
+ 			raw[i] = ((rawData[i*2 + 1] << 8) | rawData[i*2]) >> 2 ;
+ 		else
+ 			raw[i] = rawData[i*2];
+ 	}
+ 
+-	switch (format) {
+-	case BGGR_10BITS:
+-	case BGGR_8BITS:
+-		src_pixfmt = V4L2_PIX_FMT_SBGGR8;
+-		break;
+-	case GBRG_10BITS:
+-	case GBRG_8BITS:
+-		src_pixfmt = V4L2_PIX_FMT_SGBRG8;
+-		break;
+-	case GRBG_10BITS:
+-	case GRBG_8BITS:
+-		src_pixfmt = V4L2_PIX_FMT_SGRBG8;
+-		break;
+-	case RGGB_10BITS:
+-	case RGGB_8BITS:
+-	default:
+-		src_pixfmt = V4L2_PIX_FMT_SRGGB8;
+-		break;
+-	}
+-
+ 	v4lconvert_bayer_to_yuv420(raw, y_component, u_component, v_component, width, height, src_pixfmt);
+ 
+ 	ret = libyuv::I420ToYUY2(y_component, width, u_component,
+@@ -1139,11 +1139,24 @@ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer&
+         cl_YUYVtoNV12SP(mCLHandle, (uint8_t *)srcBuf.mVirtAddr,
+                     (uint8_t *)dstBuf.mVirtAddr, dst->width(), dst->height(), false, bOutputCached);
+     } else if (src->format() == dst->format()) {
+-        if (mMJPEG_format) {
++        switch(srcBuf.mStream->sensorFormat()) {
++        case V4L2_PIX_FMT_MJPEG:
+             convertMJPGToYUY2(srcBuf);
++            break;
++        case V4L2_PIX_FMT_SBGGR8:
++        case V4L2_PIX_FMT_SGBRG8:
++        case V4L2_PIX_FMT_SGRBG8:
++        case V4L2_PIX_FMT_SRGGB8:
++        case V4L2_PIX_FMT_SBGGR10:
++        case V4L2_PIX_FMT_SGBRG10:
++        case V4L2_PIX_FMT_SGRBG10:
++        case V4L2_PIX_FMT_SRGGB10:
++            convertRAWToYUY2(srcBuf);
++            break;
++        case V4L2_PIX_FMT_YUYV:
++        default:
++            break;
+         }
+-        if (mRAW_format)
+-            convertRAWToYUY2(srcBuf, mRAW_format);
+         if (HAL_PIXEL_FORMAT_RAW16 == src->format())
+             Revert16BitEndian((uint8_t *)srcBuf.mVirtAddr, (uint8_t *)dstBuf.mVirtAddr, src->width()*src->height());
+         else
+diff --git a/camera/ImageProcess.h b/camera/ImageProcess.h
+index f6ff5fa..0463ff5 100644
+--- a/camera/ImageProcess.h
++++ b/camera/ImageProcess.h
+@@ -32,18 +32,6 @@ typedef int (*hwc_func1)(void* handle);
+ typedef int (*hwc_func3)(void* handle, void* arg1, void* arg2);
+ typedef int (*hwc_func4)(void* handle, void* arg1, void* arg2, void* arg3);
+ 
+-enum RawFormat {
+-	NOT_RAW_FORMAT = 0,
+-	BGGR_10BITS,
+-	GBRG_10BITS,
+-	GRBG_10BITS,
+-	RGGB_10BITS,
+-	BGGR_8BITS,
+-	GBRG_8BITS,
+-	GRBG_8BITS,
+-	RGGB_8BITS,
+-};
+-
+ class ImageProcess
+ {
+ public:
+@@ -55,7 +43,7 @@ public:
+ private:
+     int convertNV12toNV21(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int convertMJPGToYUY2(ImxStreamBuffer& srcBuf);
+-    int convertRAWToYUY2(ImxStreamBuffer & srcBuf, int format);
++    int convertRAWToYUY2(ImxStreamBuffer & srcBuf);
+     int handleFrameByPXP(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByIPU(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByG2DCopy(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+@@ -106,9 +94,6 @@ private:
+     hwc_func3 mCLBlit;
+     hwc_func1 mCLFlush;
+     hwc_func1 mCLFinish;
+-
+-    bool mMJPEG_format = false;
+-    int mRAW_format = NOT_RAW_FORMAT;
+ };
+ 
+ }
+diff --git a/camera/MMAPStream.cpp b/camera/MMAPStream.cpp
+index 4f9b0dc..8e51db1 100644
+--- a/camera/MMAPStream.cpp
++++ b/camera/MMAPStream.cpp
+@@ -60,7 +60,7 @@ int32_t MMAPStream::onDeviceConfigureLocked(uint32_t format, uint32_t width, uin
+     }
+ 
+     int vformat = convertPixelFormatToV4L2Format(format);
+-    int capturemode = getCaptureMode(mDev, width, height);
++    int capturemode = getCaptureMode(mDev, width, height, &mSensor_format);
+ 
+     ALOGI("%s, Width * Height %d x %d format %c%c%c%c, fps: %d, capturemode %d",
+         __func__, (int)width, (int)height,
+@@ -169,6 +169,7 @@ int32_t MMAPStream::onDeviceStartLocked()
+         mBuffers[i] = new ImxStreamBuffer();
+         mBuffers[i]->index = i;
+         mBuffers[i]->mStream = this;
++        mBuffers[i]->mStream->setSensorFormat(mSensor_format);
+ 
+         if (mPlane) {
+             mBuffers[i]->mPhyAddr = (size_t)buf.m.planes->m.mem_offset;
+diff --git a/camera/MMAPStream.h b/camera/MMAPStream.h
+index 8e9b334..7df9cda 100644
+--- a/camera/MMAPStream.h
++++ b/camera/MMAPStream.h
+@@ -52,6 +52,7 @@ public:
+ 
+ public:
+     bool mPlane;
++    uint32_t mSensor_format = 0;
+ };
+ 
+ }  // namespace android

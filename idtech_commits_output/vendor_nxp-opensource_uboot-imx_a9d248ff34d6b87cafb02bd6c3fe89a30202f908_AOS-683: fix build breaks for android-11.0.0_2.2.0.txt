@@ -1,0 +1,53 @@
+a9d248ff34 George.Huang 2021-07-27
+
+AOS-683: fix build breaks for android-11.0.0_2.2.0
+
+Error Logs:
+uboot-imx/drivers/idt/multiddr/idt_ddr_select.c:49: undefined reference to `mmc_list_init'
+uboot-imx/drivers/idt/multiddr/idt_ddr_select.c:50: undefined reference to `mmc_probe'
+
+Change-Id: Ib173f70206f8bec7d8d0d601f69619d3bb555162
+
+diff --git a/board/freescale/common/tcn75.c b/board/freescale/common/tcn75.c
+index 9f4dcdfa3f..2a0ab3a849 100644
+--- a/board/freescale/common/tcn75.c
++++ b/board/freescale/common/tcn75.c
+@@ -5,6 +5,7 @@
+  */
+ #include <common.h>
+ #include <i2c.h>
++#include <linux/delay.h>
+ #include <time.h>
+ #include <asm/arch/sys_proto.h>
+ #include "tcn75.h"
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index 03c3c96d40..4a04ed5308 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -45,8 +45,11 @@ struct blk_desc* init_mmc_blk(void)
+ {
+ 	int err = 0;
+ 	struct mmc *mmc = NULL;
+-
++#if !CONFIG_IS_ENABLED(BLK)
++#if !CONFIG_IS_ENABLED(MMC_TINY)
+ 	mmc_list_init();
++#endif
++#endif
+ 	err = mmc_probe(NULL);
+ 	if (err)
+ 		printf("IDT: fail to mmc probe
+");
+diff --git a/drivers/mmc/mmc.c b/drivers/mmc/mmc.c
+index ad91498fd5..86a8191443 100644
+--- a/drivers/mmc/mmc.c
++++ b/drivers/mmc/mmc.c
+@@ -2984,7 +2984,7 @@ void mmc_set_preinit(struct mmc *mmc, int preinit)
+ }
+ 
+ #if CONFIG_IS_ENABLED(DM_MMC)
+-static int mmc_probe(struct bd_info *bis)
++int mmc_probe(struct bd_info *bis)
+ {
+ 	int ret, i;
+ 	struct uclass *uc;

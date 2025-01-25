@@ -1,0 +1,25 @@
+5de6ec61dd2c Owen Wen 2021-06-17
+
+Revert "tty: Fix ->pgrp locking in tiocspgrp()"
+
+This reverts commit 5fbb92ca740f0346ae0712cf858b385113ad3507.
+
+Reason for revert: "ls" will hang device and device reboot
+
+Change-Id: I520b4183c50a15d62722f7e2bbc38fe9dcc2b221
+
+diff --git a/drivers/tty/tty_jobctrl.c b/drivers/tty/tty_jobctrl.c
+index 6d4aa29bf64f..aa6d0537b379 100644
+--- a/drivers/tty/tty_jobctrl.c
++++ b/drivers/tty/tty_jobctrl.c
+@@ -502,10 +502,8 @@ static int tiocspgrp(struct tty_struct *tty, struct tty_struct *real_tty, pid_t
+ 	if (session_of_pgrp(pgrp) != task_session(current))
+ 		goto out_unlock;
+ 	retval = 0;
+-	spin_lock_irq(&real_tty->ctrl_lock);
+ 	put_pid(real_tty->pgrp);
+ 	real_tty->pgrp = get_pid(pgrp);
+-	spin_unlock_irq(&real_tty->ctrl_lock);
+ out_unlock:
+ 	rcu_read_unlock();
+ out_unlock_ctrl:

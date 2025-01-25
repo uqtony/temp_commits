@@ -1,0 +1,149 @@
+5f1a6a7cfe3c George.Huang 2020-10-25
+
+AOS-379: Fix conflicts from merging android-10.0.0_2.5.0
+
+Change-Id: Ibb63b5afd2a0b4975a213089504561b9b126c4ab
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 0f4006e386ca..97bc8d65d747 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -169,7 +169,8 @@ dtb-$(CONFIG_ARCH_MXC) += imx8qxp-mek-dom0.dtb imx8qxp-mek-root.dtb \
+ dtb-$(CONFIG_ARCH_MXC) += imx8dxl-evk.dtb imx8dxl-evk-rpmsg.dtb \
+ 			  imx8dxl-evk-enet0.dtb imx8dxl-evk-enet0-tja1100.dtb \
+ 			  imx8dxl-evk-lpspi-slave.dtb \
+-<<<<<<< HEAD
++			  imx8dxl-evk-pcie-ep.dtb \
++			  imx8dxl-ddr3-val.dtb imx8dxl-evk-root.dtb imx8dxl-evk-inmate.dtb \
+ 			  imx8dxl-ddr3-evk.dtb
+ 
+ dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_evt-0_evk_evk-0_mic3g.dtb \
+@@ -191,10 +192,6 @@ dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_evt-0_evk_evk-0_mic3g.dtb \
+ 			 idt_a300_evt-0_devboard_evt-1_ktc4g.dtb \
+ 			 idt_imx8mp_evt-0_evk_evk-0_mic6g.dtb
+ 
+-=======
+-			  imx8dxl-evk-pcie-ep.dtb \
+-			  imx8dxl-ddr3-val.dtb imx8dxl-evk-root.dtb imx8dxl-evk-inmate.dtb
+->>>>>>> 60cabbcd605f
+ dtb-$(CONFIG_ARCH_S32) += s32v234-evb.dtb \
+ 			  s32v234-sbc.dtb
+ 
+diff --git a/arch/arm64/boot/dts/freescale/imx8mn-evk.dts b/arch/arm64/boot/dts/freescale/imx8mn-evk.dts
+index 8554deed6d82..d9c58e891ef0 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mn-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mn-evk.dts
+@@ -63,18 +63,17 @@ status {
+ 		};
+ 	};
+ 
+-<<<<<<< HEAD
+ 	bt_rfkill {
+ 		compatible = "fsl,mxc_bt_rfkill";
+ 		bt-power-gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
+ 		status ="okay";
+-=======
++	};
++
+ 	ir_recv: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ir_recv>;
+->>>>>>> 60cabbcd605f
+ 	};
+ 
+ 	usdhc1_pwrseq: usdhc1_pwrseq {
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index e9c47e06dac1..32b38401e97c 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -111,18 +111,17 @@ rpmsg_reserved: rpmsg@0xb8000000 {
+ 		};
+ 	};
+ 
+-<<<<<<< HEAD
+ 	bt_rfkill {
+ 		compatible = "fsl,mxc_bt_rfkill";
+ 		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+ 		status ="okay";
+-=======
++	};
++
+ 	ir_recv: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_ir_recv>;
+->>>>>>> 60cabbcd605f
+ 	};
+ 
+ 	resmem: reserved-memory {
+@@ -806,11 +805,8 @@ &uart3 { /* BT */
+ };
+ 
+ &usb3_phy0 {
+-<<<<<<< HEAD
+ 	#phy-cells = <1>;
+-=======
+ 	vbus-power-source = <&ptn5110>;
+->>>>>>> 60cabbcd605f
+ 	status = "okay";
+ };
+ 
+diff --git a/drivers/bluetooth/mx8_bt_rfkill.c b/drivers/bluetooth/mx8_bt_rfkill.c
+index 3918cdcdf5ce..eb09178a44b2 100644
+--- a/drivers/bluetooth/mx8_bt_rfkill.c
++++ b/drivers/bluetooth/mx8_bt_rfkill.c
+@@ -45,12 +45,9 @@ static int system_in_suspend;
+ 
+ struct mxc_bt_rfkill_data {
+ 	int bt_power_gpio;
+-<<<<<<< HEAD
+ 	bool active_low;
+-=======
+ 	s32 delay_us;
+ 	s32 post_delay_ms;
+->>>>>>> 60cabbcd605f
+ };
+ 
+ struct mxc_bt_rfkill_pdata {
+@@ -65,17 +62,11 @@ static int mxc_bt_rfkill_reset(void *rfkdata)
+ 
+ 	printk(KERN_INFO "mxc_bt_rfkill_reset
+");
+ 	if (gpio_is_valid(data->bt_power_gpio)) {
+-<<<<<<< HEAD
+ 		gpio_set_value_cansleep(data->bt_power_gpio, data->active_low);
+-		msleep(500);
+-		gpio_set_value_cansleep(data->bt_power_gpio, !data->active_low);
+-=======
+-		gpio_set_value_cansleep(data->bt_power_gpio, 0);
+ 		udelay(data->delay_us);
+-		gpio_set_value_cansleep(data->bt_power_gpio, 1);
++		gpio_set_value_cansleep(data->bt_power_gpio, !data->active_low);
+ 		if (data->post_delay_ms > 0)
+ 			msleep(data->post_delay_ms);
+->>>>>>> 60cabbcd605f
+ 	}
+ 
+ 	return 0;
+@@ -179,9 +170,7 @@ static int mxc_bt_rfkill_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	data->bt_power_gpio = of_get_named_gpio(np, "bt-power-gpios", 0);
+-<<<<<<< HEAD
+ 	data->active_low = of_property_read_bool(np, "active-low");
+-=======
+ 
+ 	ret = of_property_read_u32(np, "reset-delay-us", &data->delay_us);
+ 	if (ret < 0)
+@@ -193,7 +182,6 @@ static int mxc_bt_rfkill_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		data->post_delay_ms = -1;
+ 
+->>>>>>> 60cabbcd605f
+ 	if (data->bt_power_gpio == -EPROBE_DEFER) {
+ 		printk(KERN_INFO "mxc_bt_rfkill: gpio not ready, need defer
+");
+ 		return -EPROBE_DEFER;

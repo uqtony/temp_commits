@@ -1,0 +1,22 @@
+db4c16f6becc AndrewS 2020-09-10
+
+AOS-303: check persist.idt.lock_orientation property before update rotation
+
+Change-Id: I7e68e41d3cf17a5f4869356ff7523a2ad01f8b60
+
+diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
+index 2232a750e11b..b5c8b13737c8 100644
+--- a/services/core/java/com/android/server/wm/DisplayContent.java
++++ b/services/core/java/com/android/server/wm/DisplayContent.java
+@@ -1371,6 +1371,11 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+      *         UNFREEZE THE SCREEN.
+      */
+     boolean updateRotationUnchecked(boolean forceUpdate) {
++        // check if IDT lock orientation property been set
++        boolean lock_orientation = SystemProperties.getInt("persist.idt.lock_orientation", 0) == 1;
++        if (lock_orientation) {
++            return false;
++        }
+         ScreenRotationAnimation screenRotationAnimation;
+         if (!forceUpdate) {
+             if (mDeferredRotationPauseCount > 0) {

@@ -1,0 +1,45 @@
+77d3e0b6 George.Huang 2022-03-08
+
+AOS-887: fix permissions error for android-12.0.0_1.0.0
+
+- exported_radio_prop flag is removed
+  use telephony_status_prop instead of exported_radio_prop
+
+- set vendor_idtech_prop as public between vendor and other partitions
+
+Change-Id: Ied1c776c7c3d575ddeabe4bced0bd443a09a5006
+
+diff --git a/imx8m/sepolicy/property.te b/imx8m/sepolicy/property.te
+index 55e1bce7..539b3338 100644
+--- a/imx8m/sepolicy/property.te
++++ b/imx8m/sepolicy/property.te
+@@ -5,4 +5,4 @@ vendor_internal_prop(vendor_bluetooth_prop)
+ vendor_restricted_prop(vendor_public_default_prop)
+ vendor_internal_prop(vendor_wifi_version)
+ vendor_internal_prop(vendor_logging_prop)
+-vendor_internal_prop(vendor_idtech_prop)
++vendor_public_prop(vendor_idtech_prop)
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 6a8dc5a0..97b362bb 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -214,7 +214,7 @@ ro.rfkilldisabled                   u:object_r:vendor_public_default_prop:s0
+ # serial number for mdnsd broadcast
+ ro.idt.serialno                     u:object_r:vendor_public_default_prop:s0
+ 
+-ro.radio.noril                      u:object_r:exported_radio_prop:s0 exact string
++ro.radio.noril                      u:object_r:telephony_status_prop:s0 exact string
+ vendor.rild.                        u:object_r:radio_prop:s0
+ rild.                               u:object_r:radio_prop:s0
+ net.eth0.                           u:object_r:radio_prop:s0
+diff --git a/imx8m/sepolicy/shell.te b/imx8m/sepolicy/shell.te
+index 24d756e4..6469ee46 100644
+--- a/imx8m/sepolicy/shell.te
++++ b/imx8m/sepolicy/shell.te
+@@ -10,5 +10,5 @@ allow shell vendor_file:file { read execute open getattr };
+ allow shell system_prop:property_service { set };
+ allow shell sysfs_usb_uevent:file { getattr read open };
+ set_prop(shell, radio_prop)
+-set_prop(shell, exported_radio_prop)
++set_prop(shell, telephony_status_prop)
+ get_prop(shell, device_config_runtime_native_boot_prop)

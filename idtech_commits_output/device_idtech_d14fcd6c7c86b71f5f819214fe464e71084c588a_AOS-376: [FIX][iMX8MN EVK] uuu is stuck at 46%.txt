@@ -1,0 +1,127 @@
+d14fcd6c George.Huang 2020-11-17
+
+AOS-376: [FIX][iMX8MN EVK] uuu is stuck at 46%
+
+Symptom:
+- flash progress is stuck at 46% with ROM android_10_idt_dev_201009_vp6820_8mn-userdebug
+
+Root Cause:
+- when uuu binary resparse super.img with 16MB buffer size:
+- (16MB is predefined in uuu binary for sparse image to show the flash progress frequently)
+- if incoming chunk is raw data and will exceed 16MB,
+  it's easy to split partial raw data to fill 16MB buffer
+- if incoming chunk is chunk header and will exceed 16MB,
+  it's impossible to split chunk header to fill 16MB buffer and cause the issue
+
+Solution:
+- long term solution: modify the uuu binary to handle the corner case
+  https://github.com/NXPmicro/mfgtools
+- short term solution: enlarge the re-sparse size from 16MB to 400MB to
+  lower the possibility to hit the corner case, and will also shorten the 15-seconds over head
+  ex: FB[-t 600000]: flash -S 0x19000000 super super.img
+- but this new option "-S" is supported after uuu version 1.4.43
+
+Reference:
+- https://atlassian.idtechproducts.com/confluence/display/EN/Flashing+i.MX8+using+uuu
+
+Change-Id: I34449a39a43ff908eb43afa582191cadef0c1708
+
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 1b2d279d..8a3028f3 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -102,6 +102,7 @@ set lpmake_product_image_a=
+ set lpmake_product_image_b=
+ set /A dont_generate_super=0
+ set board_type=
++set max_download_size=0x19000000
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -693,7 +694,7 @@ if [%board%] == [] (
+ goto :eof
+ 
+ :uuu_load_uboot
+-echo uuu_version 1.3.74 > uuu.lst
++echo uuu_version 1.4.43 > uuu.lst
+ 
+ if exist %bootloader_used_by_uuu%.link (
+     del %bootloader_used_by_uuu%.link
+@@ -744,6 +745,7 @@ set local_str=%local_str:_a=%
+ set local_str=%local_str:_b=%
+ 
+ set img_name=%local_str%-%soc_name%.img
++set flash_option=
+ 
+ if not [%partition_to_be_flashed:bootloader_=%] == [%partition_to_be_flashed%] (
+     set img_name=%uboot_proper_to_be_flashed%
+@@ -815,6 +817,7 @@ if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+         call :make_super_image
+     )
+     set img_name=%super_file%
++    set flash_option=-S %max_download_size%
+     goto :start_to_flash
+ )
+ 
+@@ -848,13 +851,13 @@ if not [%partition_to_be_flashed:userdata=%] == [%partition_to_be_flashed%] (
+ echo generate lines to flash %img_name% to the partition of %1
+ if [%img_name%] == [%super_file%] (
+     if %dont_generate_super% == 0 (
+-        echo FB[-t 600000]: flash %1 %img_name% >> uuu.lst
++        echo FB[-t 600000]: flash %flash_option% %1 %img_name% >> uuu.lst
+     ) else (
+         if exist %img_name%.link (
+             del %img_name%.link
+         )
+         cmd /c mklink %img_name%.link %image_directory%%img_name% > nul
+-        echo FB[-t 600000]: flash %1 %img_name%.link >> uuu.lst
++        echo FB[-t 600000]: flash %flash_option% %1 %img_name%.link >> uuu.lst
+     )
+ ) else (
+     if exist %img_name%.link (
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 86da568d..a519ba36 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -122,7 +122,7 @@ function whether_in_array
+ 
+ function uuu_load_uboot
+ {
+-    echo uuu_version 1.3.124 > /tmp/uuu.lst
++    echo uuu_version 1.4.43 > /tmp/uuu.lst
+     rm -f /tmp/${bootloader_used_by_uuu}
+     ln -s ${sym_link_directory}${bootloader_used_by_uuu} /tmp/${bootloader_used_by_uuu}
+     echo ${sdp}: boot -f ${bootloader_used_by_uuu} >> /tmp/uuu.lst
+@@ -160,6 +160,7 @@ function uuu_load_uboot
+ 
+ function flash_partition
+ {
++    flash_option=""
+     if [ "$(echo ${1} | grep "bootloader_")" != "" ]; then
+         img_name=${uboot_proper_to_be_flashed}
+     elif [ "$(echo ${1} | grep "system")" != "" ]; then
+@@ -199,6 +200,7 @@ function flash_partition
+             make_super_image
+         fi
+         img_name=${super_file}
++        flash_option="-S ${max_download_size}"
+     else
+         img_name="${1%_*}-${soc_name}.img"
+     fi
+@@ -208,7 +210,7 @@ function flash_partition
+         rm -f /tmp/${img_name}
+         ln -s ${sym_link_directory}${img_name} /tmp/${img_name}
+     fi
+-    echo FB[-t 600000]: flash ${1} ${img_name} >> /tmp/uuu.lst
++    echo FB[-t 600000]: flash ${flash_option} ${1} ${img_name} >> /tmp/uuu.lst
+ }
+ 
+ function flash_userpartitions
+@@ -540,6 +542,7 @@ dont_generate_super=0
+ ramsize=""
+ ramsizetest=0
+ board_type=""
++max_download_size=0x19000000
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of

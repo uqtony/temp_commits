@@ -1,0 +1,82 @@
+3077d611 Jay 2020-09-04
+
+AOS-315: Add USB thermal printer function
+
+Enable USB thermal printer function and add SELinux rule for
+platform_app. It can use ESC/POS command to control output format.
+
+Change-Id: I127b557973e5e5b35245fcf3fd2a1ff34bd922d6
+
+diff --git a/imx8m/bigcypress_8mp/android_addition_defconfig b/imx8m/bigcypress_8mp/android_addition_defconfig
+index db90d9fd..a05e5bbf 100644
+--- a/imx8m/bigcypress_8mp/android_addition_defconfig
++++ b/imx8m/bigcypress_8mp/android_addition_defconfig
+@@ -49,6 +49,7 @@ CONFIG_BCM_SBA_RAID=m
+ CONFIG_WLAN_VENDOR_NXP=y
+ CONFIG_MWL8K=y
+ CONFIG_WLAN_VENDOR_MARVELL=m
++CONFIG_USB_PRINTER=y
+ 
+ # CONFIG_KVM is not set
+ # CONFIG_MTD_UBI is not set
+diff --git a/imx8m/bigcypress_8mp/ueventd.freescale.rc b/imx8m/bigcypress_8mp/ueventd.freescale.rc
+index ee560a30..db1f89de 100644
+--- a/imx8m/bigcypress_8mp/ueventd.freescale.rc
++++ b/imx8m/bigcypress_8mp/ueventd.freescale.rc
+@@ -19,3 +19,5 @@
+ 
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++/dev/usb/lp0              0666   root         root
+diff --git a/imx8m/bigcypress_8mq/android_addition_defconfig b/imx8m/bigcypress_8mq/android_addition_defconfig
+index 65fff184..cf8e8628 100644
+--- a/imx8m/bigcypress_8mq/android_addition_defconfig
++++ b/imx8m/bigcypress_8mq/android_addition_defconfig
+@@ -48,6 +48,7 @@ CONFIG_CLK_SP810=y
+ CONFIG_USB_SNP_UDC_PLAT=y
+ CONFIG_USB_BDC_UDC=y
+ CONFIG_BCM_SBA_RAID=m
++CONFIG_USB_PRINTER=y
+ 
+ # CONFIG_KVM is not set
+ # CONFIG_MTD_UBI is not set
+diff --git a/imx8m/bigcypress_8mq/ueventd.freescale.rc b/imx8m/bigcypress_8mq/ueventd.freescale.rc
+index f2e8dd67..ee93e4d4 100644
+--- a/imx8m/bigcypress_8mq/ueventd.freescale.rc
++++ b/imx8m/bigcypress_8mq/ueventd.freescale.rc
+@@ -24,3 +24,4 @@
+ /dev/cdc-wdm*             0660   radio        radio
+ /dev/qcqmi*               0660   radio        radio
+ /dev/cdc-acm*             0660   radio        radio
++/dev/usb/lp0              0666   root         root
+diff --git a/imx8m/sepolicy/device.te b/imx8m/sepolicy/device.te
+index 5c27764b..bece38a1 100644
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@ -11,3 +11,4 @@ type latency_device, dev_type;
+ type bootloader_block_device, dev_type;
+ type spl_block_device, dev_type;
+ type rild_device, dev_type;
++type ptr_device, dev_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 7ff1f1b4..68c12072 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -108,3 +108,4 @@
+ /system/etc/ppp/ip-up            u:object_r:ppp_exec:s0
+ /system/etc/ppp/ip-down          u:object_r:ppp_exec:s0
+ /system/etc/ppp/ip-up-vpn        u:object_r:ppp_exec:s0
++/dev/usb/lp0                     u:object_r:ptr_device:s0
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index f34a155f..776a3c06 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -4,6 +4,7 @@ typeattribute platform_app mlstrustedsubject;
+ allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
+ allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
+ allow platform_app idtech_data_file:dir { add_name write };
++allow platform_app ptr_device:chr_file rw_file_perms;
+ 
+ get_prop(platform_app, vendor_default_prop)
+ set_prop(platform_app, public_vendor_default_prop)

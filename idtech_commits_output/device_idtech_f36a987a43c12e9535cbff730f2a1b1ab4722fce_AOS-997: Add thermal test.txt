@@ -1,0 +1,191 @@
+f36a987a Brian Lee 2022-04-27
+
+AOS-997: Add thermal test
+
+Add below thermal test scenario
+01/ typical
+02/ heavy
+03/ sw update
+
+Change-Id: Ia5a04c055f3b3b9ca7b77f7f49885036dd7a6c4e
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 210eba97..7d67334e 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -559,7 +559,8 @@ check_func_local_video() {
+   [ ! -z $1 ] && test_idx=$1
+   test_key="func_local_video_${test_idx}"
+   test_act="com.freescale.cactusplayer/com.freescale.cactusplayer.VideoPlayer"
+-  test_path=`ls /storage/*/Download/bbb_sunflower_1080p_60fps_normal.mp4`
++  test_path=`ls /storage/emulated/*/Download/bbb_sunflower_1080p_60fps_normal.mp4`
++  # test_path=`ls /storage/*/Download/bbb_sunflower_1080p_60fps_normal.mp4`
+   #test_path=`ls /storage/*/Download/bbb_sunflower_2160p_60fps_normal.mp4`
+ 
+   logi "$(am start -W --display ${test_idx} -a android.intent.action.VIEW \
+@@ -641,6 +642,14 @@ check_func_bt() {
+   fi
+ }
+ 
++check_func_download_files() {
++  logi "== check_func_download_files"
++  unset_test_array
++
++  curl http://ftp.vim.org/ftp/ftp/pub/graphics/blender/demo/movies/BBB/bbb_sunflower_1080p_60fps_normal.mp4 --output /sdcard/Download/bbb_sunflower_1080p_60fps_normal.mp4
++  logi "== Downloaded bbb_sunflower_1080p_60fps_normal.mp4"
++}
++
+ check_func_wlan() {
+   logi "== check_func_wlan"
+   unset_test_array
+@@ -813,6 +822,95 @@ check_bringup_stage4_func() {
+   log_rst "==============================" "======"
+ }
+ 
++check_thermal_func_typical() {
++  log_rst "==== THERAML TEST TYPICAL ====" "======"
++  # sleep 120 # wait 2 min
++# Unit in idle screen most of the time.
++# WiFi/BT/LTE in deep sleep mode.
++  logi "== wifi disable"
++  svc wifi disable
++  sleep 1
++  logi "== BT disable"
++  svc bluetooth disable
++  sleep 1
++  logi "== LTE disable"
++  svc data disable
++  sleep 1
++# Display at 70% intensity.
++  logi "== display 70% intensity"
++  settings put system screen_brightness 179
++# A simulated transaction is run every 2 minutes:
++  logi "== NFC"
++  check_idg_nfc
++# Run contactless card.
++# Do an LTE/WiFi data transfer.
++  logi "== wifi enable"
++  svc wifi enable
++  sleep 1
++  logi "== LTE enable"
++  svc data enable
++  sleep 1
++
++  logi "== samll data transfer"
++  curl http://ftp.vim.org/ftp/ftp/pub/graphics/blender/demo/movies/Sintel.2010.720p.mkv.md5sum --output /sdcard/Download/Sintel.2010.720p.mkv.md5sum
++
++# Show a couple of screens.
++  logi "== start some activity"
++  am start -n com.android.settings/.Settings
++  sleep 2
++  am start -n com.android.dialer/.main.impl.MainActivity
++  sleep 2
++  am start -n com.android.deskclock/.DeskClock
++  sleep 2
++# Then go back to idle screen
++  logi "== back HOME"
++  input keyevent KEYCODE_HOME
++  logi "== wait 2min"
++  sleep 120
++  log_rst "==============================" "======"
++}
++
++check_thermal_func_heavy() {
++  log_rst "==== THERAML TEST HEAVY ======" "======"
++# Connect a second screen. --> OK
++# Primary screen in idle mode. --> OK
++  logi "== Secondary screen playing a movie"
++  check_func_local_video 1    # display_id
++# WiFi/BT/LTE in sleep mode.
++  logi "== wifi disable"
++  svc wifi disable
++  sleep 2
++  logi "== BT disable"
++  svc bluetooth disable
++  sleep 2
++  logi "== LTE disable"
++  svc data disable
++  # sleep 120 # wait 2 min
++  sleep 2
++# Run a simulated transaction every 2 minutes as above.
++  check_idg_nfc
++  sleep 120
++  log_rst "==============================" "======"
++}
++
++check_thermal_func_sw_update() {
++  log_rst "==== THERAML TEST SW UPDATE ==" "======"
++
++# Connect a second screen.
++# Primary screen in idle mode.
++# Secondary screen in idle mode.
++# Download large files via WiFi  or LTE.
++  logi "== wifi enable"
++  svc wifi enable
++  sleep 1
++  logi "== LTE enable"
++  svc data enable
++  sleep 1
++  logi "== LTE enable"
++  check_func_download_files
++  log_rst "==============================" "======"
++}
++
+ check_bringup() {
+   test_idx=0
+   [ ! -z $1 ] && test_idx=$1
+@@ -830,6 +928,12 @@ check_bringup() {
+     check_bringup_stage2_func
+     check_bringup_stage3_func
+     check_bringup_stage4_func
++  elif [ $test_idx -eq 5 ]; then
++    check_thermal_func_typical
++  elif [ $test_idx -eq 6 ]; then
++    check_thermal_func_heavy
++  elif [ $test_idx -eq 7 ]; then
++    check_thermal_func_sw_update
+   else
+     check_bringup_stage1_if
+     check_bringup_stage1_func
+diff --git a/imx8m/bringup_test_stageall.bat b/imx8m/bringup_test_stageall.bat
+index 412392d2..029da61b 100644
+--- a/imx8m/bringup_test_stageall.bat
++++ b/imx8m/bringup_test_stageall.bat
+@@ -9,6 +9,9 @@ for %%F in (%script_path%) do set base_path=%%~dpF
+ cd %base_path%
+ 
+ :: test_idx: 0: all / 1: stage1 / 2: stage2 / 3: k81 / 4: full-load / check_emmc
++:: 5: Thermal test -- Typical
++:: 6: Thermal test -- Heavy
++:: 7: Thermal test -- SW update
+ set /A test_idx=0
+ set test_func=check_bringup
+ set test_str=%1
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+index f440ce1d..7bd93210 100755
+--- a/imx8m/bringup_test_stageall.sh
++++ b/imx8m/bringup_test_stageall.sh
+@@ -5,6 +5,9 @@ base_path=$(dirname $(pwd $0)/$0)
+ cd ${base_path}
+ 
+ # test_idx: 0: all / 1: stage1 / 2: stage2 / 3: k81 / 4: full-load / check_emmc
++# 5: Thermal test -- Typical
++# 6: Thermal test -- Heavy
++# 7: Thermal test -- SW update
+ test_idx=0
+ test_func="check_bringup"
+ test_str="${1}"
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index d5f4b8eb..e5030038 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -510,3 +510,9 @@ PRODUCT_PACKAGES += \
+ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/init.usbhid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.usbhid.sh
+ endif
++
++# -------@external tool-------
++PRODUCT_PACKAGES_DEBUG += \
++     curl \
++     iw_vendor \
++     iperf3

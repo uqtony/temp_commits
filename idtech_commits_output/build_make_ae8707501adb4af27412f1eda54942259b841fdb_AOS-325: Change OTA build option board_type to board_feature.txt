@@ -1,0 +1,122 @@
+ae8707501 George.Huang 2020-09-01
+
+AOS-325: Change OTA build option board_type to board_feature
+
+More accurately speaking, this option should be:
+  --board_feature ${ddr_type}${uboot_feature}
+
+Example:
+  --board_feature lpddr4-dual-signed
+
+Change-Id: I3da8becfb455df86736945dce325fef64c431a62
+
+diff --git a/tools/releasetools/ota_from_target_files.py b/tools/releasetools/ota_from_target_files.py
+index 6b15d7e3a..eb1d84c17 100755
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@ -78,8 +78,8 @@ Common options that apply to both of non-A/B and A/B OTAs
+       Write a copy of the metadata to a separate file. Therefore, users can
+       read the post build fingerprint without extracting the OTA package.
+ 
+-  --board_type <type>
+-      assign board_type for specific uboot, exmaple: devboard, evk,
++  --board_feature <feature>
++      assign board_feature for specific uboot, exmaple: lpddr4-dual-signed,
+       (default empty)
+ 
+ Non-A/B OTA specific options
+@@ -239,7 +239,7 @@ OPTIONS.skip_postinstall = False
+ OPTIONS.retrofit_dynamic_partitions = False
+ OPTIONS.skip_compatibility_check = False
+ OPTIONS.output_metadata_path = None
+-OPTIONS.board_type = None
++OPTIONS.board_feature = None
+ 
+ 
+ METADATA_NAME = 'META-INF/com/android/metadata'
+@@ -1984,20 +1984,20 @@ def GetTargetFilesZipWithoutPostinstallConfig(input_file):
+   return target_file
+ 
+ 
+-def GetTargetFilesZipWithBoardType(input_file, product, board_type, set_empty=False):
+-  """Returns a target-files.zip that's with specific board_type.
++def GetTargetFilesZipWithBoardFeature(input_file, product, board_feature, set_empty=False):
++  """Returns a target-files.zip that's with specific board_feature.
+ 
+-  This allows to re-asign bootloader.img with u-boot-*-<board_type>.imx
++  This allows to re-asign bootloader.img with u-boot-*-<board_feature>.imx
+ 
+   Args:
+     input_file: the input target-files.zip filename.
+     product: product name, ex: 8mq.
+-    board_type: asigned board_type for u-boot image, ex: devobard or evk.
++    board_feature: asigned board_feature for u-boot image, ex: lpddr4-dual-signed.
+     set_empty: set as True for source_file to use FullUpdateGenerator().
+ 
+   Returns:
+     The filename of target-files.zip that replaced bootloader.img with specific
+-    board_type.
++    board_feature.
+   """
+   target_file = common.MakeTempFile(prefix="targetfiles-", suffix=".zip")
+   shutil.copyfile(input_file, target_file)
+@@ -2005,15 +2005,15 @@ def GetTargetFilesZipWithBoardType(input_file, product, board_type, set_empty=Fa
+   with zipfile.ZipFile(input_file, 'r') as input_zip:
+     namelist = input_zip.namelist()
+ 
+-  src_spl = "IMAGES/spl-imx{}-{}.bin".format(product, board_type)
++  src_spl = "IMAGES/spl-imx{}-{}.bin".format(product, board_feature)
+   tgt_spl = "IMAGES/spl.img"
+   tgt_spl_bak = "IMAGES/spl_bak.img"
+   if src_spl in namelist:
+-    src_bootloader = "IMAGES/bootloader-imx{}-{}.img".format(product, board_type)
++    src_bootloader = "IMAGES/bootloader-imx{}-{}.img".format(product, board_feature)
+     tgt_bootloader = "IMAGES/bootloader.img"
+     replace = {tgt_bootloader: src_bootloader, tgt_spl: src_spl, tgt_spl_bak: src_spl}
+   else:
+-    src_bootloader = "IMAGES/u-boot-imx{}-{}.imx".format(product, board_type)
++    src_bootloader = "IMAGES/u-boot-imx{}-{}.imx".format(product, board_feature)
+     tgt_bootloader = "IMAGES/bootloader.img"
+     replace = {tgt_bootloader: src_bootloader}
+ 
+@@ -2152,14 +2152,14 @@ def WriteABOTAPackageWithBrilloScript(target_file, output_file,
+   elif OPTIONS.skip_postinstall:
+     target_file = GetTargetFilesZipWithoutPostinstallConfig(target_file)
+ 
+-  if OPTIONS.board_type:
+-    target_file = GetTargetFilesZipWithBoardType(target_file,
++  if OPTIONS.board_feature:
++    target_file = GetTargetFilesZipWithBoardFeature(target_file,
+         target_info.GetBuildProp('ro.build.product').split('_')[-1],
+-        OPTIONS.board_type)
+-  if OPTIONS.board_type and source_file is not None:
+-    source_file = GetTargetFilesZipWithBoardType(source_file,
++        OPTIONS.board_feature)
++  if OPTIONS.board_feature and source_file is not None:
++    source_file = GetTargetFilesZipWithBoardFeature(source_file,
+         target_info.GetBuildProp('ro.build.product').split('_')[-1],
+-        OPTIONS.board_type, True)
++        OPTIONS.board_feature, True)
+ 
+   # Generate payload.
+   payload = Payload()
+@@ -2298,8 +2298,8 @@ def main(argv):
+       OPTIONS.skip_compatibility_check = True
+     elif o == "--output_metadata_path":
+       OPTIONS.output_metadata_path = a
+-    elif o == "--board_type":
+-      OPTIONS.board_type = a
++    elif o == "--board_feature":
++      OPTIONS.board_feature = a
+     else:
+       return False
+     return True
+@@ -2334,7 +2334,7 @@ def main(argv):
+                                  "retrofit_dynamic_partitions",
+                                  "skip_compatibility_check",
+                                  "output_metadata_path=",
+-                                 "board_type=",
++                                 "board_feature=",
+                              ], extra_option_handler=option_handler)
+ 
+   if len(args) != 2:

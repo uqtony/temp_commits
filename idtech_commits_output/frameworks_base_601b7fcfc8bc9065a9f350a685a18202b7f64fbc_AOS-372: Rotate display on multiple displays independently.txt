@@ -1,0 +1,246 @@
+601b7fcfc8bc AndrewS 2020-10-29
+
+AOS-372: Rotate display on multiple displays independently
+
+Change-Id: I43cb0c3030cea90f784ef9352c2ef5de31b13852
+
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index 4f33ebb035da..22bc8fe4c3c8 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1378,7 +1378,9 @@ public final class DisplayManagerService extends SystemService {
+                     + device.getDisplayDeviceInfoLocked());
+             return;
+         }
+-        display.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
++        // For multiple display, need to configure display for each display device.
++        LogicalDisplay configureDisplay = findLogicalDisplayForDeviceLocked(device);
++        configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
+         final int viewportType;
+         // Update the corresponding viewport.
+         if ((info.flags & DisplayDeviceInfo.FLAG_DEFAULT_DISPLAY) != 0) {
+diff --git a/services/core/java/com/android/server/display/LogicalDisplay.java b/services/core/java/com/android/server/display/LogicalDisplay.java
+index a7b90510e6c8..78af8cf63279 100644
+--- a/services/core/java/com/android/server/display/LogicalDisplay.java
++++ b/services/core/java/com/android/server/display/LogicalDisplay.java
+@@ -377,9 +377,9 @@ final class LogicalDisplay {
+         // The orientation specifies how the physical coordinate system of the display
+         // is rotated when the contents of the logical display are rendered.
+         int orientation = Surface.ROTATION_0;
+-        if ((displayDeviceInfo.flags & DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT) != 0) {
+-            orientation = displayInfo.rotation;
+-        }
++        // because the changes in DisplayManagerService, which configure diplay for each display devices,
++        // now we can set orientation from each display's display info.
++        orientation = displayInfo.rotation;
+ 
+         // Apply the physical rotation of the display device itself.
+         orientation = (orientation + displayDeviceInfo.rotation) % 4;
+diff --git a/services/core/java/com/android/server/wm/DisplayContent.java b/services/core/java/com/android/server/wm/DisplayContent.java
+index b5c8b13737c8..1da7bbe81f87 100644
+--- a/services/core/java/com/android/server/wm/DisplayContent.java
++++ b/services/core/java/com/android/server/wm/DisplayContent.java
+@@ -946,6 +946,8 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+             // The policy may be invoked right after here, so it requires the necessary default
+             // fields of this display content.
+             mWmService.mPolicy.setDefaultDisplay(this);
++        } else {
++            mRotation = SystemProperties.getInt("ro.boot.idt_orientation_disp_2", 0)/90;
+         }
+         if (mWmService.mDisplayReady) {
+             mDisplayPolicy.onConfigurationChanged();
+@@ -1543,7 +1545,9 @@ class DisplayContent extends WindowContainer<DisplayContent.DisplayChildWindowCo
+                     = mWmService.mRotationWatchers.get(i);
+             if (rotationWatcher.mDisplayId == mDisplayId) {
+                 try {
++                    mDisplayRotation.setRotationChanged(true);
+                     rotationWatcher.mWatcher.onRotationChanged(rotation);
++                    mDisplayRotation.setRotationChanged(false);
+                 } catch (RemoteException e) {
+                     // Ignore
+                 }
+diff --git a/services/core/java/com/android/server/wm/DisplayRotation.java b/services/core/java/com/android/server/wm/DisplayRotation.java
+index a959d68bee3a..8cc7b153b239 100644
+--- a/services/core/java/com/android/server/wm/DisplayRotation.java
++++ b/services/core/java/com/android/server/wm/DisplayRotation.java
+@@ -93,7 +93,7 @@ public class DisplayRotation {
+ 
+     private int mAllowAllRotations = -1;
+     private int mUserRotationMode = WindowManagerPolicy.USER_ROTATION_FREE;
+-    private int mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
++    private int mUserRotation = Surface.ROTATION_0;
+ 
+     /**
+      * Flag that indicates this is a display that may run better when fixed to user rotation.
+@@ -131,6 +131,7 @@ public class DisplayRotation {
+     private int mDemoRotation;
+     private boolean mDemoHdmiRotationLock;
+     private boolean mDemoRotationLock;
++    private boolean mRotationChanged = false;
+ 
+     DisplayRotation(WindowManagerService service, DisplayContent displayContent) {
+         this(service, displayContent, displayContent.getDisplayPolicy(),
+@@ -160,13 +161,23 @@ public class DisplayRotation {
+         mUndockedHdmiRotation = readRotation(
+                 com.android.internal.R.integer.config_undockedHdmiRotation);
+ 
++        // reset user rotation value to display orientation value configured in properties
++        // and create mSettingsObserver and mOrientationListener for multiple displays
++        final ContentResolver resolver = mContext.getContentResolver();
+         if (isDefaultDisplay) {
+-            final Handler uiHandler = UiThread.getHandler();
+-            mOrientationListener = new OrientationListener(mContext, uiHandler);
+-            mOrientationListener.setCurrentRotation(displayContent.getRotation());
+-            mSettingsObserver = new SettingsObserver(uiHandler);
+-            mSettingsObserver.observe();
++            mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
++            Settings.System.putIntForUser(resolver, Settings.System.USER_ROTATION,
++                    mUserRotation, UserHandle.USER_CURRENT);
++        } else {
++            mUserRotation = SystemProperties.getInt("ro.boot.idt_orientation_disp_2", 0)/90;
++            Settings.System.putIntForUser(resolver, Settings.System.USER_ROTATION_DISP_2,
++                    mUserRotation, UserHandle.USER_CURRENT);
+         }
++        final Handler uiHandler = UiThread.getHandler();
++        mOrientationListener = new OrientationListener(mContext, uiHandler);
++        mOrientationListener.setCurrentRotation(displayContent.getRotation());
++        mSettingsObserver = new SettingsObserver(uiHandler);
++        mSettingsObserver.observe();
+     }
+ 
+     private int readRotation(int resID) {
+@@ -266,22 +277,8 @@ public class DisplayRotation {
+         mFixedToUserRotation = fixedToUserRotation;
+ 
+         // We will retrieve user rotation and user rotation mode from settings for default display.
+-        if (isDefaultDisplay) {
+-            return;
+-        }
+-        if (userRotationMode != WindowManagerPolicy.USER_ROTATION_FREE
+-                && userRotationMode != WindowManagerPolicy.USER_ROTATION_LOCKED) {
+-            Slog.w(TAG, "Trying to restore an invalid user rotation mode " + userRotationMode
+-                    + " for " + mDisplayContent);
+-            userRotationMode = WindowManagerPolicy.USER_ROTATION_FREE;
+-        }
+-        if (userRotation < Surface.ROTATION_0 || userRotation > Surface.ROTATION_270) {
+-            Slog.w(TAG, "Trying to restore an invalid user rotation " + userRotation
+-                    + " for " + mDisplayContent);
+-            userRotation = Surface.ROTATION_0;
+-        }
+-        mUserRotationMode = userRotationMode;
+-        mUserRotation = userRotation;
++        // Add mSettingsObserver for all displays, all displays can retrieve user rotation and
++        // user rotation mode from settings, return direcly here.
+     }
+ 
+     void setFixedToUserRotation(@FixedToUserRotation int fixedToUserRotation) {
+@@ -354,6 +351,18 @@ public class DisplayRotation {
+         }
+     }
+ 
++    /**
++     * mRotationChanged will be set to ture in DisplayContent applyRotationLocked().
++     * and set to false in WindowManagerService freezeRotation() after freezeDisplayRotation()
++     */
++    boolean isRotationChanged() {
++        return mRotationChanged;
++    }
++
++    void setRotationChanged(boolean changed) {
++        mRotationChanged = changed;
++    }
++
+     /**
+      * Returns {@code true} if this display rotation takes app requested orientation into
+      * consideration; {@code false} otherwise. For the time being the only case where this is {@code
+@@ -551,9 +560,6 @@ public class DisplayRotation {
+         final boolean deskDockEnablesAccelerometer =
+                 mDisplayPolicy.isDeskDockEnablesAccelerometer();
+ 
+-        // if property set, use property value as default orientation
+-        int customized_orientation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
+-
+         final int preferredRotation;
+         if (!isDefaultDisplay) {
+             // For secondary displays we ignore things like displays sensors, docking mode and
+@@ -638,10 +644,6 @@ public class DisplayRotation {
+             // of gravity and as NOSENSOR is never affected by gravity, then neither should
+             // NOSENSOR be affected by rotation lock (although it will be affected by docks).
+             preferredRotation = mUserRotation;
+-        } else if (customized_orientation > Surface.ROTATION_0
+-                && customized_orientation <= Surface.ROTATION_270) {
+-            // set preferredRotation as customized orientation
+-            preferredRotation = customized_orientation;
+         } else {
+             // No overriding preference.
+             // We will do exactly what the application asked us to do.
+@@ -705,7 +707,7 @@ public class DisplayRotation {
+                 if (preferredRotation >= 0) {
+                     return preferredRotation;
+                 }
+-                return Surface.ROTATION_0;
++                return mUserRotation;
+         }
+     }
+ 
+@@ -859,8 +861,17 @@ public class DisplayRotation {
+             }
+ 
+             // Configure rotation lock.
+-            // change userRotation value from value of user_rotation to value of ro.idt.orientation
+-            final int userRotation = SystemProperties.getInt("ro.boot.idt_orientation", 0)/90;
++            // read userRotation value from user_rotation/disp_2_user_rotation
++            int userRotation;
++            if (isDefaultDisplay) {
++                 userRotation = Settings.System.getIntForUser(resolver, Settings.System.USER_ROTATION,
++                                                              Surface.ROTATION_0,
++                                                              UserHandle.USER_CURRENT);
++            } else {
++                 userRotation = Settings.System.getIntForUser(resolver, Settings.System.USER_ROTATION_DISP_2,
++                                                              Surface.ROTATION_0,
++                                                              UserHandle.USER_CURRENT);
++            }
+             if (mUserRotation != userRotation) {
+                 mUserRotation = userRotation;
+                 shouldUpdateRotation = true;
+@@ -984,6 +995,16 @@ public class DisplayRotation {
+             resolver.registerContentObserver(Settings.System.getUriFor(
+                     Settings.System.USER_ROTATION), false, this,
+                     UserHandle.USER_ALL);
++            // registerContentObserver for different displays.
++            if (isDefaultDisplay) {
++                 resolver.registerContentObserver(Settings.System.getUriFor(
++                         Settings.System.USER_ROTATION), false, this,
++                         UserHandle.USER_ALL);
++            } else {
++                 resolver.registerContentObserver(Settings.System.getUriFor(
++                         Settings.System.USER_ROTATION_DISP_2), false, this,
++                         UserHandle.USER_ALL);
++            }
+             updateSettings();
+         }
+ 
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index 71b747520ba5..341fa3ada2f8 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -3659,7 +3659,18 @@ public class WindowManagerService extends IWindowManager.Stub
+ 
+     @Override
+     public void freezeRotation(int rotation) {
+-        freezeDisplayRotation(Display.DEFAULT_DISPLAY, rotation);
++        // instead of set default display directly, traverse all displays to see
++        // if rotation changed on each display, mRotationChanged will be set in
++        // DisplayContent.applyRotationLocked()
++        final int displayCount = mRoot.mChildren.size();
++        for (int i = 0; i < displayCount; ++i) {
++            final DisplayContent displayContent = mRoot.mChildren.get(i);
++            final DisplayRotation displayRotation = displayContent.getDisplayRotation();
++
++            if (displayRotation.isRotationChanged()) {
++                freezeDisplayRotation(displayContent.getDisplayId(), rotation);
++            }
++        }
+     }
+ 
+     /**

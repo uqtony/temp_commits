@@ -1,0 +1,371 @@
+3873d104 George.Huang 2021-06-23
+
+AOS-455: copy Quectel vendor RIL files in ProductConfigCommon.mk
+
+- copy Quectel vendor RIL files in ProductConfigCommon.mk
+
+- build rild for all projects
+  ENABLE_VENDOR_RIL_SERVICE :=
+
+- support to detect new Quectel EC25 modem
+  set ro.radio.noril=yes if no modem module is detected
+
+- stop ril-daemon when ro.radio.noril=yes
+
+Change-Id: Icd3cee1e8eb7462ea922ea7600b1122bedc30ac8
+
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 4f001598..d707666f 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -190,6 +190,10 @@ ifneq (,$(filter SENSOR_FUSION ALL,$(DISABLE_FSL_PREBUILT)))
+     PREBUILT_FSL_IMX_SENSOR_FUSION := false
+ endif
+ 
++# -------@block_modem-------
++# unset ENABLE_VENDOR_RIL_SERVICE to build rild
++ENABLE_VENDOR_RIL_SERVICE :=
++
+ # -------@block_treble-------
+ BOARD_VNDK_VERSION := current
+ 
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index fe56bf0a..5df01aec 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -316,8 +316,28 @@ PRODUCT_PACKAGES += \
+     fsl_sensor_fusion \
+     sensors.imx
+ 
+-# -------@block_input-------
++# -------@block_modem-------
++# Copy Quectel vendor RIL
++PRODUCT_COPY_FILES += \
++    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
++    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
++    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
++    vendor/quectel/chat:/system/bin/chat \
++    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
++    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
++    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
++    vendor/quectel/QFlash:/system/bin/QFlash \
++    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
++    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
++    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
++    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
++    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
++    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
++
++# set LTE as default
++PRODUCT_PROPERTY_OVERRIDES += ro.telephony.default_network=10
+ 
++# -------@block_input-------
+ PRODUCT_COPY_FILES += \
+     $(CONFIG_REPO_PATH)/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
+     $(CONFIG_REPO_PATH)/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
+diff --git a/imx8m/aiy_8mq/aiy_8mq.mk b/imx8m/aiy_8mq/aiy_8mq.mk
+index ecfbe1e0..4ba9457c 100644
+--- a/imx8m/aiy_8mq/aiy_8mq.mk
++++ b/imx8m/aiy_8mq/aiy_8mq.mk
+@@ -432,24 +432,6 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ #PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 6936f19c..1d7ce0e9 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -501,24 +501,6 @@ PRODUCT_COPY_FILES += \
+ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
+ PRODUCT_SOONG_NAMESPACES += vendor/partner_gms
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index b5b47b6c..976ff22e 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -439,24 +439,6 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/check_modem.sh b/imx8m/check_modem.sh
+index dea591a7..8e746330 100644
+--- a/imx8m/check_modem.sh
++++ b/imx8m/check_modem.sh
+@@ -5,13 +5,17 @@ check_modem() {
+   idx_limit=3
+   # vendor: Quectel Wireless Solutions Co., Ltd.
+   vendor_id="2c7c"
+-  # product: EG95 LTE modem
+-  product_id="0195"
++  # product:   EG95   EC25   LTE modem
++  product_id=("0195" "0125")
++  product_num=${#product_id[@]}
+ 
+   while [ $idx -lt $idx_limit ]; do
+     idx=$((idx + 1))
+-    eval "lsusb |grep -q 'ID ${vendor_id}:${product_id}$'"
+-    ret=$?
++    ret=1
++    for i in $(seq 0 $((product_num - 1))); do
++      eval "lsusb |grep -q 'ID ${vendor_id}:${product_id[i]}$'"
++      ret=$((ret & $?))
++    done
+     if [ $ret -eq 0 ]; then
+       setprop ro.radio.noril no
+       break
+diff --git a/imx8m/evk_a100/evk_a100.mk b/imx8m/evk_a100/evk_a100.mk
+index d1be6e3a..6c39d175 100644
+--- a/imx8m/evk_a100/evk_a100.mk
++++ b/imx8m/evk_a100/evk_a100.mk
+@@ -367,20 +367,3 @@ PRODUCT_PACKAGES += \
+ 
+ $(call  inherit-product-if-exists, vendor/nxp-private/security/nxp_security.mk)
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+diff --git a/imx8m/evk_a200/evk_a200.mk b/imx8m/evk_a200/evk_a200.mk
+index 13e3a89a..3969a68c 100644
+--- a/imx8m/evk_a200/evk_a200.mk
++++ b/imx8m/evk_a200/evk_a200.mk
+@@ -421,20 +421,3 @@ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
+ 
+ $(call  inherit-product-if-exists, vendor/nxp-private/security/nxp_security.mk)
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+index 45126f71..d6aa3292 100644
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -389,20 +389,3 @@ endif
+ 
+ $(call  inherit-product-if-exists, vendor/nxp-private/security/nxp_security.mk)
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+diff --git a/imx8m/redwood_8mq/redwood_8mq_common.mk b/imx8m/redwood_8mq/redwood_8mq_common.mk
+index 414071ce..c92510a7 100644
+--- a/imx8m/redwood_8mq/redwood_8mq_common.mk
++++ b/imx8m/redwood_8mq/redwood_8mq_common.mk
+@@ -430,24 +430,6 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index 3e643a43..b6a0f6c2 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -427,24 +427,6 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp.mk b/imx8m/vp6820_8mp/vp6820_8mp.mk
+index e945914c..796138e9 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp.mk
+@@ -501,24 +501,6 @@ PRODUCT_COPY_FILES += \
+ $(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
+ PRODUCT_SOONG_NAMESPACES += vendor/partner_gms
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libstdc++.so:/vendor/lib64/libstdc++.so \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index c0f88a98..6d560118 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -435,26 +435,6 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
+     frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
+ 
+-# Copy Quectel vendor RIL
+-PRODUCT_COPY_FILES += \
+-    vendor/quectel/libQuectelreference-ril.so:/vendor/lib64/libQuectelreference-ril.so \
+-    vendor/quectel/ql-ril.conf:/system/etc/ql-ril.conf \
+-    vendor/quectel/apns-conf.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/apns-conf.xml  \
+-    vendor/quectel/chat:/system/bin/chat \
+-    vendor/quectel/ip-down:/system/etc/ppp/ip-down \
+-    vendor/quectel/ip-up:/system/etc/ppp/ip-up \
+-    vendor/quectel/QAndroidLog:/system/bin/QAndroidLog \
+-    vendor/quectel/QFlash:/system/bin/QFlash \
+-    vendor/quectel/T1.LinuxData-OTA-DataService_V01.cfg:/system/data/T1.LinuxData-OTA-DataService_V01.cfg \
+-    vendor/quectel/T2.RegServ-CotextAct_V01.cfg:/system/data/T2.RegServ-CotextAct_V01.cfg \
+-    vendor/quectel/T3.SimpleData_V01.cfg:/system/data/T3.SimpleData_V01.cfg \
+-    vendor/quectel/T4.Throughput_V01.cfg:/system/data/T4.Throughput_V01.cfg \
+-    vendor/quectel/T5.COMMON_V01.cfg:/system/data/T5.COMMON_V01.cfg \
+-    vendor/quectel/T6.FullMessage.SimpleLogPacket_V01.cfg:/system/data/T6.FullMessage.SimpleLogPacket_V01.cfg
+-
+-# set LTE as default
+-PRODUCT_PROPERTY_OVERRIDES += ro.telephony.default_network=10
+-
+ #AMS
+ PRODUCT_PACKAGES += \
+     deviceadmin \

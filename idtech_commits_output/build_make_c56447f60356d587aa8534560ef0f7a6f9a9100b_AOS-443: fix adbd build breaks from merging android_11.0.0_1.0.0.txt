@@ -1,0 +1,40 @@
+c56447f60 George.Huang 2020-12-28
+
+AOS-443: fix adbd build breaks from merging android_11.0.0_1.0.0
+
+Symptom:
+  build/make/core/main.mk:1164: warning:  Host modules should be in PRODUCT_HOST_PACKAGES, not PRODUCT_PACKAGES
+  Offending entries:
+  adbd
+
+Root Cause:
+  adbd is renamed to com.android.adbd
+  "4b7f73c0da Build the adbd apex."
+
+Solution: Rename from adbd to com.android.adbd
+Change-Id: I820bad75104c50b777563ea9c3d750eb32b0debf
+
+diff --git a/target/product/base_system.mk b/target/product/base_system.mk
+index a57905d44..97d3a31c2 100644
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@ -23,9 +23,9 @@ endif
+ 
+ # adbd binary included by userdebug/production/pcidev, removed by pci-user
+ ifneq (pci,$(findstring pci, $(TARGET_PRODUCT)))
+-PRODUCT_PACKAGES += adbd
++PRODUCT_PACKAGES += com.android.adbd
+ else ifeq (pcidev,$(findstring pcidev, $(TARGET_PRODUCT)))
+-PRODUCT_PACKAGES += adbd
++PRODUCT_PACKAGES += com.android.adbd
+ endif
+ 
+ # Base modules and settings for the system partition.
+@@ -63,7 +63,6 @@ PRODUCT_PACKAGES += \
+     cgroups.json \
+     charger \
+     cmd \
+-    com.android.adbd \
+     com.android.conscrypt \
+     com.android.extservices \
+     com.android.i18n \

@@ -1,0 +1,2140 @@
+de4e83cb George.Huang 2020-12-23
+
+Merge tag 'android-11.0.0_1.0.0_history' into HEAD
+
+android-11.0.0_1.0.0_history
+
+Change-Id: I461344fcb0c5460e3d14c361454e8463c073ff6f
+
+diff --cc common/build/kernel.mk
+index 95beb0ca,3c32c38d..36ae307b
+--- a/common/build/kernel.mk
++++ b/common/build/kernel.mk
+@@@ -116,17 -110,19 +110,33 @@@ KERNEL_CONFIG_ADDITION := $(TARGET_DEVI
+  else
+  KERNEL_CONFIG_ADDITION :=
+  endif
+++<<<<<<< HEAD
+ +KERNEL_CONFIG_SECURE :=
+ +ifneq ($(TARGET_KERNEL_SECURE_DEFCONF),)
+ +ifeq (user,$(TARGET_BUILD_VARIANT))
+ +KERNEL_CONFIG_SECURE := $(TARGET_DEVICE_DIR)/$(TARGET_KERNEL_SECURE_DEFCONF)
+ +endif
+ +endif
+ +KERNEL_CONFIG_SRC := $(KERNEL_CONFIG_DEFAULT) \
+ +  $(KERNEL_CONFIG_ADDITION) \
+ +  $(KERNEL_CONFIG_SECURE)
+ +KERNEL_CONFIG := $(KERNEL_OUT)/.config
+ +KERNEL_MERGE_CONFIG := device/idtech/common/tools/mergeconfig.sh
+++=======
++ 
++ ifneq ($(TARGET_KERNEL_GKI_DEFCONF),)
++ KERNEL_CONFIG_GKI := $(TARGET_DEVICE_DIR)/$(TARGET_KERNEL_GKI_DEFCONF)
++ else
++ KERNEL_CONFIG_GKI :=
++ endif
++ 
++ KERNEL_CONFIG_SRC := $(KERNEL_CONFIG_DEFAULT) \
++   $(KERNEL_CONFIG_ADDITION) \
++   $(KERNEL_CONFIG_GKI)
++ 
++ KERNEL_CONFIG := $(KERNEL_OUT)/.config
++ KERNEL_MERGE_CONFIG := $(realpath device/nxp/common/tools/merge_config.sh)
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  KERNEL_HEADERS_INSTALL := $(KERNEL_OUT)/usr
+  #KERNEL_MODULES_INSTALL := $(TARGET_OUT)/lib/modules
+diff --cc common/tools/fastboot_imx_flashall.bat
+index 397fd8c5,82ba97ab..54b2b217
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@@ -41,19 -25,14 +42,27 @@@ set vendor_file=vendor.im
+  set product_file=product.img
+  set partition_file=partition-table.img
+  set super_file=super.img
+++<<<<<<< HEAD
+ +set spl_table_file=spl_tab.img
+++=======
++ set vendorboot_file=vendor_boot.img
+++>>>>>>> android-11.0.0_1.0.0_history
+  set /A support_dtbo=0
+  set /A support_recovery=0
+  set /A support_dualslot=0
+  set /A support_mcu_os=0
+  set /A support_dual_bootloader=0
+  set /A support_dynamic_partition=0
+++<<<<<<< HEAD
+ +set /A support_board_info=0
+ +set /A support_mem_info=0
+ +set /A write_bdinfo_serial=0
+ +set /A support_idt_dual_spl=0
+ +set /A support_idt_backup_spl=0
+ +set /A support_idt_spl_table=0
+++=======
++ set /A support_vendor_boot=0
+++>>>>>>> android-11.0.0_1.0.0_history
+  set dual_bootloader_partition=
+  set bootloader_flashed_to_board=
+  set uboot_proper_to_be_flashed=
+@@@ -67,9 -47,7 +77,13 @@@ set vbmeta_partition=vbmet
+  set dtbo_partition=dtbo
+  set mcu_os_partition=mcu_os
+  set super_partition=super
+++<<<<<<< HEAD
+ +set board_info_partition=board_info
+ +set mem_info_partition=mem_info
+ +set userdata_partition=userdata
+++=======
++ set vendor_boot_partition=vendor_boot
+++>>>>>>> android-11.0.0_1.0.0_history
+  set /A flash_mcu=0
+  set /A statisc=0
+  set /A lock=0
+@@@ -79,24 -58,17 +94,28 @@@ set ser_num
+  set fastboot_tool=fastboot
+  set /A error_level=0
+  set /A flag=1
+ -
+++<<<<<<< HEAD
+ +set lpmake_system_image_a=
+ +set lpmake_system_image_b=
+ +set lpmake_vendor_image_a=
+ +set lpmake_vendor_image_b=
+ +set lpmake_product_image_a=
+ +set lpmake_product_image_b=
+ +set /A dont_generate_super=0
+ +set board_type=
+++=======
+++
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+  :: board running different set of images(android and automative for a example), so misuse the features of one set of
+  :: images when flash another set of images can not be detect early with this scenario.
+  set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+ -set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4
+ -set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+ -set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+ +set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed
+ +set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+ +set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+  set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+- set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi
++ set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen
+  set imx7ulp_uboot_feature=evk-uuu
+  
+  set imx8mm_dtb_feature=ddr4 m4 mipi-panel
+@@@ -136,10 -108,6 +155,13 @@@ if %1 == -l set /A lock=1 & shift & got
+  if %1 == -e set /A erase=1 & shift & goto :parse_loop
+  if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+  if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+++<<<<<<< HEAD
+ +if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+ +if %1 == -tos set /A support_trusty=1 & shift & goto :parse_loop
+ +if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ +if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  echo %1 is an illegal option
+  call :help & goto :eof
+  :parse_end
+@@@ -336,13 -295,6 +358,16 @@@ echo  -D directory      the directory o
+  echo                        No need to use this option if images are in current working directory
+  echo  -s ser_num        the serial number of board
+  echo                        If only one board connected to computer, no need to use this option
+++<<<<<<< HEAD
+ +echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ +echo                        Under the condition that dynamic partition feature are enabled:
+ +echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+ +echo                          if this option is used, make sure super.img already exists together with other images.
+ +echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ +echo                               If not set, use naming from current board_info partition
+ +echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  goto :eof
+  
+  :: this function checks whether the value of first parameter is in the array value of second parameter.
+@@@ -466,16 -391,8 +500,13 @@@ if not [%partition_to_be_flashed:gpt=%
+      goto :start_to_flash
+  )
+  
+ +if not [%partition_to_be_flashed:userdata=%] == [%partition_to_be_flashed%] (
+ +    set img_name=%userdata_file%
+ +    goto :start_to_flash
+ +)
+ +
+  if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+      set img_name=%super_file%
+-     if %dont_generate_super% == 0 (
+-         call :make_super_image
+-     )
+      goto :start_to_flash
+  )
+  
+@@@ -494,10 -403,9 +517,11 @@@ goto :eo
+  
+  
+  :flash_userpartitions
+ +if %support_board_info% == 1 call :flash_partition %board_info_partition% || set /A error_level=1 && goto :exit
+ +if %support_mem_info% == 1 call :flash_partition %mem_info_partition% || set /A error_level=1 && goto :exit
+  if %support_dtbo% == 1 call :flash_partition %dtbo_partition% || set /A error_level=1 && goto :exit
+  if %support_recovery% == 1 call :flash_partition %recovery_partition% || set /A error_level=1 && goto :exit
++ if %support_vendor_boot% == 1 call :flash_partition %vendor_boot_partition% || set /A error_level=1 && goto :exit
+  call :flash_partition %boot_partition% || set /A error_level=1 && goto :exit
+  if %support_dynamic_partition% == 0 (
+      call :flash_partition %system_partition% || set /A error_level=1 && goto :exit
+@@@ -516,78 -428,7 +544,82 @@@ set vendor_partition=vendor%
+  set product_partition=product%1
+  set vbmeta_partition=vbmeta%1
+  set dtbo_partition=dtbo%1
+++<<<<<<< HEAD
+ +set mem_info_partition=mem_info%1
+ +goto :eof
+ +
+ +:check_board_info
+ +if not [%board_info_file%] == [] (
+ +    :: P1. if -d board_info_file is set, make sure it does exist
+ +    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%%board_info_file%`) DO (SET board_info_file=%%~nF.img)
+ +    FOR /F "tokens=2,3,4 delims=-" %%F IN ("%board_info_file%") DO (SET board_info_temp=%%F-%%G-%%H)
+ +)
+ +if not [%board_info_file%] == [] (
+ +    FOR /F "tokens=1 delims=_" %%F IN ("%board_info_temp%") DO (SET som_model=%%F)
+ +    FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
+ +    FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
+ +    FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
+ +    FOR /F "tokens=5 delims=_" %%F IN ("%board_info_temp%") DO (SET dev_ddr=%%F)
+ +)
+ +if not [%board_info_file%] == [] (
+ +    FOR /F "tokens=2 delims=-" %%F IN ("%som_plc%") DO (SET som_rev=%%F)
+ +    FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
+ +    FOR /F "tokens=2 delims=-" %%F IN ("%mb_plc%") DO (SET mb_rev=%%F)
+ +    FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
+ +    FOR /F "tokens=1 delims=." %%F IN ("%dev_ddr%") DO (SET dev_ddr=%%F)
+ +)
+ +if [%board_info_file%] == [] (
+ +    :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
+ +    %fastboot_tool% oem getvar som-model 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-model: fastboot_oem.log') DO (SET som_model=%%F)
+ +    %fastboot_tool% oem getvar som-plc 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-plc: fastboot_oem.log') DO (SET som_plc=%%F)
+ +    %fastboot_tool% oem getvar som-rev 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-rev: fastboot_oem.log') DO (SET som_rev=%%F)
+ +    %fastboot_tool% oem getvar mb-model 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-model: fastboot_oem.log') DO (SET mb_model=%%F)
+ +    %fastboot_tool% oem getvar mb-plc 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
+ +    %fastboot_tool% oem getvar mb-rev 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-rev: fastboot_oem.log') DO (SET mb_rev=%%F)
+ +    %fastboot_tool% oem getvar dev-ddr 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR dev-ddr: fastboot_oem.log') DO (SET dev_ddr=%%F)
+ +)
+ +if [%board_info_file%] == [] (
+ +    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img
+ +    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img`) DO (SET board_info_file=%%~nF.img)
+ +)
+ +if [%board_info_file%] == [] (
+ +    :: P3. Notify user to provide correct -d board_info_file
+ +    echo Error: Please add -bdinfo board_info_file option to find correct board_info image.
+ +    set /A error_level=2 && goto :exit
+ +)
+ +goto :eof
+ +
+ +:check_android_info
+ +IF NOT EXIST %image_directory%%android_info_file% (
+ +    echo Error: android-info.txt not found
+ +    set /A error_level=3 && goto :exit
+ +)
+ +FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android_info_file%') DO (SET som_opt=%%F)
+ +FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
+ +FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
+ +FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
+ +set /A match_som=0
+ +set /A match_mb=0
+ +FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
+ +FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
+ +IF NOT [%match_som%] == [1] (
+ +    echo Error: %som_model% and values in android-info.txt are mismatched
+ +    set /A error_level=3 && goto :exit
+ +)
+ +IF NOT [%match_mb%] GEQ [1] (
+ +    echo Error: %mb_model% and values in android-info.txt are mismatched
+ +    set /A error_level=3 && goto :exit
+ +)
+++=======
++ set vendor_boot_partition=vendor_boot%1
+++>>>>>>> android-11.0.0_1.0.0_history
+  goto :eof
+  
+  :flash_android
+@@@ -605,20 -443,10 +637,22 @@@ find "recovery" fastboot_var.log > nul 
+  ::use boot_b to check whether current gpt support a/b slot
+  find "boot_b" fastboot_var.log > nul && set /A support_dualslot=1
+  find "super" fastboot_var.log > nul && set /A support_dynamic_partition=1
++ find "vendor_boot" fastboot_var.log > nul && set /A support_vendor_boot=1
++ find "system_ext" fastboot_var.log > nul && set /A has_system_ext_partition=1
+  del fastboot_var.log
+  
+ +if %support_board_info% == 1 (
+ +    call :check_board_info
+ +    if [%ERRORLEVEL%] == [2] goto :exit
+ +    call :check_android_info
+ +    if [%ERRORLEVEL%] == [3] goto :exit
+ +)
+ +if %support_board_info% == 1 (
+ +    set board_type=-%mb_model%
+ +)
+ +if [%som_model%] == [imx8mn] if [%mb_model%] == [evk] (
+ +    set ddr_type=-ddr4
+ +)
+  :: some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+  
+  :: uboot or spl&bootloader
+@@@ -651,22 -478,13 +687,25 @@@ if %support_dual_bootloader% == 1 
+          %fastboot_tool% set_active a
+      )
+  )
+ +
+ +if %support_board_info% == 1 (
+ +    call :flash_partition board_info || set /A error_level=1 && goto :exit
+ +)
+ +if %support_mem_info% == 1 (
+ +    if not [%slot%] == [] (
+ +        call :flash_partition mem_info%slot% || set /A error_level=1 && goto :exit
+ +    ) else (
+ +        call :flash_partition mem_info_a || set /A error_level=1 && goto :exit
+ +        call :flash_partition mem_info_b || set /A error_level=1 && goto :exit
+ +    )
+ +)
+  :: full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+- %fastboot_tool% reboot bootloader
+- :: pause for about 5 second
+- ping localhost -n 6 >nul
++ :: XEN images on mek_8qm, it can't reboot
++ if not [%dtb_feature%] == [xen] (
++     %fastboot_tool% reboot bootloader
++     :: pause for about 5 second
++     ping localhost -n 6 >nul
++ )
+  
+  %fastboot_tool% getvar all 2> fastboot_var.log
+  find "mcu_os" fastboot_var.log > nul && set /A support_mcu_os=1
+diff --cc common/tools/fastboot_imx_flashall.sh
+index 7e356865,ee1aa979..9e38c1bb
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@@ -76,14 -76,6 +76,17 @@@ options
+                          No need to use this option if images are in current working directory
+    -s ser_num        the serial number of board
+                          If only one board connected to computer, no need to use this option
+++<<<<<<< HEAD
+ +  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ +                        Under the condition that dynamic partition feature are enabled:
+ +                          if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+ +                          if this option is used, make sure super.img already exists together with other images.
+ +  -R                with this option used, choose the u-boot about 1GB RAM setting.
+ +  -bdinfo board_info_file  flash board_info with this board_info_file image
+ +                               If not set, use naming from current board_info partition
+ +  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  EOF
+  
+  }
+@@@ -134,26 -128,9 +141,23 @@@ function flash_partitio
+          fi
+      elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" -a "${dtb_feature}" != "" ]; then
+          img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
+ +    elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
+ +        img_name="${board_info_file}"
+ +    elif [ "$(echo ${1} | grep "mem_info")" != "" ]; then
+ +        img_name="${mem_info_file}"
+ +    elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
+ +        if [ "${1%_*}" == "dtbo" -a -f "${image_directory}${dtbo_file}" ]; then
+ +            img_name="${dtbo_file}"
+ +        elif [ "${1%_*}" == "vbmeta" -a -f "${image_directory}${vbmeta_file}" ]; then
+ +            img_name="${vbmeta_file}"
+ +        else
+ +            img_name="${1%_*}-${soc_name}.img"
+ +        fi
+      elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+          img_name=${partition_file}
+ +    elif [ "$(echo ${1} | grep "userdata")" != "" ]; then
+ +        img_name=${userdata_file}
+      elif [ "$(echo ${1} | grep "super")" != "" ]; then
+-         if [ ${dont_generate_super} -eq 0 ]; then
+-             make_super_image
+-         fi
+          img_name=${super_file}
+      else
+          img_name="${1%_*}-${soc_name}.img"
+@@@ -204,78 -177,7 +212,82 @@@ function flash_partition_nam
+      product_partition="product"${1}
+      vbmeta_partition="vbmeta"${1}
+      dtbo_partition="dtbo"${1}
+++<<<<<<< HEAD
+ +    mem_info_partition="mem_info"${1}
+ +}
+ +
+ +function check_board_info
+ +{
+ +    # 1. if -d board_info_file is set, make sure it does exist
+ +    if [ -n "${board_info_file}" ]; then
+ +        board_info_file="$(basename $(find ${image_directory}${board_info_file} |tail -n1))"
+ +        board_info_temp="${board_info_file#board_info-}"
+ +        som_model="$(echo $board_info_temp |cut -d'_' -f1)"
+ +        som_plc="$(echo $board_info_temp |cut -d'_' -f2 |cut -d'-' -f1)"
+ +        som_rev="$(echo $board_info_temp |cut -d'-' -f2 |cut -d'_' -f1)"
+ +        mb_model="$(echo $board_info_temp |cut -d'_' -f3)"
+ +        mb_plc="$(echo $board_info_temp |cut -d'_' -f4 |cut -d'-' -f1)"
+ +        mb_rev="$(echo $board_info_temp |cut -d'-' -f3 |cut -d'_' -f1)"
+ +        dev_ddr="$(echo $board_info_temp |cut -d'_' -f5 |cut -d'.' -f1)"
+ +    fi
+ +    # 2. get som_model / som_plc / mb_model / mb_plc via fastboot
+ +    if [ -z "${board_info_file}" ]; then
+ +        result=`${fastboot_tool} oem getvar som-model 2>&1 |grep som-model:` || true
+ +        som_model=${result##* }
+ +        result=`${fastboot_tool} oem getvar som-plc 2>&1 |grep som-plc:` || true
+ +        som_plc=${result##* }
+ +        result=`${fastboot_tool} oem getvar som-rev 2>&1 |grep som-rev:` || true
+ +        som_rev=${result##* }
+ +        result=`${fastboot_tool} oem getvar mb-model 2>&1 |grep mb-model:` || true
+ +        mb_model=${result##* }
+ +        result=`${fastboot_tool} oem getvar mb-plc 2>&1 |grep mb-plc:` || true
+ +        mb_plc=${result##* }
+ +        result=`${fastboot_tool} oem getvar mb-rev 2>&1 |grep mb-rev:` || true
+ +        mb_rev=${result##* }
+ +        result=`${fastboot_tool} oem getvar dev-ddr 2>&1 |grep dev-ddr:` || true
+ +        dev_ddr=${result##* }
+ +        board_info_file="$(basename $(find ${image_directory}board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img |tail -n1))"
+ +        echo -e ${GREEN}Try to get board_info image via fastboot${STD} \
+ +                with board_info-${som_model}_${som_plc}-${som_rev}_${mb_model}_${mb_plc}-${mb_rev}_${dev_ddr}.img
+ +    fi
+ +    # 3. Notify user to provide correct -d board_info_file
+ +    if [ ! -f "${image_directory}${board_info_file}" ]; then
+ +        echo -e ${RED}Please add -bdinfo board_info_file option to find correct board_info image.${STD}
+ +        exit 1;
+ +    fi
+ +}
+ +
+ +function check_android_info
+ +{
+ +    match_som=0
+ +    match_mb=0
+ +
+ +    if [ ! -f ${image_directory}${android_info_file} ]; then
+ +        echo -e ${RED}android-info.txt not found${STD}
+ +        exit 1;
+ +    fi
+ +    for val in `grep "som_model=" ${image_directory}${android_info_file} |sed "s|^som_model=||g" |sed "s|\|| |g"`;
+ +    do
+ +        [ "${som_model}" == "${val}" ] && match_som=$((match_som + 1))
+ +    done
+ +
+ +    if [ ! ${match_som} -eq 1 ]; then
+ +        echo -e ${RED}${som_model} and values in android-info.txt are mismatched
+ +	exit 1
+ +    fi
+ +
+ +    for val in `grep "mb_model=" ${image_directory}${android_info_file} |sed "s|^mb_model=||g" |sed "s|\|| |g"`;
+ +    do
+ +        [ "${mb_model}" == "${val}" ] && match_mb=$((match_mb + 1))
+ +    done
+ +
+ +    if [ ! ${match_mb} -ge 1 ]; then
+ +        echo -e ${RED}${mb_model} and values in android-info.txt are mismatched
+ +        exit 1
+ +    fi
+++=======
++     vendor_boot_partition="vendor_boot"${1}
+++>>>>>>> android-11.0.0_1.0.0_history
+  }
+  
+  function flash_android
+@@@ -294,17 -193,9 +306,19 @@@
+      # use boot_b to check whether current gpt support a/b slot
+      grep -q "boot_b" /tmp/fastboot_var.log && support_dualslot=1
+      grep -q "super" /tmp/fastboot_var.log && support_dynamic_partition=1
++     grep -q "vendor_boot" /tmp/fastboot_var.log && support_vendor_boot=1
++     grep -q "system_ext" /tmp/fastboot_var.log && has_system_ext_partition=1
+  
+ +    if [ ${support_board_info} -eq 1 ]; then
+ +        check_board_info
+ +        check_android_info
+ +        board_type="-${mb_model}"
+ +    fi
+ +
+ +    if [ "${som_model}" = "imx8mn" ] && [ "${mb_model}" = "evk" ]; then
+ +        ddr_type="-ddr4"
+ +    fi
+ +
+      # some partitions are hard-coded in uboot, flash the uboot first and then reboot to check these partitions
+  
+      # uboot or spl&bootloader
+@@@ -316,14 -207,13 +330,16 @@@
+      fi
+  
+      # in the source code, if AB slot feature is supported, uboot partition name is bootloader0, otherwise it's bootloader
+-     if [ ${support_dualslot} -eq 1 ]; then
+-          flash_partition "bootloader0"
+-     else
+-          flash_partition "bootloader"
++     if [ "${dtb_feature}" != "xen" ]; then
++         if [ ${support_dualslot} -eq 1 ]; then
++             flash_partition "bootloader0"
++         else
++             flash_partition "bootloader"
++         fi
+      fi
+ +    if [ ${support_idt_dual_spl} -eq 1 ]; then
+ +         flash_partition "bootloader1"
+ +    fi
+  
+      # if a platform doesn't support dual slot but a slot is selected, ignore it.
+      if [ ${support_dualslot} -eq 0 ] && [ "${slot}" != "" ]; then
+@@@ -346,25 -236,12 +362,28 @@@
+          fi
+      fi
+  
+ +    if [ ${support_board_info} -eq 1 ]; then
+ +        flash_partition "board_info"
+ +    fi
+ +
+ +    if [ ${support_mem_info} -eq 1 ]; then
+ +        if [ "${slot}" != "" ]; then
+ +            mem_info_partition="mem_info"${slot}
+ +            flash_partition ${mem_info_partition}
+ +        else
+ +            mem_info_partition="mem_info_a"
+ +            flash_partition ${mem_info_partition}
+ +            mem_info_partition="mem_info_b"
+ +            flash_partition ${mem_info_partition}
+ +        fi
+ +    fi
+ +
+      # full uboot is flashed to the board and active slot is set, reboot to u-boot fastboot boot command
+-     ${fastboot_tool} reboot bootloader
+-     sleep 5
++     # XEN images on mek_8qm, it can't reboot
++     if [ "${dtb_feature}" != "xen" ]; then
++         ${fastboot_tool} reboot bootloader
++         sleep 5
++     fi
+  
+      ${fastboot_tool} getvar all 2>/tmp/fastboot_var.log
+      grep -q `echo ${mcu_os_partition}` /tmp/fastboot_var.log && support_mcu_os=1
+@@@ -400,65 -265,10 +419,29 @@@
+      if [ ${support_dynamic_partition} -eq 1 ]; then
+          flash_partition ${super_partition}
+      fi
+ +
+ +    if [ ${write_bdinfo_serial} -eq 1 ]; then
+ +        ${fastboot_tool} oem setvar dev-serial ${serialno_str}
+ +    fi
+  }
+  
+- # this function will invoke lpmake to create super.img, the super.img will
+- # be created in /tmp, make sure that there is enouth space
+- function make_super_image
+- {
+-     rm -rf /tmp/${super_file}
+-     # now dynamic partition is only enabled in dual slot condition
+-     if [ ${support_dualslot} -eq 1 ]; then
+-         if [ "${slot}" == "_a" ]; then
+-             lpmake_system_image_a="--image system_a=${image_directory}${systemimage_file}"
+-             lpmake_vendor_image_a="--image vendor_a=${image_directory}${vendor_file}"
+-             lpmake_product_image_a="--image product_a=${image_directory}${product_file}"
+-         elif [ "${slot}" == "_b" ]; then
+-             lpmake_system_image_b="--image system_b=${image_directory}${systemimage_file}"
+-             lpmake_vendor_image_b="--image vendor_b=${image_directory}${vendor_file}"
+-             lpmake_product_image_b="--image product_b=${image_directory}${product_file}"
+-         else
+-             lpmake_system_image_a="--image system_a=${image_directory}${systemimage_file}"
+-             lpmake_vendor_image_a="--image vendor_a=${image_directory}${vendor_file}"
+-             lpmake_product_image_a="--image product_a=${image_directory}${product_file}"
+-             lpmake_system_image_b="--image system_b=${image_directory}${systemimage_file}"
+-             lpmake_vendor_image_b="--image vendor_b=${image_directory}${vendor_file}"
+-             lpmake_product_image_b="--image product_b=${image_directory}${product_file}"
+-         fi
+-     fi
+- 
+-     ${image_directory}lpmake --metadata-size 65536 --super-name super --metadata-slots 3 --device super:7516192768 \
+-         --group nxp_dynamic_partitions_a:3747610624 --group nxp_dynamic_partitions_b:3747610624 \
+-         --partition system_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_system_image_a} \
+-         --partition system_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_system_image_b} \
+-         --partition vendor_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_vendor_image_a} \
+-         --partition vendor_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_vendor_image_b} \
+-         --partition product_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_product_image_a} \
+-         --partition product_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_product_image_b} \
+-         --sparse --output /tmp/${super_file}
+- }
+- 
+  
+  # parse command line
+ +som_model=""
+ +som_plc=""
+ +som_rev=""
+ +mb_model=""
+ +mb_plc=""
+ +mb_rev=""
+ +dev_ddr=""
+ +ddr_type="-lpddr4"
+ +board_info_file=""
+ +board_info_temp=""
+ +mem_info_file="mem_info.img"
+ +dtbo_file="dtbo.img"
+ +vbmeta_file="vbmeta.img"
+ +android_info_file="android-info.txt"
+ +userdata_file="userdata.img"
+  soc_name=""
+  uboot_feature=""
+  dtb_feature=""
+@@@ -476,12 -286,7 +460,16 @@@ support_dualslot=
+  support_mcu_os=0
+  support_dual_bootloader=0
+  support_dynamic_partition=0
+++<<<<<<< HEAD
+ +support_board_info=0
+ +support_mem_info=0
+ +write_bdinfo_serial=0
+ +support_idt_dual_spl=0
+ +support_idt_backup_spl=0
+ +support_idt_spl_table=0
+++=======
++ support_vendor_boot=0
+++>>>>>>> android-11.0.0_1.0.0_history
+  dual_bootloader_partition=""
+  bootloader_flashed_to_board=""
+  uboot_proper_to_be_flashed=""
+@@@ -494,9 -301,7 +484,13 @@@ vbmeta_partition="vbmeta
+  dtbo_partition="dtbo"
+  mcu_os_partition="mcu_os"
+  super_partition="super"
+++<<<<<<< HEAD
+ +board_info_partition="board_info"
+ +mem_info_partition="mem_info"
+ +userdata_partition="userdata"
+++=======
++ vendor_boot_partition="vendor_boot"
+++>>>>>>> android-11.0.0_1.0.0_history
+  flash_mcu=0
+  lock=0
+  erase=0
+@@@ -506,28 -311,18 +500,26 @@@ fastboot_tool="fastboot
+  RED='[0;31m'
+  STD='[0;0m'
+  GREEN='[0;32m'
+- lpmake_system_image_a=""
+- lpmake_system_image_b=""
+- lpmake_vendor_image_a=""
+- lpmake_vendor_image_b=""
+- lpmake_product_image_a=""
+- lpmake_product_image_b=""
+  result_value=0
+++<<<<<<< HEAD
+ +dont_generate_super=0
+ +YELLOW='[0;33m'
+ +ramsize=""
+ +ramsizetest=0
+ +board_type=""
+++=======
++ 
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+  # board running different set of images(android and automative for a example), so misuse the features of one set of
+  # images when flash another set of images can not be detect early with this scenario.
+  imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+ -imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4)
+ -imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ -imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ +imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed)
+ +imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+ +imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+  imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+- imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi)
++ imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen)
+  imx7ulp_uboot_feature=(evk-uuu)
+  
+  imx8mm_dtb_feature=(ddr4 m4 mipi-panel)
+@@@ -559,10 -354,6 +551,13 @@@ while [ $# -gt 0 ]; d
+          -l) lock=1 ;;
+          -D) image_directory=$2; shift;;
+          -s) ser_num=$2; shift;;
+++<<<<<<< HEAD
+ +        -super) dont_generate_super=1 ;;
+ +        -R) ramsizetest=1 ;;
+ +        -bdinfo) board_info_file=$2; shift;;
+ +        -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+          *)  echo -e ${RED}$1${STD} is not an illegal option
+              help; exit;;
+      esac
+diff --cc common/tools/imx-make.sh
+index 752bcce9,ba38da3b..f95ab927
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@@ -113,14 -121,15 +121,19 @@@ if [ ${build_bootloader_kernel_flag} -e
+  fi
+  
+  # vvcam.ko need build with kernel each time to make sure "insmod vvcam.ko" works
+ -if [ -n "${build_kernel}" ] && [ ${TARGET_PRODUCT} = "evk_8mp" ]; then
+ +if [ -n "${build_kernel}" ] && [ ${TARGET_PRODUCT##*_} = "8mp" ]; then
+      build_vvcam="vvcam";
++     build_kernel_module_flag=1;
+  fi
+  
+++<<<<<<< HEAD
+ +product_makefile=`pwd`/`find device/idtech -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++=======
++ product_makefile=`pwd`/`find device/nxp -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++>>>>>>> android-11.0.0_1.0.0_history
+  product_path=${product_makefile%/*}
+  soc_path=${product_path%/*}
+- fsl_git_path=${soc_path%/*}
++ nxp_git_path=${soc_path%/*}
+  
+  # if uboot is to be compiled, remove the UBOOT_COLLECTION directory
+  if [ -n "${build_bootloader}" ]; then
+diff --cc common/tools/update_kerenl_header.sh
+index 67fa214d,629f35ec..9541f571
+--- a/common/tools/update_kerenl_header.sh
++++ b/common/tools/update_kerenl_header.sh
+@@@ -2,12 -2,12 +2,20 @@@
+  
+  # usage: cd android_dir & ./common/tools/update_kerenl_header.sh
+  # if user add imx special user header file, you can use below way to update:
+++<<<<<<< HEAD
+ +# cd android_dir & touch device/idtech/common/kernel-headers/linux/new_uapi &
+++=======
++ # cd android_dir & touch device/nxp/common/kernel-headers/linux/new_uapi &
+++>>>>>>> android-11.0.0_1.0.0_history
+  # ./common/tools/update_kerenl_header.sh
+  
+  bionic_uapi_tool_path="bionic/libc/kernel/tools"
+  bionic_kernel_header_path="bionic/libc/kernel/uapi/linux"
+++<<<<<<< HEAD
+ +imx_kernel_header_path="idtech"
+++=======
++ imx_kernel_header_path="device/nxp/common/kernel-headers/linux/"
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  function prepare_work
+  {
+@@@ -35,7 -35,7 +43,11 @@@ ${bionic_uapi_tool_path}/update_all.p
+  
+  for file in $(ls ${imx_kernel_header_path})
+  do
+++<<<<<<< HEAD
+ +    cp ${bionic_kernel_header_path}/$file device/idtech/common/kernel-headers/linux/.
+++=======
++     cp ${bionic_kernel_header_path}/$file device/nxp/common/kernel-headers/linux/.
+++>>>>>>> android-11.0.0_1.0.0_history
+  done
+  
+  clean_work
+diff --cc common/tools/uuu_imx_android_flash.bat
+index 20680251,6b29cf6d..8266c286
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@@ -45,19 -26,14 +46,27 @@@ set vendor_file=vendor.im
+  set product_file=product.img
+  set partition_file=partition-table.img
+  set super_file=super.img
+++<<<<<<< HEAD
+ +set spl_table_file=spl_tab.img
+++=======
++ set vendorboot_file=vendor_boot.img
+++>>>>>>> android-11.0.0_1.0.0_history
+  set /A support_dtbo=0
+  set /A support_recovery=0
+  set /A support_dualslot=0
+  set /A support_mcu_os=0
+  set /A support_trusty=0
+  set /A support_dynamic_partition=0
+++<<<<<<< HEAD
+ +set /A support_board_info=0
+ +set /A support_mem_info=0
+ +set /A write_bdinfo_serial=0
+ +set /A support_idt_dual_spl=0
+ +set /A support_idt_backup_spl=0
+ +set /A support_idt_spl_table=0
+++=======
++ set /A support_vendor_boot=0
+++>>>>>>> android-11.0.0_1.0.0_history
+  set boot_partition=boot
+  set recovery_partition=recovery
+  set system_partition=system
+@@@ -65,11 -42,9 +75,12 @@@ set vendor_partition=vendo
+  set product_partition=product
+  set vbmeta_partition=vbmeta
+  set dtbo_partition=dtbo
++ set vendor_boot_partition=vendor_boot
+  set mcu_os_partition=mcu_os
+  set super_partition=super
+ +set board_info_partition=board_info
+ +set mem_info_partition=mem_info
+ +set userdata_partition=userdata
+  set /A flash_mcu=0
+  set /A statisc=0
+  set /A erase=0
+@@@ -96,25 -70,21 +108,33 @@@ set dual_bootloader_partition
+  set /A daemon_mode=0
+  set /A flag=1
+  set /A dryrun=0
+++<<<<<<< HEAD
+ +set lpmake_system_image_a=
+ +set lpmake_system_image_b=
+ +set lpmake_vendor_image_a=
+ +set lpmake_vendor_image_b=
+ +set lpmake_product_image_a=
+ +set lpmake_product_image_b=
+ +set /A dont_generate_super=0
+ +set board_type=
+ +set max_download_size=0x19000000
+++=======
++ set tmp_dir=%TMP%
++ if not [%tmp_dir%] == [] (
++     set tmp_dir=%tmp_dir%\
++ )
++ 
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+  :: board running different set of images(android and automative for a example), so misuse the features of one set of
+  :: images when flash another set of images can not be detect early with this scenario.
+  set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+ -set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4
+ -set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+ -set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+ +set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed
+ +set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+ +set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed
+  set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+- set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi
++ set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen
+  set imx7ulp_uboot_feature=evk-uuu
+  
+  set imx8mm_dtb_feature=ddr4 m4 mipi-panel
+@@@ -154,9 -124,6 +174,12 @@@ if %1 == -y set yocto_image=%2&shift &s
+  if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+  if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+  if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+++<<<<<<< HEAD
+ +if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+ +if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ +if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  echo unknown option "%1", please check it.
+  call :help & set /A error_level=1 && goto :exit
+  :parse_end
+@@@ -235,44 -186,44 +266,52 @@@ if [%support_dual_bootloader%] equ [1] 
+  )else (
+      if %card_size% gtr 0 set partition_file=partition-table-%card_size%GB.img
+  )
+ -
+ +set userdata_file=%partition_file:partition-table=userdata%
+  
+  :: dump the partition table image file into text file and check whether some partition names are in it
+- if exist partition-table_1.txt (
+-     del partition-table_1.txt
++ if exist %tmp_dir%partition-table_1.txt (
++     del %tmp_dir%partition-table_1.txt
+  )
+- certutil -encodehex %image_directory%%partition_file% partition-table_1.txt > nul
++ certutil -encodehex %image_directory%%partition_file% %tmp_dir%partition-table_1.txt > nul
+  :: get the last column, it's ASCII character of the values in partition table file. none-printable value displays as a dot
+- if exist partition-table_2.txt (
+-     del partition-table_2.txt
++ if exist %tmp_dir%partition-table_2.txt (
++     del %tmp_dir%partition-table_2.txt
+  )
+  :: put all the lines in a file into one line
+- for /f "tokens=17 delims= " %%I in (partition-table_1.txt) do echo %%I>> partition-table_2.txt
+- if exist partition-table_3.txt (
+-     del partition-table_3.txt
++ for /f "tokens=17 delims= " %%I in (%tmp_dir%partition-table_1.txt) do echo %%I>> %tmp_dir%partition-table_2.txt
++ if exist %tmp_dir%partition-table_3.txt (
++     del %tmp_dir%partition-table_3.txt
+  )
+- for /f "delims=" %%J in (partition-table_2.txt) do (
+-     set /p="%%J"<nul>>partition-table_3.txt 2>nul
++ for /f "delims=" %%J in (%tmp_dir%partition-table_2.txt) do (
++     set /p="%%J"<nul>>%tmp_dir%partition-table_3.txt 2>nul
+  )
+  
+  :: check whether there is "bootloader_b" in partition file
+++<<<<<<< HEAD
+ +find "b.o.o.t.l.o.a.d.e.r._.b." partition-table_3.txt > nul && set /A support_dual_bootloader=1 && echo dual bootloader is supported
+ +:: check whether there is "board_info" in partition file
+ +find "b.o.a.r.d._.i.n.f.o." partition-table_3.txt > nul && set /A support_board_info=1 && echo board_info is supported
+ +:: check whether there is "mem_info" in partition file
+ +find "m.e.m._.i.n.f.o." partition-table_3.txt > nul && set /A support_mem_info=1 && echo mem_info is supported
+++=======
++ find "b.o.o.t.l.o.a.d.e.r._.b." %tmp_dir%partition-table_3.txt > nul && set /A support_dual_bootloader=1 && echo dual bootloader is supported
+++>>>>>>> android-11.0.0_1.0.0_history
+  :: check whether there is "dtbo" in partition file
+- find "d.t.b.o." partition-table_3.txt > nul && set /A support_dtbo=1 && echo dtbo is supported
++ find "d.t.b.o." %tmp_dir%partition-table_3.txt > nul && set /A support_dtbo=1 && echo dtbo is supported
+  :: check whether there is "recovery" in partition file
+- find "r.e.c.o.v.e.r.y." partition-table_3.txt > nul && set /A support_recovery=1 && echo recovery is supported
++ find "r.e.c.o.v.e.r.y." %tmp_dir%partition-table_3.txt > nul && set /A support_recovery=1 && echo recovery is supported
+  :: check whether there is "boot_b" in partition file
+- find "b.o.o.t._.b." partition-table_3.txt > nul && set /A support_dualslot=1 && echo dual slot is supported
++ find "b.o.o.t._.b." %tmp_dir%partition-table_3.txt > nul && set /A support_dualslot=1 && echo dual slot is supported
+  :: check whether there is "super" in partition table
+- find "s.u.p.e.r." partition-table_3.txt > nul && set /A support_dynamic_partition=1 && echo dynamic partition is supported
++ find "s.u.p.e.r." %tmp_dir%partition-table_3.txt > nul && set /A support_dynamic_partition=1 && echo dynamic partition is supported
++ :: check whether there is "vendor_boot" in partition table
++ find "v.e.n.d.o.r._.b.o.o.t." %tmp_dir%partition-table_3.txt > nul && set /A support_vendor_boot=1 && echo vendor_boot is supported
++ :: check whether there is system_ext in partition table
++ find "s.y.s.t.e.m._.e.x.t." %tmp_dir%partition-table_3.txt > nul && set /A has_system_ext_partition=1
+  
+- del partition-table_1.txt
+- del partition-table_2.txt
+- del partition-table_3.txt
++ del %tmp_dir%partition-table_1.txt
++ del %tmp_dir%partition-table_2.txt
++ del %tmp_dir%partition-table_3.txt
+  
+  :: get device and board specific parameter, for now, this step can't make sure the soc_name is definitely correct
+  if not [%soc_name:imx8qm=%] == [%soc_name%] (
+@@@ -527,16 -476,12 +581,20 @@@ if not [%slot%] == [] if %support_duals
+  
+  if %erase% == 1 (
+      if %support_recovery% == 1 (
+-         echo FB[-t 600000]: erase cache>> uuu.lst
++         echo FB[-t 600000]: erase cache>> %tmp_dir%uuu.lst
+      )
+++<<<<<<< HEAD
+ +    if EXIST %image_directory%%userdata_file% (
+ +        call :flash_partition %userdata_partition% || set /A error_level=1 && goto :exit
+ +    ) else (
+ +        echo FB[-t 600000]: erase userdata>> uuu.lst
+ +    )
+++=======
++     echo FB[-t 600000]: erase userdata>> %tmp_dir%uuu.lst
+++>>>>>>> android-11.0.0_1.0.0_history
+  )
+  
+- echo FB: done >> uuu.lst
++ echo FB: done >> %tmp_dir%uuu.lst
+  
+  if [%dryrun%] == [1] (
+      goto :exit
+@@@ -544,15 -489,12 +602,23 @@@
+  
+  echo uuu script generated, start to invoke uuu with the generated uuu script
+  
+ +IF EXIST %image_directory%%uuu_tool% (
+ +    set uuu_tool=%image_directory%%uuu_tool%
+ +)
+  if %daemon_mode% equ 1 (
+++<<<<<<< HEAD
+ +    %uuu_tool% -d uuu.lst
+ +) else (
+ +    %uuu_tool% uuu.lst
+ +    del *.link
+ +    del uuu.lst
+++=======
++     uuu -d %tmp_dir%uuu.lst
++ ) else (
++     uuu %tmp_dir%uuu.lst
++     del %tmp_dir%*.link
++     del %tmp_dir%uuu.lst
+++>>>>>>> android-11.0.0_1.0.0_history
+  )
+  
+  
+@@@ -648,12 -589,6 +714,15 @@@ echo  -i                with this optio
+  echo                        This option is for users to manually flash the images to partitions they want to
+  echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+  echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+++<<<<<<< HEAD
+ +echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ +echo                        Under the condition that dynamic partition feature are enabled:
+ +echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+ +echo                          if this option is used, make sure super.img already exists together with other images.
+ +echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ +echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  goto :eof
+  
+  
+@@@ -699,13 -634,13 +768,17 @@@ if [%board%] == [] 
+  goto :eof
+  
+  :uuu_load_uboot
+++<<<<<<< HEAD
+ +echo uuu_version %uuu_version% > uuu.lst
+++=======
++ echo uuu_version 1.3.74 > %tmp_dir%uuu.lst
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+- if exist %bootloader_used_by_uuu%.link (
+-     del %bootloader_used_by_uuu%.link
++ if exist %tmp_dir%%bootloader_used_by_uuu%.link (
++     del %tmp_dir%%bootloader_used_by_uuu%.link
+  )
+- cmd /c mklink %bootloader_used_by_uuu%.link %image_directory%%bootloader_used_by_uuu% > nul
+- echo %sdp%: boot -f %bootloader_used_by_uuu%.link >> uuu.lst
++ cmd /c mklink %tmp_dir%%bootloader_used_by_uuu%.link %image_directory%%bootloader_used_by_uuu% > nul
++ echo %sdp%: boot -f %bootloader_used_by_uuu%.link >> %tmp_dir%uuu.lst
+  
+  
+  :: for uboot by uuu which enabled SPL
+@@@ -735,11 -670,8 +808,16 @@@ if [%target_dev%] == [emmc] 
+  
+  if %intervene% == 1 (
+  :: in fact, it's not an error, but to align the behaviour of cmd and powershell, a non-zero error value is used.
+++<<<<<<< HEAD
+ +    IF EXIST %image_directory%%uuu_tool% (
+ +        set uuu_tool=%image_directory%%uuu_tool%
+ +    )
+ +    echo FB: done >> uuu.lst
+ +    %uuu_tool% uuu.lst
+++=======
++     echo FB: done >> %tmp_dir%uuu.lst
++     uuu %tmp_dir%uuu.lst
+++>>>>>>> android-11.0.0_1.0.0_history
+      set /A error_level=1 && goto :exit
+  )
+  
+@@@ -821,11 -732,7 +907,8 @@@ if not [%partition_to_be_flashed:bootlo
+      goto :start_to_flash
+  )
+  if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+-     if %dont_generate_super% == 0 (
+-         call :make_super_image
+-     )
+      set img_name=%super_file%
+ +    set flash_option=-S %max_download_size%
+      goto :start_to_flash
+  )
+  
+@@@ -850,30 -749,13 +933,37 @@@ if not [%partition_to_be_flashed:gpt=%
+      goto :start_to_flash
+  )
+  
+ +if not [%partition_to_be_flashed:userdata=%] == [%partition_to_be_flashed%] (
+ +    set img_name=%userdata_file%
+ +    goto :start_to_flash
+ +)
+ +
+  :start_to_flash
+  echo generate lines to flash %img_name% to the partition of %1
+++<<<<<<< HEAD
+ +if [%img_name%] == [%super_file%] (
+ +    if %dont_generate_super% == 0 (
+ +        echo FB[-t 600000]: flash %flash_option% %1 %img_name% >> uuu.lst
+ +    ) else (
+ +        if exist %img_name%.link (
+ +            del %img_name%.link
+ +        )
+ +        cmd /c mklink %img_name%.link %image_directory%%img_name% > nul
+ +        echo FB[-t 600000]: flash %flash_option% %1 %img_name%.link >> uuu.lst
+ +    )
+ +) else (
+ +    if exist %img_name%.link (
+ +        del %img_name%.link
+ +    )
+ +    cmd /c mklink %img_name%.link %image_directory%%img_name% > nul
+ +    echo FB[-t 600000]: flash %1 %img_name%.link >> uuu.lst
+++=======
++ if exist %tmp_dir%%img_name%.link (
++     del %tmp_dir%%img_name%.link
+++>>>>>>> android-11.0.0_1.0.0_history
+  )
++ cmd /c mklink %tmp_dir%%img_name%.link %image_directory%%img_name% > nul
++ echo FB[-t 600000]: flash %1 %img_name%.link >> %tmp_dir%uuu.lst
+  goto :eof
+  
+  
+@@@ -901,86 -786,16 +996,87 @@@ set vendor_partition=vendor%
+  set product_partition=product%1
+  set vbmeta_partition=vbmeta%1
+  set dtbo_partition=dtbo%1
++ set vendor_boot_partition=vendor_boot%1
+  if %support_dual_bootloader% == 1 set dual_bootloader_partition=bootloader%1
+ +if %support_mem_info% == 1 set mem_info_partition=mem_info%1
+  goto :eof
+  
+ -:flash_android
+ +:check_board_info
+ +if not [%board_info_file%] == [] (
+ +    :: P1. if -d board_info_file is set, make sure it does exist
+ +    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%%board_info_file%`) DO (SET board_info_file=%%~nF.img)
+ +    FOR /F "tokens=2,3,4 delims=-" %%F IN ("%board_info_file%") DO (SET board_info_temp=%%F-%%G-%%H)
+ +)
+ +if not [%board_info_file%] == [] (
+ +    FOR /F "tokens=1 delims=_" %%F IN ("%board_info_temp%") DO (SET som_model=%%F)
+ +    FOR /F "tokens=2 delims=_" %%F IN ("%board_info_temp%") DO (SET som_plc=%%F)
+ +    FOR /F "tokens=3 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_model=%%F)
+ +    FOR /F "tokens=4 delims=_" %%F IN ("%board_info_temp%") DO (SET mb_plc=%%F)
+ +    FOR /F "tokens=5 delims=_" %%F IN ("%board_info_temp%") DO (SET dev_ddr=%%F)
+ +)
+ +if not [%board_info_file%] == [] (
+ +    FOR /F "tokens=2 delims=-" %%F IN ("%som_plc%") DO (SET som_rev=%%F)
+ +    FOR /F "tokens=1 delims=-" %%F IN ("%som_plc%") DO (SET som_plc=%%F)
+ +    FOR /F "tokens=2 delims=-" %%F IN ("%mb_plc%") DO (SET mb_rev=%%F)
+ +    FOR /F "tokens=1 delims=-" %%F IN ("%mb_plc%") DO (SET mb_plc=%%F)
+ +    FOR /F "tokens=1 delims=." %%F IN ("%dev_ddr%") DO (SET dev_ddr=%%F)
+ +)
+ +if [%board_info_file%] == [] (
+ +    :: P2. get som_model / som_plc / mb_model / mb_plc via fastboot
+ +    %fastboot_tool% oem getvar som-model 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-model: fastboot_oem.log') DO (SET som_model=%%F)
+ +    %fastboot_tool% oem getvar som-plc 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-plc: fastboot_oem.log') DO (SET som_plc=%%F)
+ +    %fastboot_tool% oem getvar som-rev 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR som-rev: fastboot_oem.log') DO (SET som_rev=%%F)
+ +    %fastboot_tool% oem getvar mb-model 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-model: fastboot_oem.log') DO (SET mb_model=%%F)
+ +    %fastboot_tool% oem getvar mb-plc 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-plc: fastboot_oem.log') DO (SET mb_plc=%%F)
+ +    %fastboot_tool% oem getvar mb-rev 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR mb-rev: fastboot_oem.log') DO (SET mb_rev=%%F)
+ +    %fastboot_tool% oem getvar dev-ddr 2> fastboot_oem.log
+ +    FOR /F "tokens=5 delims= " %%F IN ('FINDSTR dev-ddr: fastboot_oem.log') DO (SET dev_ddr=%%F)
+ +)
+ +if [%board_info_file%] == [] (
+ +    echo Try to get board_info image via fastboot with board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img
+ +    FOR /F "tokens=* USEBACKQ" %%F IN (`DIR /S /b /on %image_directory%board_info-%som_model%_%som_plc%-%som_rev%_%mb_model%_%mb_plc%-%mb_rev%_%dev_ddr%.img`) DO (SET board_info_file=%%~nF.img)
+ +)
+ +if [%board_info_file%] == [] (
+ +    :: P3. Notify user to provide correct -d board_info_file
+ +    echo Error: Please add -bdinfo board_info_file option to find correct board_info image.
+ +    set /A error_level=2 && goto :exit
+ +)
+ +goto :eof
+ +
+ +:check_android_info
+ +IF NOT EXIST %image_directory%%android_info_file% (
+ +    echo Error: android-info.txt not found
+ +    set /A error_level=3 && goto :exit
+ +)
+ +FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR som_model %image_directory%%android_info_file%') DO (SET som_opt=%%F)
+ +FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%som_opt%") DO (SET som_opt=%%F %%G %%H)
+ +FOR /F "tokens=2 delims=\=" %%F IN ('FINDSTR mb_model %image_directory%%android_info_file%') DO (SET mb_opt=%%F)
+ +FOR /F "tokens=1,2,3 delims=\|" %%F IN ("%mb_opt%") DO (SET mb_opt=%%F %%G %%H)
+ +set /A match_som=0
+ +set /A match_mb=0
+ +FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
+ +FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
+ +IF NOT [%match_som%] == [1] (
+ +    echo Error: %som_model% and values in android-info.txt are mismatched
+ +    set /A error_level=3 && goto :exit
+ +)
+ +IF NOT [%match_mb%] GEQ [1] (
+ +    echo Error: %mb_model% and values in android-info.txt are mismatched
+ +    set /A error_level=3 && goto :exit
+ +)
+ +goto :eof
+  
+ +:flash_android
+  :: if dual bootloader is supported, the name of the bootloader flashed to the board need to be updated
+  if %support_dual_bootloader% == 1 (
+ -    set bootloader_flashed_to_board=spl-%soc_name%%uboot_feature%.bin
+ -    set uboot_proper_to_be_flashed=bootloader-%soc_name%%uboot_feature%.img
+ +    set bootloader_flashed_to_board=spl-%soc_name%%ddr_type%%uboot_feature%.bin
+ +    set uboot_proper_to_be_flashed=bootloader-%soc_name%%ddr_type%%uboot_feature%.img
+      :: # specially handle xen related condition
+      if [%dtb_feature%] == [xen] (
+          if [%soc_name%] == [imx8qm] (
+diff --cc common/tools/uuu_imx_android_flash.sh
+index 7212635e,f0bb9b5c..48267bfd
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@@ -83,16 -82,8 +83,19 @@@ options
+                          including the name of yocto sdcard image, this parameter could be a relative path or an absolute path
+    -i                with this option used, after uboot for uuu loaded and executed to fastboot mode with target device chosen, this script will stop
+                          This option is for users to manually flash the images to partitions they want to
+ +  -R                with this option used, choose the u-boot about 1GB RAM setting.
+    -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+    -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+++<<<<<<< HEAD
+ +  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+ +                       Under the condition that dynamic partition feature are enabled:
+ +                         if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+ +                         if this option is used, make sure super.img already exists together with other images.
+ +  -bdinfo board_info_file  flash board_info with this board_info_file image
+ +                               If not set, use naming from current board_info partition
+ +  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  EOF
+  
+  }
+@@@ -160,9 -151,12 +163,13 @@@ function uuu_load_uboo
+  
+  function flash_partition
+  {
+ +    flash_option=""
+      if [ "$(echo ${1} | grep "bootloader_")" != "" ]; then
+          img_name=${uboot_proper_to_be_flashed}
++     elif [ ${support_vendor_boot} -eq 1 ] && [ "$(echo ${1} | grep "vendor_boot")" != "" ]; then
++             img_name="vendor_boot.img"
++     elif [ "$(echo ${1} | grep "system_ext")" != "" ]; then
++         img_name=${system_extimage_file}
+      elif [ "$(echo ${1} | grep "system")" != "" ]; then
+          img_name=${systemimage_file}
+      elif [ "$(echo ${1} | grep "vendor")" != "" ]; then
+@@@ -179,38 -172,18 +186,41 @@@
+          img_name="${soc_name}_mcu_demo.img"
+      elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" -a "${dtb_feature}" != "" ]; then
+          img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
+ +    elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
+ +        img_name="${board_info_file}"
+ +    elif [ "$(echo ${1} | grep "mem_info")" != "" ]; then
+ +        img_name="${mem_info_file}"
+ +    elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
+ +        if [ "${1%_*}" == "dtbo" -a -f "${image_directory}${dtbo_file}" ]; then
+ +            img_name="${dtbo_file}"
+ +        elif [ "${1%_*}" == "vbmeta" -a -f "${image_directory}${vbmeta_file}" ]; then
+ +            img_name="${vbmeta_file}"
+ +        else
+ +            img_name="${1%_*}-${soc_name}.img"
+ +        fi
+      elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+          img_name=${partition_file}
+ +    elif [ "$(echo ${1} | grep "userdata")" != "" ]; then
+ +        img_name=${userdata_file}
+      elif [ "$(echo ${1} | grep "super")" != "" ]; then
+-         if [ ${dont_generate_super} -eq 0 ]; then
+-             make_super_image
+-         fi
+          img_name=${super_file}
+ +        flash_option="-S ${max_download_size}"
+      else
+          img_name="${1%_*}-${soc_name}.img"
+      fi
+  
+      echo -e generate lines to flash ${RED}${img_name}${STD} to the partition of ${RED}${1}${STD}
+++<<<<<<< HEAD
+ +    if [ "${img_name}" != "${super_file}" ] || [ ${dont_generate_super} -eq 1 ]; then
+ +        rm -f /tmp/${img_name}
+ +        ln -s ${sym_link_directory}${img_name} /tmp/${img_name}
+ +    fi
+ +    echo FB[-t 600000]: flash ${flash_option} ${1} ${img_name} >> /tmp/uuu.lst
+++=======
++     rm -f /tmp/${img_name}
++     ln -s ${sym_link_directory}${img_name} /tmp/${img_name}
++     echo FB[-t 600000]: flash ${1} ${img_name} >> /tmp/uuu.lst
+++>>>>>>> android-11.0.0_1.0.0_history
+  }
+  
+  function flash_userpartitions
+@@@ -410,64 -301,9 +429,28 @@@ function flash_androi
+      if [ ${support_dynamic_partition} -eq 1 ]; then
+          flash_partition ${super_partition}
+      fi
+ +
+ +    if [ ${write_bdinfo_serial} -eq 1 ]; then
+ +        echo FB: oem setvar dev-serial ${serialno_str} >> /tmp/uuu.lst
+ +    fi
+  }
+  
+- # this function will invoke lpmake to create super.img, the super.img will
+- # be created in /tmp, make sure that there is enouth space
+- function make_super_image
+- {
+-     rm -rf /tmp/${super_file}
+-     # now dynamic partition is only enabled in dual slot condition
+-     if [ ${support_dualslot} -eq 1 ]; then
+-         if [ "${slot}" == "_a" ]; then
+-             lpmake_system_image_a="--image system_a=${sym_link_directory}${systemimage_file}"
+-             lpmake_vendor_image_a="--image vendor_a=${sym_link_directory}${vendor_file}"
+-             lpmake_product_image_a="--image product_a=${sym_link_directory}${product_file}"
+-         elif [ "${slot}" == "_b" ]; then
+-             lpmake_system_image_b="--image system_b=${sym_link_directory}${systemimage_file}"
+-             lpmake_vendor_image_b="--image vendor_b=${sym_link_directory}${vendor_file}"
+-             lpmake_product_image_b="--image product_b=${sym_link_directory}${product_file}"
+-         else
+-             lpmake_system_image_a="--image system_a=${sym_link_directory}${systemimage_file}"
+-             lpmake_vendor_image_a="--image vendor_a=${sym_link_directory}${vendor_file}"
+-             lpmake_product_image_a="--image product_a=${sym_link_directory}${product_file}"
+-             lpmake_system_image_b="--image system_b=${sym_link_directory}${systemimage_file}"
+-             lpmake_vendor_image_b="--image vendor_b=${sym_link_directory}${vendor_file}"
+-             lpmake_product_image_b="--image product_b=${sym_link_directory}${product_file}"
+-         fi
+-     fi
+- 
+-         ${sym_link_directory}lpmake --metadata-size 65536 --super-name super --metadata-slots 3 --device super:7516192768 \
+-             --group nxp_dynamic_partitions_a:3747610624 --group nxp_dynamic_partitions_b:3747610624 \
+-             --partition system_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_system_image_a} \
+-             --partition system_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_system_image_b} \
+-             --partition vendor_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_vendor_image_a} \
+-             --partition vendor_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_vendor_image_b} \
+-             --partition product_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_product_image_a} \
+-             --partition product_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_product_image_b} \
+-             --sparse --output /tmp/${super_file}
+- }
+- 
+  # parse command line
+ +som_model=""
+ +som_plc=""
+ +som_rev=""
+ +mb_model=""
+ +mb_plc=""
+ +mb_rev=""
+ +dev_ddr=""
+ +ddr_type="-lpddr4"
+ +board_info_file=""
+ +board_info_temp=""
+ +mem_info_file="mem_info.img"
+ +dtbo_file="dtbo.img"
+ +vbmeta_file="vbmeta.img"
+ +android_info_file="android-info.txt"
+ +userdata_file="userdata.img"
+  soc_name=""
+  uboot_feature=""
+  dtb_feature=""
+@@@ -485,12 -321,7 +469,16 @@@ support_dualslot=
+  support_mcu_os=0
+  support_trusty=0
+  support_dynamic_partition=0
+++<<<<<<< HEAD
+ +support_board_info=0
+ +support_mem_info=0
+ +write_bdinfo_serial=0
+ +support_idt_dual_spl=0
+ +support_idt_backup_spl=0
+ +support_idt_spl_table=0
+++=======
++ support_vendor_boot=0
+++>>>>>>> android-11.0.0_1.0.0_history
+  boot_partition="boot"
+  recovery_partition="recovery"
+  system_partition="system"
+@@@ -498,11 -331,10 +488,12 @@@ vendor_partition="vendor
+  product_partition="product"
+  vbmeta_partition="vbmeta"
+  dtbo_partition="dtbo"
++ vendor_boot_partition="vendor_boot"
+  mcu_os_partition="mcu_os"
+  super_partition="super"
+ -
+ +board_info_partition="board_info"
+ +mem_info_partition="mem_info"
+ +userdata_partition="userdata"
+  flash_mcu=0
+  erase=0
+  image_directory=""
+@@@ -533,28 -361,17 +524,25 @@@ sym_link_directory="
+  yocto_image_sym_link=""
+  daemon_mode=0
+  dryrun=0
+- lpmake_system_image_a=""
+- lpmake_system_image_b=""
+- lpmake_vendor_image_a=""
+- lpmake_vendor_image_b=""
+- lpmake_product_image_a=""
+- lpmake_product_image_b=""
+  result_value=0
+++<<<<<<< HEAD
+ +dont_generate_super=0
+ +ramsize=""
+ +ramsizetest=0
+ +board_type=""
+ +max_download_size=0x19000000
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+  # board running different set of images(android and automative for a example), so misuse the features of one set of
+  # images when flash another set of images can not be detect early with this scenario.
+  imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+ -imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4)
+ -imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ -imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+ +imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed)
+ +imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+ +imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed)
+  imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+- imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi)
++ imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen)
+  imx7ulp_uboot_feature=(evk-uuu)
+  
+  imx8mm_dtb_feature=(ddr4 m4 mipi-panel)
+@@@ -591,12 -407,8 +579,15 @@@ while [ $# -gt 0 ]; d
+          -y) yocto_image=$2; shift;;
+          -p) board=$2; shift;;
+          -i) intervene=1 ;;
+ +        -R) ramsizetest=1 ;;
+          -daemon) daemon_mode=1 ;;
+          -dryrun) dryrun=1 ;;
+++<<<<<<< HEAD
+ +        -super) dont_generate_super=1 ;;
+ +        -bdinfo) board_info_file=$2; shift;;
+ +        -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+          *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+              help; exit;;
+      esac
+diff --cc imx8m/BoardConfigCommon.mk
+index 9ffd8698,caa7d793..4c5e4473
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@@ -104,9 -113,13 +113,19 @@@ BOARD_GPU_LIBDRM := libdrm_im
+  
+  AB_OTA_UPDATER := true
+  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+++<<<<<<< HEAD
+ +AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta bootloader spl mem_info
+ +else
+ +AB_OTA_PARTITIONS := dtbo boot system vendor vbmeta product bootloader spl mem_info
+++=======
++ AB_OTA_PARTITIONS += dtbo boot system system_ext vendor vbmeta
++ else
++ ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++ AB_OTA_PARTITIONS += dtbo boot vendor_boot system system_ext vendor vbmeta product
++ else
++ AB_OTA_PARTITIONS += dtbo boot system system_ext vendor vbmeta product
++ endif
+++>>>>>>> android-11.0.0_1.0.0_history
+  endif
+  TARGET_NO_RECOVERY := true
+  BOARD_USES_RECOVERY_AS_BOOT := true
+@@@ -114,7 -127,9 +133,13 @@@ TARGET_RECOVERY_PIXEL_FORMAT := "RGBX_8
+  
+  BOARD_DTBOIMG_PARTITION_SIZE := 4194304
+  BOARD_BOOTIMAGE_PARTITION_SIZE := 67108864
+++<<<<<<< HEAD
+ +BOARD_VBMETAIMAGE_PARTITION_SIZE := 1048576
+++=======
++ ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++ BOARD_VENDOR_BOOTIMAGE_PARTITION_SIZE := 67108864
++ endif
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  BOARD_VENDORIMAGE_FILE_SYSTEM_TYPE = ext4
+  TARGET_COPY_OUT_VENDOR := vendor
+@@@ -125,8 -140,13 +150,13 @@@ ifneq ($(IMX_NO_PRODUCT_PARTITION),true
+    TARGET_COPY_OUT_PRODUCT := product
+  endif
+  
++ # Build a separate system_ext.img partition
++ BOARD_USES_SYSTEM_EXTIMAGE := true
++ BOARD_SYSTEM_EXTIMAGE_FILE_SYSTEM_TYPE := ext4
++ TARGET_COPY_OUT_SYSTEM_EXT := system_ext
++ 
+  BOARD_FLASH_BLOCK_SIZE := 4096
+ -TARGET_RECOVERY_UI_LIB := librecovery_ui_imx
+ +TARGET_RECOVERY_UI_LIB := librecovery_ui_imx_idt
+  
+  BOARD_VNDK_VERSION := current
+  
+@@@ -155,7 -172,9 +185,13 @@@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),
+  
+    endif
+  else
+++<<<<<<< HEAD
+ +  BOARD_VENDORIMAGE_PARTITION_SIZE := 536870912
+++=======
++   BOARD_BUILD_SYSTEM_ROOT_IMAGE := true
++   BOARD_VENDORIMAGE_PARTITION_SIZE := 671088640
++   BOARD_SYSTEM_EXTIMAGE_PARTITION_SIZE := 134217728
+++>>>>>>> android-11.0.0_1.0.0_history
+    ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+      BOARD_SYSTEMIMAGE_PARTITION_SIZE := 2952790016
+    else
+diff --cc imx8m/ProductConfigCommon.mk
+index 512ba8c4,9931aae7..d8654116
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@@ -8,21 -8,36 +8,32 @@@ $(call inherit-product, packages/servic
+  endif
+  $(call inherit-product, $(TOPDIR)frameworks/base/data/sounds/AllAudio.mk)
+  $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
++ 
++ # Installs gsi keys into ramdisk.
++ $(call inherit-product, $(SRC_TARGET_DIR)/product/developer_gsi_keys.mk)
++ $(call inherit-product, $(SRC_TARGET_DIR)/product/gsi_keys.mk)
++ PRODUCT_PACKAGES += \
++     adb_debug.prop
++ 
+  # overrides
+  PRODUCT_BRAND := Android
+- PRODUCT_MANUFACTURER := freescale
++ PRODUCT_MANUFACTURER := nxp
+  
+ -# Android infrastructures
+ +ifneq (user,$(TARGET_BUILD_VARIANT))
+  PRODUCT_PACKAGES += \
+ -    CactusPlayer \
+ -    ExtractorPkg \
+      SystemUpdaterSample \
+++<<<<<<< HEAD
+++=======
++     charger_res_images \
++     charger \
+++>>>>>>> android-11.0.0_1.0.0_history
+      ethernet \
+ -    libedid \
+ -    libion \
+ -    slideshow \
+ -    verity_warning_images
+ -
+ +    CubeLiveWallpapers
+  ifneq ($(PRODUCT_IMX_CAR),true)
+  PRODUCT_PACKAGES += \
+      Camera \
+ -    CubeLiveWallpapers \
+      Email \
+      Gallery2 \
+-     LegacyCamera \
+      LiveWallpapersPicker \
+      SoundRecorder
+  endif
+@@@ -112,19 -105,24 +123,32 @@@ PRODUCT_PACKAGES += 
+  # camera
+  ifneq ($(PRODUCT_IMX_CAR),true)
+  PRODUCT_PACKAGES += \
++     android.hardware.camera.provider@2.6-service-google \
++     android.hardware.camera.provider@2.6-impl-google \
++     libgooglecamerahal \
++     libgooglecamerahalutils \
++     lib_profiler \
++     libimxcamerahwl_impl
++ 
++ PRODUCT_PACKAGES += \
++     android.hardware.camera.provider@2.4-external-service \
+      android.hardware.camera.provider@2.4-impl \
+-     android.hardware.camera.provider@2.4-service \
+      camera.device@1.0-impl \
+-     camera.device@3.2-impl \
+-     camera.imx
++     camera.device@3.2-impl
+  endif
+  
++ # health
+  PRODUCT_PACKAGES += \
+++<<<<<<< HEAD
+ +    android.hardware.fastboot@1.0-impl-mock \
+ +    fastboot.default
+ +
+ +PRODUCT_PACKAGES += \
+ +    android.hardware.health@2.0-service.imx
+++=======
++     android.hardware.health@2.1-service \
++     android.hardware.health@2.1-impl-imx
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # display
+  PRODUCT_PACKAGES += \
+@@@ -146,7 -143,7 +169,11 @@@ PRODUCT_PACKAGES += 
+      gmem_info \
+      gpu-top
+  
+++<<<<<<< HEAD
+ +# Omx related libs, please align to device/idtech/proprietary/omx/fsl-omx.mk
+++=======
++ # Omx related libs, please align to device/nxp/proprietary/omx/fsl-omx.mk
+++>>>>>>> android-11.0.0_1.0.0_history
+  PRODUCT_PACKAGES += \
+      lib_aac_dec_v2_arm12_elinux \
+      lib_aacd_wrap_arm12_elinux_android \
+@@@ -228,22 -225,19 +255,36 @@@ PRODUCT_PACKAGES += 
+  PRODUCT_PACKAGES += \
+      fastbootd \
+  
++ # vndservicemanager
++ PRODUCT_PACKAGES += \
++     vndservicemanager
++ 
+  # Copy soc related config and binary to board
+  PRODUCT_COPY_FILES += \
+++<<<<<<< HEAD
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_c2_audio.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_c2_audio.xml \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_c2_telephony.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_c2_telephony.xml \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_c2_tv.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_c2_tv.xml \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_profiles_720p.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_profiles_720p.xml \
+ +    device/idtech/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
+ +    device/idtech/common/input/matrix-keypad.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/matrix-keypad.kl: \
+ +    device/idtech/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+ +    device/idtech/common/input/touchscreen/FW_TDDI_TRUNK_FB.ili:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/FW_TDDI_TRUNK_FB.ili \
+ +    device/idtech/common/input/touchscreen/TM050JYHS11_TM_500_20190614.hex:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/TM050JYHS11_TM_500_20190614 \
+++=======
++     device/nxp/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
++     device/nxp/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
++     device/nxp/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
++     device/nxp/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
++     device/nxp/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
++     device/nxp/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
++     device/nxp/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+++>>>>>>> android-11.0.0_1.0.0_history
+      frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
+      frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+      frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+@@@ -291,7 -268,7 +326,11 @@@ PRODUCT_PROPERTY_OVERRIDES += 
+  PRODUCT_TAGS += dalvik.gc.type-precise
+  
+  PRODUCT_DEFAULT_DEV_CERTIFICATE := \
+++<<<<<<< HEAD
+ +    device/idtech/common/security/testkey
+++=======
++     device/nxp/common/security/testkey
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # In userdebug, add minidebug info the the boot image and the system server to support
+  # diagnosing native crashes.
+@@@ -334,6 -300,4 +378,10 @@@ include frameworks/native/build/tablet-
+  
+  PREBUILT_FSL_IMX_CODEC := true
+  
+++<<<<<<< HEAD
+ +# IDT common properties
+ +PRODUCT_PROPERTY_OVERRIDES += \
+ +    persist.idt.enable_externalsource=0
+++=======
++ PRODUCT_SOONG_NAMESPACES += external/mesa3d
+++>>>>>>> android-11.0.0_1.0.0_history
+diff --cc imx8m/evk_8mn/evk_8mn.mk
+index ad2a59d6,44ff7729..d8d5a7fc
+--- a/imx8m/evk_8mn/evk_8mn.mk
++++ b/imx8m/evk_8mn/evk_8mn.mk
+@@@ -66,23 -72,25 +72,33 @@@ PRODUCT_COPY_FILES += 
+      $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
+      $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+      $(IMX_DEVICE_PATH)/usb_audio_policy_configuration-direct-output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration-direct-output.xml \
+-     $(IMX_DEVICE_PATH)/fstab.freescale:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.freescale \
+-     $(IMX_DEVICE_PATH)/init.imx8mn.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mn.rc \
+-     $(IMX_DEVICE_PATH)/init.recovery.freescale.rc:root/init.recovery.freescale.rc \
++     $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.nxp \
++     $(IMX_DEVICE_PATH)/init.imx8mn.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mn.rc \
++     $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+      $(IMX_DEVICE_PATH)/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg \
+-     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.rc \
+-     $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.usb.rc \
++     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
++     $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.usb.rc \
+      $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+-     $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
++     $(IMX_DEVICE_PATH)/ueventd.nxp.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+      $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+++<<<<<<< HEAD
+ +    device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+ +    device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+ +    device/fsl/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ +
+ +ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+++=======
++     device/nxp/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++     device/nxp/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++     device/nxp/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++ 
++ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
++ # boot ramdisk so far, we need this step to generate the vendor-ramdisk folder or build process would fail. This
++ # can be deleted once we figure out what kernel modules should be put into the vendor boot ramdisk.
++ ifeq ($(TARGET_USE_VENDOR_BOOT),true)
+++>>>>>>> android-11.0.0_1.0.0_history
+  PRODUCT_COPY_FILES += \
+-     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
+-     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
++     $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.nxp
+  endif
+  
+  # Audio card json
+@@@ -258,11 -270,14 +282,22 @@@ PRODUCT_PACKAGES += 
+      wifilogd \
+      wificond
+  
+++<<<<<<< HEAD
+ +# BCM 1MW Wifi Firmware
+ +PRODUCT_COPY_FILES += \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.bin \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.clm_blob \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.txt
+++=======
++ # WiFi RROs
++ PRODUCT_PACKAGES += \
++     WifiOverlay
++ 
++ # NXP 8987 Wifi and Bluetooth Combo Firmware
++ PRODUCT_COPY_FILES += \
++     vendor/nxp/imx-firmware/nxp/FwImage_8987/sdiouart8987_combo_v0.bin:vendor/firmware/sdiouart8987_combo_v0.bin \
++     vendor/nxp/imx-firmware/nxp/android_wifi_mod_para.conf:vendor/firmware/wifi_mod_para_sd8987.conf
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # Wifi regulatory
+  PRODUCT_COPY_FILES += \
+diff --cc imx8m/evk_8mn/init.rc
+index 18f1d118,757475e1..1534ea09
+--- a/imx8m/evk_8mn/init.rc
++++ b/imx8m/evk_8mn/init.rc
+@@@ -105,29 -111,11 +111,24 @@@ on early-boot && property:vendor.skip.c
+      write /sys/block/mmcblk1/queue/read_ahead_kb 2048
+      write /sys/block/mmcblk2/queue/read_ahead_kb 2048
+  
+++<<<<<<< HEAD
+ +    # Set period_us for usb audio
+ +    setprop ro.audio.usb.period_us 20000
+ +
+ +    # Wifi firmware reload path
+ +    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
+ +
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+      # Prepare for wifi
+      setprop wifi.interface wlan0
+ -    setprop wifi.direct.interface p2p0
+ -    setprop wifi.concurrent.interface wlan1
+ +    setprop wifi.direct.interface p2p-dev-wlan0
+ +
+ +    # Prepare for bluetooth
+ +    chmod 665 /sys/class/rfkill/rfkill0/state
+ +    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
+ +    write /sys/class/rfkill/rfkill0/state 0
+  
+-     setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
+- 
+-     # Use ro.boot.lcd_density to override ro.sf.lcd_density
+-     setprop ro.sf.lcd_density ${ro.boot.lcd_density}
+- 
+-     # prepare for ril
+-     setprop ro.ril.wake_lock_timeout 300
+- 
+      # Set tracefs permission to 755
+      chmod 0755 /sys/kernel/debug/tracing
+  
+diff --cc imx8m/evk_8mp/evk_8mp.mk
+index 8edf23e5,7d552bcb..8a5ddde9
+--- a/imx8m/evk_8mp/evk_8mp.mk
++++ b/imx8m/evk_8mp/evk_8mp.mk
+@@@ -264,11 -286,14 +286,22 @@@ PRODUCT_PACKAGES += 
+      wifilogd \
+      wificond
+  
+++<<<<<<< HEAD
+ +# nxp 8997 Firmware
+ +PRODUCT_COPY_FILES += \
+ +    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcie8997_wlan_v4.bin:vendor/firmware/mrvl/pcie8997_wlan_v4.bin \
+ +    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/mrvl/pcieuart8997_combo_v4.bin \
+ +    vendor/nxp/imx-firmware/nxp/FwImage_8997/uart8997_bt_v4.bin:vendor/firmware/mrvl/uart8997_bt_v4.bin \
+++=======
++ # WiFi RRO
++ PRODUCT_PACKAGES += \
++     WifiOverlay
++ 
++ # nxp 8997 wifi and bluetooth combo Firmware
++ PRODUCT_COPY_FILES += \
++     vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/pcieuart8997_combo_v4.bin \
++     vendor/nxp/imx-firmware/nxp/android_wifi_mod_para.conf:vendor/firmware/wifi_mod_para.conf
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # Wifi regulatory
+  PRODUCT_COPY_FILES += \
+diff --cc imx8m/evk_8mq/evk_8mq.mk
+index 5a5a2d4c,020f88f9..102d365f
+--- a/imx8m/evk_8mq/evk_8mq.mk
++++ b/imx8m/evk_8mq/evk_8mq.mk
+@@@ -64,34 -70,37 +70,45 @@@ PRODUCT_COPY_FILES += 
+      $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
+      $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+      $(IMX_DEVICE_PATH)/input-port-associations.xml:$(TARGET_COPY_OUT_VENDOR)/etc/input-port-associations.xml \
+-     $(IMX_DEVICE_PATH)/fstab.freescale:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.freescale \
+-     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mq.rc \
+-     $(IMX_DEVICE_PATH)/init.recovery.freescale.rc:root/init.recovery.freescale.rc \
++     $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.nxp \
++     $(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mq.rc \
++     $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc \
+      $(IMX_DEVICE_PATH)/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg \
+-     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.rc \
+-     $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.usb.rc \
++     $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
++     $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.usb.rc \
+      $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml \
+-     $(IMX_DEVICE_PATH)/ueventd.freescale.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
++     $(IMX_DEVICE_PATH)/ueventd.nxp.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc \
+      $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+++<<<<<<< HEAD
+ +    device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+ +    device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+ +    device/fsl/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ +
+ +ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+++=======
++     device/nxp/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++     device/nxp/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++     device/nxp/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++ 
++ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
++ # boot ramdisk so far, we need this step to generate the vendor-ramdisk folder or build process would fail. This
++ # can be deleted once we figure out what kernel modules should be put into the vendor boot ramdisk.
++ ifeq ($(TARGET_USE_VENDOR_BOOT),true)
+++>>>>>>> android-11.0.0_1.0.0_history
+  PRODUCT_COPY_FILES += \
+-     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
+-     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
++     $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.nxp
+  endif
+  
++ 
+  # Audio card json
+  PRODUCT_COPY_FILES += \
+-     device/fsl/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+-     device/fsl/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+-     device/fsl/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+-     device/fsl/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+-     device/fsl/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+-     device/fsl/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
+-     device/fsl/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++     device/nxp/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++     device/nxp/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++     device/nxp/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
++     device/nxp/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
++     device/nxp/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
++     device/nxp/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
++     device/nxp/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+  
+  ifeq ($(PRODUCT_IMX_TRUSTY),true)
+  PRODUCT_COPY_FILES += \
+@@@ -250,19 -271,18 +279,32 @@@ PRODUCT_PACKAGES += 
+      wifilogd \
+      wificond
+  
+++<<<<<<< HEAD
+ +# BCM Bluetooth vendor config
+++=======
++ # WiFi RRO
++ PRODUCT_PACKAGES += \
++     WifiOverlay
++ 
++ # NXP 8997 Bluetooth vendor config
+++>>>>>>> android-11.0.0_1.0.0_history
+  PRODUCT_PACKAGES += \
+      bt_vendor.conf
+  
+ -# NXP 8997 Wifi and Bluetooth Combo Firmware
+ +# BCM 1CX Bluetooth Firmware
+ +PRODUCT_COPY_FILES += \
+++<<<<<<< HEAD
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/BCM4354A2.1CX.hcd:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/CYW4354A2.1CX.hcd
+ +
+ +# BCM 1CX Wifi Firmware
+  PRODUCT_COPY_FILES += \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.bin \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.clm_blob \
+ +    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.txt
+++=======
++     vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/pcieuart8997_combo_v4.bin \
++     vendor/nxp/imx-firmware/nxp/android_wifi_mod_para.conf:vendor/firmware/wifi_mod_para.conf
+++>>>>>>> android-11.0.0_1.0.0_history
+  
+  # Wifi regulatory
+  PRODUCT_COPY_FILES += \
+diff --cc imx8m/evk_8mq/init.rc
+index 625a2e0d,dacfc6c9..b423df78
+--- a/imx8m/evk_8mq/init.rc
++++ b/imx8m/evk_8mq/init.rc
+@@@ -107,28 -113,11 +113,34 @@@ on early-boot && property:vendor.skip.c
+      write /sys/block/mmcblk0/queue/read_ahead_kb 2048
+      write /sys/block/mmcblk1/queue/read_ahead_kb 2048
+  
+++<<<<<<< HEAD
+ +    # Set period_us for usb audio
+ +    setprop ro.audio.usb.period_us 20000
+ +
+ +    # Wifi firmware reload path
+ +    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
+ +
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+      # Prepare for wifi
+      setprop wifi.interface wlan0
+ -    setprop wifi.direct.interface p2p0
+ -    setprop wifi.concurrent.interface wlan1
+  
+++<<<<<<< HEAD
+ +    setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
+ +
+ +    # Prepare for bluetooth
+ +    chmod 665 /sys/class/rfkill/rfkill0/state
+ +    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
+ +    write /sys/class/rfkill/rfkill0/state 0
+ +
+ +    # Prepare for RIL
+ +    setprop ro.ril.wake_lock_timeout 300
+ +
+ +    # Use ro.boot.lcd_density to override ro.sf.lcd_density
+ +    setprop ro.sf.lcd_density ${ro.boot.lcd_density}
+ +
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+      # Disable surfaceflinger back pressure propagate
+      setprop debug.sf.disable_backpressure 1
+  
+@@@ -161,10 -147,7 +170,14 @@@
+      # enlarge media max memory size to 3G.
+      setprop ro.media.maxmem 3221225471
+  
+++<<<<<<< HEAD
+ +    setprop wifi.direct.interface p2p-dev-wlan0
+ +    start vendor.wifi_hal_legacy
+ +
+ +on boot
+++=======
++ on boot && property:vendor.skip.charger_not_need=0
+++>>>>>>> android-11.0.0_1.0.0_history
+      start audioserver
+      start mediadrm
+      start media
+diff --cc imx8m/sepolicy/bootanim.te
+index f31a2d91,15f56e62..0fde3b5e
+--- a/imx8m/sepolicy/bootanim.te
++++ b/imx8m/sepolicy/bootanim.te
+@@@ -1,6 -1,3 +1,9 @@@
+++<<<<<<< HEAD
+ +typeattribute bootanim system_writes_vendor_properties_violators;
+ +typeattribute bootanim mlstrustedsubject;
+ +
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+  get_prop(bootanim, vendor_default_prop)
+  
+  allow bootanim ashmem_device:chr_file {execute};
+diff --cc imx8m/sepolicy/file.te
+index 5d84b3d3,1628c59e..9ce92550
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@@ -2,8 -2,4 +2,12 @@@ type mediadrm_vendor_data_file, file_ty
+  type debugfs_dma, debugfs_type, fs_type;
+  type debugfs_sw_sync, debugfs_type, fs_type;
+  type sysfs_soc, sysfs_type, fs_type;
+++<<<<<<< HEAD
+ +type binderfs, fs_type;
+ +type binderfs_logs, fs_type;
+ +type binderfs_logs_proc, fs_type;
+ +type sysfs_usb_uevent, sysfs_type, fs_type;
+ +type idtech_data_file, file_type, data_file_type, core_data_file_type;
+++=======
++ type proc_util_clamp, fs_type, proc_type;
+++>>>>>>> android-11.0.0_1.0.0_history
+diff --cc imx8m/sepolicy/file_contexts
+index 5148c351,9d9d2fa0..af9ff0aa
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@@ -82,29 -83,16 +84,39 @@@
+  /vendor/etc/early\.init\.cfg                  u:object_r:init-insmod-sh_exec:s0
+  
+  /vendor/bin/hw/android\.hardware\.drm@1\.2-service\.widevine u:object_r:hal_drm_widevine_exec:s0
++ /vendor/bin/hw/android\.hardware\.drm@1\.3-service\.widevine u:object_r:hal_drm_widevine_exec:s0
+  /vendor/bin/hw/android\.hardware\.drm@1\.1-service\.clearkey u:object_r:hal_drm_clearkey_exec:s0
+  /vendor/bin/hw/android\.hardware\.drm@1\.2-service\.clearkey u:object_r:hal_drm_clearkey_exec:s0
++ /vendor/bin/hw/android\.hardware\.drm@1\.3-service\.clearkey u:object_r:hal_drm_clearkey_exec:s0
+  /data/vendor/mediadrm(/.*)? u:object_r:mediadrm_vendor_data_file:s0
+- /vendor/bin/hw/android\.hardware\.dumpstate@1\.0-service\.imx      u:object_r:hal_dumpstate_impl_exec:s0
++ /vendor/bin/hw/android\.hardware\.dumpstate@1\.1-service\.imx      u:object_r:hal_dumpstate_impl_exec:s0
+  /dev/cpu_dma_latency u:object_r:latency_device:s0
+  /vendor/bin/hw/android\.hardware\.oemlock@1\.0-service\.imx      u:object_r:hal_oemlock_impl_exec:s0
+++<<<<<<< HEAD
+ +/vendor/bin/hw/android\.hardware\.boot@1\.0-service\.imx      u:object_r:hal_bootctl_default_exec:s0
+ +
+ +# lsusb command
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +
+ +#quectel port
+ +/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+ +/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+ +/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+ +#/system/socket/rild              u:object_r:rild_socket:s0
+ +#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+ +/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+ +/system/bin/chat                 u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up            u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-down          u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up-vpn        u:object_r:ppp_exec:s0
+ +/dev/usb/lp0                     u:object_r:ptr_device:s0
+++=======
++ 
++ # partitions of boot device
++ /dev/block/by-name/vendor_boot_[ab]          u:object_r:boot_block_device:s0
++ 
++ /vendor/bin/hw/android\.hardware\.camera\.provider@2\.6-service-google       u:object_r:hal_camera_default_exec:s0
+++>>>>>>> android-11.0.0_1.0.0_history
+diff --cc imx8m/sepolicy/platform_app.te
+index 81596e03,d4392cbc..1f942c0a
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@@ -1,12 -1,1 +1,16 @@@
+++<<<<<<< HEAD
+ +typeattribute platform_app system_writes_vendor_properties_violators;
+ +typeattribute platform_app mlstrustedsubject;
+ +
+ +allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
+ +allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
+ +allow platform_app idtech_data_file:dir { add_name write };
+ +allow platform_app ptr_device:chr_file rw_file_perms;
+ +allow platform_app idtech_prop:property_service  { set };
+ +
+  get_prop(platform_app, vendor_default_prop)
+ +set_prop(platform_app, public_vendor_default_prop)
+ +get_prop(platform_app, idtech_prop)
+++=======
+++get_prop(platform_app, vendor_default_prop)
+++>>>>>>> android-11.0.0_1.0.0_history
+diff --cc imx8m/sepolicy/property.te
+index 74ee48ea,dd9ca470..0ea9694a
+--- a/imx8m/sepolicy/property.te
++++ b/imx8m/sepolicy/property.te
+@@@ -1,8 -1,7 +1,12 @@@
+- type http_proxy_prop, property_type;
+- type wc_prop, property_type;
++ type vendor_wc_prop, property_type;
+  type vendor_usb_config_prop, property_type;
+- type power_hal_prop, property_type;
++ type vendor_power_hal_prop, property_type;
+  type vendor_bluetooth_prop, property_type;
+++<<<<<<< HEAD
+ +type public_vendor_default_prop, property_type;
+ +type idtech_prop, property_type;
+++=======
++ type vendor_public_default_prop, property_type;
+++>>>>>>> android-11.0.0_1.0.0_history
+  type vendor_wifi_version, property_type;
++ type vendor_logging_prop, property_type;
+diff --cc imx8m/sepolicy/property_contexts
+index 92da1eed,3deb598c..0629862f
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@@ -213,63 -196,12 +196,47 @@@ hwc.debug.dump_bitmap               u:o
+  hwc.debug.dump_split_area           u:object_r:vendor_default_prop:s0
+  hwc.stretch.filter                  u:object_r:vendor_default_prop:s0
+  hwc.debug.disable_compression       u:object_r:vendor_default_prop:s0
+- hwc2.trace                          u:object_r:vendor_default_prop:s0
+- hwc2.filter_scale                   u:object_r:vendor_default_prop:s0
+- media.VIDEO_PLAYING                 u:object_r:vendor_default_prop:s0
+- persist.audio.pass.through          u:object_r:vendor_default_prop:s0
+- rw.VIDEO_FB0_DISPLAY                u:object_r:vendor_default_prop:s0
+- rw.VIDEO_RENDER_NAME                u:object_r:vendor_default_prop:s0
+- rw.VIDEO_TVOUT_DISPLAY              u:object_r:vendor_default_prop:s0
+- rw.VIDEO_TVOUT_HEIGHT               u:object_r:vendor_default_prop:s0
+- rw.VIDEO_TVOUT_POS_X                u:object_r:vendor_default_prop:s0
+- rw.VIDEO_TVOUT_POS_Y                u:object_r:vendor_default_prop:s0
+- rw.VIDEO_TVOUT_WIDTH                u:object_r:vendor_default_prop:s0
++ vendor.persist.audio.pass.through   u:object_r:vendor_default_prop:s0
++ vendor.rw.VIDEO_RENDER_NAME         u:object_r:vendor_default_prop:s0
+  sys.SECOND_DISPLAY_ENABLED          u:object_r:vendor_default_prop:s0
+- ro.FSL_AAC_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_ASF_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_REAL_PARSER                  u:object_r:vendor_default_prop:s0
+- ro.FSL_AVI_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_DSF_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_FLAC_PARSER                  u:object_r:vendor_default_prop:s0
+- ro.FSL_FLV_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_MKV_PARSER                   u:object_r:vendor_default_prop:s0
+- ro.FSL_MPG2_PARSER                  u:object_r:vendor_default_prop:s0
+  ro.mediacomponents.package          u:object_r:vendor_default_prop:s0
+- wifi.concurrent.interface           u:object_r:vendor_default_prop:s0
+  AQROOT                              u:object_r:vendor_default_prop:s0
+  CL_NOPREPROCESS                     u:object_r:vendor_default_prop:s0
+++<<<<<<< HEAD
+ +ro.camera.req.fmq.size              u:object_r:vendor_default_prop:s0
+ +ro.camera.res.fmq.size              u:object_r:vendor_default_prop:s0
+ +ro.rfkilldisabled                   u:object_r:vendor_default_prop:s0
+ +# serial number for mdnsd broadcast
+ +ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+ +
+ +# vendor_bluetooth_prop
+ +persist.bluetooth.a4wp              u:object_r:vendor_bluetooth_prop:s0
+ +persist.bluetooth.csoc.cnt          u:object_r:vendor_bluetooth_prop:s0
+ +persist.service.bdroid.fwsnoop      u:object_r:vendor_bluetooth_prop:s0
+ +persist.service.bdroid.sibs         u:object_r:vendor_bluetooth_prop:s0
+ +persist.service.bdroid.snooplog     u:object_r:vendor_bluetooth_prop:s0
+ +persist.service.bdroid.soclog       u:object_r:vendor_bluetooth_prop:s0
+ +persist.service.bdroid.ssrlvl       u:object_r:vendor_bluetooth_prop:s0
+ +persist.set.rx_delay                u:object_r:vendor_bluetooth_prop:s0
+ +ro.bluetooth.emb_wp_mode            u:object_r:vendor_bluetooth_prop:s0
+ +ro.bluetooth.wipower                u:object_r:vendor_bluetooth_prop:s0
+ +unified_bt_logging                  u:object_r:vendor_bluetooth_prop:s0
+ +persist.BT3_2.version               u:object_r:vendor_bluetooth_prop:s0
+++=======
+++>>>>>>> android-11.0.0_1.0.0_history
+ +
+ +ro.radio.noril                      u:object_r:radio_prop:s0 exact string
+ +vendor.rild.                        u:object_r:radio_prop:s0
+ +rild.                               u:object_r:radio_prop:s0
+ +net.eth0.                           u:object_r:net_dns_prop:s0
+ +net.ppp0.dns1                       u:object_r:radio_prop:s0
+ +net.ppp0.dns2                       u:object_r:radio_prop:s0
+ +net.ppp0.local-ip                   u:object_r:radio_prop:s0
+ +net.ppp0.remote-ip                  u:object_r:radio_prop:s0
+ +net.ppp0.gw                         u:object_r:radio_prop:s0
+ +
+ +# create new property header for IDTECH products
+ +persist.idt.                        u:object_r:idtech_prop:s0
+  
+  # vendor_wifi_version
+  vendor.wlan.driver.version    u:object_r:vendor_wifi_version:s0
+diff --cc imx8m/sepolicy/system_app.te
+index 9460ed66,3413c8ef..1151c0c4
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@@ -13,9 -11,4 +11,5 @@@ allow system_app dhcp_prop:property_ser
+  allow system_app update_engine:binder { call transfer };
+  allow system_app fs_bpf:dir { search };
+  
+- set_prop(system_app, vendor_bluetooth_prop)
+  get_prop(system_app, vendor_default_prop)
+ +set_prop(system_app, idtech_prop)
+diff --cc imx8m/sepolicy/system_server.te
+index 841f2166,982e271a..a65888d7
+--- a/imx8m/sepolicy/system_server.te
++++ b/imx8m/sepolicy/system_server.te
+@@@ -1,7 -1,4 +1,5 @@@
+- typeattribute system_server system_writes_vendor_properties_violators;
+- 
+  get_prop(system_server, vendor_default_prop)
+ +get_prop(system_server, idtech_prop)
+  
+  allow system_server unlabeled:dir {relabelfrom rw_dir_perms};
+  allow system_server unlabeled:sock_file {link unlink rw_file_perms};
+diff --cc imx8m/sepolicy/update_engine.te
+index b5b3e470,80ce6f59..61d38c0f
+--- a/imx8m/sepolicy/update_engine.te
++++ b/imx8m/sepolicy/update_engine.te
+@@@ -7,4 -7,4 +7,8 @@@ allow update_engine mnt_user_file:lnk_f
+  allow update_engine sdcardfs:dir { search };
+  allow update_engine sdcardfs:file { read open getattr };
+  allow update_engine media_rw_data_file:file { read open getattr };
+++<<<<<<< HEAD
+ +allow update_engine vfat:file { getattr open read };
+++=======
++ allow update_engine loop_device:blk_file { open write };
+++>>>>>>> android-11.0.0_1.0.0_history
+diff --cc imx8m/sepolicy/vendor_init.te
+index 22ba6d16,72282a66..1d76913c
+--- a/imx8m/sepolicy/vendor_init.te
++++ b/imx8m/sepolicy/vendor_init.te
+@@@ -4,14 -4,14 +4,15 @@@ allow vendor_init sysfs_block_devices:f
+  allow vendor_init proc_sysrq:file { write };
+  allow vendor_init device:file { create write };
+  allow vendor_init device:dir { setattr search };
++ allow vendor_init proc_util_clamp:file w_file_perms;
+  
+- set_prop(vendor_init, http_proxy_prop)
+- set_prop(vendor_init, wc_prop)
++ set_prop(vendor_init, vendor_wc_prop)
+  set_prop(vendor_init, vendor_usb_config_prop)
+- set_prop(vendor_init, power_hal_prop)
++ set_prop(vendor_init, vendor_power_hal_prop)
+  set_prop(vendor_init, vendor_bluetooth_prop)
+- set_prop(vendor_init, public_vendor_default_prop)
++ set_prop(vendor_init, vendor_public_default_prop)
+  set_prop(vendor_init, vendor_default_prop)
+  get_prop(vendor_init, default_prop)
+ +set_prop(vendor_init, idtech_prop)
+  set_prop(vendor_init, system_prop)
++ set_prop(vendor_init, vendor_logging_prop)

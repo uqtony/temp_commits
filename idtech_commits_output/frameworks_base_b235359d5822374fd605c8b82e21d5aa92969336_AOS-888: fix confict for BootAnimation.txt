@@ -1,0 +1,73 @@
+b235359d5822 AndrewS 2022-02-25
+
+AOS-888: fix confict for BootAnimation
+
+Change-Id: I502a0f0134a7df693b06e05b1e5b38718f113dc0
+
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index c4ace22366d5..43889f8bbae2 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -198,16 +198,10 @@ static GLfloat quadUVs[] = {
+ 
+ // ---------------------------------------------------------------------------
+ 
+-<<<<<<< HEAD
+ BootAnimation::BootAnimation(sp<Callbacks> callbacks, uint64_t displayId, uint64_t HwcDisplayId)
+-        : Thread(false), mDisplayId(displayId), mHwcDisplayId(HwcDisplayId),
+-	mClockEnabled(true), mTimeIsAccurate(false), mTimeFormat12Hour(false),
+-        mTimeCheckThread(nullptr), mCallbacks(callbacks), mLooper(new Looper(false)) {
+-=======
+-BootAnimation::BootAnimation(sp<Callbacks> callbacks)
+         : Thread(false), mLooper(new Looper(false)), mClockEnabled(true), mTimeIsAccurate(false),
+-        mTimeFormat12Hour(false), mTimeCheckThread(nullptr), mCallbacks(callbacks) {
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
++        mTimeFormat12Hour(false), mTimeCheckThread(nullptr), mCallbacks(callbacks),
++        mDisplayId(displayId), mHwcDisplayId(HwcDisplayId) {
+     mSession = new SurfaceComposerClient();
+ 
+     std::string powerCtl = android::base::GetProperty("sys.powerctl", "");
+@@ -510,20 +504,15 @@ status_t BootAnimation::readyToRun() {
+     if (mDisplayToken == nullptr)
+         return NAME_NOT_FOUND;
+ 
+-<<<<<<< HEAD
+     bool isDefaultDisplay = mDisplayToken == SurfaceComposerClient::getInternalDisplayToken();
+     DisplayConfig displayConfig;
+-=======
+-    DisplayMode displayMode;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     const status_t error =
+-            SurfaceComposerClient::getActiveDisplayMode(mDisplayToken, &displayMode);
++            SurfaceComposerClient::getActiveDisplayConfig(mDisplayToken, &displayConfig);
+     if (error != NO_ERROR)
+         return error;
+ 
+     mMaxWidth = android::base::GetIntProperty("ro.surface_flinger.max_graphics_width", 0);
+     mMaxHeight = android::base::GetIntProperty("ro.surface_flinger.max_graphics_height", 0);
+-<<<<<<< HEAD
+     ui::Size resolution = displayConfig.resolution;
+ 
+     // check property to see if we need to change orientation
+@@ -549,9 +538,6 @@ status_t BootAnimation::readyToRun() {
+         rotation = ui::ROTATION_0;
+     }
+ 
+-=======
+-    ui::Size resolution = displayMode.resolution;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     resolution = limitSurfaceSize(resolution.width, resolution.height);
+     // create the native surface
+     sp<SurfaceControl> control = session()->createSurface(String8("BootAnimation"),
+@@ -559,11 +545,7 @@ status_t BootAnimation::readyToRun() {
+ 
+     SurfaceComposerClient::Transaction t;
+     Rect displayRect(resolution.getWidth(),resolution.getHeight());
+-<<<<<<< HEAD
+     t.setDisplayProjection(mDisplayToken, rotation, displayRect, displayRect);
+-=======
+-    t.setDisplayProjection(mDisplayToken, ui::ROTATION_0, displayRect, displayRect);
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     // this guest property specifies multi-display IDs to show the boot animation
+     // multiple ids can be set with comma (,) as separator, for example:

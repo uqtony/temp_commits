@@ -1,0 +1,65 @@
+6ef549ef93d6 AndrewS 2022-01-13
+
+AOS-865: [TEMP]workaround for USB crash
+
+Some displays failed to set idle to touch hid device, and when
+time out happens xhci driver will clean entire usb bus.
+
+Not sure why some displays se idle successfully while some not,
+add quirks to skip set idle for displays failed to set idle.
+
+Tested even set idle not been called before get descriptor, all
+displays still works fine.
+
+Change-Id: I479e5a9327b98e646bd7c9fd984e39463189d027
+
+diff --git a/drivers/hid/hid-ids.h b/drivers/hid/hid-ids.h
+index 7de58252dce0..bf13511eaa94 100644
+--- a/drivers/hid/hid-ids.h
++++ b/drivers/hid/hid-ids.h
+@@ -1323,4 +1323,7 @@
+ #define USB_VENDOR_ID_SIGNOTEC			0x2133
+ #define USB_DEVICE_ID_SIGNOTEC_VIEWSONIC_PD1011	0x0018
+ 
++#define USB_VENDOR_ID_NUVOTON_TECH		0x416
++#define USB_DEVICE_ID_NUVOTON_TECH_TOUCH	0xc168
++
+ #endif
+diff --git a/drivers/hid/hid-quirks.c b/drivers/hid/hid-quirks.c
+index 2e38340e19df..874c65344896 100644
+--- a/drivers/hid/hid-quirks.c
++++ b/drivers/hid/hid-quirks.c
+@@ -191,6 +191,7 @@ static const struct hid_device_id hid_quirks[] = {
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_WISEGROUP, USB_DEVICE_ID_QUAD_USB_JOYPAD), HID_QUIRK_NOGET | HID_QUIRK_MULTI_INPUT },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_XIN_MO, USB_DEVICE_ID_XIN_MO_DUAL_ARCADE), HID_QUIRK_MULTI_INPUT },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_LOGITECH, USB_DEVICE_ID_LOGITECH_GROUP_AUDIO), HID_QUIRK_NOGET },
++	{ HID_USB_DEVICE(USB_VENDOR_ID_NUVOTON_TECH, USB_DEVICE_ID_NUVOTON_TECH_TOUCH), HID_QUIRK_PARSE_SKIP_SET_IDLE },
+ 
+ 	{ 0 }
+ };
+diff --git a/drivers/hid/usbhid/hid-core.c b/drivers/hid/usbhid/hid-core.c
+index 17a29ee0ac6c..29e50a1fe74b 100644
+--- a/drivers/hid/usbhid/hid-core.c
++++ b/drivers/hid/usbhid/hid-core.c
+@@ -1035,7 +1035,8 @@ static int usbhid_parse(struct hid_device *hid)
+ 	if (!rdesc)
+ 		return -ENOMEM;
+ 
+-	hid_set_idle(dev, interface->desc.bInterfaceNumber, 0, 0);
++	if (!(quirks & HID_QUIRK_PARSE_SKIP_SET_IDLE))
++		hid_set_idle(dev, interface->desc.bInterfaceNumber, 0, 0);
+ 
+ 	ret = hid_get_class_descriptor(dev, interface->desc.bInterfaceNumber,
+ 			HID_DT_REPORT, rdesc, rsize);
+diff --git a/include/linux/hid.h b/include/linux/hid.h
+index 58684657960b..f38c075031cc 100644
+--- a/include/linux/hid.h
++++ b/include/linux/hid.h
+@@ -348,6 +348,7 @@ struct hid_item {
+ #define HID_QUIRK_NO_OUTPUT_REPORTS_ON_INTR_EP	BIT(18)
+ #define HID_QUIRK_HAVE_SPECIAL_DRIVER		BIT(19)
+ #define HID_QUIRK_INCREMENT_USAGE_ON_DUPLICATE	BIT(20)
++#define HID_QUIRK_PARSE_SKIP_SET_IDLE		BIT(24)
+ #define HID_QUIRK_FULLSPEED_INTERVAL		BIT(28)
+ #define HID_QUIRK_NO_INIT_REPORTS		BIT(29)
+ #define HID_QUIRK_NO_IGNORE			BIT(30)

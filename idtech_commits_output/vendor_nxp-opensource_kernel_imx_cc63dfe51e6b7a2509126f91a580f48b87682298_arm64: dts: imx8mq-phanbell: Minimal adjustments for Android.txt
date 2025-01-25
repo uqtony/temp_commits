@@ -1,0 +1,106 @@
+cc63dfe51e6b Sergii Postulga 2021-05-25
+
+arm64: dts: imx8mq-phanbell: Minimal adjustments for Android
+
+- Enable GPU/VPU
+- Adjust clocks for usdhc
+- Enable HDMI and DCSS
+- Enable TMU
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: I61dd7363b5f63b1a13b2c980a884d7f436273f89
+
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts b/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
+index f031413d04eb..9e344baa81bf 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-phanbell.dts
+@@ -360,6 +360,14 @@ ethphy0: ethernet-phy@0 {
+ 	};
+ };
+ 
++&pgc_gpu {
++	power-supply = <&buck3>;
++};
++
++&pgc_vpu {
++	power-supply = <&buck4>;
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -367,16 +375,22 @@ &uart1 {
+ };
+ 
+ &usdhc1 {
++	assigned-clocks = <&clk IMX8MQ_CLK_USDHC1>;
++	assigned-clock-rates = <400000000>;
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+ 	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
+ 	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
+ 	bus-width = <8>;
+ 	non-removable;
++	no-sd;
++	no-sdio;
+ 	status = "okay";
+ };
+ 
+ &usdhc2 {
++	assigned-clocks = <&clk IMX8MQ_CLK_USDHC2>;
++	assigned-clock-rates = <200000000>;
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
+ 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
+@@ -559,3 +573,51 @@ MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B 0xc6
+ 		>;
+ 	};
+ };
++
++&vpu {
++	status = "okay";
++};
++
++&vpu_v4l2 {
++	status = "okay";
++};
++
++&gpu3d {
++	status = "okay";
++};
++
++&irqsteer {
++	status = "okay";
++};
++
++&dcss {
++	status = "okay";
++
++	port@0 {
++		dcss_out: endpoint {
++			  remote-endpoint = <&hdmi_in>;
++		};
++	};
++};
++
++&hdmi {
++	compatible = "cdn,imx8mq-hdmi";
++	lane-mapping = <0xe4>;
++	hdcp-config = <0x3>;
++	status = "okay";
++	port@1 {
++		hdmi_in: endpoint {
++			remote-endpoint = <&dcss_out>;
++		};
++	};
++};
++
++&tmu {
++	throttle-cfgs {
++		throttle_devfreq: devfreq {
++			throttle,max_state = <2>;
++			#cooling-cells = <2>;
++		};
++	};
++};
++

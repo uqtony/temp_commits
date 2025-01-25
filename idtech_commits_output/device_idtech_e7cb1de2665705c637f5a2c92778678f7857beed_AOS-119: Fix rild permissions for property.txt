@@ -1,0 +1,160 @@
+e7cb1de2 George.Huang 2020-03-12
+
+AOS-119: Fix rild permissions for property
+
+1. Remove permissions requested by Quectel which are excessive
+   set_prop(rild, net_radio_prop):
+     net.rmnet               u:object_r:net_radio_prop:s0
+     net.gprs                u:object_r:net_radio_prop:s0
+     net.ppp                 u:object_r:net_radio_prop:s0
+     net.qmi                 u:object_r:net_radio_prop:s0
+     ...
+
+   default_prop:
+     *                       u:object_r:default_prop:s0
+
+   system_prop:
+     net.                    u:object_r:system_prop:s0
+     dev.                    u:object_r:system_prop:s0
+     ro.runtime.             u:object_r:system_prop:s0
+     ...
+
+2. Add permissions which rild exactly used
+   radio_prop: (changed from vendor_default_prop)
+     vendor.rild.libpath
+     vendor.rild.libargs
+     rild.libpath
+     rild.libargs
+
+   net_dns_prop: (changed from system_prop)
+     net.eth0.dns[0-9]
+     net.eth0.gw
+
+   net_dns_prop:
+     net.dns[0-9]
+
+   radio_prop:
+     gsm.version.ril-impl
+
+   exported_default_prop: (changed from default_prop)
+     ro.kernel.qemu
+     ro.kernel.qemu.wifi
+
+Change-Id: I4b897cfbc1ca003d9365d4886f16efe7c845ac89
+
+diff --git a/imx8m/evk_a300/sepolicy/property_contexts b/imx8m/evk_a300/sepolicy/property_contexts
+new file mode 100644
+index 00000000..2e0ec0f1
+--- /dev/null
++++ b/imx8m/evk_a300/sepolicy/property_contexts
+@@ -0,0 +1,3 @@
++vendor.rild.                        u:object_r:radio_prop:s0
++rild.                               u:object_r:radio_prop:s0
++net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/evk_a300/sepolicy/rild.te b/imx8m/evk_a300/sepolicy/rild.te
+index 3a50a9fe..6efa9e26 100644
+--- a/imx8m/evk_a300/sepolicy/rild.te
++++ b/imx8m/evk_a300/sepolicy/rild.te
+@@ -17,19 +17,14 @@ allow rild kernel:system module_request;
+ allow rild kernel:lnk_file read;
+ allow rild kernel:file read;
+ allow rild rild_device:chr_file { read write ioctl open getattr create };
+-#allow rild net_radio_prop:property_service set;
+ allow rild ppp_device:chr_file { read write ioctl open };
+ allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+-allow rild radio_prop:property_service set;
+ allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+ allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+ allow rild sysfs_wake_lock:file { open read write };
+ allow rild system_file:file { read open getattr execute_no_trans };
+-allow rild system_prop:property_service set;
+ allow rild sysfs:file write;
+ allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild default_prop:property_service set;
+-allow rild default_prop:file { read open };
+ allow rild device:dir { write add_name };
+ allow rild rootfs:dir { read open };
+ allow rild hwservicemanager:dir search;
+@@ -60,11 +55,20 @@ allow rild hal_keymaster_default:dir search;
+ allow rild vold:dir search;
+ 
+ # property service
++# The property permissions that Quectel requested, but too over
++#set_prop(rild, net_radio_prop)
++#set_prop(rild, default_prop)
++#set_prop(rild, system_prop)
++# TODO: remove auditallow once if rild related functions are fully tested.
++userdebug_or_eng(
++  auditallow rild net_radio_prop:property_service set;
++  auditallow rild default_prop:property_service set;
++  auditallow rild system_prop:property_service set;
++)
++# The property permissions that hardware/ril exactly used
+ set_prop(rild, radio_prop)
+-set_prop(rild, net_radio_prop)
+-set_prop(rild, system_radio_prop)
+-auditallow rild net_radio_prop:property_service set;
+-auditallow rild system_radio_prop:property_service set;
++set_prop(rild, net_dns_prop)
++get_prop(rild, exported_default_prop)
+ 
+ allow rild tty_device:chr_file rw_file_perms;
+ 
+diff --git a/imx8m/vp6820_8mq/sepolicy/property_contexts b/imx8m/vp6820_8mq/sepolicy/property_contexts
+new file mode 100644
+index 00000000..2e0ec0f1
+--- /dev/null
++++ b/imx8m/vp6820_8mq/sepolicy/property_contexts
+@@ -0,0 +1,3 @@
++vendor.rild.                        u:object_r:radio_prop:s0
++rild.                               u:object_r:radio_prop:s0
++net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/rild.te b/imx8m/vp6820_8mq/sepolicy/rild.te
+index 3a50a9fe..6efa9e26 100644
+--- a/imx8m/vp6820_8mq/sepolicy/rild.te
++++ b/imx8m/vp6820_8mq/sepolicy/rild.te
+@@ -17,19 +17,14 @@ allow rild kernel:system module_request;
+ allow rild kernel:lnk_file read;
+ allow rild kernel:file read;
+ allow rild rild_device:chr_file { read write ioctl open getattr create };
+-#allow rild net_radio_prop:property_service set;
+ allow rild ppp_device:chr_file { read write ioctl open };
+ allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+-allow rild radio_prop:property_service set;
+ allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+ allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+ allow rild sysfs_wake_lock:file { open read write };
+ allow rild system_file:file { read open getattr execute_no_trans };
+-allow rild system_prop:property_service set;
+ allow rild sysfs:file write;
+ allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild default_prop:property_service set;
+-allow rild default_prop:file { read open };
+ allow rild device:dir { write add_name };
+ allow rild rootfs:dir { read open };
+ allow rild hwservicemanager:dir search;
+@@ -60,11 +55,20 @@ allow rild hal_keymaster_default:dir search;
+ allow rild vold:dir search;
+ 
+ # property service
++# The property permissions that Quectel requested, but too over
++#set_prop(rild, net_radio_prop)
++#set_prop(rild, default_prop)
++#set_prop(rild, system_prop)
++# TODO: remove auditallow once if rild related functions are fully tested.
++userdebug_or_eng(
++  auditallow rild net_radio_prop:property_service set;
++  auditallow rild default_prop:property_service set;
++  auditallow rild system_prop:property_service set;
++)
++# The property permissions that hardware/ril exactly used
+ set_prop(rild, radio_prop)
+-set_prop(rild, net_radio_prop)
+-set_prop(rild, system_radio_prop)
+-auditallow rild net_radio_prop:property_service set;
+-auditallow rild system_radio_prop:property_service set;
++set_prop(rild, net_dns_prop)
++get_prop(rild, exported_default_prop)
+ 
+ allow rild tty_device:chr_file rw_file_perms;
+ 

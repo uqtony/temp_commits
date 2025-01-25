@@ -1,0 +1,92 @@
+40967e04 owen.wen 2020-04-17
+
+AOS-27: Reduce amount of apps for secure build
+
+Change-Id: Ib7d66bd40b3b4ea0b54e3b88534eb3bf7a23b6cf
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index f8e1dabe..87e2c671 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -12,26 +12,14 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
+ PRODUCT_BRAND := Android
+ PRODUCT_MANUFACTURER := freescale
+ 
+-# Android infrastructures
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+-    CactusPlayer \
+-    ExtractorPkg \
+     SystemUpdaterSample \
+-    charger_res_images \
+     ethernet \
+-    libGLES_android \
+-    libRS \
+-    libedid \
+-    libion \
+-    librs_jni \
+-    slideshow \
+-    verity_warning_images_idt \
+-    vndk-sp
+-
++    CubeLiveWallpapers
+ ifneq ($(PRODUCT_IMX_CAR),true)
+ PRODUCT_PACKAGES += \
+     Camera \
+-    CubeLiveWallpapers \
+     Email \
+     Gallery2 \
+     LegacyCamera \
+@@ -40,6 +28,22 @@ PRODUCT_PACKAGES += \
+     SoundRecorder
+ endif
+ 
++endif
++
++# Android infrastructures
++PRODUCT_PACKAGES += \
++    CactusPlayer \
++    ExtractorPkg \
++    charger_res_images \
++    libGLES_android \
++    libRS \
++    libedid \
++    libion \
++    librs_jni \
++    slideshow \
++    verity_warning_images_idt \
++    vndk-sp
++
+ # HAL
+ PRODUCT_PACKAGES += \
+     copybit.imx8 \
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 5b824476..57f8a219 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -281,13 +281,14 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+ 
+-# Tensorflow lite camera demo
+-PRODUCT_PACKAGES += \
+-                    tflitecamerademo
+-
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ # Multi-Display launcher
+ PRODUCT_PACKAGES += \
+     MultiDisplay
++# Tensorflow lite camera demo
++PRODUCT_PACKAGES += \
++    tflitecamerademo
++endif
+ 
+ # Multi-Client IME
+ PRODUCT_PACKAGES += \
+@@ -341,4 +342,4 @@ PRODUCT_PACKAGES += \
+     deviceadmin \
+     appmanager \
+     amsconnector \
+-    amsclouddrive
+\ No newline at end of file
++    amsclouddrive

@@ -1,0 +1,328 @@
+1a3c590d72 AndrewS 2021-02-20
+
+AOS-499: read display orientation data from idtechdata partition
+
+- read display orientation data from new created idtechdata partition,
+  and parse/store it before prepare splash.
+- modify get_disp_rotation() to get multiple display's orientation.
+- append all displays orientation to bootargs, and which would be
+  formatted as read only properties and we can use these properties
+  in frameworks.
+
+example format of orientation data file:
+display_count 3
+main_display 270
+second_display 180
+third_display 0
+
+first line to specify display count, and below are orientation of
+each display.
+
+Change-Id: If1eafdcef7dfaaa013e78629e92020c557d2bc66
+
+diff --git a/common/image-android.c b/common/image-android.c
+index 45df420fbb..7908fae35d 100644
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@ -112,13 +112,21 @@ static void append_kernel_cmdline(char *commandline)
+ 	}
+ 
+ 	/* append display rotation into bootargs */
+-	char idt_disp_rotation[BDINFO_DATA_SIZE] = "";
+-
+-	if (idt_get_board_rotation(idt_disp_rotation, BDINFO_DATA_SIZE)) {
+-		sprintf(newbootargs, " androidboot.idt_orientation=%s", idt_disp_rotation);
+-		strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+-	} else {
+-		printf("WARN: failed to get idt_get_board_rotation
+");
++	char *idt_disp_rotation;
++	char append[BDINFO_DATA_SIZE];
++
++	memset(append, 0, BDINFO_DATA_SIZE);
++	for (int i=0;i<MAX_DISPLAY_COUNT;i++) {
++		if ((idt_disp_rotation = get_disp_rotation(i)) != NULL) {
++			if (i != DISPLAY_MAIN)
++				sprintf(append, "_disp_%d", (i+1));
++			sprintf(newbootargs, " androidboot.idt_orientation%s=%s",
++					(i == DISPLAY_MAIN)?"":append,
++					idt_disp_rotation);
++			strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
++		} else {
++			break;
++		}
+ 	}
+ 
+ 	sprintf(newbootargs,
+diff --git a/common/splash.c b/common/splash.c
+index 2f35a9bacc..00b83c5767 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -24,8 +24,8 @@
+ #include <env.h>
+ #include <splash.h>
+ #include <lcd.h>
+-#ifdef CONFIG_IDT_ROTATION
+ #include <persist_idt.h>
++#ifdef CONFIG_IDT_ROTATION
+ #include <asm/io.h>
+ #include <image_idt.h>
+ #include <stdlib.h>
+@@ -227,6 +227,10 @@ int splash_display(void)
+ 		return -EINVAL;
+ 
+ 	addr = simple_strtoul(s, NULL, 16);
++
++	/* read display orientation from idtechdata partition before prepare splash */
++	read_orientation_file();
++
+ 	ret = splash_screen_prepare();
+ #ifdef CONFIG_IDT_ROTATION
+ 	if (ret == SPLASH_CUSTOMER_SOURCE) {
+@@ -242,11 +246,10 @@ int splash_display(void)
+ #ifdef CONFIG_IDT_ROTATION
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+ 	if ((!ret) && (rotate != SPLASH_CUSTOMER_SOURCE)) {
+-		binfo_rotate = get_disp_rotation();
++		binfo_rotate = get_disp_rotation(DISPLAY_MAIN);
+ 		if (binfo_rotate != NULL) {
+ 			degree = (int)simple_strtol(binfo_rotate, NULL, 10);
+ 			rotate = SPLASH_ROTATED;
+-			free(binfo_rotate);
+ 		}
+ 		idt_image_clear(dev);
+ 	} else {
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+index e2a51386f2..caa58e3df3 100644
+--- a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+@@ -575,10 +575,9 @@ int idt_display_unlock_warning(void)
+ 	char *binfo_rotate = NULL;
+ 	int degree = 0;
+ 
+-	binfo_rotate = get_disp_rotation();
++	binfo_rotate = get_disp_rotation(DISPLAY_MAIN);
+ 	if (binfo_rotate != NULL) {
+ 		degree = (int)simple_strtol(binfo_rotate, NULL, 10);
+-		free((void *)binfo_rotate);
+ 	}
+ 
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+diff --git a/include/persist_idt.h b/include/persist_idt.h
+index 68f847264c..3578c128a9 100644
+--- a/include/persist_idt.h
++++ b/include/persist_idt.h
+@@ -18,6 +18,21 @@ extern "C" {
+ #define BDINFO_TOTAL_DATA_SIZE 144
+ #define BDINFO_PROPERTY_SIZE 4
+ 
++#define DISP_ORIENTATION_PARTITION "idtechdata"
++#define DISP_ORIENTATION_FILE "disp_orientation/orientation"
++#define DISP_ORIENTATION_FILE_SIZE 128
++#define DISP_ORIENTATION_VALUE_SIZE 4
++#define DISPLAY_COUNT "display_count"
++#define MAIN_DISPLAY "main_display"
++#define SECOND_DISPLAY "second_display"
++#define THIRD_DISPLAY "third_display"
++#define MAX_DISPLAY_COUNT 3
++
++struct display_orientation {
++	int display;
++	char orientation[DISP_ORIENTATION_VALUE_SIZE];
++};
++
+ typedef struct BoardInfoData {
+ 	uint8_t magic[BDINFO_MAGIC_LEN];
+ 
+@@ -99,14 +114,23 @@ typedef enum {
+ 	IDT_FHD,
+ } idt_resolution_mode;
+ 
++typedef enum {
++	DISPLAY_MAIN = 0,
++	DISPLAY_SECOND,
++	DISPLAY_THIRD,
++	DISPLAY_NONE,
++} idt_display;
++
+ bool is_bdinfo_var(char *cmd);
+ 
+ bool is_bdinfo_som_set(void);
+ 
+ bool get_dtb_id(char *id_buf, size_t id_buf_size);
+ 
++void read_orientation_file(void);
++
+ /* to get the rotation property from board-info. (needed to free after using) */
+-char *get_disp_rotation(void);
++char *get_disp_rotation(int display);
+ 
+ /* to get the hdmi resolution index to choose timing. */
+ int get_hdmi_resolution_index(void);
+diff --git a/lib/persist_idt/persist_idt.c b/lib/persist_idt/persist_idt.c
+index 492b01929d..f72ca4cab0 100644
+--- a/lib/persist_idt/persist_idt.c
++++ b/lib/persist_idt/persist_idt.c
+@@ -4,11 +4,18 @@
+ 
+ #include <common.h>
+ #include <stdlib.h>
++#include <mmc.h>
++#include <fb_fsl.h>
++#include <fs.h>
+ #include <linux/string.h>
++#include <linux/ctype.h>
+ #include <persist_idt.h>
+ 
+ IdtInfoResult bdinfo_read(BoardInfoData* bdinfo_data, char *err_msg, size_t err_msg_len);
+ 
++static struct display_orientation *orientation_data = NULL;
++static int display_count = 0;
++
+ static int strcmp_l1(const char *s1, const char *s2) {
+ 	if (!s1 || !s2)
+ 		return -1;
+@@ -90,25 +97,98 @@ bool get_dtb_id(char *id_buf, size_t id_buf_size) {
+ 	return true;
+ }
+ 
+-char *get_disp_rotation(void)
++void read_orientation_file(void)
+ {
+-	char *id_buf;
+-
+-	id_buf = malloc(sizeof(char) * BDINFO_PROPERTY_SIZE);
+-	if (!id_buf) {
+-		printf("Error: wrong input buffer alloc
+");
+-		return NULL;
+-	}
+-	BoardInfoData bdinfo_data;
+-	char response[FASTBOOT_RESPONSE_LEN];
+-	if (bdinfo_read(&bdinfo_data, response, FASTBOOT_RESPONSE_LEN) != 0) {
+-		printf("Error: bdinfo read failed: %s
+", response);
+-		return NULL;
++	struct fastboot_ptentry *ptn;
++	char partition[8] = {0};
++	char orientation[DISP_ORIENTATION_FILE_SIZE] = {0};
++	loff_t actread;
++	int ret;
++
++	display_count = 0;
++	/* find idtechdata partition */
++	ptn = fastboot_flash_find_ptn(DISP_ORIENTATION_PARTITION);
++	if (!ptn) {
++		printf("Error: partition not found
+");
++		return;
++	}
++
++	snprintf(partition, sizeof(partition), "%d:%x",
++		 mmc_get_env_dev(),
++		 ptn->partition_index);
++	/* set block device */
++	ret = fs_set_blk_dev("mmc", partition, FS_TYPE_ANY);
++	if (ret) {
++		printf("Error: fs_set_blk_dev failed: %d
+", ret);
++		return;
++	}
++	/* read display orientation data */
++	ret = fs_read(DISP_ORIENTATION_FILE, (ulong)orientation, 0, DISP_ORIENTATION_FILE_SIZE, &actread);
++	if (ret) {
++		printf("Error: fs_read failed: %d
+", ret);
++		return;
++	}
++	/* parsing file */
++	if (!actread) {
++		printf("Error: no display orientation data
+");
++		return;
++	}
++
++	char *ptr;
++	char *value;
++	int copy_len;
++	int index = 0;
++
++	/* get display count */
++	ptr = strtok(orientation, "
+");
++	if (strncmp(ptr, DISPLAY_COUNT, strlen(DISPLAY_COUNT))) {
++		printf("Error: no display orientation data
+");
++		return;
++	}
++	value = strstr(ptr, " ");
++	while (!isdigit(*value)) value++;
++	if (strlen(value) != 1) {
++		printf("Error: display orientation file format error
+");
++		return;
++	}
++	display_count = *value - '0';
++	if (display_count > MAX_DISPLAY_COUNT) {
++		printf("Error: display count over limit
+");
++		return;
++	}
++	/* allocate orientation_data to store orientation data */
++	orientation_data = calloc(display_count, sizeof(struct display_orientation));
++	/* parsing orientation */
++	ptr = strtok(NULL, "
+");
++	while (ptr != NULL) {
++		if (!strncmp(ptr, MAIN_DISPLAY, strlen(MAIN_DISPLAY))) {
++			orientation_data[index].display = DISPLAY_MAIN;
++		} else if (!strncmp(ptr, SECOND_DISPLAY, strlen(SECOND_DISPLAY))) {
++			orientation_data[index].display = DISPLAY_SECOND;
++		} else if (!strncmp(ptr, THIRD_DISPLAY, strlen(THIRD_DISPLAY))) {
++			orientation_data[index].display = DISPLAY_THIRD;
++		} else {
++			ptr = strtok(NULL, "
+");
++			continue;
++		}
++		value = strstr(ptr, " ");
++		while (!isdigit(*value)) value++;
++		copy_len = (strlen(value) > BDINFO_PROPERTY_SIZE)?
++				BDINFO_PROPERTY_SIZE:strlen(value);
++		strncpy(orientation_data[index].orientation, value, copy_len);
++		if (++index > MAX_DISPLAY_COUNT)
++			break;
++		ptr = strtok(NULL, "
+");
+ 	}
+-	snprintf(id_buf, BDINFO_PROPERTY_SIZE, "%s",
+-		 (char *)bdinfo_data.disp_rotation);
++}
+ 
+-	return id_buf;
++char *get_disp_rotation(int display)
++{
++	for (int i=0;i<display_count;i++) {
++		if (orientation_data[i].display == display)
++			return orientation_data[i].orientation;
++	}
++	return NULL;
+ }
+ 
+ int get_hdmi_resolution_index(void)
+diff --git a/lib/verifiedstate_idt/idt_red_warning.c b/lib/verifiedstate_idt/idt_red_warning.c
+index 893e121b41..9fe5e265ba 100644
+--- a/lib/verifiedstate_idt/idt_red_warning.c
++++ b/lib/verifiedstate_idt/idt_red_warning.c
+@@ -34,10 +34,9 @@ void idt_show_red_warning_and_shutdown(void)
+ 	char *binfo_rotate = NULL;
+ 	int degree = 0;
+ 
+-	binfo_rotate = get_disp_rotation();
++	binfo_rotate = get_disp_rotation(DISPLAY_MAIN);
+ 	if (binfo_rotate != NULL) {
+ 		degree = (int)simple_strtol(binfo_rotate, NULL, 10);
+-		free(binfo_rotate);
+ 	}
+ #endif /* CONFIG_IDT_ROTATION */
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);

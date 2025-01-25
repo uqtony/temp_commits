@@ -1,0 +1,144 @@
+cd55d5ab George.Huang 2020-04-08
+
+AOS-129: Runtime setup ro.radio.noril via lsusb results
+
+0. This change will affect all imx8m products.
+
+1. Instead of setting up ro.radio.noril in build time,
+   set it up via script check_modem.sh in runtime.
+
+2. The script uses lsusb command to detect modem module
+   from usb. if modem module exists, then will set
+   ro.radio.noril=no, otherwise will set ro.radio.noril=yes.
+   * Bus 001 Device 004: ID 2c7c:0195
+   * vendor_id =2c7c: Quectel Wireless Solutions Co., Ltd.
+   * product_id=0195: EG95 LTE modem
+
+3. The service check_modem will start at 12 sec from rebooting
+
+4. For lsusb command security permissions, redefine usb uevent
+   files security type from sysfs to sysfs_usb_uevent.
+
+4. For shell script security permissions, redefine ro.radio.noril
+   prop security type from exported3_default_prop to radio_prop.
+
+Change-Id: Ia82bf7e45af124ea006aed29e600d6bc422a75ea
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 19721fe1..f8e1dabe 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -331,16 +331,13 @@ PRODUCT_COPY_FILES += \
+ 
+ # Copy soc related config and binary to board
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/init.idt.common.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/init.idt.common.rc
++    device/idtech/imx8m/init.idt.common.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/init.idt.common.rc \
++    device/idtech/imx8m/check_modem.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/check_modem.sh \
+ 
+ PRODUCT_PROPERTY_OVERRIDES += \
+     pm.dexopt.boot=quicken \
+     ro.hardware.bootctrl=avb \
+ 
+-# Temporary disable RIL, until all patches will be integrated
+-PRODUCT_PROPERTY_OVERRIDES += \
+-    ro.radio.noril=yes
+-
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.mediacomponents.package=com.nxp.extractorpkg
+ 
+diff --git a/imx8m/check_modem.sh b/imx8m/check_modem.sh
+new file mode 100644
+index 00000000..dea591a7
+--- /dev/null
++++ b/imx8m/check_modem.sh
+@@ -0,0 +1,31 @@
++#!/system/bin/sh
++
++check_modem() {
++  idx=0
++  idx_limit=3
++  # vendor: Quectel Wireless Solutions Co., Ltd.
++  vendor_id="2c7c"
++  # product: EG95 LTE modem
++  product_id="0195"
++
++  while [ $idx -lt $idx_limit ]; do
++    idx=$((idx + 1))
++    eval "lsusb |grep -q 'ID ${vendor_id}:${product_id}$'"
++    ret=$?
++    if [ $ret -eq 0 ]; then
++      setprop ro.radio.noril no
++      break
++    else
++      sleep 1
++    fi
++  done
++  [ $ret -ne 0 ] && setprop ro.radio.noril yes || true
++}
++
++#####################################################
++#                       main                        #
++#####################################################
++if [ "$1" = check_modem ]; then
++  check_modem
++fi
++
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index 1b0dcfd6..e104f9f5 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -7,3 +7,12 @@ on early-boot
+     setprop ro.idt.signature_online_check false
+     # set multi client IME
+     setprop ro.sys.multi_client_ime com.example.android.multiclientinputmethod/.MultiClientInputMethod
++
++service check_modem /system/bin/sh /product/etc/init/hw/check_modem.sh "check_modem"
++    class core
++    oneshot
++    user shell
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
+diff --git a/imx8m/sepolicy/file.te b/imx8m/sepolicy/file.te
+index 1f071208..9a21738e 100644
+--- a/imx8m/sepolicy/file.te
++++ b/imx8m/sepolicy/file.te
+@@ -1,3 +1,4 @@
+ type mediadrm_vendor_data_file, file_type, data_file_type;
+ type debugfs_dma, debugfs_type, fs_type;
+ type debugfs_sw_sync, debugfs_type, fs_type;
++type sysfs_usb_uevent, sysfs_type, fs_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 3a28e0f2..3172795f 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -94,3 +94,7 @@
+ /dev/block/mmcblk0boot0p1      u:object_r:bootloader_block_device:s0
+ /dev/block/mmcblk0boot1        u:object_r:bootloader_block_device:s0
+ /dev/block/mmcblk0boot1p1      u:object_r:bootloader_block_device:s0
++
++# lsusb command
++/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 352cde0d..75fe8919 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -251,3 +251,5 @@ ro.bluetooth.emb_wp_mode            u:object_r:vendor_bluetooth_prop:s0
+ ro.bluetooth.wipower                u:object_r:vendor_bluetooth_prop:s0
+ unified_bt_logging                  u:object_r:vendor_bluetooth_prop:s0
+ persist.BT3_2.version               u:object_r:vendor_bluetooth_prop:s0
++
++ro.radio.noril                      u:object_r:radio_prop:s0 exact string
+diff --git a/imx8m/sepolicy/shell.te b/imx8m/sepolicy/shell.te
+index ac325037..3a85d92d 100644
+--- a/imx8m/sepolicy/shell.te
++++ b/imx8m/sepolicy/shell.te
+@@ -8,3 +8,5 @@ allow shell kernel:process { setsched };
+ dontaudit shell self:capability { dac_override };
+ allow shell vendor_file:file { read execute open getattr };
+ allow shell system_prop:property_service { set };
++allow shell sysfs_usb_uevent:file { getattr read open };
++set_prop(shell, radio_prop)

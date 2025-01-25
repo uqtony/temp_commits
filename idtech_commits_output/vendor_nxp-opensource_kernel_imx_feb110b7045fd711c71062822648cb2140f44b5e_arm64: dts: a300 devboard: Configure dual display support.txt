@@ -1,0 +1,92 @@
+feb110b7045f Sergii Postulga 2020-02-26
+
+arm64: dts: a300 devboard: Configure dual display support
+
+Patch:
+- connects ili9881cc to lcdif
+- connects hdmi to dcss
+- adjusts mipi_dsi configuration
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: If9ec1b7ba025579e4f07a3fd31f1708840ca8096
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index d682e10f29e4..9c2a39bc67cb 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@ -1088,34 +1088,22 @@ &A53_0 {
+ 	dc-supply = <&reg_gpio_dvfs>;
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
+ &dcss {
+ 	status = "okay";
+-	disp-dev = "mipi_disp";
+-	clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>,
+-		 <&clk IMX8MQ_CLK_DISP_AXI_ROOT>,
+-		 <&clk IMX8MQ_CLK_DISP_RTRM_ROOT>,
+-		 <&clk IMX8MQ_CLK_DC_PIXEL>,
+-		 <&clk IMX8MQ_CLK_DISP_DTRC>,
+-		 <&clk IMX8MQ_VIDEO_PLL1>,
+-		 <&clk IMX8MQ_CLK_27M>,
+-		 <&clk IMX8MQ_CLK_25M>;
+-	clock-names = "apb", "axi", "rtrm", "pix", "dtrc", "pll",
+-		      "pll_src1", "pll_src2";
+-
+-	assigned-clocks = <&clk IMX8MQ_CLK_DC_PIXEL>,
+-			  <&clk IMX8MQ_CLK_DISP_AXI>,
+-			  <&clk IMX8MQ_CLK_DISP_RTRM>;
+-	assigned-clock-parents = <&clk IMX8MQ_VIDEO_PLL1_OUT>,
+-				 <&clk IMX8MQ_SYS1_PLL_800M>,
+-				 <&clk IMX8MQ_SYS1_PLL_800M>;
+-	assigned-clock-rates = <600000000>,
+-			       <800000000>,
+-			       <400000000>;
+-
+-	dcss_disp0: port@0 {
+-		reg = <0>;
+ 
+-		dcss_disp0_mipi_dsi: mipi_dsi {
++	disp-dev = "hdmi_disp";
++};
++
++&lcdif {
++	status = "okay";
++	max-res = <720>, <1280>;
++
++	port@0 {
++		lcdif_mipi_dsi: endpoint {
+ 			remote-endpoint = <&mipi_dsi_in>;
+ 		};
+ 	};
+@@ -1127,13 +1115,14 @@ &mipi_dsi_phy {
+ 
+ &mipi_dsi {
+ 	status = "okay";
++	as_bridge;
++	sync-pol = <1>;
+ 
+ 	port@1 {
+ 		mipi_dsi_in: endpoint {
+-			remote-endpoint = <&dcss_disp0_mipi_dsi>;
++			remote-endpoint = <&lcdif_mipi_dsi>;
+ 		};
+ 	};
+-
+ };
+ 
+ &mipi_dsi_bridge {
+@@ -1182,10 +1171,6 @@ mipi_dsi_bridge_out: endpoint {
+ 	};
+ };
+ 
+-&hdmi {
+-	status = "okay";
+-};
+-
+ &pwm1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm1>;

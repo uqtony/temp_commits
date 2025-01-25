@@ -1,0 +1,42 @@
+07d295194ff3 owen.wen 2021-09-30
+
+AOS-639: ALS: fix opt3001 regulator
+
+Symptom: i2cdetect -y 2 cannot find 0x45
+RootCause: regulator setup problem
+Solution: set regulator-always-on
+
+detect OK now
+$ i2cdetect -y 2
+0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- UU -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- UU -- -- -- -- -- -- -- -- 4e --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+
+ALS not covered by hand
+redwood_8mq:/sys/bus/iio/devices/iio:device0 # cat in_illuminance_input
+235.680000
+
+ASL covered by hand
+redwood_8mq:/sys/bus/iio/devices/iio:device0 # cat in_illuminance_input
+3.400000
+
+Change-Id: I2eb9edddee47f48d0f2f5377e6436e7d054f5d03
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index d52820a3fa7b..5b00c9a580e7 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -150,6 +150,7 @@ reg_light_vdd: fixed-regulator-opt3001-vdd {
+ 		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
+ 		off-on-delay-us = <2000>;
+ 		enable-active-high;
++		regulator-always-on;
+ 	};
+ 
+ 	reg_lcm_lcd_vdd: fixed-regulator-3v3-vdd {

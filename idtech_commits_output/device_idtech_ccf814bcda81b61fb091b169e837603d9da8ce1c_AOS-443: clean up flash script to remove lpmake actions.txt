@@ -1,0 +1,261 @@
+ccf814bc George.Huang 2020-12-29
+
+AOS-443: clean up flash script to remove lpmake actions
+
+- clean up flash script to remove lpmake actions
+- flash super.img by default
+
+Change-Id: Ic4238307524b459c85f25593ff21d1eb35eeee18
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 0815f95b..45d5eea6 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -85,13 +85,6 @@ set ser_num=
+ set fastboot_tool=fastboot
+ set /A error_level=0
+ set /A flag=1
+-set lpmake_system_image_a=
+-set lpmake_system_image_b=
+-set lpmake_vendor_image_a=
+-set lpmake_vendor_image_b=
+-set lpmake_product_image_a=
+-set lpmake_product_image_b=
+-set /A dont_generate_super=0
+ set board_type=
+ 
+ 
+@@ -143,7 +136,6 @@ if %1 == -l set /A lock=1 & shift & goto :parse_loop
+ if %1 == -e set /A erase=1 & shift & goto :parse_loop
+ if %1 == -D set image_directory=%2& shift & shift & goto :parse_loop
+ if %1 == -s set ser_num=%2&shift &shift & goto :parse_loop
+-if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+ echo %1 is an illegal option
+@@ -343,10 +335,6 @@ echo  -D directory      the directory of of images
+ echo                        No need to use this option if images are in current working directory
+ echo  -s ser_num        the serial number of board
+ echo                        If only one board connected to computer, no need to use this option
+-echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+-echo                        Under the condition that dynamic partition feature are enabled:
+-echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+-echo                          if this option is used, make sure super.img already exists together with other images.
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo                               If not set, use naming from current board_info partition
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index cf24f3f4..854b9116 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -76,10 +76,6 @@ options:
+                         No need to use this option if images are in current working directory
+   -s ser_num        the serial number of board
+                         If only one board connected to computer, no need to use this option
+-  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+-                        Under the condition that dynamic partition feature are enabled:
+-                          if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+-                          if this option is used, make sure super.img already exists together with other images.
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+@@ -488,7 +484,6 @@ RED='[0;31m'
+ STD='[0;0m'
+ GREEN='[0;32m'
+ result_value=0
+-dont_generate_super=0
+ YELLOW='[0;33m'
+ board_type=""
+ 
+@@ -533,7 +528,6 @@ while [ $# -gt 0 ]; do
+         -l) lock=1 ;;
+         -D) image_directory=$2; shift;;
+         -s) ser_num=$2; shift;;
+-        -super) dont_generate_super=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 566ca536..1e1ca9b4 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -102,13 +102,6 @@ set dual_bootloader_partition=
+ set /A daemon_mode=0
+ set /A flag=1
+ set /A dryrun=0
+-set lpmake_system_image_a=
+-set lpmake_system_image_b=
+-set lpmake_vendor_image_a=
+-set lpmake_vendor_image_b=
+-set lpmake_product_image_a=
+-set lpmake_product_image_b=
+-set /A dont_generate_super=0
+ set board_type=
+ set max_download_size=0x19000000
+ set tmp_dir=%TMP%
+@@ -165,7 +158,6 @@ if %1 == -y set yocto_image=%2&shift &shift & goto :parse_loop
+ if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+-if %1 == -super set /A dont_generate_super=1 & shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+ echo unknown option "%1", please check it.
+@@ -686,10 +678,6 @@ echo  -i                with this option used, after uboot for uuu loaded and ex
+ echo                        This option is for users to manually flash the images to partitions they want to
+ echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-echo  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+-echo                        Under the condition that dynamic partition feature are enabled:
+-echo                          if this option is not used, super.img will be generated under current working directory and flashed to the board.
+-echo                          if this option is used, make sure super.img already exists together with other images.
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ goto :eof
+@@ -867,9 +855,6 @@ if not [%partition_to_be_flashed:bootloader=%] == [%partition_to_be_flashed%] (
+     goto :start_to_flash
+ )
+ if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+-    if %dont_generate_super% == 0 (
+-        call :make_super_image
+-    )
+     set img_name=%super_file%
+     set flash_option=-S %max_download_size%
+     goto :start_to_flash
+@@ -1134,45 +1119,6 @@ if not [!dec!] == [0] (
+ echo !hex!
+ goto :eof
+ 
+-:: this function will invoke lpmake to create super.img, the super.img will
+-:: be created in current directory
+-:make_super_image
+-if exist %super_file% (
+-    del %super_file%
+-)
+-:: now dynamic partition is only enabled in dual slot condition
+-if %support_dualslot% == 1 (
+-    setlocal enabledelayedexpansion
+-    if [%slot%] == [_a] (
+-        set lpmake_system_image_a=--image system_a=%image_directory%%systemimage_file%
+-        set lpmake_vendor_image_a=--image vendor_a=%image_directory%%vendor_file%
+-        set lpmake_product_image_a=--image product_a=%image_directory%%product_file%
+-    )
+-    if [%slot%] == [_b] (
+-        set lpmake_system_image_b=--image system_b=%image_directory%%systemimage_file%
+-        set lpmake_vendor_image_b=--image vendor_b=%image_directory%%vendor_file%
+-        set lpmake_product_image_b=--image product_b=%image_directory%%product_file%
+-    )
+-    if [%slot%] == [] (
+-        set lpmake_system_image_a=--image system_a=%image_directory%%systemimage_file%
+-        set lpmake_vendor_image_a=--image vendor_a=%image_directory%%vendor_file%
+-        set lpmake_product_image_a=--image product_a=%image_directory%%product_file%
+-        set lpmake_system_image_b=--image system_b=%image_directory%%systemimage_file%
+-        set lpmake_vendor_image_b=--image vendor_b=%image_directory%%vendor_file%
+-        set lpmake_product_image_b=--image product_b=%image_directory%%product_file%
+-    )
+-    %image_directory%lpmake.exe --metadata-size 65536 --super-name super --metadata-slots 3 --device super:7516192768 ^
+-        --group nxp_dynamic_partitions_a:3747610624 --group nxp_dynamic_partitions_b:3747610624 ^
+-        --partition system_a:readonly:0:nxp_dynamic_partitions_a !lpmake_system_image_a! ^
+-        --partition system_b:readonly:0:nxp_dynamic_partitions_b !lpmake_system_image_b! ^
+-        --partition vendor_a:readonly:0:nxp_dynamic_partitions_a !lpmake_vendor_image_a! ^
+-        --partition vendor_b:readonly:0:nxp_dynamic_partitions_b !lpmake_vendor_image_b! ^
+-        --partition product_a:readonly:0:nxp_dynamic_partitions_a !lpmake_product_image_a! ^
+-        --partition product_b:readonly:0:nxp_dynamic_partitions_b !lpmake_product_image_b! ^
+-        --sparse --output !super_file!
+-)
+-
+-goto :eof
+ 
+ :exit
+ exit /B %error_level%
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 5d6d8e7a..70372329 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -85,10 +85,6 @@ options:
+                         This option is for users to manually flash the images to partitions they want to
+   -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-  -super            do not generate super.img when flash the images with dynamic partition feature enabled.
+-                       Under the condition that dynamic partition feature are enabled:
+-                         if this option is not used, super.img will be generated under "/tmp" and flashed to the board.
+-                         if this option is used, make sure super.img already exists together with other images.
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+@@ -199,9 +195,6 @@ function flash_partition
+     elif [ "$(echo ${1} | grep "userdata")" != "" ]; then
+         img_name=${userdata_file}
+     elif [ "$(echo ${1} | grep "super")" != "" ]; then
+-        if [ ${dont_generate_super} -eq 0 ]; then
+-            make_super_image
+-        fi
+         img_name=${super_file}
+         flash_option="-S ${max_download_size}"
+     else
+@@ -426,42 +419,6 @@ function flash_android
+     fi
+ }
+ 
+-# this function will invoke lpmake to create super.img, the super.img will
+-# be created in /tmp, make sure that there is enouth space
+-function make_super_image
+-{
+-    rm -rf /tmp/${super_file}
+-    # now dynamic partition is only enabled in dual slot condition
+-    if [ ${support_dualslot} -eq 1 ]; then
+-        if [ "${slot}" == "_a" ]; then
+-            lpmake_system_image_a="--image system_a=${sym_link_directory}${systemimage_file}"
+-            lpmake_vendor_image_a="--image vendor_a=${sym_link_directory}${vendor_file}"
+-            lpmake_product_image_a="--image product_a=${sym_link_directory}${product_file}"
+-        elif [ "${slot}" == "_b" ]; then
+-            lpmake_system_image_b="--image system_b=${sym_link_directory}${systemimage_file}"
+-            lpmake_vendor_image_b="--image vendor_b=${sym_link_directory}${vendor_file}"
+-            lpmake_product_image_b="--image product_b=${sym_link_directory}${product_file}"
+-        else
+-            lpmake_system_image_a="--image system_a=${sym_link_directory}${systemimage_file}"
+-            lpmake_vendor_image_a="--image vendor_a=${sym_link_directory}${vendor_file}"
+-            lpmake_product_image_a="--image product_a=${sym_link_directory}${product_file}"
+-            lpmake_system_image_b="--image system_b=${sym_link_directory}${systemimage_file}"
+-            lpmake_vendor_image_b="--image vendor_b=${sym_link_directory}${vendor_file}"
+-            lpmake_product_image_b="--image product_b=${sym_link_directory}${product_file}"
+-        fi
+-    fi
+-
+-        ${sym_link_directory}lpmake --metadata-size 65536 --super-name super --metadata-slots 3 --device super:7516192768 \
+-            --group nxp_dynamic_partitions_a:3747610624 --group nxp_dynamic_partitions_b:3747610624 \
+-            --partition system_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_system_image_a} \
+-            --partition system_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_system_image_b} \
+-            --partition vendor_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_vendor_image_a} \
+-            --partition vendor_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_vendor_image_b} \
+-            --partition product_a:readonly:0:nxp_dynamic_partitions_a ${lpmake_product_image_a} \
+-            --partition product_b:readonly:0:nxp_dynamic_partitions_b ${lpmake_product_image_b} \
+-            --sparse --output /tmp/${super_file}
+-}
+-
+ # parse command line
+ som_model=""
+ som_plc=""
+@@ -548,14 +505,7 @@ sym_link_directory=""
+ yocto_image_sym_link=""
+ daemon_mode=0
+ dryrun=0
+-lpmake_system_image_a=""
+-lpmake_system_image_b=""
+-lpmake_vendor_image_a=""
+-lpmake_vendor_image_b=""
+-lpmake_product_image_a=""
+-lpmake_product_image_b=""
+ result_value=0
+-dont_generate_super=0
+ board_type=""
+ max_download_size=0x19000000
+ 
+@@ -606,7 +556,6 @@ while [ $# -gt 0 ]; do
+         -i) intervene=1 ;;
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
+-        -super) dont_generate_super=1 ;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}

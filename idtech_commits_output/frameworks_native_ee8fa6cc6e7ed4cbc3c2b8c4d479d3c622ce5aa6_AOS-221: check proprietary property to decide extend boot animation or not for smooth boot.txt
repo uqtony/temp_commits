@@ -1,0 +1,23 @@
+ee8fa6cc6e AndrewS 2020-06-23
+
+AOS-221: check proprietary property to decide extend boot animation or not for smooth boot
+
+Change-Id: I4220b1b4dd168dfa27d235957c24a5bbafd4576d
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 3d6534d161..3579787fb1 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -559,7 +559,11 @@ void SurfaceFlinger::bootFinished()
+     // stop boot animation
+     // formerly we would just kill the process, but we now ask it to exit so it
+     // can choose where to stop the animation.
+-    property_set("service.bootanim.exit", "1");
++    bool extendBootAnim = (property_get_int32("ro.idt.extend_boot_anim", int32_t(0)) == 1);
++    // check property to decide if we need to extend boot animation or not.
++    if (!extendBootAnim) {
++        property_set("service.bootanim.exit", "1");
++    }
+ 
+     const int LOGTAG_SF_STOP_BOOTANIM = 60110;
+     LOG_EVENT_LONG(LOGTAG_SF_STOP_BOOTANIM,

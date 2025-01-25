@@ -1,0 +1,187 @@
+60047fbd4 owen.wen 2020-03-25
+
+AOS-122: binder client DEMO app
+
+Change-Id: I07d6de8e3e94bc7a4d6778e57b69edab72a603c4
+
+diff --git a/samples/IdtechInputSuspendDemo/Android.mk b/samples/IdtechInputSuspendDemo/Android.mk
+index caa86d158..9c879b13a 100644
+--- a/samples/IdtechInputSuspendDemo/Android.mk
++++ b/samples/IdtechInputSuspendDemo/Android.mk
+@@ -6,12 +6,16 @@ LOCAL_MODULE_TAGS := samples
+ # Only compile source java files in this apk.
+ LOCAL_SRC_FILES := $(call all-java-files-under, src)
+ 
+-LOCAL_PACKAGE_NAME := HelloActivity
++LOCAL_PACKAGE_NAME := IdtechInputSuspendDemo
+ 
+ LOCAL_SDK_VERSION := current
+ 
++LOCAL_CERTIFICATE := platform
++
+ LOCAL_DEX_PREOPT := false
+ 
++LOCAL_PRODUCT_MODULE := true
++
+ include $(BUILD_PACKAGE)
+ 
+ # Use the following include to make our test apk.
+diff --git a/samples/IdtechInputSuspendDemo/AndroidManifest.xml b/samples/IdtechInputSuspendDemo/AndroidManifest.xml
+index 9551e54e6..2b624e94b 100644
+--- a/samples/IdtechInputSuspendDemo/AndroidManifest.xml
++++ b/samples/IdtechInputSuspendDemo/AndroidManifest.xml
+@@ -20,8 +20,8 @@
+      own application, the package name must be changed from "com.example.*"
+      to come from a domain that you own or have control over. -->
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="com.example.android.helloactivity">
+-    <application android:label="Hello, Activity!">
++    package="com.idtech.InputSuspendDemo">
++    <application android:label="InputSuspend">
+         <activity android:name="HelloActivity">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN"/>
+diff --git a/samples/IdtechInputSuspendDemo/res/layout/hello_activity.xml b/samples/IdtechInputSuspendDemo/res/layout/hello_activity.xml
+index bab9c9c45..ab7e2bfd2 100644
+--- a/samples/IdtechInputSuspendDemo/res/layout/hello_activity.xml
++++ b/samples/IdtechInputSuspendDemo/res/layout/hello_activity.xml
+@@ -14,11 +14,38 @@
+      limitations under the License.
+ -->
+ 
++
++<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
++ android:layout_width="match_parent"
++ android:layout_height="match_parent"
++ android:orientation="vertical" >
++
+ <EditText xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/text"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
+     android:textSize="18sp"
+     android:autoText="true"
+     android:capitalize="sentences"
+-    android:text="@string/hello_activity_text_text" />
++    android:text="@string/hello_activity_text_text"
++    android:focusable="true"
++    android:focusableInTouchMode="true" />
++
++<Button
++    android:id="@+id/Button"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
++    android:text = "Button"
++    android:onClick="buttonOnClick" />
++
++<TextView
++    android:id="@+id/textView1"
++    android:layout_width="wrap_content"
++    android:layout_height="wrap_content"
++    android:layout_alignParentLeft="true"
++    android:layout_alignParentTop="true"
++    android:layout_marginLeft="34dp"
++    android:layout_marginTop="58dp"
++    android:text="Large Text"
++    android:textAppearance="?android:attr/textAppearanceMedium" />
+ 
++</RelativeLayout>
+diff --git a/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/HelloActivity.java b/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/HelloActivity.java
+index f4babe7b2..4bfd8579a 100644
+--- a/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/HelloActivity.java
++++ b/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/HelloActivity.java
+@@ -14,18 +14,31 @@
+  * limitations under the License.
+  */
+ 
+-package com.example.android.helloactivity;
++package com.idtech.InputSuspendDemo;
+ 
+ import android.app.Activity;
+ import android.os.Bundle;
+ import android.view.View;
+ import android.view.WindowManager;
+-
++import android.os.IBinder;
++import android.os.Parcel;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.util.Log;
++import android.os.CountDownTimer;
++import android.widget.TextView;
++import android.widget.Button;
+ 
+ /**
+  * A minimal "Hello, World!" application.
+  */
+ public class HelloActivity extends Activity {
++    private static final String TAG = "(Idtech)";
++    private static final java.lang.String DESCRIPTOR = "com.idtech.pinpad";
++    private static final int FUNC_SUSPEND = 1;
++    private static final int FUNC_RESUME = 2;
++    TextView mTextField;
++    Button mButton;
+     /**
+      * Called with the activity is first created.
+      */
+@@ -37,6 +50,47 @@ public class HelloActivity extends Activity {
+         // in res/layout/hello_activity.xml
+         View view = getLayoutInflater().inflate(R.layout.hello_activity, null);
+         setContentView(view);
++        mTextField = (TextView)findViewById(R.id.textView1);
++        mButton = (Button)findViewById(R.id.Button);
++
++        Log.i(TAG, "Client oncreate ");
++        Parcel _data = Parcel.obtain();
++        Parcel _reply = Parcel.obtain();
++        getSystemService(NOTIFICATION_SERVICE);
++        IBinder b = ServiceManager.getService(DESCRIPTOR);
++        mButton.setOnClickListener(new Button.OnClickListener(){
++            @Override
++            public void onClick(View v)
++            {
++                try {
++                    _data.writeInterfaceToken(DESCRIPTOR);
++                    b.transact(FUNC_SUSPEND, _data, _reply, 0);
++                    _reply.readException();
++                    _reply.readInt();
++                } catch (RemoteException e) {
++                     // TODO Auto-generated catch block
++                    e.printStackTrace();
++
++                } finally {
++                    _reply.recycle();
++                    _data.recycle();
++                }
++                new CountDownTimer(10000, 1000) {
++                    public void onTick(long millisUntilFinished) {
++                        mTextField.setText("seconds remaining: " + millisUntilFinished / 1000);
++                       //here you can have your logic to set text to edittext
++                    }
++                    public void onFinish() {
++                        mTextField.setText("done!");
++                        try {
++                            b.transact(FUNC_RESUME, _data, _reply, 0);
++                        } catch (RemoteException e) {
++                            e.printStackTrace();
++                        }
++                    }
++                }.start();
++            }
++        });
+     }
+ }
+ 
+diff --git a/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/ServiceManager.java b/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/ServiceManager.java
+new file mode 100644
+index 000000000..f5325abd9
+--- /dev/null
++++ b/samples/IdtechInputSuspendDemo/src/com/idtech/InputSuspendDemo/ServiceManager.java
+@@ -0,0 +1,8 @@
++package android.os;
++
++public class ServiceManager {
++    public static IBinder getService(String name) {
++        return null;
++    }
++}
++

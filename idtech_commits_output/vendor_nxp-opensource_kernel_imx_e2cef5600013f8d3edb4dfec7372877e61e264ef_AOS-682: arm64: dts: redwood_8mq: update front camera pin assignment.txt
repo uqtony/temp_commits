@@ -1,0 +1,134 @@
+e2cef5600013 Jay 2021-08-24
+
+AOS-682: arm64: dts: redwood_8mq: update front camera pin assignment
+
+According latest version schematic and pin assignment table to
+setup config for front camera(SHCL20). Also remove conflict
+and unuse config.
+
+Updated pin as below
+  1. CAMERA2_STATUS_LED : GPIO5-3 for status led
+  2. CAMERA2_PWM_WHT_LED : GPIO5-2 for flash led
+  3. PROXIMITY_INT : GPIO1-1 for ALS
+
+Change-Id: I710d10486ff12b24aa6752a8d19cbfcb3e7a9e97
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 116fb9fab026..303123b655ee 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -626,7 +626,7 @@ shcl20_mipi: shcl20_mipi@10 {
+ 		reg = <0x10>;
+ 		status ="okay";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi2_rst>;
++		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi2_rst>, <&pinctrl_csi2_light>;
+ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		clock-names = "csi_mclk";
+ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
+@@ -691,29 +691,12 @@ lsm303agr_mag: lsm303agr_mag@1e {
+ 		reg = <0x1e>;
+ 	};
+ 
+-	vl53l1x: vl53l1x@29 {
+-		compatible = "st,vl53l1x";
+-		reg = <0x29>;
+-		st,xshut-gpio = <&exp1 3 GPIO_ACTIVE_HIGH>;  // add for gpio control
+-	};
+-
+ 	typec_hd3ss3220: hd3ss3220@67 {
+ 		compatible = "ti,hd3ss3220";
+ 		reg = <0x67>;
+ 		interrupt-parent = <&gpio3>;
+ 		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
+ 	};
+-
+-	exp1: gpio@74 {
+-		compatible = "nxp,pca9539";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_pca9539>;
+-		reg = <0x74>;
+-		interrupt-parent = <&gpio3>;
+-		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+-		#gpio-cells = <2>;
+-		gpio-controller;
+-	};
+ };
+ 
+ &pcie0 {
+@@ -934,6 +917,14 @@ MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
+ 		>;
+ 	};
+ 
++	pinctrl_csi2_light: csi2_light_grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SPDIF_TX_GPIO5_IO3			0x19	// CAMERA2_STATUS_LED
++			MX8MQ_IOMUXC_SAI3_MCLK_GPIO5_IO2		0x19	// CAMERA2_PWM_WHT_LED
++			MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1		0x19	// PROXIMITY_INT
++		>;
++	};
++
+ 	pinctrl_fec1: fec1grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3		// ENET_MDC
+@@ -1158,13 +1149,6 @@ MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  //DSI_TE
+ 		>;
+ 	};
+ 
+-	pinctrl_pca9539: pca9539grp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6			0x19  //GPIO_01, nINT
+-			MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1			0x51  //GPIO_02, nRST
+-		>;
+-	};
+-
+ 	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SPDIF_EXT_CLK_PWM1_OUT			0x06  //PWM1
+@@ -1177,18 +1161,6 @@ MX8MQ_IOMUXC_SPDIF_RX_PWM2_OUT				0x06  //PWM2
+ 		>;
+ 	};
+ 
+-	pinctrl_pwm3: pwm3grp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_SPDIF_TX_PWM3_OUT				0x06  //PWM3
+-		>;
+-	};
+-
+-	pinctrl_pwm4: pwm4grp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_SAI3_MCLK_PWM4_OUT				0x06  //PWM4
+-		>;
+-	};
+-
+ 	pinctrl_codec: codec-grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13		0x19		// AUDIO_RSTn
+@@ -1200,7 +1172,7 @@ MX8MQ_IOMUXC_SAI2_RXD0_GPIO4_IO23		0x19		// AUDIO_PWR_ON
+ 	pinctrl_light_sensor: opt3001-grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19		// ALS_INTn
+-			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19		// ALS_PWR_ON_RSTn
++			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19		// ALS_PROX_PWR_ON
+ 		>;
+ 	};
+ };
+@@ -1347,18 +1319,6 @@ &pwm2 {
+ 	status = "okay";
+ };
+ 
+-&pwm3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pwm3>;
+-	status = "okay";
+-};
+-
+-&pwm4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pwm4>;
+-	status = "okay";
+-};
+-
+ &tmu {
+ 	throttle-cfgs {
+ 		throttle_devfreq: devfreq {

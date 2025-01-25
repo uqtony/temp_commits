@@ -1,0 +1,200 @@
+c287ef8f8 George.Huang 2021-03-09
+
+AOS-515: kioskled: kioskled AIDL interface
+
+$ hidl2aidl -o ./hardware/interfaces/kioskled/aidl android.hardware.kioskled@1.0
+  (hardware/interfaces/kioskled/1.0/IKioskled.hal is converted to
+   hardware/interfaces/kioskled/aidl/android/hardware/kioskled/IKioskled.aidl)
+  (hardware/interfaces/kioskled/1.0/types.hal is converted to
+   hardware/interfaces/kioskled/aidl/android/hardware/kioskled/Index.aidl)
+
+Reference:
+  hardware/interfaces/light/aidl/
+  hardware/interfaces/power/aidl/
+  hardware/interfaces/vibrator/aidl/
+
+Change-Id: I3ff2ed1ca1ae2f6f3ada1f635f93788c789aadb6
+
+diff --git a/kioskled/aidl/Android.bp b/kioskled/aidl/Android.bp
+new file mode 100644
+index 000000000..8782f12ad
+--- /dev/null
++++ b/kioskled/aidl/Android.bp
+@@ -0,0 +1,21 @@
++aidl_interface {
++    name: "android.hardware.kioskled",
++    vendor_available: true,
++    srcs: [
++        "android/hardware/kioskled/*.aidl",
++    ],
++    stability: "vintf",
++    backend: {
++        java: {
++            platform_apis: true,
++        },
++        ndk: {
++            vndk: {
++                enabled: true,
++            },
++        },
++        cpp: {
++            enabled: false,
++        },
++    },
++}
+diff --git a/kioskled/aidl/android/hardware/kioskled/IKioskled.aidl b/kioskled/aidl/android/hardware/kioskled/IKioskled.aidl
+new file mode 100644
+index 000000000..bd04fba77
+--- /dev/null
++++ b/kioskled/aidl/android/hardware/kioskled/IKioskled.aidl
+@@ -0,0 +1,8 @@
++// FIXME: license file if you have one
++
++package android.hardware.kioskled;
++
++@VintfStability
++interface IKioskled {
++    void setLed(in byte idx, in byte onOff);
++}
+diff --git a/kioskled/aidl/android/hardware/kioskled/Index.aidl b/kioskled/aidl/android/hardware/kioskled/Index.aidl
+new file mode 100644
+index 000000000..8e434092b
+--- /dev/null
++++ b/kioskled/aidl/android/hardware/kioskled/Index.aidl
+@@ -0,0 +1,12 @@
++// FIXME: license file if you have one
++
++package android.hardware.kioskled;
++
++@VintfStability
++@Backing(type="byte")
++enum Index {
++    KIOSK_LED_4 = 4,
++    KIOSK_LED_5,
++    KIOSK_LED_6,
++    KIOSK_LED_7,
++}
+diff --git a/kioskled/aidl/default/Android.bp b/kioskled/aidl/default/Android.bp
+new file mode 100644
+index 000000000..621c0e2ac
+--- /dev/null
++++ b/kioskled/aidl/default/Android.bp
+@@ -0,0 +1,18 @@
++// FIXME: your file license if you have one
++
++cc_binary {
++    name: "android.hardware.kioskled-service.example",
++    relative_install_path: "hw",
++    init_rc: ["kioskled-default.rc"],
++    vintf_fragments: ["kioskled-default.xml"],
++    vendor: true,
++    shared_libs: [
++        "libbase",
++        "libbinder_ndk",
++        "android.hardware.kioskled-ndk_platform",
++    ],
++    srcs: [
++        "Kioskled.cpp",
++        "main.cpp",
++    ],
++}
+diff --git a/kioskled/aidl/default/Kioskled.cpp b/kioskled/aidl/default/Kioskled.cpp
+new file mode 100644
+index 000000000..4b32a1854
+--- /dev/null
++++ b/kioskled/aidl/default/Kioskled.cpp
+@@ -0,0 +1,21 @@
++// FIXME: your file license if you have one
++
++#include "Kioskled.h"
++
++#include <android-base/logging.h>
++
++namespace aidl {
++namespace android {
++namespace hardware {
++namespace kioskled {
++
++ndk::ScopedAStatus Kioskled::setLed(int8_t idx, int8_t onOff) {
++
++    LOG(INFO) << "Kioskled setting led: " << idx << " to: " << onOff;
++    return ndk::ScopedAStatus::ok();
++}
++
++}  // namespace kioskled
++}  // namespace hardware
++}  // namespace android
++}  // namespace aidl
+diff --git a/kioskled/aidl/default/Kioskled.h b/kioskled/aidl/default/Kioskled.h
+new file mode 100644
+index 000000000..c25ba258c
+--- /dev/null
++++ b/kioskled/aidl/default/Kioskled.h
+@@ -0,0 +1,19 @@
++// FIXME: your file license if you have one
++
++#pragma once
++
++#include <aidl/android/hardware/kioskled/BnKioskled.h>
++
++namespace aidl {
++namespace android {
++namespace hardware {
++namespace kioskled {
++
++class Kioskled : public BnKioskled {
++    ndk::ScopedAStatus setLed(int8_t idx, int8_t onOff) override;
++};
++
++}  // namespace kioskled
++}  // namespace hardware
++}  // namespace android
++}  // namespace aidl
+diff --git a/kioskled/aidl/default/kioskled-default.rc b/kioskled/aidl/default/kioskled-default.rc
+new file mode 100644
+index 000000000..36551bcdf
+--- /dev/null
++++ b/kioskled/aidl/default/kioskled-default.rc
+@@ -0,0 +1,5 @@
++service vendor.kioskled-default /vendor/bin/hw/android.hardware.kioskled-service.example
++    interface aidl android.hardware.kioskled.IKioskled/default
++    class hal
++    user system
++    group system
+diff --git a/kioskled/aidl/default/kioskled-default.xml b/kioskled/aidl/default/kioskled-default.xml
+new file mode 100644
+index 000000000..3d210ebb8
+--- /dev/null
++++ b/kioskled/aidl/default/kioskled-default.xml
+@@ -0,0 +1,6 @@
++<manifest version="1.0" type="device">
++    <hal format="aidl">
++        <name>android.hardware.kioskled</name>
++        <fqname>IKioskled/default</fqname>
++    </hal>
++</manifest>
+diff --git a/kioskled/aidl/default/main.cpp b/kioskled/aidl/default/main.cpp
+new file mode 100644
+index 000000000..760ef433b
+--- /dev/null
++++ b/kioskled/aidl/default/main.cpp
+@@ -0,0 +1,19 @@
++#include "Kioskled.h"
++
++#include <android-base/logging.h>
++#include <android/binder_manager.h>
++#include <android/binder_process.h>
++
++using ::aidl::android::hardware::kioskled::Kioskled;
++
++int main() {
++    ABinderProcess_setThreadPoolMaxThreadCount(0);
++    std::shared_ptr<Kioskled> kioskled = ndk::SharedRefBase::make<Kioskled>();
++
++    const std::string instance = std::string() + Kioskled::descriptor + "/default";
++    binder_status_t status = AServiceManager_addService(kioskled->asBinder().get(), instance.c_str());
++    CHECK(status == STATUS_OK);
++
++    ABinderProcess_joinThreadPool();
++    return EXIT_FAILURE;  // should not reach
++}

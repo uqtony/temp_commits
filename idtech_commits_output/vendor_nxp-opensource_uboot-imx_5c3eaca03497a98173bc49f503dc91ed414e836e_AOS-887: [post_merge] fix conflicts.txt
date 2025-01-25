@@ -1,0 +1,1325 @@
+5c3eaca034 George.Huang 2022-03-03
+
+AOS-887: [post_merge] fix conflicts
+
+Change-Id: Ie41c3704601f534fd201298bb9f82f4847aaebf7
+
+diff --git a/board/freescale/imx8mn_a100/imx8mn_a100.c b/board/freescale/imx8mn_a100/imx8mn_a100.c
+index 7593761275..92601393cb 100644
+--- a/board/freescale/imx8mn_a100/imx8mn_a100.c
++++ b/board/freescale/imx8mn_a100/imx8mn_a100.c
+@@ -304,6 +304,9 @@ int board_init(void)
+ 
+ #ifdef CONFIG_USB_TCPC
+ 	setup_typec();
++
++	/* Enable Power by default for SR-IR usage */
++	imx8m_usb_power(0, true);
+ #endif
+ 
+ 	if (IS_ENABLED(CONFIG_FEC_MXC))
+diff --git a/board/freescale/imx8mp_a200/Makefile b/board/freescale/imx8mp_a200/Makefile
+index 705a6337b5..dde375d78f 100644
+--- a/board/freescale/imx8mp_a200/Makefile
++++ b/board/freescale/imx8mp_a200/Makefile
+@@ -8,10 +8,14 @@ obj-y += imx8mp_a200.o
+ 
+ ifdef CONFIG_SPL_BUILD
+ obj-y += spl.o
++ifdef CONFIG_IMX8M_LPDDR4_FREQ0_3200MTS
++obj-y += lpddr4_timing_ndm.o
++else
+ ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
+ else
+ obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_4000mts.o
+-endif
+ obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing.o
+ endif
++endif
++endif
+diff --git a/board/freescale/imx8mp_a200/imx8mp_a200.c b/board/freescale/imx8mp_a200/imx8mp_a200.c
+index c4997439cc..f2826d3981 100644
+--- a/board/freescale/imx8mp_a200/imx8mp_a200.c
++++ b/board/freescale/imx8mp_a200/imx8mp_a200.c
+@@ -353,10 +353,6 @@ int board_usb_init(int index, enum usb_init_type init)
+ 		ret = tcpc_setup_dfp_mode(&port1);
+ #endif
+ 		return ret;
+-	} else if (index == 1 && init == USB_INIT_HOST) {
+-		/* Enable GPIO1_IO14 for 5V VBUS */
+-		gpio_request(USB2_PWR_EN, "usb2_pwr");
+-		gpio_direction_output(USB2_PWR_EN, 1);
+ 	}
+ 
+ 	return 0;
+@@ -371,9 +367,6 @@ int board_usb_cleanup(int index, enum usb_init_type init)
+ #ifdef CONFIG_USB_TCPC
+ 		ret = tcpc_disable_src_vbus(&port1);
+ #endif
+-	} else if (index == 1 && init == USB_INIT_HOST) {
+-		/* Disable GPIO1_IO14 for 5V VBUS */
+-		gpio_direction_output(USB2_PWR_EN, 0);
+ 	}
+ 
+ 	imx8m_usb_power(index, false);
+@@ -446,6 +439,10 @@ int board_init(void)
+ 
+ #ifdef CONFIG_USB_TCPC
+ 	setup_typec();
++
++	/* Enable USB power default */
++	imx8m_usb_power(0, true);
++	imx8m_usb_power(1, true);
+ #endif
+ 
+ 	if (CONFIG_IS_ENABLED(FEC_MXC)) {
+@@ -486,17 +483,6 @@ int board_late_init(void)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_IMX_BOOTAUX
+-ulong board_get_usable_ram_top(ulong total_size)
+-{
+-	/* Reserve 16M memory used by M core vring/buffer, which begins at 16MB before optee */
+-	if (rom_pointer[1])
+-		return gd->ram_top - SZ_16M;
+-
+-	return gd->ram_top;
+-}
+-#endif
+-
+ #ifdef CONFIG_ANDROID_SUPPORT
+ bool is_power_key_pressed(void) {
+ 	return (bool)(!!(readl(SNVS_HPSR) & (0x1 << 6)));
+diff --git a/board/freescale/imx8mp_a200/lpddr4_timing_ndm.c b/board/freescale/imx8mp_a200/lpddr4_timing_ndm.c
+new file mode 120000
+index 0000000000..116d9c3c9f
+--- /dev/null
++++ b/board/freescale/imx8mp_a200/lpddr4_timing_ndm.c
+@@ -0,0 +1 @@
++../imx8mp_evk/lpddr4_timing_ndm.c
+\ No newline at end of file
+diff --git a/board/freescale/imx8mp_a200/spl.c b/board/freescale/imx8mp_a200/spl.c
+index 1631ebac26..8059e7e84f 100644
+--- a/board/freescale/imx8mp_a200/spl.c
++++ b/board/freescale/imx8mp_a200/spl.c
+@@ -137,7 +137,7 @@ void spl_board_init(void)
+ 	 * Should set the clock after PMIC setting done.
+ 	 * Default is 400Mhz (system_pll1_800m with div = 2) set by ROM for ND VDD_SOC
+ 	 */
+-#ifdef CONFIG_IMX8M_LPDDR4
++#if defined(CONFIG_IMX8M_LPDDR4) && !defined(CONFIG_IMX8M_VDD_SOC_850MV)
+ 	clock_enable(CCGR_GIC, 0);
+ 	clock_set_target_val(GIC_CLK_ROOT, CLK_ROOT_ON | CLK_ROOT_SOURCE_SEL(5));
+ 	clock_enable(CCGR_GIC, 1);
+diff --git a/configs/bigcypress_8mq_evk_android_defconfig b/configs/bigcypress_8mq_evk_android_defconfig
+index 8c15d6bb1f..841cfb9ef1 100644
+--- a/configs/bigcypress_8mq_evk_android_defconfig
++++ b/configs/bigcypress_8mq_evk_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/bigcypress_8mq_evk_android_dual_defconfig b/configs/bigcypress_8mq_evk_android_dual_defconfig
+index 1e75da97b3..61bfaa56f7 100644
+--- a/configs/bigcypress_8mq_evk_android_dual_defconfig
++++ b/configs/bigcypress_8mq_evk_android_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig b/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
+index 9915f01d3a..cde8ad249f 100644
+--- a/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/bigcypress_8mq_evk_android_trusty_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,6 +150,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_SPLASH_SOURCE=y
+diff --git a/configs/imx8mn_a100_devboard_android_defconfig b/configs/imx8mn_a100_devboard_android_defconfig
+index 92f3c75360..97329de07f 100644
+--- a/configs/imx8mn_a100_devboard_android_defconfig
++++ b/configs/imx8mn_a100_devboard_android_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/imx8mn_a100_devboard_android_dual_defconfig b/configs/imx8mn_a100_devboard_android_dual_defconfig
+index 3e31ffeeb9..57c5084251 100644
+--- a/configs/imx8mn_a100_devboard_android_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_defconfig b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+index 8d30189d17..05b0e58842 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+@@ -166,3 +166,8 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mn"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mn"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MN"
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+index 5417283bc9..14bfb4c828 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+@@ -166,6 +166,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mn"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mn"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MN"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_IDT_DUAL_SPL=y
+diff --git a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+index 1f0e4df562..6408da7b3f 100644
+--- a/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+@@ -166,5 +166,10 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mn"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mn"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MN"
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+diff --git a/configs/imx8mn_a100_devboard_android_uuu_defconfig b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+index 7c2a762f16..5b723dc9ce 100644
+--- a/configs/imx8mn_a100_devboard_android_uuu_defconfig
++++ b/configs/imx8mn_a100_devboard_android_uuu_defconfig
+@@ -138,8 +138,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/imx8mn_ddr4_evk_android_dual_defconfig b/configs/imx8mn_ddr4_evk_android_dual_defconfig
+index 874034c3c7..80302d4c13 100644
+--- a/configs/imx8mn_ddr4_evk_android_dual_defconfig
++++ b/configs/imx8mn_ddr4_evk_android_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/imx8mp_a200_devboard_android_defconfig b/configs/imx8mp_a200_devboard_android_defconfig
+index 0d2c6cfc95..7117e603fe 100644
+--- a/configs/imx8mp_a200_devboard_android_defconfig
++++ b/configs/imx8mp_a200_devboard_android_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/imx8mp_a200_devboard_android_dual_defconfig b/configs/imx8mp_a200_devboard_android_dual_defconfig
+index d7bd47b174..47d9b820c3 100644
+--- a/configs/imx8mp_a200_devboard_android_dual_defconfig
++++ b/configs/imx8mp_a200_devboard_android_dual_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_defconfig b/configs/imx8mp_a200_devboard_android_trusty_defconfig
+index 8aff30b4f4..2409bd62e8 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+@@ -179,3 +180,8 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mp"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mp"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MP"
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig b/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
+index c8467b7f6b..dad4a24dd4 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_dual_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+@@ -180,6 +181,11 @@ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mp"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mp"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MP"
+ 
+ CONFIG_IDT_DUAL_SPL=y
+ CONFIG_IDT_BACKUP_SPL=y
+diff --git a/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
+index 0a56b90444..d818ea236b 100644
+--- a/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+@@ -179,5 +180,10 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mp"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mp"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MP"
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+diff --git a/configs/imx8mp_a200_devboard_android_uuu_defconfig b/configs/imx8mp_a200_devboard_android_uuu_defconfig
+index 5a6200159a..f148923e05 100644
+--- a/configs/imx8mp_a200_devboard_android_uuu_defconfig
++++ b/configs/imx8mp_a200_devboard_android_uuu_defconfig
+@@ -146,8 +146,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -155,6 +155,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+index 225ea127d5..932292ec5d 100644
+--- a/configs/imx8mq_a300_devboard_android_defconfig
++++ b/configs/imx8mq_a300_devboard_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+index 4c67673907..a2d559a53d 100644
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_defconfig b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+index 6cbb5da8bf..9c2f6beb34 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,5 +150,10 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ 
+ CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+index b11eeee5f0..d222f7e2f1 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+@@ -148,6 +148,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_IDT_RAM_2GB=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+index a0c143af2c..a2ef656457 100644
+--- a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,6 +150,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_SECURE_UNLOCK=y
+ CONFIG_IMX_HAB=y
+ 
+diff --git a/configs/imx8mq_a300_devboard_android_uuu_defconfig b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+index b2ca10f680..2305bb5733 100644
+--- a/configs/imx8mq_a300_devboard_android_uuu_defconfig
++++ b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_defconfig b/configs/kingscanyon_8mq_ibr210_android_defconfig
+index 83cb51e9b1..8a2a6089f3 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+index efb9205a60..66f54e3895 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_trusty_dual_defconfig b/configs/kingscanyon_8mq_ibr210_android_trusty_dual_defconfig
+index f4daf6030b..f007f086e9 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_trusty_dual_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_trusty_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,6 +150,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_SPLASH_SOURCE=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig b/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
+index 781b5736b8..970613a0ec 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_uuu_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/redwood_8mq_evk_android_defconfig b/configs/redwood_8mq_evk_android_defconfig
+index 104e6e581a..add5761972 100644
+--- a/configs/redwood_8mq_evk_android_defconfig
++++ b/configs/redwood_8mq_evk_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/redwood_8mq_evk_android_dp_dual_defconfig b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+index 176149b3e6..9bfdf45875 100644
+--- a/configs/redwood_8mq_evk_android_dp_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/redwood_8mq_evk_android_dual_defconfig b/configs/redwood_8mq_evk_android_dual_defconfig
+index 8568c48a43..d5b6f826be 100644
+--- a/configs/redwood_8mq_evk_android_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/redwood_8mq_evk_android_trusty_dual_defconfig b/configs/redwood_8mq_evk_android_trusty_dual_defconfig
+index 609002c1d4..0761fb2584 100644
+--- a/configs/redwood_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_trusty_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,6 +150,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_VIDEO_IMX_NW_DSI=y
+diff --git a/configs/redwood_8mq_evk_android_uuu_ktc2g_defconfig b/configs/redwood_8mq_evk_android_uuu_ktc2g_defconfig
+index 27f5d185d1..71015db722 100644
+--- a/configs/redwood_8mq_evk_android_uuu_ktc2g_defconfig
++++ b/configs/redwood_8mq_evk_android_uuu_ktc2g_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/redwood_8mq_evk_android_uuu_ktc4g_defconfig b/configs/redwood_8mq_evk_android_uuu_ktc4g_defconfig
+index fc44780ceb..5ed3430fdb 100644
+--- a/configs/redwood_8mq_evk_android_uuu_ktc4g_defconfig
++++ b/configs/redwood_8mq_evk_android_uuu_ktc4g_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mn_ddr4_evk_android_defconfig b/configs/vp6820_8mn_ddr4_evk_android_defconfig
+index d65c9cd18f..a9c422d4ad 100644
+--- a/configs/vp6820_8mn_ddr4_evk_android_defconfig
++++ b/configs/vp6820_8mn_ddr4_evk_android_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_ddr4_evk_android_dual_defconfig b/configs/vp6820_8mn_ddr4_evk_android_dual_defconfig
+index 50a6fc4551..e77fc4293d 100644
+--- a/configs/vp6820_8mn_ddr4_evk_android_dual_defconfig
++++ b/configs/vp6820_8mn_ddr4_evk_android_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig b/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
+index 7052b22673..e544a7b26e 100644
+--- a/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mn_ddr4_evk_android_uuu_defconfig
+@@ -138,8 +138,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_evk_android_defconfig b/configs/vp6820_8mn_evk_android_defconfig
+index 9efcab0107..ea75417124 100644
+--- a/configs/vp6820_8mn_evk_android_defconfig
++++ b/configs/vp6820_8mn_evk_android_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_evk_android_dual_defconfig b/configs/vp6820_8mn_evk_android_dual_defconfig
+index 20137c3160..e0155ccfdd 100644
+--- a/configs/vp6820_8mn_evk_android_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_evk_android_trusty_dual_defconfig b/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
+index cd982cddc5..91fdd9891b 100644
+--- a/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mn_evk_android_trusty_dual_defconfig
+@@ -137,8 +137,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+@@ -166,6 +166,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mn"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mn"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MN"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_VIDEO_LCD_HIMAX_HX8394F=y
+diff --git a/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig b/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
+index 778a791512..aabaafd8f5 100644
+--- a/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
++++ b/configs/vp6820_8mn_evk_android_uuu_ktc1g_defconfig
+@@ -138,8 +138,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig b/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
+index 7c2a762f16..5b723dc9ce 100644
+--- a/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
++++ b/configs/vp6820_8mn_evk_android_uuu_ktc2g_defconfig
+@@ -138,8 +138,8 @@ CONFIG_CI_UDC=y
+ CONFIG_USB_EHCI_HCD=y
+ 
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ 
+diff --git a/configs/vp6820_8mp_evk_android_defconfig b/configs/vp6820_8mp_evk_android_defconfig
+index 3cf4e19771..00a7a1ce30 100644
+--- a/configs/vp6820_8mp_evk_android_defconfig
++++ b/configs/vp6820_8mp_evk_android_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/vp6820_8mp_evk_android_dual_defconfig b/configs/vp6820_8mp_evk_android_dual_defconfig
+index b26f93eb1e..e5cb8160ff 100644
+--- a/configs/vp6820_8mp_evk_android_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_dual_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+index f48a38590a..514bb469b5 100644
+--- a/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mp_evk_android_trusty_dual_defconfig
+@@ -145,8 +145,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -154,6 +154,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+@@ -180,6 +181,11 @@ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_DUAL_BOOTLOADER=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mp"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mp"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MP"
+ 
+ CONFIG_SPLASH_SOURCE=y
+ CONFIG_IDT_SPLASH_SUPPORT=y
+diff --git a/configs/vp6820_8mp_evk_android_uuu_defconfig b/configs/vp6820_8mp_evk_android_uuu_defconfig
+index 5a6200159a..f148923e05 100644
+--- a/configs/vp6820_8mp_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mp_evk_android_uuu_defconfig
+@@ -146,8 +146,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -155,6 +155,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig b/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
+index 5a6200159a..f148923e05 100644
+--- a/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
++++ b/configs/vp6820_8mp_evk_android_uuu_mic6g_defconfig
+@@ -146,8 +146,8 @@ CONFIG_DM_USB=y
+ 
+ CONFIG_OF_LIBFDT_OVERLAY=y
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_XHCI_IMX8M=y
+@@ -155,6 +155,7 @@ CONFIG_USB_XHCI_DWC3=y
+ CONFIG_USB_DWC3=y
+ CONFIG_USB_DWC3_GADGET=y
+ 
++CONFIG_OF_BOARD_FIXUP=y
+ CONFIG_OF_BOARD_SETUP=y
+ 
+ CONFIG_REGMAP=y
+diff --git a/configs/vp6820_8mq_evk_android_defconfig b/configs/vp6820_8mq_evk_android_defconfig
+index 8f7fc7d441..9b86868ed1 100644
+--- a/configs/vp6820_8mq_evk_android_defconfig
++++ b/configs/vp6820_8mq_evk_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mq_evk_android_dual_defconfig b/configs/vp6820_8mq_evk_android_dual_defconfig
+index 65efca565a..439bcb3b30 100644
+--- a/configs/vp6820_8mq_evk_android_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mq_evk_android_trusty_dual_defconfig b/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+index 95e4a5283c..d8fcfd01a2 100644
+--- a/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+@@ -150,6 +150,11 @@ CONFIG_VIRTUAL_AB_SUPPORT=y
+ CONFIG_ANDROID_SUPPORT=y
+ CONFIG_ANDROID_AB_SUPPORT=y
+ CONFIG_IMX_TRUSTY_OS=y
++CONFIG_ATTESTATION_ID_BRAND="Android"
++CONFIG_ATTESTATION_ID_DEVICE="evk_8mq"
++CONFIG_ATTESTATION_ID_PRODUCT="evk_8mq"
++CONFIG_ATTESTATION_ID_MANUFACTURER="nxp"
++CONFIG_ATTESTATION_ID_MODEL="EVK_8MQ"
+ CONFIG_DUAL_BOOTLOADER=y
+ 
+ CONFIG_VIDEO_IMX_NW_DSI=y
+diff --git a/configs/vp6820_8mq_evk_android_uuu_defconfig b/configs/vp6820_8mq_evk_android_uuu_defconfig
+index cf69b855bd..45ca181ff7 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig b/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
+index 27f5d185d1..71015db722 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_ktc2g_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig b/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
+index fc44780ceb..5ed3430fdb 100644
+--- a/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
++++ b/configs/vp6820_8mq_evk_android_uuu_ktc4g_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/configs/vp6820_8mq_evk_ram1GB_android_defconfig b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+index 0a745af595..764dc4e833 100644
+--- a/configs/vp6820_8mq_evk_ram1GB_android_defconfig
++++ b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+@@ -119,8 +119,8 @@ CONFIG_FASTBOOT_BUF_SIZE=0x19000000
+ CONFIG_FASTBOOT_FLASH=y
+ CONFIG_EFI_PARTITION=y
+ CONFIG_SDP_LOADADDR=0x40400000
+-CONFIG_USB_GADGET_VENDOR_NUM=0x0525
+-CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_VENDOR_NUM=0x1fc9
++CONFIG_USB_GADGET_PRODUCT_NUM=0x0152
+ CONFIG_USB_GADGET_MANUFACTURER="FSL"
+ CONFIG_USB_GADGET_DOWNLOAD=y
+ CONFIG_SPL_USB_GADGET=y
+diff --git a/include/configs/imx8mn_a100.h b/include/configs/imx8mn_a100.h
+index 90efe46838..30c3aacfee 100644
+--- a/include/configs/imx8mn_a100.h
++++ b/include/configs/imx8mn_a100.h
+@@ -87,11 +87,11 @@
+ 	"jh_clk=   " \
+ 	"jh_root_dtb=" JH_ROOT_DTB " " \
+ 	"jh_mmcboot=mw 0x303d0518 0xff; setenv fdtfile ${jh_root_dtb};" \
+-		"setenv jh_clk clk_ignore_unused mem=1340MB; " \
++		"setenv jh_clk clk_ignore_unused mem=1212MB; " \
+ 			   "if run loadimage; then " \
+ 				   "run mmcboot; " \
+ 			   "else run jh_netboot; fi;  " \
+-	"jh_netboot=mw 0x303d0518 0xff; setenv fdtfile ${jh_root_dtb}; setenv jh_clk clk_ignore_unused mem=1340MB; run netboot;   "
++	"jh_netboot=mw 0x303d0518 0xff; setenv fdtfile ${jh_root_dtb}; setenv jh_clk clk_ignore_unused mem=1212MB; run netboot;   "
+ 
+ #define CONFIG_MFG_ENV_SETTINGS \
+ 	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
+diff --git a/include/configs/imx8mn_a100_android.h b/include/configs/imx8mn_a100_android.h
+index b573a0abcd..078c7173d6 100644
+--- a/include/configs/imx8mn_a100_android.h
++++ b/include/configs/imx8mn_a100_android.h
+@@ -37,7 +37,8 @@
+ #ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
+ #define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_MMC
+ #define ANDROID_MCU_FIRMWARE_START 0x500000
+-#define ANDROID_MCU_FIRMWARE_SIZE  0x40000
++#define ANDROID_MCU_OS_PARTITION_SIZE 0x40000
++#define ANDROID_MCU_FIRMWARE_SIZE  0x20000
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+@@ -58,18 +59,6 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
+-
+-#ifdef CONFIG_ID_ATTESTATION
+-#define ATTESTATION_ID_BRAND "Android"
+-#define ATTESTATION_ID_DEVICE "evk_8mn"
+-#define ATTESTATION_ID_MANUFACTURER "nxp"
+-#define ATTESTATION_ID_MODEL "EVK_8MN"
+-#ifdef CONFIG_ATTESTATION_ID_PRODUCT
+-#undef CONFIG_ATTESTATION_ID_PRODUCT
+-#endif
+-#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mn"
+-#endif
+-
+ #endif
+ 
+ #endif /* IMX8MN_A100_ANDROID_H */
+diff --git a/include/configs/imx8mp_a200.h b/include/configs/imx8mp_a200.h
+index 308f1a2371..b0915f41b3 100644
+--- a/include/configs/imx8mp_a200.h
++++ b/include/configs/imx8mp_a200.h
+@@ -79,11 +79,11 @@
+ #define JAILHOUSE_ENV \
+ 	"jh_clk=   " \
+ 	"jh_mmcboot=setenv fdtfile imx8mp-evk-root.dtb;" \
+-		"setenv jh_clk clk_ignore_unused mem=2048MB; " \
++		"setenv jh_clk clk_ignore_unused mem=1920MB; " \
+ 			   "if run loadimage; then " \
+ 				   "run mmcboot; " \
+ 			   "else run jh_netboot; fi;  " \
+-	"jh_netboot=setenv fdtfile imx8mp-evk-root.dtb; setenv jh_clk clk_ignore_unused mem=2048MB; run netboot;   "
++	"jh_netboot=setenv fdtfile imx8mp-evk-root.dtb; setenv jh_clk clk_ignore_unused mem=1920MB; run netboot;   "
+ 
+ #define CONFIG_MFG_ENV_SETTINGS \
+ 	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
+diff --git a/include/configs/imx8mp_a200_android.h b/include/configs/imx8mp_a200_android.h
+index 819fe48e97..1a31af3c36 100644
+--- a/include/configs/imx8mp_a200_android.h
++++ b/include/configs/imx8mp_a200_android.h
+@@ -36,7 +36,8 @@
+ #ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
+ #define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_MMC
+ #define ANDROID_MCU_FIRMWARE_START 0x500000
+-#define ANDROID_MCU_FIRMWARE_SIZE  0x40000
++#define ANDROID_MCU_OS_PARTITION_SIZE 0x40000
++#define ANDROID_MCU_FIRMWARE_SIZE  0x20000
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+@@ -57,18 +58,6 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
+-
+-#ifdef CONFIG_ID_ATTESTATION
+-#define ATTESTATION_ID_BRAND "Android"
+-#define ATTESTATION_ID_DEVICE "evk_8mp"
+-#define ATTESTATION_ID_MANUFACTURER "nxp"
+-#define ATTESTATION_ID_MODEL "EVK_8MP"
+-#ifdef CONFIG_ATTESTATION_ID_PRODUCT
+-#undef CONFIG_ATTESTATION_ID_PRODUCT
+-#endif
+-#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mp"
+-#endif
+-
+ #endif
+ 
+ #endif /* IMX8MP_A200_ANDROID_H */
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+index 5d57ce53b0..b966bf29fd 100644
+--- a/include/configs/imx8mq_a300.h
++++ b/include/configs/imx8mq_a300.h
+@@ -63,7 +63,7 @@
+ #define BOOT_TARGET_DEVICES(func) \
+ 	func(USB, usb, 0) \
+ 	func(MMC, mmc, 1) \
+-	func(MMC, mmc, 2)
++	func(MMC, mmc, 0)
+ 
+ #include <config_distro_bootcmd.h>
+ #else
+@@ -77,11 +77,11 @@
+ #define JAILHOUSE_ENV \
+ 	"jh_clk=   " \
+ 	"jh_mmcboot=setenv fdtfile imx8mq-evk-root.dtb; " \
+-		"setenv jh_clk clk_ignore_unused mem=2000M; " \
++		"setenv jh_clk clk_ignore_unused mem=1872M; " \
+ 			   "if run loadimage; then " \
+ 				   "run mmcboot; " \
+ 			   "else run jh_netboot; fi;  " \
+-	"jh_netboot=setenv fdtfile imx8mq-evk-root.dtb; setenv jh_clk clk_ignore_unused mem=2000M; run netboot;   "
++	"jh_netboot=setenv fdtfile imx8mq-evk-root.dtb; setenv jh_clk clk_ignore_unused mem=1872MB; run netboot;   "
+ 
+ #define CONFIG_MFG_ENV_SETTINGS \
+ 	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
+@@ -175,7 +175,7 @@
+ #define CONFIG_MMCROOT			"/dev/mmcblk1p2"  /* USDHC2 */
+ 
+ /* Size of malloc() pool */
+-#define CONFIG_SYS_MALLOC_LEN		((CONFIG_ENV_SIZE + (2 * 1024)) * 1024)
++#define CONFIG_SYS_MALLOC_LEN		SZ_32M
+ 
+ #define CONFIG_SYS_SDRAM_BASE           0x40000000
+ #define PHYS_SDRAM                      0x40000000
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+index 13cb6599c1..9effaaa3fa 100644
+--- a/include/configs/imx8mq_a300_android.h
++++ b/include/configs/imx8mq_a300_android.h
+@@ -42,7 +42,8 @@
+ #ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
+ #define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_MMC
+ #define ANDROID_MCU_FIRMWARE_START 0x500000
+-#define ANDROID_MCU_FIRMWARE_SIZE  0x40000
++#define ANDROID_MCU_OS_PARTITION_SIZE 0x40000
++#define ANDROID_MCU_FIRMWARE_SIZE  0x20000
+ #define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
+ #endif
+ 
+@@ -63,18 +64,6 @@
+ #define KEYSLOT_HWPARTITION_ID 2
+ #define KEYSLOT_BLKS             0x1FFF
+ #define NS_ARCH_ARM64 1
+-
+-#ifdef CONFIG_ID_ATTESTATION
+-#define ATTESTATION_ID_BRAND "Android"
+-#define ATTESTATION_ID_DEVICE "evk_8mq"
+-#define ATTESTATION_ID_MANUFACTURER "nxp"
+-#define ATTESTATION_ID_MODEL "EVK_8MQ"
+-#ifdef CONFIG_ATTESTATION_ID_PRODUCT
+-#undef CONFIG_ATTESTATION_ID_PRODUCT
+-#endif
+-#define CONFIG_ATTESTATION_ID_PRODUCT "evk_8mq"
+-#endif
+-
+ #endif
+ 
+ #endif /* IMX8MQ_A300_ANDROID_H */

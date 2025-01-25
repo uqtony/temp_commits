@@ -1,0 +1,528 @@
+35bef8b5d338 George.Huang 2020-06-03
+
+Fix build breaks of deprecated apis on 5.4 kernel
+
+Change-Id: Iad48955486d6c972c2d7110e50c3708a7371e6c5
+
+diff --git a/drivers/input/misc/st/acc/ais328dq/ais328dq_acc.c b/drivers/input/misc/st/acc/ais328dq/ais328dq_acc.c
+index 8333b8306603..c225130a164b 100644
+--- a/drivers/input/misc/st/acc/ais328dq/ais328dq_acc.c
++++ b/drivers/input/misc/st/acc/ais328dq/ais328dq_acc.c
+@@ -147,15 +147,15 @@ static struct ais328dq_acc_platform_data def_pdata = {
+ 
+ static inline s64 ais328dq_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int ais328dq_acc_hw_init(struct ais328dq_acc_data *acc)
+diff --git a/drivers/input/misc/st/acc/h3lis100dl/h3lis100dl_core.c b/drivers/input/misc/st/acc/h3lis100dl/h3lis100dl_core.c
+index cd7b58d56217..b2c42aadc6e5 100644
+--- a/drivers/input/misc/st/acc/h3lis100dl/h3lis100dl_core.c
++++ b/drivers/input/misc/st/acc/h3lis100dl/h3lis100dl_core.c
+@@ -114,11 +114,11 @@ static struct {
+ 
+ static inline int64_t h3lis100dl_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static struct workqueue_struct *h3lis100dl_workqueue;
+diff --git a/drivers/input/misc/st/acc/lis2de/lis2de_acc.c b/drivers/input/misc/st/acc/lis2de/lis2de_acc.c
+index e1aa7c2a944d..a6f86e5b9c97 100644
+--- a/drivers/input/misc/st/acc/lis2de/lis2de_acc.c
++++ b/drivers/input/misc/st/acc/lis2de/lis2de_acc.c
+@@ -914,11 +914,11 @@ static int remove_sysfs_interfaces(struct device *dev)
+ 
+ static inline int64_t lis2de_acc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static void lis2de_acc_input_work_func(struct work_struct *work)
+diff --git a/drivers/input/misc/st/acc/lis2dh/lis2dh_acc.c b/drivers/input/misc/st/acc/lis2dh/lis2dh_acc.c
+index 91d3680f6f3f..630a35c2265d 100644
+--- a/drivers/input/misc/st/acc/lis2dh/lis2dh_acc.c
++++ b/drivers/input/misc/st/acc/lis2dh/lis2dh_acc.c
+@@ -417,11 +417,11 @@ static int lis2dh_acc_register_write(struct lis2dh_acc_status *stat,
+ 
+ static inline int64_t lis2dh_acc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static enum hrtimer_restart lis2dh_acc_poll_function_read(struct hrtimer *timer)
+diff --git a/drivers/input/misc/st/acc/lis2ds/lis2ds_core.c b/drivers/input/misc/st/acc/lis2ds/lis2ds_core.c
+index adc42f2d18fd..1f995e54bf32 100644
+--- a/drivers/input/misc/st/acc/lis2ds/lis2ds_core.c
++++ b/drivers/input/misc/st/acc/lis2ds/lis2ds_core.c
+@@ -436,14 +436,14 @@ static struct lis2ds_fs_table {
+ 
+ static inline s64 lis2ds_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lis2ds_write_data_with_mask(struct lis2ds_data *cdata,
+diff --git a/drivers/input/misc/st/acc/lis2dw12/lis2dw12_core.c b/drivers/input/misc/st/acc/lis2dw12/lis2dw12_core.c
+index a6a4b045f2e8..382384fdc070 100644
+--- a/drivers/input/misc/st/acc/lis2dw12/lis2dw12_core.c
++++ b/drivers/input/misc/st/acc/lis2dw12/lis2dw12_core.c
+@@ -514,11 +514,11 @@ static int lis2dw12_set_fs(struct lis2dw12_sensor_data *sdata, unsigned int fs)
+ 
+ static inline int64_t lis2dw12_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ /* Acc data */
+diff --git a/drivers/input/misc/st/acc/lis2hh12/lis2hh12_core.c b/drivers/input/misc/st/acc/lis2hh12/lis2hh12_core.c
+index 34b8eaec6a20..993a341c27b2 100644
+--- a/drivers/input/misc/st/acc/lis2hh12/lis2hh12_core.c
++++ b/drivers/input/misc/st/acc/lis2hh12/lis2hh12_core.c
+@@ -214,11 +214,11 @@ struct {
+ 
+ static inline int64_t lis2hh12_acc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int int1_gpio = LIS2HH12_ACC_DEFAULT_INT1_GPIO;
+diff --git a/drivers/input/misc/st/acc/lis3dh/lis3dh.h b/drivers/input/misc/st/acc/lis3dh/lis3dh.h
+index 566f70301d27..3cedfb4947d9 100644
+--- a/drivers/input/misc/st/acc/lis3dh/lis3dh.h
++++ b/drivers/input/misc/st/acc/lis3dh/lis3dh.h
+@@ -140,15 +140,15 @@ struct lis3dh_acc_status {
+ 
+ static inline s64 lis3dh_acc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ /* Input events used by lis3dh driver */
+diff --git a/drivers/input/misc/st/acc/lis3dhh/lis3dhh_core.c b/drivers/input/misc/st/acc/lis3dhh/lis3dhh_core.c
+index fd5292e64618..74920b76827b 100644
+--- a/drivers/input/misc/st/acc/lis3dhh/lis3dhh_core.c
++++ b/drivers/input/misc/st/acc/lis3dhh/lis3dhh_core.c
+@@ -63,11 +63,11 @@
+ 
+ static inline int64_t lis3dhh_acc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lis3dhh_acc_hw_init(struct lis3dhh_acc_status *stat)
+diff --git a/drivers/input/misc/st/ecompass/ism303dac/ism303dac_core.h b/drivers/input/misc/st/ecompass/ism303dac/ism303dac_core.h
+index 7e9e39743ed8..f3b56187fa86 100644
+--- a/drivers/input/misc/st/ecompass/ism303dac/ism303dac_core.h
++++ b/drivers/input/misc/st/ecompass/ism303dac/ism303dac_core.h
+@@ -142,14 +142,14 @@ struct st_common_data {
+ };
+ 
+ static inline s64 st_sensor_get_time_ns(void) {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ enum hrtimer_restart st_ism303dac_sensor_poll_function(struct hrtimer *timer);
+diff --git a/drivers/input/misc/st/ecompass/lsm303agr/lsm303agr_core.h b/drivers/input/misc/st/ecompass/lsm303agr/lsm303agr_core.h
+index 97616d2e9cf0..ca84527889e9 100644
+--- a/drivers/input/misc/st/ecompass/lsm303agr/lsm303agr_core.h
++++ b/drivers/input/misc/st/ecompass/lsm303agr/lsm303agr_core.h
+@@ -91,15 +91,15 @@ struct lsm303agr_common_data {
+ 
+ static inline s64 lsm303agr_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ void lsm303agr_acc_remove(struct lsm303agr_common_data *cdata);
+diff --git a/drivers/input/misc/st/ecompass/lsm303ah/lsm303ah_core.h b/drivers/input/misc/st/ecompass/lsm303ah/lsm303ah_core.h
+index db9767809edd..248024ed1335 100644
+--- a/drivers/input/misc/st/ecompass/lsm303ah/lsm303ah_core.h
++++ b/drivers/input/misc/st/ecompass/lsm303ah/lsm303ah_core.h
+@@ -146,14 +146,14 @@ struct st_common_data {
+ };
+ 
+ static inline s64 st_sensor_get_time_ns(void) {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ enum hrtimer_restart st_sensor_poll_function(struct hrtimer *timer);
+diff --git a/drivers/input/misc/st/gyro/a3g4250d/a3g4250d.h b/drivers/input/misc/st/gyro/a3g4250d/a3g4250d.h
+index 281e0ad6f900..191f6bea9dbb 100644
+--- a/drivers/input/misc/st/gyro/a3g4250d/a3g4250d.h
++++ b/drivers/input/misc/st/gyro/a3g4250d/a3g4250d.h
+@@ -116,15 +116,15 @@ struct a3g4250d_data {
+ 
+ static inline s64 a3g4250d_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ /* Input events used by a3g4250d driver */
+diff --git a/drivers/input/misc/st/gyro/l3gd20/l3gd20_gyr.c b/drivers/input/misc/st/gyro/l3gd20/l3gd20_gyr.c
+index 8e180f962410..025a2e3c423a 100644
+--- a/drivers/input/misc/st/gyro/l3gd20/l3gd20_gyr.c
++++ b/drivers/input/misc/st/gyro/l3gd20/l3gd20_gyr.c
+@@ -490,11 +490,11 @@ static int l3gd20_gyr_update_odr(struct l3gd20_gyr_status *stat,
+ 
+ static inline int64_t l3gd20_gyr_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ /* gyroscope data readout */
+diff --git a/drivers/input/misc/st/gyro/l3gd20h/l3gd20h_gyr.c b/drivers/input/misc/st/gyro/l3gd20h/l3gd20h_gyr.c
+index fd19d6a346af..c33a8fa845ae 100644
+--- a/drivers/input/misc/st/gyro/l3gd20h/l3gd20h_gyr.c
++++ b/drivers/input/misc/st/gyro/l3gd20h/l3gd20h_gyr.c
+@@ -509,11 +509,11 @@ static int l3gd20h_gyr_enable_low_odr(struct l3gd20h_gyr_status *stat,
+ 
+ static inline int64_t l3gd20h_gyr_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ /* gyroscope data readout */
+diff --git a/drivers/input/misc/st/imu/asm330lhh/asm330lhh_core.c b/drivers/input/misc/st/imu/asm330lhh/asm330lhh_core.c
+index 32857f9a620c..0cdb3b8c2f70 100644
+--- a/drivers/input/misc/st/imu/asm330lhh/asm330lhh_core.c
++++ b/drivers/input/misc/st/imu/asm330lhh/asm330lhh_core.c
+@@ -297,11 +297,11 @@ static inline void asm330lhh_flush_works(void)
+ 
+ static inline int64_t asm330lhh_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int asm330lhh_write_data_with_mask(struct asm330lhh_data *cdata,
+diff --git a/drivers/input/misc/st/imu/asm330lxh/asm330lxh.c b/drivers/input/misc/st/imu/asm330lxh/asm330lxh.c
+index 7ef182780fd0..d4c105d8e7ad 100644
+--- a/drivers/input/misc/st/imu/asm330lxh/asm330lxh.c
++++ b/drivers/input/misc/st/imu/asm330lxh/asm330lxh.c
+@@ -283,15 +283,15 @@ static const struct asm330lxh_gyr_platform_data default_asm330lxh_gyr_pdata = {
+ 
+ static inline s64 asm330lxh_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ struct asm330lxh_main_platform_data default_asm330lxh_main_platform_data = {
+diff --git a/drivers/input/misc/st/imu/ism330dlc/ism330dlc_core.c b/drivers/input/misc/st/imu/ism330dlc/ism330dlc_core.c
+index 43af39433fb3..a400ba9f300f 100644
+--- a/drivers/input/misc/st/imu/ism330dlc/ism330dlc_core.c
++++ b/drivers/input/misc/st/imu/ism330dlc/ism330dlc_core.c
+@@ -236,11 +236,11 @@ static inline void ism330dlc_flush_works(void)
+ 
+ static inline int64_t ism330dlc_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int ism330dlc_write_data_with_mask(struct ism330dlc_data *cdata,
+diff --git a/drivers/input/misc/st/imu/lsm6ds3/lsm6ds3_core.c b/drivers/input/misc/st/imu/lsm6ds3/lsm6ds3_core.c
+index a4e9e6bd7f0a..ef4cf16722aa 100644
+--- a/drivers/input/misc/st/imu/lsm6ds3/lsm6ds3_core.c
++++ b/drivers/input/misc/st/imu/lsm6ds3/lsm6ds3_core.c
+@@ -296,11 +296,11 @@ static inline void lsm6ds3_flush_works(void)
+ 
+ static inline int64_t lsm6ds3_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lsm6ds3_write_data_with_mask(struct lsm6ds3_data *cdata,
+diff --git a/drivers/input/misc/st/imu/lsm6dsl/lsm6dsl_core.c b/drivers/input/misc/st/imu/lsm6dsl/lsm6dsl_core.c
+index 6ec630d0d7d8..c2a59abb13d0 100644
+--- a/drivers/input/misc/st/imu/lsm6dsl/lsm6dsl_core.c
++++ b/drivers/input/misc/st/imu/lsm6dsl/lsm6dsl_core.c
+@@ -260,11 +260,11 @@ static inline void lsm6dsl_flush_works(void)
+ 
+ static inline int64_t lsm6dsl_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lsm6dsl_write_data_with_mask(struct lsm6dsl_data *cdata,
+diff --git a/drivers/input/misc/st/imu/lsm6dsm/lsm6dsm_core.c b/drivers/input/misc/st/imu/lsm6dsm/lsm6dsm_core.c
+index ececb528cbba..7c153fa41b1e 100644
+--- a/drivers/input/misc/st/imu/lsm6dsm/lsm6dsm_core.c
++++ b/drivers/input/misc/st/imu/lsm6dsm/lsm6dsm_core.c
+@@ -268,11 +268,11 @@ static inline void lsm6dsm_flush_works(void)
+ 
+ static inline int64_t lsm6dsm_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lsm6dsm_write_data_with_mask(struct lsm6dsm_data *cdata,
+diff --git a/drivers/input/misc/st/imu/lsm9ds1/lsm9ds1.h b/drivers/input/misc/st/imu/lsm9ds1/lsm9ds1.h
+index decb3303925c..3fad2075ae61 100644
+--- a/drivers/input/misc/st/imu/lsm9ds1/lsm9ds1.h
++++ b/drivers/input/misc/st/imu/lsm9ds1/lsm9ds1.h
+@@ -265,15 +265,15 @@ struct lsm9ds1_acc_gyr_main_platform_data {
+ 
+ static inline s64 lsm9ds1_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ int lsm9ds1_acc_gyr_probe(struct lsm9ds1_acc_gyr_dev *dev, int irq);
+diff --git a/drivers/input/misc/st/magnetometer/lis2mdl/lis2mdl.h b/drivers/input/misc/st/magnetometer/lis2mdl/lis2mdl.h
+index 522277fbf1b6..e931e0c247c3 100644
+--- a/drivers/input/misc/st/magnetometer/lis2mdl/lis2mdl.h
++++ b/drivers/input/misc/st/magnetometer/lis2mdl/lis2mdl.h
+@@ -135,14 +135,14 @@ struct st_common_data {
+ };
+ 
+ static inline s64 lis2mdl_get_time_ns(void) {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ int lis2mdl_enable(struct st_common_data *cdata);
+diff --git a/drivers/input/misc/st/magnetometer/lis3mdl/lis3mdl_mag.c b/drivers/input/misc/st/magnetometer/lis3mdl/lis3mdl_mag.c
+index e1e055e7cd02..4139dbbc6a16 100644
+--- a/drivers/input/misc/st/magnetometer/lis3mdl/lis3mdl_mag.c
++++ b/drivers/input/misc/st/magnetometer/lis3mdl/lis3mdl_mag.c
+@@ -142,11 +142,11 @@ struct {
+ 
+ static inline int64_t lis3mdl_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int lis3mdl_write_data_with_mask(struct lis3mdl_dev *dev,
+diff --git a/drivers/input/misc/vl53l1x_uld/vl53l1x-i2c.c b/drivers/input/misc/vl53l1x_uld/vl53l1x-i2c.c
+index 63cf7225c965..26ba75ce0b89 100644
+--- a/drivers/input/misc/vl53l1x_uld/vl53l1x-i2c.c
++++ b/drivers/input/misc/vl53l1x_uld/vl53l1x-i2c.c
+@@ -99,15 +99,15 @@ struct {
+ 
+ static inline s64 vl53l1x_get_time_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+ 	/*
+ 	 * calls getnstimeofday.
+ 	 * If hrtimers then up to ns accurate, if not microsecond.
+ 	 */
+-	get_monotonic_boottime(&ts);
++	ktime_get_boottime_ts64(&ts);
+ 
+-	return timespec_to_ns(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ static int vl53l1x_prx_input_init(struct vl53l1x_data *cdata,
+@@ -1394,4 +1394,4 @@ module_i2c_driver(vl53l1x_driver);
+ 
+ MODULE_AUTHOR("Song Qiang <songqiang1304521@gmail.com>");
+ MODULE_DESCRIPTION("ST vl53l1x ToF ranging sensor driver");
+-MODULE_LICENSE("GPL v2");
+\ No newline at end of file
++MODULE_LICENSE("GPL v2");

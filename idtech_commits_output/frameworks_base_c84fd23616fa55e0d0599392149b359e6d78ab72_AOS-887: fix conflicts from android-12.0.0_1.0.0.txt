@@ -1,0 +1,519 @@
+c84fd23616fa George.Huang 2022-03-01
+
+AOS-887: fix conflicts from android-12.0.0_1.0.0
+
+Change-Id: I338e975b21db68205fe37d5dc68c8a729b705593
+
+diff --git a/core/java/android/view/autofill/AutofillManager.java b/core/java/android/view/autofill/AutofillManager.java
+index b7fc2ce70816..d0651472bd16 100644
+--- a/core/java/android/view/autofill/AutofillManager.java
++++ b/core/java/android/view/autofill/AutofillManager.java
+@@ -1991,12 +1991,7 @@ public final class AutofillManager {
+             Log.w(TAG, "Autofill service is null!");
+             return false;
+         }
+-<<<<<<< HEAD
+-
+-        if (mServiceClient == null && hasAutofillFeature()) {
+-=======
+         if (mServiceClient == null) {
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+             mServiceClient = new AutofillManagerClient(this);
+             try {
+                 final int userId = mContext.getUserId();
+diff --git a/data/etc/car/android.car.cluster.xml b/data/etc/car/android.car.cluster.xml
+index 9feb1433ff8a..de3accafa2fa 100644
+--- a/data/etc/car/android.car.cluster.xml
++++ b/data/etc/car/android.car.cluster.xml
+@@ -20,11 +20,7 @@
+         <permission name="android.permission.INTERACT_ACROSS_USERS"/>
+         <permission name="android.permission.MANAGE_USERS"/>
+         <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+-<<<<<<< HEAD
+-        <permission name="android.permission.MEDIA_CONTENT_CONTROL"/>
+-=======
+         <permission name="android.car.permission.CAR_ENGINE_DETAILED"/>
+         <permission name="android.car.permission.CAR_INSTRUMENT_CLUSTER_CONTROL"/>
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     </privapp-permissions>
+ </permissions>
+diff --git a/packages/SystemUI/src/com/android/systemui/biometrics/AuthController.java b/packages/SystemUI/src/com/android/systemui/biometrics/AuthController.java
+index f57438c1cb6d..0790af94f287 100644
+--- a/packages/SystemUI/src/com/android/systemui/biometrics/AuthController.java
++++ b/packages/SystemUI/src/com/android/systemui/biometrics/AuthController.java
+@@ -63,8 +63,6 @@ import com.android.systemui.dagger.SysUISingleton;
+ import com.android.systemui.dagger.qualifiers.Main;
+ import com.android.systemui.doze.DozeReceiver;
+ import com.android.systemui.statusbar.CommandQueue;
+-import com.android.systemui.shared.system.ActivityManagerWrapper;
+-import com.android.systemui.shared.system.TaskStackChangeListener;
+ 
+ import java.util.ArrayList;
+ import java.util.Arrays;
+@@ -114,12 +112,6 @@ public class AuthController extends SystemUI implements CommandQueue.Callbacks,
+     @VisibleForTesting
+     TaskStackListener mTaskStackListener;
+     @VisibleForTesting
+-<<<<<<< HEAD
+-    IBiometricServiceReceiverInternal mReceiver;
+-
+-    @VisibleForTesting
+-    private final TaskStackChangeListener mTaskStackListener = new TaskStackChangeListener() {
+-=======
+     IBiometricSysuiReceiver mReceiver;
+     @VisibleForTesting
+     @NonNull final BiometricOrientationEventListener mOrientationListener;
+@@ -131,12 +123,11 @@ public class AuthController extends SystemUI implements CommandQueue.Callbacks,
+     @NonNull private final SparseBooleanArray mUdfpsEnrolledForUser;
+ 
+     private class BiometricTaskStackListener extends TaskStackListener {
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         @Override
+         public void onTaskStackChanged() {
+             mHandler.post(AuthController.this::handleTaskStackChanged);
+         }
+-    };
++    }
+ 
+     private final FingerprintStateListener mFingerprintStateListener =
+             new FingerprintStateListener() {
+@@ -503,9 +494,6 @@ public class AuthController extends SystemUI implements CommandQueue.Callbacks,
+     public void start() {
+         mCommandQueue.addCallback(this);
+ 
+-<<<<<<< HEAD
+-        ActivityManagerWrapper.getInstance().registerTaskStackListener(mTaskStackListener);
+-=======
+         if (mFingerprintManager != null) {
+             mFingerprintManager.addAuthenticatorsRegisteredCallback(
+                     mFingerprintAuthenticatorsRegisteredCallback);
+@@ -532,7 +520,6 @@ public class AuthController extends SystemUI implements CommandQueue.Callbacks,
+      */
+     @Nullable public IUdfpsHbmListener getUdfpsHbmListener() {
+         return mUdfpsHbmListener;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     }
+ 
+     @Override
+diff --git a/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java b/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
+index 3f12029d40e4..4151ab2044f4 100644
+--- a/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
++++ b/packages/SystemUI/tests/src/com/android/systemui/statusbar/notification/stack/NotificationStackScrollLayoutTest.java
+@@ -120,18 +120,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
+                 1, UserHandle.USER_CURRENT);
+ 
+         // Inject dependencies before initializing the layout
+-<<<<<<< HEAD
+-        mDependency.injectMockDependency(VisualStabilityManager.class);
+-        mDependency.injectTestDependency(
+-                NotificationBlockingHelperManager.class,
+-                mBlockingHelperManager);
+         mDependency.injectTestDependency(SysuiStatusBarStateController.class, mBarState);
+-        mDependency.injectTestDependency(MetricsLogger.class, mMetricsLogger);
+-        mDependency.injectTestDependency(NotificationRemoteInputManager.class,
+-                mRemoteInputManager);
+-=======
+-        mDependency.injectTestDependency(SysuiStatusBarStateController.class, mBarState);
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         mDependency.injectMockDependency(ShadeController.class);
+ 
+         NotificationShelfController notificationShelfController =
+diff --git a/services/core/java/com/android/server/am/AppErrors.java b/services/core/java/com/android/server/am/AppErrors.java
+index c3d517432ad2..bcb42bb38495 100644
+--- a/services/core/java/com/android/server/am/AppErrors.java
++++ b/services/core/java/com/android/server/am/AppErrors.java
+@@ -529,17 +529,11 @@ class AppErrors {
+             mService.mHandler.postDelayed(
+                     () -> {
+                         synchronized (mService) {
+-<<<<<<< HEAD
+-                            killAppImmediateLocked(p, ApplicationExitInfo.REASON_OTHER,
+-                                    ApplicationExitInfo.SUBREASON_INVALID_STATE,
+-                                    "forced", "killed for invalid state");
+-=======
+                             synchronized (mProcLock) {
+                                 killAppImmediateLSP(p, ApplicationExitInfo.REASON_OTHER,
+                                         ApplicationExitInfo.SUBREASON_INVALID_STATE,
+                                         "forced", "killed for invalid state");
+                             }
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+                         }
+                     },
+                     5000L);
+diff --git a/services/core/java/com/android/server/pm/PackageManagerService.java b/services/core/java/com/android/server/pm/PackageManagerService.java
+index 4f91cc888632..6da70ad77d67 100644
+--- a/services/core/java/com/android/server/pm/PackageManagerService.java
++++ b/services/core/java/com/android/server/pm/PackageManagerService.java
+@@ -21271,193 +21271,6 @@ public class PackageManagerService extends IPackageManager.Stub
+         }
+     }
+ 
+-<<<<<<< HEAD
+-    private void startIntentFilterVerifications(int userId, boolean replacing, AndroidPackage pkg) {
+-        if (mIntentFilterVerifierComponent == null) {
+-            Slog.w(TAG, "No IntentFilter verification will not be done as "
+-                    + "there is no IntentFilterVerifier available!");
+-            return;
+-        }
+-
+-        final int verifierUid = getPackageUid(
+-                mIntentFilterVerifierComponent.getPackageName(),
+-                MATCH_DEBUG_TRIAGED_MISSING,
+-                (userId == UserHandle.USER_ALL) ? UserHandle.USER_SYSTEM : userId);
+-
+-        Message msg = mHandler.obtainMessage(START_INTENT_FILTER_VERIFICATIONS);
+-        msg.obj = new IFVerificationParams(
+-                pkg.getPackageName(),
+-                pkg.isHasDomainUrls(),
+-                pkg.getActivities(),
+-                replacing,
+-                userId,
+-                verifierUid
+-        );
+-        mHandler.sendMessage(msg);
+-    }
+-
+-    private void verifyIntentFiltersIfNeeded(int userId, int verifierUid, boolean replacing,
+-            String packageName,
+-            boolean hasDomainUrls,
+-            List<ParsedActivity> activities) {
+-        int size = activities.size();
+-        if (size == 0) {
+-            if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG,
+-                    "No activity, so no need to verify any IntentFilter!");
+-            return;
+-        }
+-
+-        if (!hasDomainUrls) {
+-            if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG,
+-                    "No domain URLs, so no need to verify any IntentFilter!");
+-            return;
+-        }
+-
+-        if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG, "Checking for userId:" + userId
+-                + " if any IntentFilter from the " + size
+-                + " Activities needs verification ...");
+-
+-        int count = 0;
+-        boolean handlesWebUris = false;
+-        ArraySet<String> domains = new ArraySet<>();
+-        final boolean previouslyVerified;
+-        boolean hostSetExpanded = false;
+-        boolean needToRunVerify = false;
+-        synchronized (mLock) {
+-            // If this is a new install and we see that we've already run verification for this
+-            // package, we have nothing to do: it means the state was restored from backup.
+-            IntentFilterVerificationInfo ivi =
+-                    mSettings.getIntentFilterVerificationLPr(packageName);
+-            previouslyVerified = (ivi != null);
+-            if (!replacing && previouslyVerified) {
+-                if (DEBUG_DOMAIN_VERIFICATION) {
+-                    Slog.i(TAG, "Package " + packageName + " already verified: status="
+-                            + ivi.getStatusString());
+-                }
+-                return;
+-            }
+-
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.i(TAG, "    Previous verified hosts: "
+-                        + (ivi == null ? "[none]" : ivi.getDomainsString()));
+-            }
+-
+-            // If any filters need to be verified, then all need to be.  In addition, we need to
+-            // know whether an updating app has any web navigation intent filters, to re-
+-            // examine handling policy even if not re-verifying.
+-            final boolean needsVerification = needsNetworkVerificationLPr(packageName);
+-            for (ParsedActivity a : activities) {
+-                for (ParsedIntentInfo filter : a.getIntents()) {
+-                    if (filter.handlesWebUris(true)) {
+-                        handlesWebUris = true;
+-                    }
+-                    if (needsVerification && filter.needsVerification()) {
+-                        if (DEBUG_DOMAIN_VERIFICATION) {
+-                            Slog.d(TAG, "autoVerify requested, processing all filters");
+-                        }
+-                        needToRunVerify = true;
+-                        // It's safe to break out here because filter.needsVerification()
+-                        // can only be true if filter.handlesWebUris(true) returned true, so
+-                        // we've already noted that.
+-                        break;
+-                    }
+-                }
+-            }
+-
+-            // Compare the new set of recognized hosts if the app is either requesting
+-            // autoVerify or has previously used autoVerify but no longer does.
+-            if (needToRunVerify || previouslyVerified) {
+-                final int verificationId = mIntentFilterVerificationToken++;
+-                for (ParsedActivity a : activities) {
+-                    for (ParsedIntentInfo filter : a.getIntents()) {
+-                        // Run verification against hosts mentioned in any web-nav intent filter,
+-                        // even if the filter matches non-web schemes as well
+-                        if (filter.handlesWebUris(false /*onlyWebSchemes*/)) {
+-                            if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG,
+-                                    "Verification needed for IntentFilter:" + filter.toString());
+-                            mIntentFilterVerifier.addOneIntentFilterVerification(
+-                                    verifierUid, userId, verificationId, filter, packageName);
+-                            domains.addAll(filter.getHostsList());
+-                            count++;
+-                        }
+-                    }
+-                }
+-            }
+-
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.i(TAG, "    Update published hosts: " + domains.toString());
+-            }
+-
+-            // If we've previously verified this same host set (or a subset), we can trust that
+-            // a current ALWAYS policy is still applicable.  If this is the case, we're done.
+-            // (If we aren't in ALWAYS, we want to reverify to allow for apps that had failing
+-            // hosts in their intent filters, then pushed a new apk that removed them and now
+-            // passes.)
+-            //
+-            // Cases:
+-            //   + still autoVerify (needToRunVerify):
+-            //      - preserve current state if all of: unexpanded, in always
+-            //      - otherwise rerun as usual (fall through)
+-            //   + no longer autoVerify (alreadyVerified && !needToRunVerify)
+-            //      - wipe verification history always
+-            //      - preserve current state if all of: unexpanded, in always
+-            hostSetExpanded = !previouslyVerified
+-                    || (ivi != null && !ivi.getDomains().containsAll(domains));
+-            final int currentPolicy =
+-                    mSettings.getIntentFilterVerificationStatusLPr(packageName, userId);
+-            final boolean keepCurState = !hostSetExpanded
+-                    && currentPolicy == INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS;
+-
+-            if (needToRunVerify && keepCurState) {
+-                if (DEBUG_DOMAIN_VERIFICATION) {
+-                    Slog.i(TAG, "Host set not expanding + ALWAYS -> no need to reverify");
+-                }
+-                ivi.setDomains(domains);
+-                scheduleWriteSettingsLocked();
+-                return;
+-            } else if (previouslyVerified && !needToRunVerify) {
+-                // Prior autoVerify state but not requesting it now.  Clear autoVerify history,
+-                // and preserve the always policy iff the host set is not expanding.
+-                clearIntentFilterVerificationsLPw(packageName, userId, !keepCurState);
+-                return;
+-            }
+-        }
+-
+-        if (needToRunVerify && count > 0) {
+-            // app requested autoVerify and has at least one matching intent filter
+-            if (DEBUG_DOMAIN_VERIFICATION) Slog.d(TAG, "Starting " + count
+-                    + " IntentFilter verification" + (count > 1 ? "s" : "")
+-                    +  " for userId:" + userId);
+-            mIntentFilterVerifier.startVerifications(userId);
+-        } else {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.d(TAG, "No web filters or no new host policy for " + packageName);
+-            }
+-        }
+-    }
+-
+-    @GuardedBy("mLock")
+-    private boolean needsNetworkVerificationLPr(String packageName) {
+-        IntentFilterVerificationInfo ivi = mSettings.getIntentFilterVerificationLPr(
+-                packageName);
+-        if (ivi == null) {
+-            return true;
+-        }
+-        int status = ivi.getStatus();
+-        switch (status) {
+-            case INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_UNDEFINED:
+-            case INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS:
+-            case INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ASK:
+-                return true;
+-
+-            default:
+-                // Nothing to do
+-                return false;
+-        }
+-    }
+-
+-=======
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     private static boolean isExternal(PackageSetting ps) {
+         return (ps.pkgFlags & ApplicationInfo.FLAG_EXTERNAL_STORAGE) != 0;
+     }
+diff --git a/services/core/java/com/android/server/pm/Settings.java b/services/core/java/com/android/server/pm/Settings.java
+index 138de7f0b543..26aebbc1ea93 100644
+--- a/services/core/java/com/android/server/pm/Settings.java
++++ b/services/core/java/com/android/server/pm/Settings.java
+@@ -1347,132 +1347,6 @@ public final class Settings implements Watchable, Snappable {
+         return cpir;
+     }
+ 
+-<<<<<<< HEAD
+-    /**
+-     * The following functions suppose that you have a lock for managing access to the
+-     * mIntentFiltersVerifications map.
+-     */
+-
+-    /* package protected */
+-    IntentFilterVerificationInfo getIntentFilterVerificationLPr(String packageName) {
+-        PackageSetting ps = mPackages.get(packageName);
+-        if (ps == null) {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.w(PackageManagerService.TAG, "No package known: " + packageName);
+-            }
+-            return null;
+-        }
+-        return ps.getIntentFilterVerificationInfo();
+-    }
+-
+-    /* package protected */
+-    IntentFilterVerificationInfo createIntentFilterVerificationIfNeededLPw(String packageName,
+-            ArraySet<String> domains) {
+-        PackageSetting ps = mPackages.get(packageName);
+-        if (ps == null) {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.w(PackageManagerService.TAG, "No package known: " + packageName);
+-            }
+-            return null;
+-        }
+-        IntentFilterVerificationInfo ivi = ps.getIntentFilterVerificationInfo();
+-        if (ivi == null) {
+-            ivi = new IntentFilterVerificationInfo(packageName, domains);
+-            ps.setIntentFilterVerificationInfo(ivi);
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.d(PackageManagerService.TAG,
+-                        "Creating new IntentFilterVerificationInfo for pkg: " + packageName);
+-            }
+-        } else {
+-            ivi.setDomains(domains);
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.d(PackageManagerService.TAG,
+-                        "Setting domains to existing IntentFilterVerificationInfo for pkg: " +
+-                                packageName + " and with domains: " + ivi.getDomainsString());
+-            }
+-        }
+-        return ivi;
+-    }
+-
+-    int getIntentFilterVerificationStatusLPr(String packageName, int userId) {
+-        PackageSetting ps = mPackages.get(packageName);
+-        if (ps == null) {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.w(PackageManagerService.TAG, "No package known: " + packageName);
+-            }
+-            return INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_UNDEFINED;
+-        }
+-        return (int)(ps.getDomainVerificationStatusForUser(userId) >> 32);
+-    }
+-
+-    boolean updateIntentFilterVerificationStatusLPw(String packageName, final int status, int userId) {
+-        // Update the status for the current package
+-        PackageSetting current = mPackages.get(packageName);
+-        if (current == null) {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.w(PackageManagerService.TAG, "No package known: " + packageName);
+-            }
+-            return false;
+-        }
+-
+-        final int alwaysGeneration;
+-        if (status == INTENT_FILTER_DOMAIN_VERIFICATION_STATUS_ALWAYS) {
+-            alwaysGeneration = mNextAppLinkGeneration.get(userId) + 1;
+-            mNextAppLinkGeneration.put(userId, alwaysGeneration);
+-        } else {
+-            alwaysGeneration = 0;
+-        }
+-
+-        current.setDomainVerificationStatusForUser(status, alwaysGeneration, userId);
+-        return true;
+-    }
+-
+-    /**
+-     * Used for Settings App and PackageManagerService dump. Should be read only.
+-     */
+-    List<IntentFilterVerificationInfo> getIntentFilterVerificationsLPr(
+-            String packageName) {
+-        if (packageName == null) {
+-            return Collections.<IntentFilterVerificationInfo>emptyList();
+-        }
+-        ArrayList<IntentFilterVerificationInfo> result = new ArrayList<>();
+-        for (PackageSetting ps : mPackages.values()) {
+-            IntentFilterVerificationInfo ivi = ps.getIntentFilterVerificationInfo();
+-            if (ivi == null || TextUtils.isEmpty(ivi.getPackageName()) ||
+-                    !ivi.getPackageName().equalsIgnoreCase(packageName)) {
+-                continue;
+-            }
+-            result.add(ivi);
+-        }
+-        return result;
+-    }
+-
+-    boolean removeIntentFilterVerificationLPw(String packageName, int userId,
+-            boolean alsoResetStatus) {
+-        PackageSetting ps = mPackages.get(packageName);
+-        if (ps == null) {
+-            if (DEBUG_DOMAIN_VERIFICATION) {
+-                Slog.w(PackageManagerService.TAG, "No package known: " + packageName);
+-            }
+-            return false;
+-        }
+-        if (alsoResetStatus) {
+-            ps.clearDomainVerificationStatusForUser(userId);
+-        }
+-        ps.setIntentFilterVerificationInfo(null);
+-        return true;
+-    }
+-
+-    boolean removeIntentFilterVerificationLPw(String packageName, int[] userIds) {
+-        boolean result = false;
+-        for (int userId : userIds) {
+-            result |= removeIntentFilterVerificationLPw(packageName, userId, true);
+-        }
+-        return result;
+-    }
+-
+-=======
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+     String removeDefaultBrowserPackageNameLPw(int userId) {
+         return (userId == UserHandle.USER_ALL) ? null : mDefaultBrowserApp.removeReturnOld(userId);
+     }
+diff --git a/services/incremental/IncrementalService.cpp b/services/incremental/IncrementalService.cpp
+index ecf528208cb1..0e96567dbfad 100644
+--- a/services/incremental/IncrementalService.cpp
++++ b/services/incremental/IncrementalService.cpp
+@@ -640,12 +640,8 @@ StorageId IncrementalService::createStorage(std::string_view mountPoint,
+         if (!mkdirOrLog(path::join(backing, ".incomplete"), 0777)) {
+             return kInvalidStorageId;
+         }
+-<<<<<<< HEAD
+-        auto status = mVold->mountIncFs(backing, mountTarget, 0, &controlParcel);
+-=======
+         metricsKey = makeUniqueName(mountKey);
+         auto status = mVold->mountIncFs(backing, mountTarget, 0, metricsKey, &controlParcel);
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         if (!status.isOk()) {
+             LOG(ERROR) << "Vold::mountIncFs() failed: " << status.toString8();
+             return kInvalidStorageId;
+diff --git a/services/voiceinteraction/java/com/android/server/soundtrigger/SoundTriggerService.java b/services/voiceinteraction/java/com/android/server/soundtrigger/SoundTriggerService.java
+index aa6e662dc964..5183e5b8e246 100644
+--- a/services/voiceinteraction/java/com/android/server/soundtrigger/SoundTriggerService.java
++++ b/services/voiceinteraction/java/com/android/server/soundtrigger/SoundTriggerService.java
+@@ -749,20 +749,12 @@ public class SoundTriggerService extends SystemService {
+                     Slog.i(TAG, "getModuleProperties()");
+                 }
+ 
+-<<<<<<< HEAD
+-            synchronized (mLock) {
+-                ModuleProperties properties = mSoundTriggerHelper.getModuleProperties();
+-                sEventLogger.log(new SoundTriggerLogger.StringEvent(
+-                        "getModuleProperties(): " + Objects.toString(properties)));
+-                return properties;
+-=======
+                 synchronized (mLock) {
+                     ModuleProperties properties = mSoundTriggerHelper.getModuleProperties();
+                     sEventLogger.log(new SoundTriggerLogger.StringEvent(
+                             "getModuleProperties(): " + properties));
+                     return properties;
+                 }
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+             }
+         }
+ 

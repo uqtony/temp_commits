@@ -1,0 +1,73 @@
+12c3598e George.Huang 2020-06-04
+
+[Temp] Revert "vp6820_mq: add sensor hal config"
+
+This reverts commit 30468f84f860dd90ef7278040b97e124287d46dc.
+
+Change-Id: Ia9027adacdc5d232e836365b1b92143922af9c6f
+
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index f145275b..8e2ea636 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -85,8 +85,7 @@ BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
+ # BCM 1CX BT
+ BOARD_HAVE_BLUETOOTH_BCM := true
+ 
+-#BOARD_USE_SENSOR_FUSION := true
+-BOARD_USE_ST_SENSOR_INPUT := true
++BOARD_USE_SENSOR_FUSION := true
+ 
+ # we don't support sparse image.
+ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index b11289fe..e8a312f4 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -188,12 +188,6 @@ service sensor_fusion /vendor/bin/fsl_sensor_fusion
+     group input
+     oneshot
+ 
+-service vendor.sensors-hal-1-0 /vendor/bin/hw/android.hardware.sensors@1.0-service
+-	class hal
+-	user system
+-	group system wakelock input root
+-	capabilities BLOCK_SUSPEND SYS_NICE
+-
+ # Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
+ service watchdogd /system/bin/watchdogd 10 20
+     class core
+diff --git a/imx8m/vp6820_8mq/manifest.xml b/imx8m/vp6820_8mq/manifest.xml
+index 8aee50c7..20889c18 100644
+--- a/imx8m/vp6820_8mq/manifest.xml
++++ b/imx8m/vp6820_8mq/manifest.xml
+@@ -70,15 +70,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.sensors</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>ISensors</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.configstore</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 19add924..2e7c293c 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -221,9 +221,6 @@ PRODUCT_PACKAGES += \
+     android.hardware.power@1.3-service.imx \
+     android.hardware.light@2.0-impl \
+     android.hardware.light@2.0-service \
+-    android.hardware.sensors@1.0-impl \
+-    android.hardware.sensors@1.0-convert \
+-    android.hardware.sensors@1.0-service \
+     android.hardware.configstore@1.1-service \
+     configstore@1.1.policy
+ 

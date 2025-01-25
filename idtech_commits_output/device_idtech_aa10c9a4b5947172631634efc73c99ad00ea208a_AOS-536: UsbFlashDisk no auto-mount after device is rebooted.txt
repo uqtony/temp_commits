@@ -1,0 +1,19 @@
+aa10c9a4 owen.wen 2021-03-15
+
+AOS-536: UsbFlashDisk no auto-mount after device is rebooted
+
+Symptom: USB drive not auto-mounted after reboot
+         unplug/plug again can work around
+RootCause: avc: denied { write } for comm="Binder:243_2" name="uevent" dev="sysfs" ino=31682 scontext=u:r:vold:s0 tcontext=u:object_r:sysfs_usb_uevent:s0 tclass=file permissive=0
+Solution: add rules for vold
+Change-Id: Ie87e8685f22dd9823d434ae4057d1f879f299c02
+
+diff --git a/imx8m/sepolicy/vold.te b/imx8m/sepolicy/vold.te
+index a7bc5908..bcbe7e43 100644
+--- a/imx8m/sepolicy/vold.te
++++ b/imx8m/sepolicy/vold.te
+@@ -2,3 +2,4 @@ allow vold vendor_configs_file:file { map };
+ allow vold proc_swaps:file { read open getattr };
+ allow vold sysfs_block_devices:file {write};
+ allow vold idtechdata_block_device:blk_file rw_file_perms;
++allow vold sysfs_usb_uevent:file write;

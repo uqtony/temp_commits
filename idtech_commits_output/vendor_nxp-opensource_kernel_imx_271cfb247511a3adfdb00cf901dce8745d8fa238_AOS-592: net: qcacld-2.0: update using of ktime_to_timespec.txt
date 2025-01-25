@@ -1,0 +1,58 @@
+271cfb247511 George.Huang 2021-05-11
+
+AOS-592: net: qcacld-2.0: update using of ktime_to_timespec
+
+Error Log:
+  kernel_imx/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h:128:8:
+  error: implicit declaration of function 'ktime_to_timespec'
+
+Change-Id: If2e992f3cb953b492ce3ea0bbc9d23d347c69b50
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+index 7760f1260a24..d20654972041 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+@@ -32335,7 +32335,7 @@ wlan_hdd_cfg80211_extscan_full_scan_result_event(void *ctx,
+ {
+ 	hdd_context_t *pHddCtx  = (hdd_context_t *)ctx;
+ 	struct sk_buff *skb;
+-	struct timespec ts;
++	struct timespec64 ts;
+ 	int flags = vos_get_gfp_flags();
+ 	struct hdd_ext_scan_context *context;
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
+index 07f0b6cbe914..4db8852195c0 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
+@@ -123,14 +123,14 @@ static inline int vos_wlan_pm_control(bool vote)
+ static inline void vos_lock_pm_sem(void) { return; }
+ static inline void vos_release_pm_sem(void) { return; }
+ 
+-static inline void vos_get_monotonic_bootime_ts(struct timespec *ts)
++static inline void vos_get_monotonic_bootime_ts(struct timespec64 *ts)
+ {
+-	*ts = ktime_to_timespec(ktime_get_boottime());
++	*ts = ktime_to_timespec64(ktime_get_boottime());
+ }
+ 
+-static inline void vos_get_boottime_ts(struct timespec *ts)
++static inline void vos_get_boottime_ts(struct timespec64 *ts)
+ {
+-	ktime_get_ts(ts);
++	ktime_get_ts64(ts);
+ }
+ 
+ static inline void *vos_get_virt_ramdump_mem(struct device *dev,
+@@ -201,9 +201,9 @@ static inline int vos_wlan_get_dfs_nol(void *info, u16 info_len)
+ 	return -EINVAL;
+ }
+ 
+-static inline void vos_get_monotonic_boottime_ts(struct timespec *ts)
++static inline void vos_get_monotonic_boottime_ts(struct timespec64 *ts)
+ {
+-	*ts = ktime_to_timespec(ktime_get_boottime());
++	*ts = ktime_to_timespec64(ktime_get_boottime());
+ }
+ 
+ static inline void vos_schedule_recovery_work(struct device *dev) { return; }

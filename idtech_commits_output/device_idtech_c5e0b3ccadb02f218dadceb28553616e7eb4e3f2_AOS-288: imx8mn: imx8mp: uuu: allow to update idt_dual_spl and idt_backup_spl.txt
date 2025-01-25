@@ -1,0 +1,45 @@
+c5e0b3cc George.Huang 2020-09-01
+
+AOS-288: imx8mn: imx8mp: uuu: allow to update idt_dual_spl and idt_backup_spl
+
+Change-Id: Ieaab6488debf0d5302faca8e0c5d6614fa6c32fd
+
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 2433b401..c2ef94a0 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -169,6 +169,17 @@ if [%soc_name%] == [imx8mq] (
+     set /A support_idt_backup_spl=1
+     set /A support_idt_spl_table=1
+ )
++:: enable these 2 features only for imx8mn or imx8mp
++if [%soc_name%] == [imx8mn] (
++    set /A support_idt_dual_spl=1
++    set /A support_idt_backup_spl=1
++    set /A support_idt_spl_table=0
++)
++if [%soc_name%] == [imx8mp] (
++    set /A support_idt_dual_spl=1
++    set /A support_idt_backup_spl=1
++    set /A support_idt_spl_table=0
++)
+ 
+ :: avoid substring judgement error
+ set uboot_feature_test=A%uboot_feature%
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 6503edea..98edfbfc 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -604,6 +604,12 @@ if [[ "${soc_name}" == "imx8mq" ]]; then
+     support_idt_backup_spl=1;
+     support_idt_spl_table=1;
+ fi
++# enable these 2 features only for imx8mn or imx8mp
++if [[ "${soc_name}" == "imx8mn" ]] || [[ "${soc_name}" == "imx8mp" ]]; then
++    support_idt_dual_spl=1;
++    support_idt_backup_spl=1;
++    support_idt_spl_table=0;
++fi
+ 
+ # Process of the uboot_feature parameter
+ if [[ "${uboot_feature}" = *"trusty"* ]] || [[ "${uboot_feature}" = *"secure"* ]]; then

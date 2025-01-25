@@ -1,0 +1,170 @@
+8a7e6ba jay deng 2020-11-04
+
+AOS-378: Add HIDL support for KIOSK LEDS
+
+Add HIDL support for kiosk leds, this part is HIDL service which
+combined with HAL, HIDL interface is in hardware/interface.
+
+Change-Id: I715185ae3f9ef1c560972c4677d09536624f0693
+
+diff --git a/kioskled/Android.bp b/kioskled/Android.bp
+new file mode 100644
+index 0000000..ffee625
+--- /dev/null
++++ b/kioskled/Android.bp
+@@ -0,0 +1,21 @@
++// FIXME: your file license if you have one
++
++cc_binary {
++    name: "android.hardware.kioskled@1.0-service",
++    defaults: ["hidl_defaults"],
++    relative_install_path: "hw",
++    vendor: true,
++    init_rc: ["android.hardware.kioskled@1.0-service.rc"],
++    srcs: [
++        "Kioskled.cpp",
++        "service.cpp",
++    ],
++    shared_libs: [
++        "libhidlbase",
++        "libhidltransport",
++        "libutils",
++        "liblog",
++        "libhardware",
++        "android.hardware.kioskled@1.0",
++    ],
++}
+diff --git a/kioskled/Kioskled.cpp b/kioskled/Kioskled.cpp
+new file mode 100644
+index 0000000..b121d49
+--- /dev/null
++++ b/kioskled/Kioskled.cpp
+@@ -0,0 +1,44 @@
++// FIXME: your file license if you have one
++
++#include "Kioskled.h"
++#include <utils/Log.h>
++
++namespace android {
++namespace hardware {
++namespace kioskled {
++namespace V1_0 {
++namespace implementation {
++
++// Methods from ::android::hardware::kioskled::V1_0::IKioskled follow.
++Return<void> Kioskled::setLed(uint8_t idx, uint8_t onOff) {
++    const hw_module_t *module = NULL;
++    hw_device_t *device = NULL;
++    kioskLed_device_t *kioskLed_device = NULL;
++
++    if (!hw_get_module(KIOSKLED_HARDWARE_MODULE_ID, &module) &&
++        !module->methods->open(module, KIOSKLED_HARDWARE_MODULE_ID, &device)) {
++        kioskLed_device = reinterpret_cast<kioskLed_device_t*>(device);
++        kioskLed_device->setKioskLed(kioskLed_device, idx, onOff);
++        kioskLed_device->common.close(device);
++    } else {
++        if (module == NULL)
++            ALOGE("[KioskLed HIDL] Cannot find module
+");
++        else
++            ALOGE("[KioskLed HIDL] Cannot open device
+");
++    }
++
++    return Void();
++}
++
++
++// Methods from ::android::hidl::base::V1_0::IBase follow.
++
++//IKioskled* HIDL_FETCH_IKioskled(const char* /* name */) {
++    //return new Kioskled();
++//}
++//
++}  // namespace implementation
++}  // namespace V1_0
++}  // namespace kioskled
++}  // namespace hardware
++}  // namespace android
+diff --git a/kioskled/Kioskled.h b/kioskled/Kioskled.h
+new file mode 100644
+index 0000000..96ec3a8
+--- /dev/null
++++ b/kioskled/Kioskled.h
+@@ -0,0 +1,40 @@
++// FIXME: your file license if you have one
++
++#pragma once
++
++#include <android/hardware/kioskled/1.0/IKioskled.h>
++#include <hidl/MQDescriptor.h>
++#include <hidl/Status.h>
++#include <hardware/hardware.h>
++#include <hardware/kioskLed.h>
++
++namespace android {
++namespace hardware {
++namespace kioskled {
++namespace V1_0 {
++namespace implementation {
++
++using android::hardware::hidl_array;
++using android::hardware::hidl_memory;
++using android::hardware::hidl_string;
++using android::hardware::hidl_vec;
++using android::hardware::Return;
++using android::hardware::Void;
++using android::sp;
++
++struct Kioskled : public IKioskled {
++    // Methods from ::android::hardware::kioskled::V1_0::IKioskled follow.
++	Return < void > setLed(uint8_t idx, uint8_t onOff) override;
++
++    // Methods from ::android::hidl::base::V1_0::IBase follow.
++
++};
++
++// FIXME: most likely delete, this is only for passthrough implementations
++// extern "C" IKioskled* HIDL_FETCH_IKioskled(const char* name);
++
++}  // namespace implementation
++}  // namespace V1_0
++}  // namespace kioskled
++}  // namespace hardware
++}  // namespace android
+diff --git a/kioskled/android.hardware.kioskled@1.0-service.rc b/kioskled/android.hardware.kioskled@1.0-service.rc
+new file mode 100644
+index 0000000..ef7db92
+--- /dev/null
++++ b/kioskled/android.hardware.kioskled@1.0-service.rc
+@@ -0,0 +1,5 @@
++service vendor.kioskled-hal-1.0 /vendor/bin/hw/android.hardware.kioskled@1.0-service
++interface android.hardware.kioskled@1.0::IKioskled default
++class hal
++user system
++group system
+diff --git a/kioskled/service.cpp b/kioskled/service.cpp
+new file mode 100644
+index 0000000..3710e9b
+--- /dev/null
++++ b/kioskled/service.cpp
+@@ -0,0 +1,19 @@
++#include <android/hardware/kioskled/1.0/IKioskled.h>
++#include <hidl/LegacySupport.h>
++#include "Kioskled.h"
++
++using android::hardware::kioskled::V1_0::IKioskled;
++using android::hardware::kioskled::V1_0::implementation::Kioskled;
++
++using android::hardware::defaultPassthroughServiceImplementation;
++using android::hardware::configureRpcThreadpool;
++using android::hardware::joinRpcThreadpool;
++
++int main() {
++    android::sp<IKioskled> service = new Kioskled();
++    configureRpcThreadpool(1, true /*callerWillJoin*/);
++    if(android::OK !=  service->registerAsService())
++        return 1;
++    joinRpcThreadpool();
++    return 1;
++}

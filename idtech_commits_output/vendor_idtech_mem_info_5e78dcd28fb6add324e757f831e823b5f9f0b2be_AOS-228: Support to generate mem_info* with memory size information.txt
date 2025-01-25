@@ -1,0 +1,101 @@
+5e78dcd max.yang 2020-07-09
+
+AOS-228: Support to generate mem_info* with memory size information
+
+Change-Id: I5c9f896e24755c7906e9d739e680303b25b99d7d
+
+diff --git a/generate_meminfo.py b/generate_meminfo.py
+index f3bada5..c0061f1 100644
+--- a/generate_meminfo.py
++++ b/generate_meminfo.py
+@@ -65,8 +65,8 @@ struct dram_timing_info {
+ '''
+ 
+ #TODO find a way to update this, .o will be erased once we perform next u-boot build
+-DRAM_TIMING_DATA = [['devboard', 'evt', '/PATH/TO/A300/lpddr4_timing_2g.c', '/PATH/TO/A300/lpddr4_timing_2g.o'],
+-                    ['evk', 'evk', '/PATH/TO/PATH/TO/EVK/lpddr4_timing.c', '/PATH/TO/EVK/lpddr4_timing.o']
++DRAM_TIMING_DATA = [['board_info-a300_evt-0_devboard_evt-1_ktc2g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mq_a300/ddr/lpddr4_timing_2g.c', './a300-lpddr4_timing_2g.o'],
++                    ['board_info-imx8mq_evt-0_evk_evk-0_mic3g.img', '../../nxp-opensource/uboot-imx/board/freescale/imx8mq_evk/lpddr4_timing.c', './mq-evk-lpddr4_timing.o']
+                     ]
+ 
+ BLOCK_SIZE = 512.0
+@@ -77,8 +77,11 @@ FORMAT_STRING_MEMOBJ = ('I' # drate, 0 for nothing
+                         'I' # offset from header blk
+                         'I' # array_size
+                            )
+-FORMAT_STRING_ROOT = ('16s' # name, align BDINFO_DATA_SIZE
+-                      '16s' # feature, align BDINFO_DATA_SIZE
++FORMAT_STRING_ROOT = ('16s' # som_model, align BDINFO_DATA_SIZE
++                      '16s' # som_plc, align BDINFO_DATA_SIZE
++                      '16s' # mb_model
++                      '16s' # mb_plc
++                      '16s' # dev_ddr
+                       'I'   # offset
+                       'I'   # size
+                            )
+@@ -179,6 +182,9 @@ class dram_timing(object):
+     self.update_hdr(obj_blob, self.ddrphy_trained_csr_name)
+     self.update_hdr(obj_blob, self.ddrphy_pie_name)
+ 
++  def write_memsize_to_hdr(self, ddr_size):
++    self.mem_hdr += struct.pack('I', ddr_size)
++
+   def update_meminfo(self, hdr_obj, fsp_item=None):
+     drate = 0
+     fw_t  = 0
+@@ -228,7 +234,7 @@ class dram_timing(object):
+       f.write(self.mem_hdr)
+       f.write(self.mem_body)
+ 
+-def make_meminfo_obj(dram_code, dram_obj):
++def make_meminfo_obj(dram_code, dram_obj, mm_size_k):
+   # get array name from source code
+   # init struct member array and sub-array
+   d_data = dram_timing(dram_code)
+@@ -239,6 +245,7 @@ def make_meminfo_obj(dram_code, dram_obj):
+ 
+   d_data.print_hdr()
+ 
++  d_data.write_memsize_to_hdr(mm_size_k)
+   d_data.compose_meminfo()
+ 
+   #d_data.output_meminfo("./meminfo")
+@@ -250,13 +257,26 @@ def main(argv):
+   mem_root_body = bytearray()
+   offset = 1 # first block for header
+ 
++  m_txt = open("./mem_info.txt", "w")
++
+   for item in DRAM_TIMING_DATA:
++    # handle board information
++    board_info = item[0].replace('_','-').replace('.','-')
++    som_model = board_info.split('-')[2]
++    som_plc = board_info.split('-')[3]
++    mb_model = board_info.split('-')[5]
++    mb_plc = board_info.split('-')[6]
++    dev_ddr = board_info.split('-')[8]
++    mem_size_k = int(float(dev_ddr[3:-1])*1024*1024)
++
++    # handle memory obj
+     local_blob = bytearray()
+-    single_mem_obj = make_meminfo_obj(item[2], item[3])
++    single_mem_obj = make_meminfo_obj(item[1], item[2], mem_size_k)
+     local_blob += single_mem_obj.mem_hdr
+     local_blob += single_mem_obj.mem_body
+     size = int(len(local_blob)/BLOCK_SIZE)
+-    mem_root_hdr += struct.pack(FORMAT_STRING_ROOT, item[0], item[1], offset, size)
++    mem_root_hdr += struct.pack(FORMAT_STRING_ROOT, som_model, som_plc, mb_model, mb_plc, dev_ddr, offset, size)
++    m_txt.write('{}-{}-{}-{}-{}-{}-{}
+'.format(som_model, som_plc, mb_model, mb_plc, dev_ddr, offset, size))
+ 
+     offset += size
+     mem_root_body += local_blob
+@@ -265,6 +285,8 @@ def main(argv):
+   padding = int(BLOCK_SIZE - len(mem_root_hdr))
+   mem_root_hdr += struct.pack(str(padding) + 'x')
+ 
++  m_txt.close()
++
+   with open("./mem_info.img", "w") as f:
+     f.write(mem_root_hdr)
+     f.write(mem_root_body)

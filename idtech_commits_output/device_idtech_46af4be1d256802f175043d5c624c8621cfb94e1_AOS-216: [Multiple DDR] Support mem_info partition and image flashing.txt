@@ -1,0 +1,303 @@
+46af4be1 max.yang 2020-06-17
+
+AOS-216: [Multiple DDR] Support mem_info partition and image flashing
+
+  The pre-build mem_info.img is from below commit:
+    https://gerrit.idtechproducts.com/c/android-imx/idtech/board_info/+/3102
+
+  Because it need multiple dram_timing.o to output single mem_info.img, but
+  UBOOT_OBJ will be cleared everytime build different platform. So we build
+  it one-by-one and collect dram_timings to pre-build this file temparary.
+
+Change-Id: If4528bbd682a3ab7ee7aa6bc96a97b99efd77512
+
+diff --git a/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt b/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
+index 7111a5b3..68e3b6a4 100644
+--- a/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
++++ b/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt
+@@ -11,6 +11,12 @@
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "mem_info",
++            "size": "1 MiB",
++            "guid": "auto",
++            "type_guid": "brillo_vendor_specific"
++        },
+         {
+             "ab": true,
+             "label": "bootloader",
+diff --git a/common/partition/device-partitions-14.4GB-ab.bpt b/common/partition/device-partitions-14.4GB-ab.bpt
+index d04c363d..e1131b1a 100644
+--- a/common/partition/device-partitions-14.4GB-ab.bpt
++++ b/common/partition/device-partitions-14.4GB-ab.bpt
+@@ -11,6 +11,12 @@
+             "guid": "auto",
+             "type_guid": "brillo_vendor_specific"
+         },
++        {
++            "label": "mem_info",
++            "size": "1 MiB",
++            "guid": "auto",
++            "type_guid": "brillo_vendor_specific"
++        },
+         {
+             "ab": true,
+             "label": "dtbo",
+diff --git a/common/prebuilts/mem_info.img b/common/prebuilts/mem_info.img
+new file mode 100644
+index 00000000..6bf9d61e
+Binary files /dev/null and b/common/prebuilts/mem_info.img differ
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 0d09e1b1..c461fef2 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -23,6 +23,7 @@ set mb_rev=
+ set mb_opt=
+ set board_info_file=
+ set board_info_temp=
++set mem_info_file=mem_info.img
+ set dtbo_file=dtbo.img
+ set vbmeta_file=vbmeta.img
+ set android_info_file=android-info.txt
+@@ -43,6 +44,7 @@ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_dual_bootloader=0
+ set /A support_board_info=0
++set /A support_mem_info=0
+ set /A write_bdinfo_serial=0
+ set /A support_idt_dual_spl=0
+ set /A support_idt_backup_spl=0
+@@ -60,6 +62,7 @@ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
+ set board_info_partition=board_info
++set mem_info_partition=mem_info
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A lock=0
+@@ -380,6 +383,10 @@ if not [%partition_to_be_flashed:board_info=%] == [%partition_to_be_flashed%] (
+     set img_name=%board_info_file%
+     goto :start_to_flash
+ )
++if not [%partition_to_be_flashed:mem_info=%] == [%partition_to_be_flashed%] (
++    set img_name=%mem_info_file%
++    goto :start_to_flash
++)
+ if not [%partition_to_be_flashed:vbmeta=%] == [%partition_to_be_flashed%] (
+     if not [%vbmeta_file%] == [] (
+         set img_name=%vbmeta_file%
+@@ -434,6 +441,7 @@ goto :eof
+ 
+ :flash_userpartitions
+ if %support_board_info% == 1 call :flash_partition %board_info_partition% || set /A error_level=1 && goto :exit
++if %support_mem_info% == 1 call :flash_partition %mem_info_partition% || set /A error_level=1 && goto :exit
+ if %support_dtbo% == 1 call :flash_partition %dtbo_partition% || set /A error_level=1 && goto :exit
+ if %support_recovery% == 1 call :flash_partition %recovery_partition% || set /A error_level=1 && goto :exit
+ call :flash_partition %boot_partition% || set /A error_level=1 && goto :exit
+@@ -528,6 +536,7 @@ call :flash_partition gpt || set /A error_level=1 && goto :exit
+ find "bootloader_a" fastboot_var.log > nul && set /A support_dual_bootloader=1
+ find "bootloader1" fastboot_var.log > nul && set /A support_idt_dual_spl=1
+ find "board_info" fastboot_var.log > nul && set /A support_board_info=1
++find "mem_info" fastboot_var.log > nul && set /A support_mem_info=1
+ find "dtbo" fastboot_var.log > nul && set /A support_dtbo=1
+ 
+ find "recovery" fastboot_var.log > nul && set /A support_recovery=1
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index f01112b9..da0bf792 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -126,6 +126,8 @@ function flash_partition
+         img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
+     elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
+         img_name="${board_info_file}"
++    elif [ "$(echo ${1} | grep "mem_info")" != "" ]; then
++        img_name="${mem_info_file}"
+     elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
+         if [ "${1%_*}" == "dtbo" -a -f "${image_directory}${dtbo_file}" ]; then
+             img_name="${dtbo_file}"
+@@ -150,6 +152,10 @@ function flash_userpartitions
+         flash_partition ${board_info_partition}
+     fi
+ 
++    if [ ${support_mem_info} -eq 1 ]; then
++        flash_partition ${mem_info_partition}
++    fi
++
+     if [ ${support_dtbo} -eq 1 ]; then
+         flash_partition ${dtbo_partition}
+     fi
+@@ -255,6 +261,7 @@ function flash_android
+     grep -q "bootloader_a" /tmp/fastboot_var.log && support_dual_bootloader=1
+     grep -q "bootloader1" /tmp/fastboot_var.log && support_idt_dual_spl=1
+     grep -q "board_info" /tmp/fastboot_var.log && support_board_info=1
++    grep -q "mem_info" /tmp/fastboot_var.log && support_mem_info=1
+     grep -q "dtbo" /tmp/fastboot_var.log && support_dtbo=1
+     grep -q "recovery" /tmp/fastboot_var.log && support_recovery=1
+     # use boot_b to check whether current gpt support a/b slot
+@@ -359,6 +366,7 @@ mb_plc=""
+ mb_rev=""
+ board_info_file=""
+ board_info_temp=""
++mem_info_file="mem_info.img"
+ dtbo_file="dtbo.img"
+ vbmeta_file="vbmeta.img"
+ android_info_file="android-info.txt"
+@@ -378,6 +386,7 @@ support_dualslot=0
+ support_mcu_os=0
+ support_dual_bootloader=0
+ support_board_info=0
++support_mem_info=0
+ write_bdinfo_serial=0
+ support_idt_dual_spl=0
+ support_idt_backup_spl=0
+@@ -394,6 +403,7 @@ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
+ board_info_partition="board_info"
++mem_info_partition="mem_info"
+ flash_mcu=0
+ lock=0
+ erase=0
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 8e9e57c5..51645ba3 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -24,6 +24,7 @@ set mb_rev=
+ set mb_opt=
+ set board_info_file=
+ set board_info_temp=
++set mem_info_file=mem_info.img
+ set dtbo_file=dtbo.img
+ set vbmeta_file=vbmeta.img
+ set android_info_file=android-info.txt
+@@ -46,6 +47,7 @@ set /A support_dualslot=0
+ set /A support_mcu_os=0
+ set /A support_trusty=0
+ set /A support_board_info=0
++set /A support_mem_info=0
+ set /A write_bdinfo_serial=0
+ set /A support_idt_dual_spl=1
+ set /A support_idt_backup_spl=1
+@@ -59,6 +61,7 @@ set vbmeta_partition=vbmeta
+ set dtbo_partition=dtbo
+ set mcu_os_partition=mcu_os
+ set board_info_partition=board_info
++set mem_info_partition=mem_info
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A erase=0
+@@ -217,6 +220,8 @@ for /f "delims=" %%J in (partition-table_2.txt) do (
+ find "b.o.o.t.l.o.a.d.e.r._.b." partition-table_3.txt > nul && set /A support_dual_bootloader=1 && echo dual bootloader is supported
+ :: check whether there is "board_info" in partition file
+ find "b.o.a.r.d._.i.n.f.o." partition-table_3.txt > nul && set /A support_board_info=1 && echo board_info is supported
++:: check whether there is "mem_info" in partition file
++find "m.e.m._.i.n.f.o." partition-table_3.txt > nul && set /A support_mem_info=1 && echo mem_info is supported
+ :: check whether there is "dtbo" in partition file
+ find "d.t.b.o." partition-table_3.txt > nul && set /A support_dtbo=1 && echo dtbo is supported
+ :: check whether there is "recovery" in partition file
+@@ -702,6 +707,10 @@ if not [%partition_to_be_flashed:board_info=%] == [%partition_to_be_flashed%] (
+     set img_name=%board_info_file%
+     goto :start_to_flash
+ )
++if not [%partition_to_be_flashed:mem_info=%] == [%partition_to_be_flashed%] (
++    set img_name=%mem_info_file%
++    goto :start_to_flash
++)
+ if not [%partition_to_be_flashed:vbmeta=%] == [%partition_to_be_flashed%] (
+     if not [%vbmeta_file%] == [] (
+         set img_name=%vbmeta_file%
+@@ -759,6 +768,7 @@ goto :eof
+ 
+ :flash_userpartitions
+ if %support_board_info% == 1 call :flash_partition %board_info_partition% || set /A error_level=1 && goto :exit
++if %support_mem_info% == 1 call :flash_partition %mem_info_partition% || set /A error_level=1 && goto :exit
+ if %support_dual_bootloader% == 1 call :flash_partition %dual_bootloader_partition% || set /A error_level=1 && goto :exit
+ if %support_dtbo% == 1 call :flash_partition %dtbo_partition% || set /A error_level=1 && goto :exit
+ if %support_recovery% == 1 call :flash_partition %recovery_partition% || set /A error_level=1 && goto :exit
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 763860b4..8a23ff35 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -170,6 +170,8 @@ function flash_partition
+         img_name="${1%_*}-${soc_name}-${dtb_feature}.img"
+     elif [ "$(echo ${1} | grep "board_info")" != "" ]; then
+         img_name="${board_info_file}"
++    elif [ "$(echo ${1} | grep "mem_info")" != "" ]; then
++        img_name="${mem_info_file}"
+     elif [ "$(echo ${1} | grep -E "dtbo|vbmeta|recovery")" != "" ]; then
+         if [ "${1%_*}" == "dtbo" -a -f "${image_directory}${dtbo_file}" ]; then
+             img_name="${dtbo_file}"
+@@ -198,6 +200,9 @@ function flash_userpartitions
+     if [ ${support_board_info} -eq 1 ]; then
+         flash_partition ${board_info_partition}
+     fi
++    if [ ${support_mem_info} -eq 1 ]; then
++        flash_partition ${mem_info_partition}
++    fi
+     if [ ${support_dtbo} -eq 1 ]; then
+         flash_partition ${dtbo_partition}
+     fi
+@@ -388,6 +393,7 @@ mb_plc=""
+ mb_rev=""
+ board_info_file=""
+ board_info_temp=""
++mem_info_file="mem_info.img"
+ dtbo_file="dtbo.img"
+ vbmeta_file="vbmeta.img"
+ android_info_file="android-info.txt"
+@@ -407,6 +413,7 @@ support_dualslot=0
+ support_mcu_os=0
+ support_trusty=0
+ support_board_info=0
++support_mem_info=0
+ write_bdinfo_serial=0
+ support_idt_dual_spl=1
+ support_idt_backup_spl=1
+@@ -420,6 +427,7 @@ vbmeta_partition="vbmeta"
+ dtbo_partition="dtbo"
+ mcu_os_partition="mcu_os"
+ board_info_partition="board_info"
++mem_info_partition="mem_info"
+ 
+ flash_mcu=0
+ erase=0
+@@ -602,6 +610,9 @@ grep "62 00 6f 00 6f 00 74 00 6c 00 6f 00 61 00 64 00 65 00 72 00 5f 00 62 00" /
+ # check whether there is "board_info" in partition file
+ grep "62 00 6f 00 61 00 72 00 64 00 5f 00 69 00 6e 00 66 00 6f 00" /tmp/partition-table_3.txt > /dev/null \
+         && support_board_info=1 && echo board_info is supported
++# check whether there is "mem_info" in partition file
++grep "6d 00 65 00 6d 00 5f 00 69 00 6e 00 66 00 6f 00" /tmp/partition-table_3.txt > /dev/null \
++        && support_mem_info=1 && echo mem_info is supported
+ # check whether there is "dtbo" in partition file
+ grep "64 00 74 00 62 00 6f 00" /tmp/partition-table_3.txt > /dev/null \
+         && support_dtbo=1 && echo dtbo is supported
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+index df37c408..b4c0d021 100644
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -49,7 +49,8 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+     device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
+-    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 69158457..0572a09a 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -52,7 +52,8 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/device_owner_2.xml \
+     device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
+     device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
+-    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_COPY_FILES += \

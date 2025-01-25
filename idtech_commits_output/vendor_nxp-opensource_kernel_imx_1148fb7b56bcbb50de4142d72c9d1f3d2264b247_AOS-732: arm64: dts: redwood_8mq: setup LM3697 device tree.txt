@@ -1,0 +1,59 @@
+1148fb7b56bc Jay 2021-09-14
+
+AOS-732: arm64: dts: redwood_8mq: setup LM3697 device tree
+
+According schematic to add backlight LM3697 configuration for
+redwood display.
+
+Update pin as below
+MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10 //LCD_BLEN
+
+This pin also control K81 battery backup.
+
+Change-Id: I590db82fa87ce60f4bbed0c3844408dff1826f6c
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 7667daa94e0c..c5cc4252b885 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -644,6 +644,24 @@ shcl20_mipi_ep: endpoint {
+ 			};
+ 		};
+ 	};
++
++	led-controller@36 {
++		compatible = "ti,lm3697";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x36>;
++		enable-gpios = <&gpio3 10 GPIO_ACTIVE_HIGH>;
++
++		lcd_bl: led@0 {
++			reg = <0>;
++			led-sources = <0 1 2>;
++			ti,brightness-resolution = <255>;
++			ramp-up-us = <500>;
++			ramp-down-us = <1000>;
++			label = "white:backlight";
++			linux,default-trigger = "backlight";
++		};
++	};
+ };
+ 
+ &i2c3 {
+@@ -877,6 +895,7 @@ MX8MQ_IOMUXC_SAI3_RXFS_GPIO4_IO28			0x19  //LTE_RI
+ 			MX8MQ_IOMUXC_SAI3_RXC_GPIO4_IO29			0x19  //HUB_RESET
+ 			MX8MQ_IOMUXC_SAI3_TXC_GPIO5_IO0				0x19  //LTE_STATUSn
+ 			MX8MQ_IOMUXC_SPDIF_EXT_CLK_GPIO5_IO5			0x16  //GNSS_ELNA_CTRL
++			MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10			0x19  //LCD_BLEN, also control K81 battery backup
+ 		>;
+ 	};
+ 
+@@ -1287,7 +1306,6 @@ panel_in: endpoint {
+ 		};
+ 	};
+ 
+-
+ 	ports {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;

@@ -1,0 +1,52 @@
+e8a285c591b5 Arthur Chen 2019-11-27
+
+AOS-12: Add DT for RAM 1GB working setting.
+
+    reduce the size of continuous memory allocation to avoid overflowing.
+
+Change-Id: I1a0a5962719b28affec40daa934193bb7d9a0d12
+
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index d93025c6c9c4..872dec13a6e9 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -127,7 +127,8 @@ dtb-$(CONFIG_ARCH_FSL_IMX8MQ) += fsl-imx8mq-ddr3l-arm2.dtb \
+ 				 idt_imx8mq_evt-0_evk_evk-0.dtb \
+ 				 idt_imx8mq_evt-0_evk_idtechspi-0.dtb \
+ 				 idt_imx8mq_evt-0_evk_mipi-0.dtb \
+-				 idt_imx8mq_evt-0_evk_mipipanel-0.dtb
++				 idt_imx8mq_evt-0_evk_mipipanel-0.dtb \
++				 idt_imx8mq_evt-0_evk_ram1gb-0.dtb
+ dtb-$(CONFIG_ARCH_FSL_IMX8MM) += fsl-imx8mm-evk.dtb \
+ 				 fsl-imx8mm-evk-drm.dtb \
+ 				 fsl-imx8mm-evk-ak4497.dtb \
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_ram1gb-0.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_ram1gb-0.dts
+new file mode 100644
+index 000000000000..c1724e1fe7fa
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_ram1gb-0.dts
+@@ -0,0 +1,24 @@
++/*
++ * Dummy device-tree based om EVK with IDTech ID's
++ *
++ * Copyright 2019 IDTech
++ *
++ */
++
++/dts-v1/;
++
++#include "fsl-imx8mq-evk-idtech-spi.dts"
++
++/ {
++	idt,prod-id = "idt_imx8mq_evt-0_evk_ram1gb-0";
++};
++
++&resmem {
++	linux,cma {
++		compatible = "shared-dma-pool";
++		reusable;
++		size = <0 0x1e000000>;
++		alloc-ranges = <0 0x40000000 0 0x40000000>;
++		linux,cma-default;
++	};
++};

@@ -1,0 +1,43 @@
+d1ec8c0f AndrewS 2020-09-10
+
+AOS-303: set sepolicy for idtech_prop
+
+platform_app: for AMS/deviceadmin to access idtech_prop properties
+system_app: for settings app to access idtech_prop properties
+system_server: for binder service to access idtech_prop properties, if permission not set, we will see avc denied message from console
+
+Change-Id: Idc7d6afb625442ac36a342dd4e0bcc2c45dbc7c8
+
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index 776a3c06..12260cf1 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -5,6 +5,7 @@ allow platform_app idtech_data_file:dir { create_dir_perms rw_dir_perms };
+ allow platform_app idtech_data_file:file { create_file_perms rw_file_perms };
+ allow platform_app idtech_data_file:dir { add_name write };
+ allow platform_app ptr_device:chr_file rw_file_perms;
++allow platform_app idtech_prop:property_service  { set };
+ 
+ get_prop(platform_app, vendor_default_prop)
+ set_prop(platform_app, public_vendor_default_prop)
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index 95636c85..9460ed66 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -18,3 +18,4 @@ allow system_app fs_bpf:dir { search };
+ 
+ set_prop(system_app, vendor_bluetooth_prop)
+ get_prop(system_app, vendor_default_prop)
++set_prop(system_app, idtech_prop)
+diff --git a/imx8m/sepolicy/system_server.te b/imx8m/sepolicy/system_server.te
+index b887a427..841f2166 100644
+--- a/imx8m/sepolicy/system_server.te
++++ b/imx8m/sepolicy/system_server.te
+@@ -1,6 +1,7 @@
+ typeattribute system_server system_writes_vendor_properties_violators;
+ 
+ get_prop(system_server, vendor_default_prop)
++get_prop(system_server, idtech_prop)
+ 
+ allow system_server unlabeled:dir {relabelfrom rw_dir_perms};
+ allow system_server unlabeled:sock_file {link unlink rw_file_perms};

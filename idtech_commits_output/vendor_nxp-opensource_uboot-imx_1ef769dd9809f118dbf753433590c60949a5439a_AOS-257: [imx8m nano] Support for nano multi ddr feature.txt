@@ -1,0 +1,147 @@
+1ef769dd98 max.yang 2020-07-21
+
+AOS-257: [imx8m nano] Support for nano multi ddr feature
+
+  1. support for loading training data from emmc
+  2. sram address differ from imx8mq, defined in common .h file
+  3. MMC boot device differ from
+  4. Adjust buffer location because init at .data too much will cause
+     training block, or fail and keep crashing
+  5. spl_mmc_find_device() repaced by inner mmc init function to avoid
+     boot crashing
+
+Change-Id: I16ec4b97c4df18800c5687b225b93f2ef942f163
+
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index e71b3755c4..895746373a 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -31,6 +31,7 @@
+ #include <env.h>
+ #include <env_internal.h>
+ #include <efi_loader.h>
++#include <idt_ddr_select.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -203,6 +204,13 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ 		return -EINVAL;
+ 
+ 	*size = PHYS_SDRAM_SIZE;
++
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	unsigned int mem_size = PHYS_SDRAM_SIZE;
++	memcpy((void *)&mem_size, (void *)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
++	printf("idt set to ");
++	*size = mem_size * 1024;
++#endif
+ 	return 0;
+ }
+ 
+diff --git a/board/freescale/imx8mn_evk/spl.c b/board/freescale/imx8mn_evk/spl.c
+index c31a680baf..4c5750d07b 100644
+--- a/board/freescale/imx8mn_evk/spl.c
++++ b/board/freescale/imx8mn_evk/spl.c
+@@ -295,7 +295,11 @@ void board_init_f(ulong dummy)
+ 	power_init_board();
+ 
+ 	/* DDR initialization */
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	idt_spl_dram_init();
++#else
+ 	spl_dram_init();
++#endif
+ 
+ 	board_init_r(NULL, 0);
+ }
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index cd4ae222a4..af1a55cfb3 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -28,24 +28,30 @@
+ 
+ extern int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device);
+ 
+-char buf_ddrc_cfg[IDT_BLOCK_SIZE * 2]            __attribute__((section(".data")));
+-char buf_ddrphy_cfg[IDT_BLOCK_SIZE * 4]          __attribute__((section(".data")));
+-char buf_ddrphy_trained_csr[IDT_BLOCK_SIZE * 12] __attribute__((section(".data")));
+-char buf_ddrphy_pie[IDT_BLOCK_SIZE * 10]         __attribute__((section(".data")));
+-
+-char buf_fsp_msg0[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg1[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg2[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
+-char buf_fsp_msg3[IDT_BLOCK_SIZE*2] __attribute__((section(".data")));
+-
++char buf_ddrc_cfg[IDT_BLOCK_SIZE * 2]             = "0";
++char buf_ddrphy_cfg[IDT_BLOCK_SIZE * 4]           = "0";
++char buf_ddrphy_trained_csr[IDT_BLOCK_SIZE * 12]  = "0";
++char buf_ddrphy_pie[IDT_BLOCK_SIZE * 10] = "0";
++char buf_fsp_msg0[IDT_BLOCK_SIZE*2] = "0";
++char buf_fsp_msg1[IDT_BLOCK_SIZE*2] = "0";
++char buf_fsp_msg2[IDT_BLOCK_SIZE*2] = "0";
++char buf_fsp_msg3[IDT_BLOCK_SIZE*2] = "0";
++
++void mmc_list_init(void);
++void mmc_do_preinit(void);
++int mmc_probe(bd_t *bis);
+ struct blk_desc* init_mmc_blk(void)
+ {
+ 	int err = 0;
+ 	struct mmc *mmc = NULL;
+ 
+-	err = spl_mmc_find_device(&mmc, 1);
++	mmc_list_init();
++	err = mmc_probe(NULL);
+ 	if (err)
+-		printf("IDT: fail to find mmc device
+");
++		printf("IDT: fail to mmc probe
+");
++	mmc_do_preinit();
++	mmc = find_mmc_device(MMC_BOOTDEV);
++
+ 	err = mmc_init(mmc);
+ 	if (err)
+ 		printf("IDT: fail to init mmc
+");
+@@ -216,5 +222,5 @@ void idt_spl_dram_init(void)
+ 	ddr_init(&t_data);
+ 
+ 	// pass mem size to uboot
+-	memcpy((void*)DEV_MEM_SIZE_BASE, (void*)ddr_size, sizeof(unsigned int));
++	memcpy((void *)DEV_MEM_SIZE_BASE, (void *)ddr_size, sizeof(unsigned int));
+ }
+diff --git a/drivers/mmc/mmc.c b/drivers/mmc/mmc.c
+index 3e36566693..927daf2663 100644
+--- a/drivers/mmc/mmc.c
++++ b/drivers/mmc/mmc.c
+@@ -2992,7 +2992,7 @@ static int mmc_probe(bd_t *bis)
+ 	return 0;
+ }
+ #else
+-static int mmc_probe(bd_t *bis)
++int mmc_probe(bd_t *bis)
+ {
+ 	if (board_mmc_init(bis) < 0)
+ 		cpu_mmc_init(bis);
+diff --git a/include/idt_ddr_select.h b/include/idt_ddr_select.h
+index 1ca3044cdd..bbb2acc434 100644
+--- a/include/idt_ddr_select.h
++++ b/include/idt_ddr_select.h
+@@ -9,9 +9,16 @@
+ 
+ #define _DEBUG_IDT_DDR 0
+ 
++#if defined(CONFIG_IMX8MN)
++// SRAM: 0x00900000 ~ 0x0093FFFF, 0x00940000 ~ 0x00977FFF
++#define DEV_MEM_SIZE_BASE 0x93ff00  // pass mem size to uboot at tail of sram
++#define MMC_BOOTDEV 1
++#elif defined(CONFIG_IMX8MQ)
+ // SRAM: 0x007E0000 ~ 0x0081FFFF
+ #define DEV_MEM_SIZE_BASE 0x81ff00  // pass mem size to uboot at tail of sram
+ #define UUU_MEM_OBJ_ADDR  0x81a000  // an enough space on sram for uuu loading mem object
++#define MMC_BOOTDEV 0
++#endif
+ 
+ #define IDT_BLOCK_SIZE  512
+ #define BDINFO_BLOCK_BASE 16384   // board_info start from emmc: 8M

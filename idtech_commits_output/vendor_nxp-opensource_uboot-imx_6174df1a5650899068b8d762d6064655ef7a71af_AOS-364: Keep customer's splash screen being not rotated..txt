@@ -1,0 +1,100 @@
+6174df1a56 Arthur Chen 2020-10-27
+
+AOS-364: Keep customer's splash screen being not rotated.
+
+    - sync with AMS-145 mechanism.
+    - for customer, we use AMS to edit customer's splash screen image.
+    So we don't need to handle extra orientation adjustment.
+
+Change-Id: Id79efebe5d0e3de34c7f0fee40ae999c4bb38792
+
+diff --git a/common/splash.c b/common/splash.c
+index 8241c839f1..2f35a9bacc 100644
+--- a/common/splash.c
++++ b/common/splash.c
+@@ -131,8 +131,16 @@ __weak int splash_screen_prepare(void)
+ 	}
+ 
+ #ifdef CONFIG_IDT_SPLASH_SUPPORT
++#ifdef CONFIG_IDT_ROTATION
++	if (!ret)
++		ret = SPLASH_CUSTOMER_SOURCE;
++	else
++		ret = splash_video_logo_load();
++#else /* !CONFIG_IDT_ROTATION */
+ 	if (ret)
+ 		ret = splash_video_logo_load();
++#endif /* CONFIG_IDT_ROTATION */
++
+ 	return ret;
+ #else
+ 	return splash_video_logo_load();
+@@ -208,7 +216,7 @@ int splash_display(void)
+ 	char *s;
+ 	int x = 0, y = 0, ret;
+ #ifdef CONFIG_IDT_ROTATION
+-	bool rotate = false;
++	int rotate = 0;
+ 	char *binfo_rotate;
+ 	struct udevice *dev;
+ 	int degree = 0;
+@@ -220,6 +228,12 @@ int splash_display(void)
+ 
+ 	addr = simple_strtoul(s, NULL, 16);
+ 	ret = splash_screen_prepare();
++#ifdef CONFIG_IDT_ROTATION
++	if (ret == SPLASH_CUSTOMER_SOURCE) {
++		rotate = SPLASH_CUSTOMER_SOURCE;
++		ret = 0;
++	}
++#endif /* CONFIG_IDT_ROTATION */
+ 	if (ret)
+ 		return ret;
+ 
+@@ -227,26 +241,26 @@ int splash_display(void)
+ 
+ #ifdef CONFIG_IDT_ROTATION
+ 	ret = uclass_first_device_err(UCLASS_VIDEO, &dev);
+-	if (!ret) {
++	if ((!ret) && (rotate != SPLASH_CUSTOMER_SOURCE)) {
+ 		binfo_rotate = get_disp_rotation();
+ 		if (binfo_rotate != NULL) {
+ 			degree = (int)simple_strtol(binfo_rotate, NULL, 10);
+-			rotate = true;
++			rotate = SPLASH_ROTATED;
+ 			free(binfo_rotate);
+ 		}
+ 		idt_image_clear(dev);
+ 	} else {
+ 		printf("splash screen rotation is not support
+");
+ 	}
++#endif /* CONFIG_IDT_ROTATION */
+ 	ret = bmp_display(addr, x, y);
+ 
+-	if (rotate)
++#ifdef CONFIG_IDT_ROTATION
++	if (rotate > SPLASH_CUSTOMER_SOURCE)
+ 		idt_image_rotate(dev, degree);
+ 	else
+ 		idt_image_sync(dev);
+ 
+-#else /* !CONFIG_IDT_ROTATION */
+-	ret = bmp_display(addr, x, y);
+ #endif /* CONFIG_IDT_ROTATION */
+ 	/* Skip banner output on video console if the logo is not at 0,0 */
+ 	if (x || y)
+diff --git a/include/image_idt.h b/include/image_idt.h
+index 0be9886f71..b1ac9df3c3 100644
+--- a/include/image_idt.h
++++ b/include/image_idt.h
+@@ -14,6 +14,9 @@
+ /* for dynamic centered the layout position */
+ #define IDT_WARNING_OFFSET_X			0xA0
+ #define IDT_WARNING_OFFSET_Y			0xF0
++/* for distinguishing splash screen image source */
++#define SPLASH_CUSTOMER_SOURCE		1
++#define SPLASH_ROTATED			2
+ 
+ #ifndef __IMAGE_IDT_H__
+ #define __IMAGE_IDT_H__

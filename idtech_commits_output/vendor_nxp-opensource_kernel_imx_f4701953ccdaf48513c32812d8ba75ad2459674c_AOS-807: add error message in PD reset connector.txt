@@ -1,0 +1,58 @@
+f4701953ccda AndrewS 2022-03-24
+
+AOS-807: add error message in PD reset connector
+
+Change-Id: If3c43aa52bf005bc17dc05f9680e93909b8c9a68
+
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 40e163383bf2..4836c58f426b 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -456,14 +456,18 @@ static int tps65994_reset_connector(struct tps65994 *tps)
+ 	mutex_lock(&tps->lock);
+ 
+ 	ret = tps65994_i2c_read(client, TPS_REG_BOOT_STATUS, boot_status, NULL);
+-	if (ret)
++	if (ret) {
++		dev_err(&client->dev, "failed to read BOOT_STATUS, ret=%d
+", ret);
+ 		goto out_unlock;
++	}
+ 
+ 	/* clear dead battery flag */
+ 	if (boot_status[0] & 0x04) {
+ 		ret = tps65994_exec_cmd(tps, cmd_dbfg, 0, NULL, 0, NULL);
+-		if (ret)
++		if (ret) {
++			dev_err(&client->dev, "failed to send cmd_dbfg, ret=%d
+", ret);
+ 			goto out_unlock;
++		}
+ 
+ 		usleep_range(10000, 11000);
+ 	}
+@@ -474,8 +478,10 @@ static int tps65994_reset_connector(struct tps65994 *tps)
+ 	/* will be cut off during reset */
+ 	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_DATA_STATUS,
+ 				data_status, NULL);
+-	if (ret)
+-		return ret;
++	if (ret) {
++		dev_err(&client->dev, "failed to read DATA_STATUS, ret=%d
+", ret);
++		goto out_unlock;
++	}
+ 
+ 	if ((data_status[0] & 0x1) && (data_status[1] & 0x1)) {
+ 		memset(in_data, 0, sizeof(in_data));
+@@ -484,7 +490,7 @@ static int tps65994_reset_connector(struct tps65994 *tps)
+ 		in_data[2] = (tps->main_port) ? 0x1 : 0x2;
+ 		ret = tps65994_exec_cmd(tps, cmd_ucsi, 8, in_data, 1, out_data);
+ 		if (ret || (out_data[0] != 0)) {
+-			pr_info("failed to send cmd_ucsi, ret=%d, out_data[0]=%d
+",
++			dev_err(&client->dev, "failed to send cmd_ucsi, ret=%d, out_data[0]=%d
+",
+ 					ret, out_data[0]);
+ 			goto out_unlock;
+ 		}

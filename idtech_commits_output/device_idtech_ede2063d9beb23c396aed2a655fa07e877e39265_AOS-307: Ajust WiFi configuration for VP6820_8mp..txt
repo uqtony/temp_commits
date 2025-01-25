@@ -1,0 +1,72 @@
+ede2063d Arthur Chen 2020-08-17
+
+AOS-307: Ajust WiFi configuration for VP6820_8mp.
+
+Change-Id: Ic6594a744c859377a6d53ab03a90e398f6bf6ea9
+
+diff --git a/imx8m/vp6820_8mp/BoardConfig.mk b/imx8m/vp6820_8mp/BoardConfig.mk
+index 0577a0a6..d2c8b61a 100644
+--- a/imx8m/vp6820_8mp/BoardConfig.mk
++++ b/imx8m/vp6820_8mp/BoardConfig.mk
+@@ -80,8 +80,10 @@ BOARD_WPA_SUPPLICANT_PRIVATE_LIB        := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+ 
+ WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
+ 
+-# NXP 8997 BT
+-BOARD_HAVE_BLUETOOTH_NXP := true
++# NXP 8997 WiFi driver module install
++BOARD_VENDOR_KERNEL_MODULES += \
++    $(KERNEL_OUT)/drivers/net/wireless/marvell/mrvl8997/wlan_src/mlan.ko \
++    $(KERNEL_OUT)/drivers/net/wireless/marvell/mrvl8997/wlan_src/pcie8xxx.ko
+ 
+ # NXP 8997 BT
+ BOARD_HAVE_BLUETOOTH_NXP := true
+diff --git a/imx8m/vp6820_8mp/android_addition_defconfig b/imx8m/vp6820_8mp/android_addition_defconfig
+index ae692849..db90d9fd 100644
+--- a/imx8m/vp6820_8mp/android_addition_defconfig
++++ b/imx8m/vp6820_8mp/android_addition_defconfig
+@@ -46,6 +46,9 @@ CONFIG_CLK_SP810=y
+ CONFIG_USB_SNP_UDC_PLAT=y
+ CONFIG_USB_BDC_UDC=y
+ CONFIG_BCM_SBA_RAID=m
++CONFIG_WLAN_VENDOR_NXP=y
++CONFIG_MWL8K=y
++CONFIG_WLAN_VENDOR_MARVELL=m
+ 
+ # CONFIG_KVM is not set
+ # CONFIG_MTD_UBI is not set
+diff --git a/imx8m/vp6820_8mp/init.imx8mp.rc b/imx8m/vp6820_8mp/init.imx8mp.rc
+index 9c1e9eec..0635cecb 100755
+--- a/imx8m/vp6820_8mp/init.imx8mp.rc
++++ b/imx8m/vp6820_8mp/init.imx8mp.rc
+@@ -17,6 +17,11 @@ on early-boot
+     chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+ 
++    # Prepare for WiFi
++    setprop wifi.interface wlan0
++    setprop wifi.direct.interface p2p0
++    setprop wifi.concurrent.interface p2p0
++
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp.mk b/imx8m/vp6820_8mp/vp6820_8mp.mk
+index c611b6e9..3759badc 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp.mk
+@@ -262,11 +262,10 @@ PRODUCT_PACKAGES += \
+     wifilogd \
+     wificond
+ 
+-# nxp 8997 Firmware
++# NXP 8997 combo Firmware for WiFi
+ PRODUCT_COPY_FILES += \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcie8997_wlan_v4.bin:vendor/firmware/mrvl/pcie8997_wlan_v4.bin \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/mrvl/pcieuart8997_combo_v4.bin \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8997/uart8997_bt_v4.bin:vendor/firmware/mrvl/uart8997_bt_v4.bin \
++    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcie8997_wlan_v4.bin:vendor/firmware/pcie8997_wlan_v4.bin \
++    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/pcieuart8997_combo_v4.bin
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \

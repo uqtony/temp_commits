@@ -1,0 +1,118 @@
+a09e7608a859 Jay 2021-07-21
+
+AOS-682: redwood: Add camera configuration
+
+According schematic to add configuration for camera
+GC02M2 and SHCL20.
+
+Change-Id: Ifa934be2e66133ddf486dc6601f54b54d784a56c
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index bbd4f2b31da5..86c57b90eb34 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -405,7 +405,7 @@ &mipi_csi_1 {
+ 	status = "okay";
+ 	port {
+ 		mipi1_sensor_ep: endpoint@0 {
+-			remote-endpoint = <&ov5640_mipi1_ep>;
++			remote-endpoint = <&gc02m2_mipi_ep>;
+ 			data-lanes = <1 2>;
+ 			bus-type = <4>;
+ 		};
+@@ -422,7 +422,7 @@ &mipi_csi_2 {
+ 	status = "okay";
+ 	port {
+ 		mipi2_sensor_ep: endpoint@0 {
+-			remote-endpoint = <&ov2685_mipi2_ep>;
++			remote-endpoint = <&shcl20_mipi_ep>;
+ 			data-lanes = <1 2>;
+ 			bus-type = <4>;
+ 		};
+@@ -598,47 +598,46 @@ &i2c2 {
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	ov2685_mipi: ov2685_mipi@10 {
+-		compatible = "ovti,ov2685_mipi";
+-		reg = <0x10>;
++	gc02m2_mipi: gc02m2_mipi@6e {
++		//compatible = // wait for driver
++		reg = <0x6e>;
+ 		status = "okay";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi_clk>;
++		pinctrl-0 = <&pinctrl_csi1_pwn>, <&pinctrl_csi1_rst>, <&pinctrl_csi_clk>;
+ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		clock-names = "csi_mclk";
+ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
+ 		assigned-clock-rates = <20000000>;
+-		csi_id = <1>;
+-		pwn-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
++		csi_id = <0>;
++		pwn-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
++		rst-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
+ 		mclk = <20000000>;
+ 		mclk_source = <0>;
+ 		port {
+-			ov2685_mipi2_ep: endpoint {
+-				remote-endpoint = <&mipi2_sensor_ep>;
++			gc02m2_mipi_ep: endpoint {
++				remote-endpoint = <&mipi1_sensor_ep>;
+ 			};
+ 		};
+ 	};
+ 
+-	ov5640_mipi: ov5640_mipi@3c {
+-		compatible = "ovti,ov5640_mipi";
+-		reg = <0x3c>;
+-		status = "okay";
++	shcl20_mipi: shcl20_mipi@10 {
++		//compatible = // wait for driver
++		reg = <0x10>;
++		status ="okay";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_csi1_pwn>, <&pinctrl_csi_rst>;
++		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi2_rst>;
+ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		clock-names = "csi_mclk";
+ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
+ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
+ 		assigned-clock-rates = <20000000>;
+-		csi_id = <0>;
+-		pwn-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+-		rst-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+-		mclk = <20000000>;
+-		mclk_source = <0>;
++		csi_id = <1>;
++		pwn-gpios = <&gpio1 5 GPIO_ACTIVE_HIGH>;
++		rst-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
+ 		port {
+-			ov5640_mipi1_ep: endpoint {
+-				remote-endpoint = <&mipi1_sensor_ep>;
++			shcl20_mipi_ep: endpoint {
++				remote-endpoint = <&mipi2_sensor_ep>;
+ 			};
+ 		};
+ 	};
+@@ -917,12 +916,18 @@ MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5			0x19
+ 		>;
+ 	};
+ 
+-	pinctrl_csi_rst: csi_rst_grp {
++	pinctrl_csi1_rst: csi1_rst_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6			0x19
+ 		>;
+ 	};
+ 
++	pinctrl_csi2_rst: csi2_rst_grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD1_RESET_B_GPIO2_IO10			0x19
++		>;
++	};
++
+ 	pinctrl_csi_clk: csi_clk_grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59

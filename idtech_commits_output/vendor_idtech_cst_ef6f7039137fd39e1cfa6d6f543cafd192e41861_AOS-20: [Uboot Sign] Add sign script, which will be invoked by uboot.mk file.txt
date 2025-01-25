@@ -1,0 +1,139 @@
+ef6f703 max.yang 2019-11-14
+
+AOS-20: [Uboot Sign] Add sign script, which will be invoked by uboot.mk file
+
+Change-Id: I3b5abccfeb691f7ea5068d9788f9388829238c90
+
+diff --git a/sign_uboot.py b/sign_uboot.py
+new file mode 100755
+index 0000000..8f68762
+--- /dev/null
++++ b/sign_uboot.py
+@@ -0,0 +1,123 @@
++#!/usr/bin/env python
++
++"""
++Build signed_uboot.imx from given UBOOT_OBJ_DIR PRODUCT_OUT_DIR CST_DIR,
++and write output into PRODUCT_OUT_DIR
++
++Usage: sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH)
++
++$(UBOOT_OUT): location of uboot obj, will generate temprary files inside
++$(PRODUCT_OUT): location of u-boot.imx, output will be written to same dir
++$(CST_PATH): location of NXP code sign tool
++"""
++
++import os
++import sys
++import subprocess
++
++sig_info = {}
++hab_info = []
++image = "u-boot.imx"
++image_out = "signed_uboot.imx"
++
++def GetImageSigInfo(filename):
++  f = open(filename)
++  for line in f:
++    if line and (line.lstrip().startswith("csf_off")
++            or line.lstrip().startswith("spl hab block:")
++            or line.lstrip().startswith("sld_csf_off")
++            or line.lstrip().startswith("sld hab block:")):
++      k, v = line.lstrip().split("	", 1)
++      sig_info[k.rstrip()] = v.strip('	').strip('
+')
++  print sig_info
++  f.close()
++
++def GetImageHabInfo(filename):
++  f = open(filename)
++  for line in f:
++    if line and line.startswith("0x"):
++      hab_info.append(line.strip('
+'))
++
++  print(hab_info)
++  f.close()
++
++def UpdateCsfSpl(filename):
++  f = open(filename, "a")
++  f.write("    Blocks = " + sig_info["spl hab block:"] + " \"flash.bin\"")
++  f.close()
++
++def UpdateCsfFit(filename):
++  f = open(filename, "a")
++  f.write("    Blocks = " + sig_info["sld hab block:"] + " \"flash.bin\", " + "\
+")
++  for item in hab_info[0:-1]:
++    f.write("             " + item + " \"flash.bin\", \
+")
++  f.write("             " + hab_info[-1] + " \"flash.bin\"")
++  f.close
++
++def GenerateCsfBin(dirpath, tool_path):
++  cmd = ["./release/linux64/bin/cst",
++            "-i", os.path.join(dirpath, "csf_spl.txt"),
++            "-o", os.path.join(dirpath, "csf_spl.bin")]
++  print(cmd)
++  p = subprocess.Popen(cmd, cwd=tool_path)
++  p.wait()
++
++  cmd = ["./release/linux64/bin/cst",
++            "-i", os.path.join(dirpath, "csf_fit.txt"),
++            "-o", os.path.join(dirpath, "csf_fit.bin")]
++  print(cmd)
++  p = subprocess.Popen(cmd, cwd=tool_path)
++  p.wait()
++
++def WriteSignedImage(uboot_obj_dir, product_out_dir, tool_path):
++  cmd = ["cp", os.path.join(product_out_dir, image), os.path.join(product_out_dir, image_out)]
++  print(cmd)
++  p = subprocess.Popen(cmd)
++
++  cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_spl.bin"),
++               "of="+ os.path.join(product_out_dir, image_out),
++               "seek="+str(int(sig_info["csf_off"], 0)),
++               "bs=1", "conv=notrunc"]
++  print(cmd)
++  p = subprocess.Popen(cmd)
++  p.wait()
++
++  cmd = ["dd", "if="+ os.path.join(uboot_obj_dir, "csf_fit.bin"),
++               "of="+ os.path.join(product_out_dir, image_out),
++               "seek="+str(int(sig_info["sld_csf_off"], 0)),
++               "bs=1", "conv=notrunc"]
++  print(cmd)
++  p = subprocess.Popen(cmd)
++  p.wait()
++
++
++def main(argv):
++  if len(argv) != 3:
++    print(__doc__)
++    sys.exit(1)
++
++  path_uboot_obj   = os.path.abspath(argv[0])
++  path_product_out = os.path.abspath(argv[1])
++  path_cst_tool    = os.path.abspath(argv[2])
++
++  sig_info_file = os.path.join(path_uboot_obj, "sig_info.txt")
++  hab_info_file = os.path.join(path_uboot_obj, "hab_info.txt")
++  csf_spl_txt   = os.path.join(path_uboot_obj, "csf_spl.txt")
++  csf_fit_txt   = os.path.join(path_uboot_obj, "csf_fit.txt")
++
++  # Get/parse information from log
++  GetImageSigInfo(sig_info_file)
++  GetImageHabInfo(hab_info_file)
++
++  # Update inputs file of cst tool, fill up start_addr/sign_addr/size
++  UpdateCsfSpl(csf_spl_txt)
++  UpdateCsfFit(csf_fit_txt)
++
++  # Invoke NXP's cst tool to generate signatures
++  GenerateCsfBin(path_uboot_obj, path_cst_tool)
++
++  # Write signatures into signed uboot image
++  WriteSignedImage(path_uboot_obj, path_product_out, path_cst_tool)
++
++if __name__ == '__main__':
++  main(sys.argv[1:])

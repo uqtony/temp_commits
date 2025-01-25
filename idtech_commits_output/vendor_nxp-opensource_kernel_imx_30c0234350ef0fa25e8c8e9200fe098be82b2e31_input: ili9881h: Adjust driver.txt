@@ -1,0 +1,204 @@
+30c0234350ef Sergii Postulga 2020-02-27
+
+input: ili9881h: Adjust driver
+
+A lot of small changes to make touch functional
+
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+Change-Id: I6f9c81385bfd82f5b624fb688bf7b2c32fbeaec7
+
+diff --git a/drivers/input/touchscreen/ili/ilitek.h b/drivers/input/touchscreen/ili/ilitek.h
+index f1d7f489f915..cd1199fe0439 100644
+--- a/drivers/input/touchscreen/ili/ilitek.h
++++ b/drivers/input/touchscreen/ili/ilitek.h
+@@ -137,12 +137,12 @@
+ #define CSV_LCM_OFF_PATH		"/userdata/ilitek_mp_lcm_off_log"
+ #define INI_NAME_PATH			"/userdata/mp.ini"
+ //#define UPDATE_FW_FILP_PATH		"/sdcard/ILITEK_FW"
+-//#define UPDATE_FW_FILP_PATH			"/vendor/usr/tp/ili/FW_TDDI_TRUNK_FB.ili"
+-#define UPDATE_FW_FILP_PATH			"/vendor/usr/tp/ili/TM050JYHS11_TM_500_20190614.hex"
++#define UPDATE_FW_FILP_PATH			"/vendor/usr/tp/ili/FW_TDDI_TRUNK_FB.ili"
++// #define UPDATE_FW_FILP_PATH			"/vendor/usr/tp/ili/TM050JYHS11_TM_500_20190614.hex"
+ 
+ //#define UPDATE_FW_REQUEST_PATH		"ILITEK_FW"
+-#define UPDATE_FW_REQUEST_PATH		"/vendor/usr/tp/ili/TM050JYHS11_TM_500_20190614.hex"
+-//#define UPDATE_FW_REQUEST_PATH		"/vendor/usr/tp/ili/FW_TDDI_TRUNK_FB.ili"
++// #define UPDATE_FW_REQUEST_PATH		"/vendor/usr/tp/ili/TM050JYHS11_TM_500_20190614.hex"
++#define UPDATE_FW_REQUEST_PATH		"/vendor/usr/tp/ili/FW_TDDI_TRUNK_FB.ili"
+ #define POWER_STATUS_PATH		"/sys/class/power_supply/battery/status"
+ #define DUMP_FLASH_PATH			"/userdata/flash_dump"
+ #define DUMP_IRAM_PATH			"/userdata/iram_dump"
+@@ -150,8 +150,7 @@
+ /* Debug messages */
+ #define DEBUG_NONE	0
+ #define DEBUG_ALL	1
+-// #define DEBUG_OUTPUT	DEBUG_NONE
+-#define DEBUG_OUTPUT	DEBUG_ALL
++#define DEBUG_OUTPUT	DEBUG_NONE
+ 
+ #define ipio_info(fmt, arg...)						\
+ ({									\
+@@ -273,10 +272,10 @@ enum TP_DATA_FORMAT {
+ #define TOUCH_SCREEN_X_MIN			0
+ #define TOUCH_SCREEN_Y_MIN			0
+ #define TOUCH_SCREEN_X_MAX			720
+-#define TOUCH_SCREEN_Y_MAX			1440
+-//#define TOUCH_SCREEN_Y_MAX			1280
+-#define MAX_TOUCH_NUM				10
+-//#define MAX_TOUCH_NUM				2
++//#define TOUCH_SCREEN_Y_MAX			1440
++#define TOUCH_SCREEN_Y_MAX			1280
++//#define MAX_TOUCH_NUM				10
++#define MAX_TOUCH_NUM				2
+ 
+ /* define the range on panel */
+ #define TPD_HEIGHT				2048
+diff --git a/drivers/input/touchscreen/ili/ilitek_fw.c b/drivers/input/touchscreen/ili/ilitek_fw.c
+index d13f4d55a648..6f2fca85e73d 100644
+--- a/drivers/input/touchscreen/ili/ilitek_fw.c
++++ b/drivers/input/touchscreen/ili/ilitek_fw.c
+@@ -1492,8 +1492,8 @@ int ilitek_tddi_fw_upgrade(int upgrade_type, int file_type, int open_file_method
+ 
+ 	do {
+ 		if (upgrade_type == UPGRADE_FLASH)
+-			//ret = ilitek_tddi_fw_flash_upgrade(pfw);
+-			ret = UPDATE_PASS;
++			ret = ilitek_tddi_fw_flash_upgrade(pfw);
++			//ret = UPDATE_PASS;
+ 		else
+ 			ret = ilitek_tddi_fw_iram_upgrade(pfw);
+ 
+diff --git a/drivers/input/touchscreen/ili/ilitek_i2c.c b/drivers/input/touchscreen/ili/ilitek_i2c.c
+index 8740f573caab..4c04aae7a442 100644
+--- a/drivers/input/touchscreen/ili/ilitek_i2c.c
++++ b/drivers/input/touchscreen/ili/ilitek_i2c.c
+@@ -259,8 +259,8 @@ static int ilitek_i2c_probe(struct i2c_client *i2c, const struct i2c_device_id *
+ 	idev->report = ENABLE;
+ 	idev->netlink = DISABLE;
+ 	idev->debug_node_open = DISABLE;
+-//	idev->irq_tirgger_type = IRQF_TRIGGER_FALLING;
+-	idev->irq_tirgger_type = IRQF_TRIGGER_RISING;
++	idev->irq_tirgger_type = IRQF_TRIGGER_FALLING;
++//	idev->irq_tirgger_type = IRQF_TRIGGER_RISING;
+ 
+ 	if (ENABLE_GESTURE)
+ 		idev->gesture = ENABLE;
+diff --git a/drivers/input/touchscreen/ili/ilitek_main.c b/drivers/input/touchscreen/ili/ilitek_main.c
+index 309f81404f99..74762c835a39 100644
+--- a/drivers/input/touchscreen/ili/ilitek_main.c
++++ b/drivers/input/touchscreen/ili/ilitek_main.c
+@@ -467,8 +467,8 @@ int ilitek_tddi_fw_upgrade_handler(void *data)
+ 	atomic_set(&idev->fw_stat, START);
+ 
+ 	idev->fw_update_stat = 0;
+-//	ret = ilitek_tddi_fw_upgrade(idev->fw_upgrade_mode, ILI_FILE, idev->fw_open);
+-	ret = ilitek_tddi_fw_upgrade(idev->fw_upgrade_mode, HEX_FILE, idev->fw_open);
++	ret = ilitek_tddi_fw_upgrade(idev->fw_upgrade_mode, ILI_FILE, idev->fw_open);
++//	ret = ilitek_tddi_fw_upgrade(idev->fw_upgrade_mode, HEX_FILE, idev->fw_open);
+ 	if (ret != 0)
+ 		idev->fw_update_stat = -1;
+ 	else
+@@ -784,11 +784,12 @@ int ilitek_tddi_init(void)
+ 
+ 	ilitek_tddi_fw_read_flash_info(idev->fw_upgrade_mode);
+ 
+-		ilitek_tddi_ic_get_protocl_ver();
+-		ilitek_tddi_ic_get_fw_ver();
+-		ilitek_tddi_ic_get_core_ver();
+-		ilitek_tddi_ic_get_tp_info();
+-		ilitek_tddi_ic_get_panel_info();
++//		ilitek_tddi_ic_get_protocl_ver();
++//		ilitek_tddi_ic_get_fw_ver();
++//		ilitek_tddi_ic_get_core_ver();
++//		ilitek_tddi_ic_get_tp_info();
++//		ilitek_tddi_ic_get_panel_info();
++
+ 
+ 	fw_boot_th = kthread_run(ilitek_tddi_fw_upgrade_handler, NULL, "ili_fw_boot");
+ 	if (fw_boot_th == (struct task_struct *)ERR_PTR) {
+@@ -813,7 +814,7 @@ void ilitek_tddi_dev_remove(void)
+ 
+ 	gpio_free(idev->tp_int);
+ 	// CS mark it as tp_rst now is controlled by panel driver
+-	//gpio_free(idev->tp_rst);
++	gpio_free(idev->tp_rst);
+ 
+ 	if (esd_wq != NULL) {
+ 		cancel_delayed_work_sync(&esd_work);
+diff --git a/drivers/input/touchscreen/ili/ilitek_plat_nxp.c b/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
+index 6d92d3961323..51fc5c963733 100644
+--- a/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
++++ b/drivers/input/touchscreen/ili/ilitek_plat_nxp.c
+@@ -34,16 +34,16 @@ void ilitek_plat_tp_reset(void)
+ {
+ 	ipio_info("ilitek_plat_tp_reset(), edge delay = %d
+", idev->rst_edge_delay);
+ 
+-	ipio_info("Do no gpio reset control for power on sequence!
+");
++//	ipio_info("Do no gpio reset control for power on sequence!
+");
+ 	/* Need accurate power sequence, do not change it to msleep */
+-//	gpio_direction_output(idev->tp_rst, 1);
+-//	mdelay(1);
+-//	mdelay(5);
+-//	gpio_set_value(idev->tp_rst, 0);
++	gpio_direction_output(idev->tp_rst, 1);
++	mdelay(1);
+ //	mdelay(5);
++	gpio_set_value(idev->tp_rst, 0);
++	mdelay(5);
+ //	mdelay(25);
+-//	gpio_set_value(idev->tp_rst, 1);
+-//	mdelay(idev->rst_edge_delay);
++	gpio_set_value(idev->tp_rst, 1);
++	mdelay(idev->rst_edge_delay);
+ }
+ 
+ void ilitek_plat_tp_reset2(void)
+@@ -228,7 +228,7 @@ static int ilitek_plat_gpio_register(void)
+ 	}
+ 
+ 	ipio_info("Skip TP_RESET registration as it's controlled by panel driver now!!");
+-/*
++
+ 	ret = gpio_request(idev->tp_rst, "TP_RESET");
+ 	if (ret < 0) {
+ 		ipio_err("Request RESET GPIO failed, ret = %d
+", ret);
+@@ -239,7 +239,7 @@ static int ilitek_plat_gpio_register(void)
+ 			goto out;
+ 		}
+ 	}
+-*/
++
+ 	ipio_info("ilitek_plat_gpio_register()]n");
+ 
+ out:
+@@ -503,7 +503,7 @@ static int ilitek_plat_probe(void)
+ 	ilitek_plat_irq_register(idev->irq_tirgger_type);
+ 	ilitek_plat_sleep_init();
+ 
+-	ipio_info("platform probe() touch init complete!
+");
++//	ipio_info("platform probe() touch init complete!
+");
+ 
+ //	ilt_panel_exitsleep_and_turnon(DRM_PanelS);
+ 	ipio_info("platform probe() end!
+");
+diff --git a/drivers/input/touchscreen/ili/ilitek_touch.c b/drivers/input/touchscreen/ili/ilitek_touch.c
+index dfb666fad348..476e7b3938dc 100644
+--- a/drivers/input/touchscreen/ili/ilitek_touch.c
++++ b/drivers/input/touchscreen/ili/ilitek_touch.c
+@@ -771,7 +771,7 @@ void ilitek_tddi_report_ap_mode(u8 *buf, int len)
+ 			idev->curt_touch[i] = 1;
+ 	}
+ 
+-	ipio_debug("figner number = %d, LastTouch = %d
+", idev->finger, idev->last_touch);
++	ipio_debug("finger number = %d, LastTouch = %d
+", idev->finger, idev->last_touch);
+ 
+ 	if (idev->finger) {
+ 		if (MT_B_TYPE) {

@@ -1,0 +1,41 @@
+c067179734 AndrewS 2021-12-21
+
+AOS-837: regular expression for input routing
+
+if current inputPort not found in input-port-associations.xml,
+get default touch location from property
+'persist.idt.default_touch_location', and see if default touch
+location can be found in inputPort, if yes using the display
+linked by default touch location.
+
+Change-Id: I5645484606f091e95fe357c87a7f8fb616862db0
+
+diff --git a/services/inputflinger/reader/InputDevice.cpp b/services/inputflinger/reader/InputDevice.cpp
+index 3347ba6ad7..cdb615d1fc 100644
+--- a/services/inputflinger/reader/InputDevice.cpp
++++ b/services/inputflinger/reader/InputDevice.cpp
+@@ -19,6 +19,7 @@
+ #include "InputDevice.h"
+ 
+ #include <algorithm>
++#include <cutils/properties.h>
+ 
+ #include "CursorInputMapper.h"
+ #include "ExternalStylusInputMapper.h"
+@@ -285,6 +286,16 @@ void InputDevice::configure(nsecs_t when, const InputReaderConfiguration* config
+                 const auto& displayPort = ports.find(inputPort);
+                 if (displayPort != ports.end()) {
+                     mAssociatedDisplayPort = std::make_optional(displayPort->second);
++                } else {
++                    char value[PROPERTY_VALUE_MAX];
++                    property_get("persist.idt.default_touch_location", value, "0");
++                    const std::string defaultTouchLocation = value;
++                    auto found = inputPort.find(defaultTouchLocation);
++                    if (found != std::string::npos) {
++                        const auto& defaultPort = ports.find(defaultTouchLocation);
++                        if (defaultPort != ports.end())
++                            mAssociatedDisplayPort = std::make_optional(defaultPort->second);
++                    }
+                 }
+             }
+ 

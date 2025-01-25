@@ -1,0 +1,36 @@
+97d071587425 owen.wen 2021-11-29
+
+AOS-743: idg_spi: change IRQ to rising edge
+
+1. change IRQ to rising edge(K81 requirement)
+2. CS default LOW(disabled)
+
+Change-Id: I071b203226db7c2582893624758f0041c0d0f46f
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 5abdfa7548af..78a76afb81b3 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -509,7 +509,7 @@ idg_spi@0 {
+ 		reg = <0>;
+ 		compatible = "idtech,idg-spi";
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
++		interrupts = <10 IRQ_TYPE_EDGE_RISING>;
+ 		spi-max-frequency = <4000000>; /* 4 MHz */
+ 		spi-bits-per-word = <8>; /* 8 bits */
+ 		spi-working-mode = <0>; /* SPI_MODE_0 */
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index f18f7f34263f..d4e42632a59c 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -1189,7 +1189,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	idg_dev->bits_per_word = spi->bits_per_word;
+ 	idg_spi_tty = spi;
+ 
+-	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_HIGH);
++	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_LOW);
+ 	if (!idg_dev->spi_cs) {
+ 		dev_err(&spi->dev, "chipselect is not exist
+");
+ 		err = -ENODATA;

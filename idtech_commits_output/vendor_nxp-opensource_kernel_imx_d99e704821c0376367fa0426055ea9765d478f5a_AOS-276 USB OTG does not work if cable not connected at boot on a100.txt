@@ -1,0 +1,89 @@
+d99e704821c0 AndrewS 2020-07-28
+
+AOS-276 USB OTG does not work if cable not connected at boot on a100
+
+Correct type c controller interrupt pin.
+Disable ChipIdea USB driver run time power management.
+remove pinctrl_hog_1 in device tree which was added mistakenly.
+
+Change-Id: I4fc65361ddc939e1b569696737d2a209c42bdc0a
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 69ea5091274e..88ae02875b86 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -453,6 +453,12 @@ MX8MN_IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI		0x19
+ 			>;
+ 		};
+ 
++		pinctrl_typec1: typec1grp {
++			fsl,pins = <
++				MX8MN_IOMUXC_SD1_STROBE_GPIO2_IO11        	0x159
++			>;
++		};
++
+ 		pinctrl_usdhc1_gpio: usdhc1grpgpio {
+ 			fsl,pins = <
+ 				MX8MN_IOMUXC_SD1_RESET_B_GPIO2_IO10	0x41
+@@ -921,8 +927,8 @@ vl53l1x: vl53l1x@29 {
+ 	typec_hd3ss3220: hd3ss3220@67 {
+ 		compatible = "ti,hd3ss3220";
+ 		reg = <0x67>;
+-		interrupt-parent = <&gpio3>;
+-		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
+ 	};
+ 
+ 	exp1: gpio@74 {
+@@ -1145,7 +1151,7 @@ &usbotg1 {
+ 	hnp-disable;
+ 	srp-disable;
+ 	adp-disable;
+-	usb-role-switch;
++	ci-disable-lpm;
+ 	extcon = <&typec_hd3ss3220>;
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi
+index 6681c092e926..6fe25b5217c1 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-1.dtsi
+@@ -21,21 +21,6 @@ vdd_1v8_main: fixedregulator-1v8 {
+ 	};
+ };
+ 
+-&pinctrl_hog_1 {
+-	fsl,pins = <
+-		MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
+-		MX8MN_IOMUXC_GPIO1_IO15_GPIO1_IO15		0x19  /* GPIO_05, DNI */
+-		MX8MN_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x151 /* LTE_VBAT_EN */
+-		MX8MN_IOMUXC_SAI5_RXD1_GPIO3_IO22		0x151 /* LTE_AP_READY */
+-		MX8MN_IOMUXC_SAI5_RXC_GPIO3_IO20		0x151 /* LTE_PWR_KEY */
+-		MX8MN_IOMUXC_SAI5_RXD2_GPIO3_IO23		0x19  /* LTE_RI */
+-		MX8MN_IOMUXC_SAI5_RXD0_GPIO3_IO21		0x19  /* LTE_RESET_N */
+-		MX8MN_IOMUXC_GPIO1_IO05_GPIO1_IO5		0x19  /* GPIO_03, VL53L1X_INT */
+-		MX8MN_IOMUXC_GPIO1_IO13_GPIO1_IO13		0x19  /* GPIO_06, LSM303_INT1 */
+-		MX8MN_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19  /* LTE_EXT_CODEC_EN, INT_MAG */
+-	>;
+-};
+-
+ &pinctrl_pca9539 {
+ 	fsl,pins = <
+ 		MX8MN_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x19  /* GPIO_01, nINT */
+@@ -56,15 +41,6 @@ &exp1 {
+ };
+ 
+ &usbotg1 {
+-/delete-property/ usb-role-switch;
+-	picophy,pre-emp-curr-control = <3>;
+-	picophy,dc-vol-level-adjust = <7>;
+-	dr_mode = "otg";
+-	hnp-disable;
+-	srp-disable;
+-	adp-disable;
+ 	usbmux-gpio = <&exp1 8 GPIO_ACTIVE_HIGH>;		/* usb mux pin */
+ 	usbdemux-gpio = <&exp1 9 GPIO_ACTIVE_HIGH>;		/* usb demux pin */
+-	extcon = <&typec_hd3ss3220>;
+-	status = "okay";
+ };

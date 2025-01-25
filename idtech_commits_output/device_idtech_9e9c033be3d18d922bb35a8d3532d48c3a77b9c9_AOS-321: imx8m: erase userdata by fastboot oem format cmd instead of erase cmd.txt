@@ -1,0 +1,45 @@
+9e9c033b George.Huang 2020-09-04
+
+AOS-321: imx8m: erase userdata by fastboot oem format cmd instead of erase cmd
+
+It will shrink erase time from 95 sec to 0.2 sec
+
+But for uuu, it's not proper to modify uuu or
+fastboot binary to support "fastboot format" command.
+So keep uuu script as usual for now.
+
+The alternative way for uuu is to generate userdata.img in build time:
+  https://gerrit.idtechproducts.com/c/android-imx/platform/system/core/+/4446
+
+Example command: (image_size=7228882944/4096=1764864)
+  /mnt/repos_8qm/out/soong/host/linux-x86/bin/mke2fs -t ext4 -b 4096
+  -E android_sparse,stride=2,stripe-width=128 -O uninit_bg userdata.img 1764864
+
+Change-Id: I549c931d40c03352e5d3bc0a61cfefb78cbb3f98
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 1311f543..dc410533 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -237,7 +237,7 @@ if %erase% == 1 (
+         %fastboot_tool% erase cache
+     )
+     %fastboot_tool% erase misc
+-    %fastboot_tool% erase userdata
++    %fastboot_tool% format userdata
+ )
+ if %lock% == 1 %fastboot_tool% oem lock
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index e7b1bdee..1d14510c 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -643,7 +643,7 @@ if [ ${erase} -eq 1 ]; then
+         ${fastboot_tool} erase cache
+     fi
+     ${fastboot_tool} erase misc
+-    ${fastboot_tool} erase userdata
++    ${fastboot_tool} format userdata
+ fi
+ 
+ if [ ${lock} -eq 1 ]; then

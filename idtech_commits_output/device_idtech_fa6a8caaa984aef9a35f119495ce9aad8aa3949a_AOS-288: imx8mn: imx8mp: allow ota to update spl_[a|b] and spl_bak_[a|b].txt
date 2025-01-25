@@ -1,0 +1,156 @@
+fa6a8caa George.Huang 2020-08-24
+
+AOS-288: imx8mn: imx8mp: allow ota to update spl_[a|b] and spl_bak_[a|b]
+
+Change-Id: I3d41bccf207fbe966ac85b42e314eef0386d4e72
+
+diff --git a/imx8m/evk_a100/init.imx8mn.rc b/imx8m/evk_a100/init.imx8mn.rc
+index 9c1e9eec..78103493 100755
+--- a/imx8m/evk_a100/init.imx8mn.rc
++++ b/imx8m/evk_a100/init.imx8mn.rc
+@@ -40,3 +40,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk2boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk2boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk2boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk2boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/evk_a100/sepolicy/file_contexts b/imx8m/evk_a100/sepolicy/file_contexts
+index 31b9a760..8ea6b45b 100644
+--- a/imx8m/evk_a100/sepolicy/file_contexts
++++ b/imx8m/evk_a100/sepolicy/file_contexts
+@@ -25,6 +25,10 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
++# spl
++/dev/block/mmcblk2boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk2boot[01]p[1-9]      u:object_r:spl_block_device:s0
++
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
+diff --git a/imx8m/evk_a200/init.imx8mp.rc b/imx8m/evk_a200/init.imx8mp.rc
+index 9c1e9eec..78103493 100755
+--- a/imx8m/evk_a200/init.imx8mp.rc
++++ b/imx8m/evk_a200/init.imx8mp.rc
+@@ -40,3 +40,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk2boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk2boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk2boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk2boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/evk_a200/sepolicy/file_contexts b/imx8m/evk_a200/sepolicy/file_contexts
+index da06f1f8..1e578674 100644
+--- a/imx8m/evk_a200/sepolicy/file_contexts
++++ b/imx8m/evk_a200/sepolicy/file_contexts
+@@ -25,6 +25,10 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
++# spl
++/dev/block/mmcblk2boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk2boot[01]p[1-9]      u:object_r:spl_block_device:s0
++
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
+diff --git a/imx8m/evk_a300/init.imx8mq.rc b/imx8m/evk_a300/init.imx8mq.rc
+index 9c1e9eec..dc5c3d7b 100755
+--- a/imx8m/evk_a300/init.imx8mq.rc
++++ b/imx8m/evk_a300/init.imx8mq.rc
+@@ -40,3 +40,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk0boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk0boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk0boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk0boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+index c5b08840..64136a31 100644
+--- a/imx8m/evk_a300/sepolicy/file_contexts
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -25,6 +25,10 @@
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
++# spl
++/dev/block/mmcblk0boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk0boot[01]p[1-9]      u:object_r:spl_block_device:s0
++
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
+diff --git a/imx8m/vp6820_8mn/init.imx8mn.rc b/imx8m/vp6820_8mn/init.imx8mn.rc
+index 9c1e9eec..78103493 100755
+--- a/imx8m/vp6820_8mn/init.imx8mn.rc
++++ b/imx8m/vp6820_8mn/init.imx8mn.rc
+@@ -40,3 +40,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk2boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk2boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk2boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk2boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/vp6820_8mn/sepolicy/file_contexts b/imx8m/vp6820_8mn/sepolicy/file_contexts
+index 31b9a760..8ea6b45b 100644
+--- a/imx8m/vp6820_8mn/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mn/sepolicy/file_contexts
+@@ -25,6 +25,10 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
++# spl
++/dev/block/mmcblk2boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk2boot[01]p[1-9]      u:object_r:spl_block_device:s0
++
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
+diff --git a/imx8m/vp6820_8mp/init.imx8mp.rc b/imx8m/vp6820_8mp/init.imx8mp.rc
+index 0635cecb..7ebdbd40 100755
+--- a/imx8m/vp6820_8mp/init.imx8mp.rc
++++ b/imx8m/vp6820_8mp/init.imx8mp.rc
+@@ -45,3 +45,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk2boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk2boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk2boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk2boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/vp6820_8mp/sepolicy/file_contexts b/imx8m/vp6820_8mp/sepolicy/file_contexts
+index da06f1f8..1e578674 100644
+--- a/imx8m/vp6820_8mp/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mp/sepolicy/file_contexts
+@@ -25,6 +25,10 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
++# spl
++/dev/block/mmcblk2boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk2boot[01]p[1-9]      u:object_r:spl_block_device:s0
++
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+ /vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0

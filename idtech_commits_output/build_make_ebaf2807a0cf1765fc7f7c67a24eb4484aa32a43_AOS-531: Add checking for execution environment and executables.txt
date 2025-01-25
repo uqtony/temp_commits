@@ -1,0 +1,51 @@
+ebaf2807a max.yang 2021-03-05
+
+AOS-531: Add checking for execution environment and executables
+
+Symptom: Script run on windows+WSL with error message "No such file"
+Root Cause: Could not find "unzip" command by common.py
+Solution: 1. Execution enviroment should install such executables
+          2. Script side could check necessary binaries before execute it
+Note: Print out java/javac version for debugging purpose
+
+Change-Id: Ica56ef72d469b884e3e392910882a3d36f5b6d75
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index b1010a355..d19a74a3c 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -14,12 +14,25 @@ import sign_target_files_apks
+ import post_sign_vbmeta
+ import idt_web_service
+ from xml.etree import ElementTree
++from distutils.spawn import find_executable
+ 
+ WS = idt_web_service.web_service()
+ idt_key_map = {}
+ #TODO: replace cert path once we get it
+ idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING/"
+ 
++# Check execution environment and binaries
++def check_executable():
++  exec_list = ["unzip", "apksigner", "openssl", "mkbootfs", "mkbootimg", "java"]
++  for exe_file in exec_list:
++    if find_executable(exe_file) is None:
++      raise ValueError('No executable: {}'.format(exe_file))
++
++  print("------------------")
++  os.system("java  -version")
++  os.system("javac -version")
++  print("------------------")
++
+ def IDTReplaceCert(data):
+   for old, new in idt_key_map.iteritems():
+     print("    Replacing %s.x509.pem with %s.x509.pem" % (old, new))
+@@ -282,6 +295,8 @@ def main(argv):
+   os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
+   print('PATH: {}'.format(os.environ["PATH"]))
+ 
++  check_executable()
++
+   WS.dual_login()
+   WS.regist_socket()
+ 

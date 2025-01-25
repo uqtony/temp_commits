@@ -1,0 +1,27 @@
+e6e8fde225 max.yang 2020-09-21
+
+AOS-348: [Multi-DDR] Allow board-info and mem_info item matching without mb_plc
+
+Symptom: cannot find proper meminfo for board_info-imx8mq_evt-0_evk_dual-0_mic3g.img
+Root Cause: mismatching for board-info and meminfo at mb_plc field
+Solution: Remove this check so that below board_info will use same dram timing data.
+          board_info-imx8mq_evt-0_evk_dual-0_mic3g.img
+          board_info-imx8mq_evt-0_evk_evk-0_mic3g.img
+          board_info-imx8mq_evt-0_evk_mipi-0_mic3g.img
+
+Change-Id: I8cbe31d2e17a171621af864784f7b5be299459a9
+
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index eb23e7b356..ed401dcf49 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -135,8 +135,6 @@ unsigned int read_mem_root_block(struct blk_desc *dev_desc, unsigned int root_hd
+ 			continue;
+ 		if (memcmp(p_bdinfo->mb_model,  p_root->mem_obj_ary[i].m_mb_model,  BDINFO_DATA_SIZE) != 0)
+ 			continue;
+-		if (memcmp(p_bdinfo->mb_plc,    p_root->mem_obj_ary[i].m_mb_plc,    BDINFO_DATA_SIZE) != 0)
+-			continue;
+ 		if (memcmp(p_bdinfo->dev_ddr,   p_root->mem_obj_ary[i].m_ddr_t,     BDINFO_DATA_SIZE) != 0)
+ 			continue;
+ 		printf("idt: using dram index %u
+", i);

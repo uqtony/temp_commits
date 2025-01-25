@@ -1,0 +1,66 @@
+741b411b max.yang 2021-02-18
+
+AOS-488: Fix permission denied on 8mq evk board
+
+  1. back_camera_name, sync solution from:
+         device/nxp/imx6sl/sepolicy/property_contexts
+  2. lsusb denied caused by check_modem.sh, fix it by adding file-node orders
+  3. wakeup7 access by power manager, fix by adding new file-node permission
+
+avc: denied { set } for property=back_camera_name pid=189 uid=0 gid=0 scontext=u:r:vendor_init:s0 tcontext=u:object_r:default_prop:s0 tclass=property_service permissive=0
+avc: denied { set } for property=back_camera_orient pid=189 uid=0 gid=0 scontext=u:r:vendor_init:s0 tcontext=u:object_r:default_prop:s0 tclass=property_service permissive=0
+avc: denied { set } for property=front_camera_name pid=189 uid=0 gid=0 scontext=u:r:vendor_init:s0 tcontext=u:object_r:default_prop:s0 tclass=property_service permissive=0
+avc: denied { set } for property=front_camera_orient pid=189 uid=0 gid=0 scontext=u:r:vendor_init:s0 tcontext=u:object_r:default_prop:s0 tclass=property_service permissive=0
+avc: denied { read } for comm="lsusb" name="uevent" dev="sysfs" ino=27414 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+avc: denied { read } for comm="lsusb" name="uevent" dev="sysfs" ino=27539 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+avc: denied { read } for comm="lsusb" name="uevent" dev="sysfs" ino=27477 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+avc: denied { read } for comm="lsusb" name="uevent" dev="sysfs" ino=27602 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=0
+avc: denied { read } for comm="Binder:255_2" name="wakeup7" dev="sysfs" ino=30970 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs:s0 tclass=dir permissive=0
+Change-Id: I44fe912aaeef37e0b77129e325d4973c35b5919c
+
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 1e2e1903..df984bef 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -99,10 +99,10 @@
+ /vendor/bin/hw/android\.hardware\.camera\.provider@2\.6-service-google       u:object_r:hal_camera_default_exec:s0
+ 
+ # lsusb command
+-/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+-/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+-/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+-/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
++/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.[0-1]\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ 
+ #quectel port
+ #/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 1ca4d9d2..8e05e166 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -202,6 +202,10 @@ sys.SECOND_DISPLAY_ENABLED          u:object_r:vendor_default_prop:s0
+ ro.mediacomponents.package          u:object_r:vendor_default_prop:s0
+ AQROOT                              u:object_r:vendor_default_prop:s0
+ CL_NOPREPROCESS                     u:object_r:vendor_default_prop:s0
++back_camera_name                    u:object_r:vendor_default_prop:s0
++back_camera_orient                  u:object_r:vendor_default_prop:s0
++front_camera_name                   u:object_r:vendor_default_prop:s0
++front_camera_orient                 u:object_r:vendor_default_prop:s0
+ 
+ # serial number for mdnsd broadcast
+ ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/genfs_contexts b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+index 40a7f087..f5a29c71 100644
+--- a/imx8m/vp6820_8mq/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+@@ -23,6 +23,7 @@ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0
+ 
+ # vp6820 chip as external connection
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a40000.i2c/i2c-2/2-0067/extcon   u:object_r:sysfs_extcon:s0

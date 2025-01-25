@@ -1,0 +1,35 @@
+89a67b6a6c max.yang 2020-11-26
+
+AOS-410: Disable development option on pci-user build
+
+  pci-user build only:
+    1. To avoid pci-user seeing development options page, we disbale
+       count down function, and dev page won't be enabled
+    2. adbd binary is phisically removed so that user cannot use adb
+
+Change-Id: I5fbc3fdb05f465ffdd1c0cb4d75952bad44483df
+
+diff --git a/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java b/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
+index dd522bfa1d..b45b81a541 100644
+--- a/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
++++ b/src/com/android/settings/deviceinfo/BuildNumberPreferenceController.java
+@@ -28,6 +28,7 @@ import android.os.UserManager;
+ import android.text.BidiFormatter;
+ import android.text.TextUtils;
+ import android.widget.Toast;
++import android.os.SystemProperties;
+ 
+ import androidx.preference.Preference;
+ 
+@@ -163,6 +164,11 @@ public class BuildNumberPreferenceController extends BasePreferenceController im
+             return false;
+         }
+ 
++        if (SystemProperties.get("ro.product.name").endsWith("pci")) {
++            // no development option count down
++            return false;
++        }
++
+         if (mDevHitCountdown > 0) {
+             mDevHitCountdown--;
+             if (mDevHitCountdown == 0 && !mProcessingLastDevHit) {

@@ -1,0 +1,79 @@
+eab90ac9a495 owen.wen 2021-08-23
+
+AOS-649: update K81_PWR_ON pin assignment
+
+according to schematic and pin assignment update
+ANDROID_REDWOOD_2021-08-17_2000_TPE.pdf
+Redwood_PIN assignment_20210817_v0.xlsm
+
+update below 1 pin
+MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12                     0x82
+
+Change-Id: I3da96cddc42e6bba17518a64c27cbd5cbb825363
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index d7796f75bfe5..c84a57ab14ed 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -454,6 +454,7 @@ idg_spi@0 {
+ 		spi-bits-per-word = <8>; /* 8 bits */
+ 		spi-working-mode = <0>; /* SPI_MODE_0 */
+ 		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
++		spi-poweron-gpio = <&gpio5 12 GPIO_ACTIVE_HIGH>; /* power control */
+ 		/* idg-keep-sense */
+ 		status = "okay";
+ 	};
+@@ -998,7 +999,7 @@ pinctrl_ecspi2: ecspi2grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK		0x82
+ 			MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI		0x82
+-			MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO		0x82
++			MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12		0x82
+ 		>;
+ 	};
+ 
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 5d47bf87f8ed..5fe53f73aaf0 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -1117,6 +1117,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	u32 dt_irq[IRQ_SIZE] = {0, 0};
+ 	int irq = 0;
+ 	int err = 0;
++	int ret = 0;
+ 
+ 	dev_info(&spi->dev, "idg_spi driver probe
+");
+ 	irq = spi->irq;
+@@ -1158,6 +1159,17 @@ static int idg_spi_probe(struct spi_device *spi)
+ 		err = -ENOMEM;
+ 		goto idg_dev_error;
+ 	}
++	idg_dev->poweron_gpio = of_get_named_gpio(np, "spi-poweron-gpio", 0);
++	if (gpio_is_valid(idg_dev->poweron_gpio)) {
++		ret = devm_gpio_request_one(&spi->dev, idg_dev->poweron_gpio,
++				GPIOF_OUT_INIT_HIGH, "K81 power on");
++		if (ret) {
++			dev_err(&spi->dev, "unable to get spi poweron gpio
+");
++			return ret;
++		}
++	} else if (idg_dev->poweron_gpio < 0) {
++		dev_info(&spi->dev, "idg_spi no poweron gpio found
+");
++	}
+ 	spin_lock_init(&idg_dev->spi_lock);
+ 	spi_set_drvdata(spi, idg_dev);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index b7290d1fd9cc..9310034e70cc 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -83,6 +83,7 @@ struct idg_spi_device {
+ 	struct gpio_desc	*spi_cs;
+ 	int			clock_freq;
+ 	int			idg_irq;
++	int			poweron_gpio;
+ 	u8			bits_per_word;
+ 	spinlock_t		spi_lock; /* to get spi device safely */
+ 	wait_queue_head_t	wait;

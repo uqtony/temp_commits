@@ -1,0 +1,151 @@
+9f9ae1f610 Jay 2021-07-27
+
+AOS-657: According display id to probe panel driver
+
+Must add display-id into device tree.
+According display id which stored in bdinfo to probe panel driver
+and setup display-timing which get from linux dtb.
+
+Change-Id: I88cdb0432d811688122f6f709aca72473c9f31e4
+
+diff --git a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+index da18597d43..4ceea56a9f 100644
+--- a/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm/dts/idt_a300_evt-0_devboard_evt-1.dts
+@@ -420,6 +420,7 @@
+ 
+ 	hx8394f@0 {
+ 		compatible = "himax,hx8394f";
++		display-id = "830000";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+ 		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm/dts/imx8mn-evk.dts b/arch/arm/dts/imx8mn-evk.dts
+index 29f8da764e..f33d6ab2c9 100644
+--- a/arch/arm/dts/imx8mn-evk.dts
++++ b/arch/arm/dts/imx8mn-evk.dts
+@@ -24,6 +24,7 @@
+ 
+ 	hx8394f_panel {
+ 		compatible = "himax,hx8394f";
++		display-id = "830000";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+ 		reset-gpio = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+diff --git a/drivers/idt/bdinfo_parser/linux_dtb.c b/drivers/idt/bdinfo_parser/linux_dtb.c
+index 3745b3e5b6..f139c8eca3 100644
+--- a/drivers/idt/bdinfo_parser/linux_dtb.c
++++ b/drivers/idt/bdinfo_parser/linux_dtb.c
+@@ -31,6 +31,12 @@
+ #elif defined(CONFIG_IMX8MN)
+ #define PANEL_PATH "/soc@0/bus@32c00000/dsi_controller@32e10000/panel@0/display-timings/timing"
+ #endif
++#if defined(CONFIG_IMX8MQ)
++#define PANEL_NODE "/soc@0/bus@30800000/mipi-dsi@30a00000/panel@"
++#elif defined(CONFIG_IMX8MN)
++#define PANEL_NODE "/soc@0/bus@32c00000/dsi_controller@32e10000/panel@"
++#endif
++#define DISPLAY_TIMING	"/display-timings/timing"
+ 
+ static const char *dtbo_slot[2] = {"dtbo_a", "dtbo_b"};
+ 
+@@ -259,7 +265,9 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	size_t num_bytes;
+ 	size_t dtbo_size;
+ 	int nodeoff;
+-	int ret = -1;
++	int ret = -1, i = 0;
++	char idt_display_id[BDINFO_DATA_SIZE] = "";
++	char panel_path[256] = "";
+ 
+ 	if ((slot < 0) || (slot > 1)) {
+ 		puts("dtbo slot selection fail
+");
+@@ -301,10 +309,36 @@ int get_dtbo_mipi_dsi_timing(int slot, int fdt_idx, struct display_timing *dt)
+ 	blob = (void *)(ulong)dt_img +
+ 	       fdt32_to_cpu(dt_entry->dt_offset);
+ 
+-	nodeoff = fdt_path_offset(blob, PANEL_PATH);
++	if (!idt_get_board_display_id(idt_display_id, BDINFO_DATA_SIZE))
++		goto timing_out;
++
++	do {
++		int len;
++		const char *displayId;
++
++		snprintf(panel_path, sizeof(panel_path), "%s%d", PANEL_NODE, i);
++		nodeoff = fdt_path_offset(blob, panel_path);
++		if (nodeoff < 0 || !fdtdec_get_is_enabled(blob, nodeoff))
++			break;
++
++		displayId = fdt_getprop(blob, nodeoff, "display-id", &len);
++		if (len < 0) {
++			i++;
++			continue;
++		}
++
++		if (!strncmp(displayId, idt_display_id, strlen(idt_display_id))) {
++			strcat(panel_path, DISPLAY_TIMING);
++			break;
++		}
++
++		i++;
++	} while (nodeoff >= 0);
++
++	nodeoff = fdt_path_offset(blob, panel_path);
+ 	if (nodeoff < 0 ||
+ 	    !fdtdec_get_is_enabled(blob, nodeoff)) {
+-		printf("%s get fail
+", PANEL_PATH);
++		printf("%s get fail
+", panel_path);
+ 		goto timing_out;
+ 	}
+ #if DEBUG_INFO
+diff --git a/drivers/video/video_link.c b/drivers/video/video_link.c
+index 70dc2397e4..0f1e2fcb82 100644
+--- a/drivers/video/video_link.c
++++ b/drivers/video/video_link.c
+@@ -509,6 +509,31 @@ static int do_videolink(struct cmd_tbl * cmdtp, int flag, int argc, char * const
+ 	return ret;
+ }
+ 
++static int get_video_link_idx(ulong *idx)
++{
++	int i = 0;
++	char idt_display_id[BDINFO_DATA_SIZE] = "";
++
++	if (!idt_get_board_display_id(idt_display_id, BDINFO_DATA_SIZE))
++		return -ENOENT;
++
++	for (i = 0; i < video_links_num; i++) {
++		int index = video_links[i].dev_num - 1;
++		char *display_id;
++
++		display_id = ofnode_read_string(video_links[i].link_devs[index]->node_,
++										"display-id");
++		if (!display_id)
++			continue;
++
++		if (!strncmp(idt_display_id, display_id, strlen(idt_display_id))) {
++			*idx = i;
++			return 0;
++		}
++	}
++	return -ENOENT;
++}
++
+ int video_link_init(void)
+ {
+ 	struct udevice *dev;
+@@ -536,7 +561,9 @@ int video_link_init(void)
+ 		return 0;
+ 	}
+ 
+-	env_id = env_get_ulong("video_link", 10, 0);
++	if (get_video_link_idx(&env_id))
++		env_id = env_get_ulong("video_link", 10, 0);
++
+ 	if (env_id < video_links_num)
+ 		curr_video_link = env_id;
+ 

@@ -1,0 +1,66 @@
+27d652f8a6 owen.wen 2021-09-03
+
+AOS-680: support imx_hab_is_enabled
+
+Change-Id: Id00f9dd68a9827984f277b124b34bf830a016deb
+
+diff --git a/arch/arm/include/asm/mach-imx/hab.h b/arch/arm/include/asm/mach-imx/hab.h
+index 2abf28ea45..e00dbcfe95 100644
+--- a/arch/arm/include/asm/mach-imx/hab.h
++++ b/arch/arm/include/asm/mach-imx/hab.h
+@@ -137,9 +137,7 @@ struct imx_sec_config_fuse_t {
+ 	int word;
+ };
+ 
+-#if defined(CONFIG_IMX_HAB)
+ extern struct imx_sec_config_fuse_t const imx_sec_config_fuse;
+-#endif
+ 
+ /*Function prototype description*/
+ typedef enum hab_status hab_rvt_report_event_t(enum hab_status, uint32_t,
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index a2d9e16c7c..4f133fdfe1 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -17,7 +17,7 @@ obj-y += mmc_env.o
+ obj-$(CONFIG_FEC_MXC) += mac.o
+ obj-$(CONFIG_DWC_ETH_QOS) += mac.o
+ obj-$(CONFIG_SYS_I2C_MXC) += i2c-mxv7.o
+-obj-$(CONFIG_IMX_HAB) += hab.o
++obj-y += hab.o
+ obj-y += cpu.o
+ endif
+ 
+diff --git a/arch/arm/mach-imx/hab.c b/arch/arm/mach-imx/hab.c
+index a5bfeb0947..37f29b8c87 100644
+--- a/arch/arm/mach-imx/hab.c
++++ b/arch/arm/mach-imx/hab.c
+@@ -899,7 +899,9 @@ int imx_hab_authenticate_image(uint32_t ddr_start, uint32_t image_size,
+ 	printf("
+Authenticate image from DDR location 0x%x...
+",
+ 	       ddr_start);
+ 
++#if defined(CONFIG_IMX_HAB)
+ 	hab_caam_clock_enable(1);
++#endif
+ 
+ 	/* Calculate IVT address header */
+ 	ivt_addr = (ulong) (ddr_start + ivt_offset);
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index 012b0b8736..18fd6c19ad 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -39,12 +39,10 @@
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+-#if defined(CONFIG_IMX_HAB) || defined(CONFIG_AVB_ATX) || defined(CONFIG_IMX_TRUSTY_OS)
+ struct imx_sec_config_fuse_t const imx_sec_config_fuse = {
+ 	.bank = 1,
+ 	.word = 3,
+ };
+-#endif
+ 
+ int timer_init(void)
+ {

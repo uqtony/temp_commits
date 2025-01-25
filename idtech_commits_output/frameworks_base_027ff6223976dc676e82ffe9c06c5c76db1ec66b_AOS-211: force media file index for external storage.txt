@@ -1,0 +1,28 @@
+027ff6223976 owen.wen 2020-06-16
+
+AOS-211: force media file index for external storage
+
+refer AOSP comments here
+https://cs.android.com/android/platform/superproject/+/master:frameworks/base/core/java/android/os/storage/VolumeInfo.java;l=58;drc=master;bpv=0;bpt=1
+ * Visible volumes are considered a more stable part of the device, which is why we take the
+ * time to index them. In particular, transient volumes like USB OTG devices
+ * <em>should not</em> be marked as visible; their contents should be surfaced
+ * to apps through the Storage Access Framework
+
+Change-Id: Iac76100223bb5fc8f6a1f9f8aaea734ddd55754d
+
+diff --git a/services/core/java/com/android/server/StorageManagerService.java b/services/core/java/com/android/server/StorageManagerService.java
+index deff7ef7d39a..c318e4d24428 100644
+--- a/services/core/java/com/android/server/StorageManagerService.java
++++ b/services/core/java/com/android/server/StorageManagerService.java
+@@ -1284,6 +1284,10 @@ class StorageManagerService extends IStorageManager.Stub
+             // public API requirement of being in a stable location.
+             if (vol.disk.isAdoptable()) {
+                 vol.mountFlags |= VolumeInfo.MOUNT_FLAG_VISIBLE;
++            } else {
++                // mount USB drive as VISIBLE since we using USB drive as
++                // media storage
++                vol.mountFlags |= VolumeInfo.MOUNT_FLAG_VISIBLE;
+             }
+ 
+             vol.mountUserId = mCurrentUserId;

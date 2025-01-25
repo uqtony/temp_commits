@@ -1,0 +1,502 @@
+6e64eac15429 owen.wen 2022-02-16
+
+AOS-870: support V5 protocol
+
+Driver will need only to bypass data over SPI
+
+below process is to get full IDG data
+1. read 10 bytes, compare if V2 or V5 match
+2.1 read 4 more bytes when V2
+2.2 read 9 more bytes when V5
+3. read n+2 more bytes to get data and CRC
+
+Change-Id: I682b9dd125388d6777e2d74ebe3cb2c8b3562fae
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index c7139fb0653d..c288d7d122e3 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -39,9 +39,7 @@
+ 
+ #define IDG_INPUT_HEX_NUMBER	0  /* enable: 1, disable: 0 */
+ 
+-#define IDG_RETURN_WITH_HEADER	1  /* enable: 1, disable: 0 */
+-
+-#define IDG_K81_CRC_RULE	1  /* enable: 1, disable: 0 */
++#define IDG_K81_CRC_RULE	0  /* enable: 1, disable: 0 */
+ 
+ static struct spi_device *idg_spi_tty;
+ 
+@@ -128,17 +126,22 @@ int fifo_get_msg(struct mt_fifo *fifo, char *msg)
+ 
+ 	if (fifo->msg_cnt) {
+ 		fifo->msg_cnt--;
+-#if IDG_RETURN_WITH_HEADER
+-		ret = msg[IDG_SIZE_MSB] << 8;
+-		ret += msg[IDG_SIZE_LSB];
+-		ret += IDG_HEADER_LEN;
+-		ret += NEOII_CMD_LEN;
+-		ret += NEOII_CRC_LEN;
+-#else
+-		ret = msg[RX_SIZE_MSB] << 8;
+-		ret += msg[RX_SIZE_LSB];
+-		ret += NEOII_CMD_LEN;
+-#endif /* IDG_RETURN_WITH_HEADER */
++		if (!strncmp(msg, IDG_Header_V2, IDG_HEADER_LEN)) {
++			ret = msg[V2_SIZE_MSB] << 8;
++			ret += msg[V2_SIZE_LSB];
++			ret += IDG_HEADER_LEN;
++			ret += V2_FRAME_SIZE;
++			ret += NEOII_CRC_LEN;
++		} else if (!strncmp(msg, IDG_Header_V5, IDG_HEADER_LEN)) {
++			ret = msg[V5_SIZE_MSB] << 8;
++			ret += msg[V5_SIZE_LSB];
++			ret += IDG_HEADER_LEN;
++			ret += V5_FRAME_SIZE;
++			ret += NEOII_CRC_LEN;
++		} else {
++			pr_err("%s: fail to find IDG_Header in FIFO msg", DRVNAME);
++			return 0;
++		}
+ 	} else {
+ 		ret = 0;
+ 	}
+@@ -303,7 +306,7 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		goto ttyv5_write_out;
+ 	}
+ #if IDG_INPUT_HEX_NUMBER
+-	memcpy(idg_tx, CLIENT_NEOII_Header_V5, IDG_HEADER_LEN);
++	memcpy(idg_tx, IDG_Header_V5, IDG_HEADER_LEN);
+ 	user_buf = kmalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!user_buf) {
+ 		status = -ENOMEM;
+@@ -525,7 +528,7 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		goto tty_write_out;
+ 	}
+ #if IDG_INPUT_HEX_NUMBER
+-	memcpy(idg_tx, CLIENT_NEOII_Header_V2, IDG_HEADER_LEN);
++	memcpy(idg_tx, IDG_Header_V2, IDG_HEADER_LEN);
+ 	user_buf = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!user_buf) {
+ 		status = -ENOMEM;
+@@ -650,6 +653,13 @@ static struct miscdevice idg_spi_tty_misc = {
+ 	.fops  = &idg_spi_tty_fops
+ };
+ 
++/* this function will be called when K81 DAV interrupt rising edge trigger
++ * get IDG response frame from K81 via SPI, IDG could be IDG V2 or V5, and send to USDK
++ * 1. read 10 bytes
++ * 2. if match V2 header, then read 4 more bytes, data length(N) located at index 12, 13
++ * 3. if match V5 header, then read 9 more bytes, data length(N) located at index 17, 18
++ * 4. read N+2 bytes to get data and CRC
++ */
+ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ {
+ 	struct spi_device *spi;
+@@ -658,29 +668,27 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	char *idg_tx = NULL;
+ 	char *idg_rx = NULL;
+ 	char *data = NULL;
+-	int idg_start_pos = -1;
+-	int err = 0;
+-	int idg_size;
+-	int status;
+-	int status_s;
+-	int i;
++	int data_size = 0;
++	int status = 0;
++	int i = 0;
++	int frame_size = 0;
+ 
+ 	spi_message_init(&spi_msg);
+ 	spi_xfer = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+ 	if (!spi_xfer)
+-		goto out;
++		goto kzalloc_fail;
+ 	spi_xfer->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+ 	if (!spi_xfer->ptp_sts)
+-		goto out;
++		goto kzalloc_fail;
+ 	idg_tx = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!idg_tx)
+-		goto out;
++		goto kzalloc_fail;
+ 	idg_rx = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!idg_rx)
+-		goto out;
++		goto kzalloc_fail;
+ 	data = kzalloc(BASE_READ_SIZE + MAX_BUFFER_SIZE, GFP_KERNEL);
+ 	if (!data)
+-		goto out;
++		goto kzalloc_fail;
+ 
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+@@ -690,7 +698,7 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi_xfer->tx_nbits = SPI_NBITS_SINGLE;
+ 	spi_xfer->rx_buf = idg_rx;
+ 	spi_xfer->rx_nbits = SPI_NBITS_SINGLE;
+-	spi_xfer->len = BASE_READ_SIZE;
++	spi_xfer->len = IDG_HEADER_LEN;
+ 	spi_xfer->speed_hz = idg_dev->clock_freq;
+ 	spi_xfer->bits_per_word = idg_dev->bits_per_word;
+ 	mutex_lock(&idg_dev->lock);
+@@ -701,208 +709,83 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi_message_add_tail(spi_xfer, &spi_msg);
+ 	status = spi_sync(spi, &spi_msg);
+ 	mutex_unlock(&idg_dev->lock);
+-	dev_dbg(&spi->dev, "first read (16 bytes)
+");
++	dev_dbg(&spi->dev, "first read (%d bytes)
+", spi_xfer->len);
++	if (status) {
++		pr_err("%s: idg spi sync failed(%d)", DRVNAME, status);
++		goto finish_spi;
++	}
++	// read IDG header success
++	memcpy(data, idg_rx, IDG_HEADER_LEN);
++	for (i = 0; i < IDG_HEADER_LEN; i++)
++		dev_dbg(&spi->dev, "0x%.2X ", idg_rx[i]);
++	if (!strncmp(data, IDG_Header_V2, IDG_HEADER_LEN)) {
++		frame_size = V2_FRAME_SIZE;
++	} else if (!strncmp(data, IDG_Header_V5, IDG_HEADER_LEN)) {
++		frame_size = V5_FRAME_SIZE;
++	} else {
++		pr_err("%s: invalid IDG header response", DRVNAME);
++		goto finish_spi;
++	}
++	// read the rest IDG frame
++	spi_xfer->len = frame_size;
++	mutex_lock(&idg_dev->lock);
++	status = spi_sync(spi, &spi_msg);
++	mutex_unlock(&idg_dev->lock);
++	dev_dbg(&spi->dev, "second read (%d bytes)
+", spi_xfer->len);
+ 	if (!status) {
+-		memcpy(data, idg_rx, BASE_READ_SIZE);
+-		idg_size = data[IDG_SIZE_MSB] << 8;
+-		idg_size += data[IDG_SIZE_LSB];
+-		dev_dbg(&spi->dev, "K81 size: %d
+", idg_size);
+-		for (i = 0; i < BASE_READ_SIZE - NEOII_HEADER_LEN ; i++) {
+-			if (!strncmp(&data[i],
+-					NEOII_Header, NEOII_HEADER_LEN)) {
+-				idg_start_pos = i;
+-				break;
+-			}
+-		}
+-		for (i = 0; i < BASE_READ_SIZE; i++)
+-			dev_dbg(&spi->dev, "0x%.2X ", idg_rx[i]);
+-		if (idg_size == 0) {
+-			dev_dbg(&spi->dev, "idg header: %s
+", data);
+-			dev_dbg(&spi->dev, "idg data length: %d
+", idg_size);
+-			/* CRC check */
+-			if (CalculateCRC(data, BASE_READ_SIZE)) {
+-				dev_info(&spi->dev, "read data CRC error
+");
+-				err = EINVAL;
+-			}
+-		} else if (idg_start_pos < 0) {
+-			dev_info(&spi->dev, "NEOII header not found
+");
+-			err = EINVAL;
+-		} else if (idg_size < MAX_BUFFER_SIZE) {
+-			spi_xfer->len = idg_size;
+-			mutex_lock(&idg_dev->lock);
+-			spin_lock_irq(&idg_dev->spi_lock);
+-			spi_msg.spi = spi;
+-			spin_unlock_irq(&idg_dev->spi_lock);
+-			status_s = spi_sync(spi, &spi_msg);
+-			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+-			mutex_unlock(&idg_dev->lock);
+-			dev_dbg(&spi->dev, "second read (%d bytes)
+",
+-				 idg_size);
+-			if (!status_s) {
+-				memcpy(&data[BASE_READ_SIZE], idg_rx,
+-				       idg_size);
+-				for (i = 0; i < idg_size; i++)
+-					dev_dbg(&spi->dev, "0x%.2X ",
+-						 data[BASE_READ_SIZE + i]);
+-
+-#if IDG_K81_CRC_RULE
+-				if (!k81_crc(data,
+-					     (idg_size + BASE_READ_SIZE))) {
+-					dev_info(&spi->dev,
+-						 "read data CRC error
+");
+-					err = EINVAL;
+-				}
+-#else
+-				if (CalculateCRC(data,
+-						 (idg_size + BASE_READ_SIZE))) {
+-					dev_info(&spi->dev,
+-						 "read data CRC error
+");
+-					err = EINVAL;
+-				}
+-#endif /* IDG_K81_CRC_RULE */
+-			} else {
+-				pr_err("%s: idg spi second read failed(%d)",
+-				       DRVNAME, status_s);
+-				err = EIO;
+-				for (i = 0; i < BASE_READ_SIZE ; i++)
+-					dev_dbg(&spi->dev, "0x%.2X ",
+-						 idg_rx[i]);
+-
+-			}
+-		} else {
+-			dev_info(&spi->dev,
+-				 "data from K81 error
+");
+-				err = EBUSY;
+-		}
+-
+-		if ((!err) &&
+-		    (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V2,
+-			     NEOII_VERSION_LEN) == 0)) {
+-#if IDG_RETURN_WITH_HEADER
+-			if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+-				fifo_clean(idg_dev->v2_fifo);
+-				dev_info(&spi->dev, "FIFO v2 overflow, "
+-						    "cleaned
+");
+-				fifo_add_msg(idg_dev->v2_fifo, data);
+-			}
+-#else
+-			if (fifo_add_msg(idg_dev->v2_fifo,
+-					 &data[IDG_HEADER_LEN])) {
+-				fifo_clean(idg_dev->v2_fifo);
+-				dev_info(&spi->dev, "FIFO v2 overflow, "
+-						    "cleaned
+");
+-				fifo_add_msg(idg_dev->v2_fifo,
+-					     &data[IDG_HEADER_LEN]);
+-			}
+-#endif /* IDG_RETURN_WITH_HEADER */
+-		} else if ((!err) &&
+-			   (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V5,
+-				    NEOII_VERSION_LEN) == 0)) {
+-#if IDG_RETURN_WITH_HEADER
+-			if (fifo_add_msg(idg_dev->v5_fifo, data)) {
+-				fifo_clean(idg_dev->v5_fifo);
+-				dev_info(&spi->dev, "FIFO v5 overflow. "
+-						    "cleaned
+");
+-				fifo_add_msg(idg_dev->v5_fifo, data);
+-			}
+-#else
+-			if (fifo_add_msg(idg_dev->v5_fifo,
+-					 &data[IDG_HEADER_LEN])) {
+-				fifo_clean(idg_dev->v5_fifo);
+-				dev_info(&spi->dev, "FIFO v5 overflow. "
+-						    "cleaned
+");
+-				fifo_add_msg(idg_dev->v5_fifo,
+-					     &data[IDG_HEADER_LEN]);
+-			}
+-#endif /* IDG_RETURN_WITH_HEADER */
+-		} else {
+-			gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+-			switch (err) {
+-			case EINVAL:
+-				dev_info(&spi->dev, "read data failed "
+-						    "by invalid
+");
+-#if IDG_RETURN_WITH_HEADER
+-				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_CRC_HD,
+-				       ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
+-				       READ_ERROR_CRC, READ_ERROR_CRC_SIZE);
+-#else
+-				memcpy(data, READ_ERROR_CRC_HD, ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_CRC,
+-				       READ_ERROR_CRC_SIZE);
+-#endif /* IDG_RETURN_WITH_HEADER */
+-				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+-					fifo_clean(idg_dev->v2_fifo);
+-					dev_info(&spi->dev, "FIFO v2 overflow, "
+-							    "cleaned
+");
+-					fifo_add_msg(idg_dev->v2_fifo, data);
+-				}
+-				break;
+-			case EBUSY:
+-				dev_info(&spi->dev, "read data failed
+");
+-#if IDG_RETURN_WITH_HEADER
+-				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_K81_HD,
+-				       ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
+-				       READ_ERROR_K81, READ_ERROR_K81_SIZE);
+-#else
+-				memcpy(data, READ_ERROR_K81_HD, ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_K81,
+-				       READ_ERROR_K81_SIZE);
+-#endif /* IDG_RETURN_WITH_HEADER */
+-				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+-					fifo_clean(idg_dev->v2_fifo);
+-					dev_info(&spi->dev, "FIFO v2 overflow, "
+-							    "cleaned
+");
+-					fifo_add_msg(idg_dev->v2_fifo, data);
+-				}
+-				break;
+-			case EIO:
+-				if (status_s)
+-					pr_err("%s: idg spi second "
+-					       "report failed(%d)", DRVNAME,
+-					       status_s);
+-#if IDG_RETURN_WITH_HEADER
+-				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_HD,
+-				       ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
+-				       READ_ERROR, READ_ERROR_SIZE);
+-#else
+-				memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
+-				memcpy(&data[ERROR_HD_SIZE], READ_ERROR,
+-				       READ_ERROR_SIZE);
+-#endif /* IDG_RETURN_WITH_HEADER */
+-				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+-					fifo_clean(idg_dev->v2_fifo);
+-					dev_info(&spi->dev, "FIFO v2 overflow, "
+-							    "cleaned
+");
+-					fifo_add_msg(idg_dev->v2_fifo, data);
+-				}
+-				break;
+-			default:
+-				pr_err("%s: idg spi unknown error(%d)", DRVNAME,
+-				       err);
+-				break;
+-			}
+-		}
++		memcpy(&data[IDG_HEADER_LEN], idg_rx, spi_xfer->len);
++		for (i = 0; i < spi_xfer->len; i++)
++			dev_dbg(&spi->dev, "0x%.2X ",
++				data[IDG_HEADER_LEN + i]);
+ 	} else {
+-		gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+-		pr_err("%s: idg spi report failed(%d)", DRVNAME, status);
+-#if IDG_RETURN_WITH_HEADER
+-		memcpy(&data[IDG_HEADER_LEN], READ_ERROR_HD, ERROR_HD_SIZE);
+-		memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN], READ_ERROR,
+-		       READ_ERROR_SIZE);
+-#else
+-		memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
+-		memcpy(&data[ERROR_HD_SIZE], READ_ERROR, READ_ERROR_SIZE);
+-#endif /* IDG_RETURN_WITH_HEADER */
+-		if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+-			fifo_clean(idg_dev->v2_fifo);
+-			dev_info(&spi->dev, "FIFO v2 overflow, cleaned
+");
+-			fifo_add_msg(idg_dev->v2_fifo, data);
+-		}
++		pr_err("%s: idg spi read the rest IDG frame failed(%d)",
++			DRVNAME, status);
++		goto finish_spi;
++	}
++	// get data length
++	if (frame_size == V2_FRAME_SIZE) {
++		data_size = data[V2_SIZE_MSB] << 8;
++		data_size += data[V2_SIZE_LSB];
++	} else if (frame_size == V5_FRAME_SIZE) {
++		data_size = data[V5_SIZE_MSB] << 8;
++		data_size += data[V5_SIZE_LSB];
++	} else {
++		goto finish_spi;
+ 	}
+-out:
++	dev_dbg(&spi->dev, "data length: %d
+", data_size);
++	// read data
++	spi_xfer->len = data_size + 2; // 2 byte for CRC
++	mutex_lock(&idg_dev->lock);
++	status = spi_sync(spi, &spi_msg);
++	mutex_unlock(&idg_dev->lock);
++	dev_dbg(&spi->dev, "third read (%d bytes)
+", spi_xfer->len);
++	if (!status) {
++		memcpy(&data[IDG_HEADER_LEN + frame_size], idg_rx, spi_xfer->len);
++		for (i = 0; i < spi_xfer->len; i++)
++			dev_dbg(&spi->dev, "0x%.2X ",
++				data[IDG_HEADER_LEN + frame_size + i]);
++	} else {
++		pr_err("%s: idg spi read data failed(%d)",
++			DRVNAME, status);
++		goto finish_spi;
++	}
++	dev_dbg(&spi->dev, "CRC check %s
+",
++		k81_crc(data, (IDG_HEADER_LEN + frame_size + data_size + 2))
++		== true ? "success" : "fail");
++#if IDG_K81_CRC_RULE
++	// let USDK check CRC so USDK can get response even if response invalid
++	if (!k81_crc(data, (IDG_HEADER_LEN + frame_size + data_size + 2)))
++		goto finish_spi;
++#endif
++	// put K81 return data to FIFO queue
++	if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++		fifo_clean(idg_dev->v2_fifo);
++		dev_info(&spi->dev, "FIFO overflow, clear queue
+");
++		fifo_add_msg(idg_dev->v2_fifo, data);
++	}
++finish_spi:
++	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
++kzalloc_fail:
+ 	if (spi_xfer->ptp_sts != NULL)
+ 		kfree(spi_xfer->ptp_sts);
+ 	if (spi_xfer != NULL)
+@@ -913,7 +796,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		kfree(idg_rx);
+ 	if (data != NULL)
+ 		kfree(data);
+-
+ }
+ 
+ static irqreturn_t idg_spi_irq_handler(int irq, void *handle)
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index 9310034e70cc..c0673a7e4bf5 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -20,19 +20,17 @@
+ #define IRQ_SIZE		2
+ 
+ #define IDG_HEADER_LEN		10
+-#define IDG_SIZE_MSB		12
+-#define IDG_SIZE_LSB		13
+ #define MAX_BUFFER_SIZE		2048 /* referenced from K81 defined */
+ 				/* ViVOtech2  */
+-#define CLIENT_NEOII_Header_V2	"\x56\x69\x56\x4F\x74\x65\x63\x68\x32\x00"
+-				/* ViVOpayV5  */
+-#define CLIENT_NEOII_Header_V5	"\x56\x69\x56\x4F\x70\x61\x79\x56\x35\x00"
++#define IDG_Header_V2	"\x56\x69\x56\x4F\x74\x65\x63\x68\x32\x00"
++				/* ViVOtech5  */
++#define IDG_Header_V5	"\x56\x69\x56\x4F\x74\x65\x63\x68\x35\x00"
+ 				/* ViVO */
+ #define NEOII_Header		"\x56\x69\x56\x4F"
+ 				/* tech2  */
+ #define NEOII_Header_V2		"\x74\x65\x63\x68\x32\x00"
+-				/* payV5  */
+-#define NEOII_Header_V5		"\x70\x61\x79\x56\x35\x00"
++				/* tech5  */
++#define NEOII_Header_V5		"\x74\x65\x63\x68\x35\x00"
+ #define NEOII_HEADER_LEN	4
+ #define NEOII_VERSION_LEN	6
+ #define NEOII_CRC_LEN		2
+@@ -40,6 +38,12 @@
+ #define RX_SIZE_MSB		2
+ #define RX_SIZE_LSB		3
+ #define BASE_READ_SIZE		16
++#define V2_FRAME_SIZE		4  // read 4 more bytes for a complete V2 frame
++#define V5_FRAME_SIZE		9  // read 9 more bytes for a complete V5 frame
++#define V2_SIZE_MSB		12
++#define V2_SIZE_LSB		13
++#define V5_SIZE_MSB		17
++#define V5_SIZE_LSB		18
+ 
+ #define NUM_ASCII		48
+ #define UPPER_ASCII		55

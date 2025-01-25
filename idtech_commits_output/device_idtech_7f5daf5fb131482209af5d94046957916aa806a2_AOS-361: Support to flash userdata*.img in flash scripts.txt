@@ -1,0 +1,351 @@
+7f5daf5f George.Huang 2020-09-28
+
+AOS-361: Support to flash userdata*.img in flash scripts
+
+- will save 96 sec by "fastboot flash userdata userdata.img"
+  instead of "fastboot erase userdata"
+
+- generate userdata*.img from partition-table*.bpt due to different userdata size
+  userdata-28GB-dual.img from partition-table-28GB-dual.bpt
+  userdata-28GB.img      from partition-table-28GB.bpt
+  userdata-default.img   from partition-table-default.bpt
+  userdata-dual.img      from partition-table-dual.bpt
+  userdata.img           from partition-table.bpt
+
+- build command:
+  $ make userdataimage
+
+- fastboot commands to generate userdata.img:
+  $ fastboot getvar logical-block-size      (=512)
+  $ fastboot getvar erase-block-size        (=524288)
+  $ fastboot getvar partition-size:userdata (=7763656704)
+  blk_size=4096 (4K alignment)
+  stride=512/4096 (should >= 2x4K); stride=8192/4096=2
+  stripe-width=524288/4096=128
+  userdata_size=7228882944/4096=1764864
+  $ MKE2FS_CONFIG=$HOST_OUT/bin/mke2fs.conf $HOST_OUT/bin/mke2fs -t ext4 -b 4096
+    -E android_sparse,stride=2,stripe-width=128 -O uninit_bg userdata.img 1764864
+
+Change-Id: Id64b0fb983386b9cbfe496135465cc810211858f
+
+diff --git a/common/build/userdata.mk b/common/build/userdata.mk
+new file mode 100644
+index 00000000..8e70f6f9
+--- /dev/null
++++ b/common/build/userdata.mk
+@@ -0,0 +1,30 @@
++ifdef BOARD_BPT_INPUT_FILES
++
++USERDATA_DEFAULT_TARGET := $(PRODUCT_OUT)/userdata-default.img
++BLK_SIZE := 4096
++BUILD_ARGS := \
++  -t ext4 -b $(BLK_SIZE) \
++  -E android_sparse,stride=2,stripe-width=128 \
++  -O uninit_bg
++
++define build-userdataimage-target
++  $(call pretty,"Target userdata image: $(USERDATAIMAGE_TARGET)")
++  for bpt_file in `ls $(PRODUCT_OUT)/partition-table*.bpt`; do \
++    USERDATA_TARGET=`echo $$bpt_file |sed "s|partition-table|userdata|g" |sed "s|\.bpt|\.img|g"`; \
++    USERDATA_SIZE=`cat $$bpt_file |grep -A5 userdata |grep size |sed "s|.*: ||g" |sed "s|,||g"`; \
++    USERDATA_SIZE_BLK=`expr $$USERDATA_SIZE / $(BLK_SIZE)`; \
++    rm -f $$USERDATA_TARGET; \
++    MKE2FS_CONFIG=$(HOST_OUT)/bin/mke2fs.conf $(HOST_OUT)/bin/mke2fs $(BUILD_ARGS) $$USERDATA_TARGET $$USERDATA_SIZE_BLK; \
++  done
++endef
++
++USERDATAIMAGE_TARGET := $(USERDATA_DEFAULT_TARGET)
++$(USERDATAIMAGE_TARGET): $(BOARD_BPT_INPUT_FILES) $(IMX_INSTALLED_BPTIMAGE_TARGET)
++	$(build-userdataimage-target)
++
++ALL_DEFAULT_INSTALLED_MODULES += $(USERDATAIMAGE_TARGET)
++
++.PHONY: userdataimage
++userdataimage: $(USERDATAIMAGE_TARGET)
++
++endif # BOARD_BPT_INPUT_FILES
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 7489221a..b769dfde 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -29,6 +29,7 @@ set mem_info_file=mem_info.img
+ set dtbo_file=dtbo.img
+ set vbmeta_file=vbmeta.img
+ set android_info_file=android-info.txt
++set userdata_file=userdata.img
+ set soc_name=
+ set uboot_feature=
+ set dtb_feature=
+@@ -68,6 +69,7 @@ set mcu_os_partition=mcu_os
+ set super_partition=super
+ set board_info_partition=board_info
+ set mem_info_partition=mem_info
++set userdata_partition=userdata
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A lock=0
+@@ -193,6 +195,7 @@ if [%support_dual_bootloader%] == [1] (
+         set partition_file=partition-table.img
+     )
+ )
++set userdata_file=%partition_file:partition-table=userdata%
+ 
+ 
+ :: if directory is specified, and the last character is not backslash, add one backslash
+@@ -237,7 +240,8 @@ if %erase% == 1 (
+         %fastboot_tool% erase cache
+     )
+     %fastboot_tool% erase misc
+-    %fastboot_tool% format userdata
++    if EXIST %image_directory%%userdata_file% call :flash_partition %userdata_partition%
++    if NOT [%ERRORLEVEL%] == [0] %fastboot_tool% format userdata
+     if NOT [%ERRORLEVEL%] == [0] %fastboot_tool% erase userdata
+ )
+ if %lock% == 1 %fastboot_tool% oem lock
+@@ -461,6 +465,11 @@ if not [%partition_to_be_flashed:gpt=%] == [%partition_to_be_flashed%] (
+     goto :start_to_flash
+ )
+ 
++if not [%partition_to_be_flashed:userdata=%] == [%partition_to_be_flashed%] (
++    set img_name=%userdata_file%
++    goto :start_to_flash
++)
++
+ if not [%partition_to_be_flashed:super=%] == [%partition_to_be_flashed%] (
+     set img_name=%super_file%
+     if %dont_generate_super% == 0 (
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 947a3e7c..4e29c86e 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -148,6 +148,8 @@ function flash_partition
+         fi
+     elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+         img_name=${partition_file}
++    elif [ "$(echo ${1} | grep "userdata")" != "" ]; then
++        img_name=${userdata_file}
+     elif [ "$(echo ${1} | grep "super")" != "" ]; then
+         if [ ${dont_generate_super} -eq 0 ]; then
+             make_super_image
+@@ -456,6 +458,7 @@ mem_info_file="mem_info.img"
+ dtbo_file="dtbo.img"
+ vbmeta_file="vbmeta.img"
+ android_info_file="android-info.txt"
++userdata_file="userdata.img"
+ soc_name=""
+ uboot_feature=""
+ dtb_feature=""
+@@ -493,6 +496,7 @@ mcu_os_partition="mcu_os"
+ super_partition="super"
+ board_info_partition="board_info"
+ mem_info_partition="mem_info"
++userdata_partition="userdata"
+ flash_mcu=0
+ lock=0
+ erase=0
+@@ -609,6 +613,7 @@ else
+         partition_file="partition-table.img";
+     fi
+ fi
++userdata_file=`echo ${partition_file} |sed "s|partition-table|userdata|g"`
+ 
+ # if directory is specified, make sure there is a slash at the end
+ if [[ "${image_directory}" = "" ]]; then
+@@ -652,6 +657,7 @@ if [ ${erase} -eq 1 ]; then
+         ${fastboot_tool} erase cache
+     fi
+     ${fastboot_tool} erase misc
++    [ -f "${image_directory}${userdata_file}" ] && flash_partition userdata ||
+     ${fastboot_tool} format userdata ||
+     ${fastboot_tool} erase userdata
+ fi
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 208d6296..428e052b 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -30,6 +30,7 @@ set mem_info_file=mem_info.img
+ set dtbo_file=dtbo.img
+ set vbmeta_file=vbmeta.img
+ set android_info_file=android-info.txt
++set userdata_file=userdata.img
+ set soc_name=
+ set uboot_feature=
+ set uboot_feature_opt=
+@@ -67,6 +68,7 @@ set mcu_os_partition=mcu_os
+ set super_partition=super
+ set board_info_partition=board_info
+ set mem_info_partition=mem_info
++set userdata_partition=userdata
+ set /A flash_mcu=0
+ set /A statisc=0
+ set /A erase=0
+@@ -230,6 +232,7 @@ if [%support_dual_bootloader%] equ [1] (
+ )else (
+     if %card_size% gtr 0 set partition_file=partition-table-%card_size%GB.img
+ )
++set userdata_file=%partition_file:partition-table=userdata%
+ 
+ :: dump the partition table image file into text file and check whether some partition names are in it
+ if exist partition-table_1.txt (
+@@ -522,7 +525,11 @@ if %erase% == 1 (
+     if %support_recovery% == 1 (
+         echo FB[-t 600000]: erase cache>> uuu.lst
+     )
+-    echo FB[-t 600000]: erase userdata>> uuu.lst
++    if EXIST %image_directory%%userdata_file% (
++        call :flash_partition %userdata_partition% || set /A error_level=1 && goto :exit
++    ) else (
++        echo FB[-t 600000]: erase userdata>> uuu.lst
++    )
+ )
+ 
+ echo FB: done >> uuu.lst
+@@ -831,6 +838,11 @@ if not [%partition_to_be_flashed:gpt=%] == [%partition_to_be_flashed%] (
+     goto :start_to_flash
+ )
+ 
++if not [%partition_to_be_flashed:userdata=%] == [%partition_to_be_flashed%] (
++    set img_name=%userdata_file%
++    goto :start_to_flash
++)
++
+ :start_to_flash
+ echo generate lines to flash %img_name% to the partition of %1
+ if [%img_name%] == [%super_file%] (
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 484cdd8e..eeb1f3a7 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -192,6 +192,8 @@ function flash_partition
+         fi
+     elif [ "$(echo ${1} | grep "gpt")" != "" ]; then
+         img_name=${partition_file}
++    elif [ "$(echo ${1} | grep "userdata")" != "" ]; then
++        img_name=${userdata_file}
+     elif [ "$(echo ${1} | grep "super")" != "" ]; then
+         if [ ${dont_generate_super} -eq 0 ]; then
+             make_super_image
+@@ -463,6 +465,7 @@ mem_info_file="mem_info.img"
+ dtbo_file="dtbo.img"
+ vbmeta_file="vbmeta.img"
+ android_info_file="android-info.txt"
++userdata_file="userdata.img"
+ soc_name=""
+ uboot_feature=""
+ dtb_feature=""
+@@ -497,7 +500,7 @@ mcu_os_partition="mcu_os"
+ super_partition="super"
+ board_info_partition="board_info"
+ mem_info_partition="mem_info"
+-
++userdata_partition="userdata"
+ flash_mcu=0
+ erase=0
+ image_directory=""
+@@ -689,6 +692,7 @@ else
+         partition_file="partition-table.img";
+     fi
+ fi
++userdata_file=`echo ${partition_file} |sed "s|partition-table|userdata|g"`
+ 
+ # dump the partition table image file into text file and check whether some partition names are in it
+ hexdump -C -v ${image_directory}${partition_file} > /tmp/partition-table_1.txt
+@@ -929,6 +933,7 @@ if [ ${erase} -eq 1 ]; then
+     if [ ${support_recovery} -eq 1 ]; then
+         echo FB[-t 600000]: erase cache >> /tmp/uuu.lst
+     fi
++    [ -f "${image_directory}${userdata_file}" ] && flash_partition userdata ||
+     echo FB[-t 600000]: erase userdata >> /tmp/uuu.lst
+ fi
+ 
+diff --git a/imx8m/bigcypress_8mp/AndroidBoard.mk b/imx8m/bigcypress_8mp/AndroidBoard.mk
+index e9cf443e..a6a92de5 100644
+--- a/imx8m/bigcypress_8mp/AndroidBoard.mk
++++ b/imx8m/bigcypress_8mp/AndroidBoard.mk
+@@ -3,6 +3,7 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ #TODO add imx8mp target
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/bigcypress_8mq/AndroidBoard.mk b/imx8m/bigcypress_8mq/AndroidBoard.mk
+index 84e328fe..97d97bf5 100644
+--- a/imx8m/bigcypress_8mq/AndroidBoard.mk
++++ b/imx8m/bigcypress_8mq/AndroidBoard.mk
+@@ -3,5 +3,6 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a100/AndroidBoard.mk b/imx8m/evk_a100/AndroidBoard.mk
+index 84e328fe..97d97bf5 100644
+--- a/imx8m/evk_a100/AndroidBoard.mk
++++ b/imx8m/evk_a100/AndroidBoard.mk
+@@ -3,5 +3,6 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a200/AndroidBoard.mk b/imx8m/evk_a200/AndroidBoard.mk
+index e9cf443e..a6a92de5 100644
+--- a/imx8m/evk_a200/AndroidBoard.mk
++++ b/imx8m/evk_a200/AndroidBoard.mk
+@@ -3,6 +3,7 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ #TODO add imx8mp target
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/evk_a300/AndroidBoard.mk b/imx8m/evk_a300/AndroidBoard.mk
+index 84e328fe..97d97bf5 100644
+--- a/imx8m/evk_a300/AndroidBoard.mk
++++ b/imx8m/evk_a300/AndroidBoard.mk
+@@ -3,5 +3,6 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/vp6820_8mn/AndroidBoard.mk b/imx8m/vp6820_8mn/AndroidBoard.mk
+index 84e328fe..97d97bf5 100644
+--- a/imx8m/vp6820_8mn/AndroidBoard.mk
++++ b/imx8m/vp6820_8mn/AndroidBoard.mk
+@@ -3,5 +3,6 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/vp6820_8mp/AndroidBoard.mk b/imx8m/vp6820_8mp/AndroidBoard.mk
+index e9cf443e..a6a92de5 100644
+--- a/imx8m/vp6820_8mp/AndroidBoard.mk
++++ b/imx8m/vp6820_8mp/AndroidBoard.mk
+@@ -3,6 +3,7 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ #TODO add imx8mp target
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+diff --git a/imx8m/vp6820_8mq/AndroidBoard.mk b/imx8m/vp6820_8mq/AndroidBoard.mk
+index 84e328fe..97d97bf5 100644
+--- a/imx8m/vp6820_8mq/AndroidBoard.mk
++++ b/imx8m/vp6820_8mq/AndroidBoard.mk
+@@ -3,5 +3,6 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk

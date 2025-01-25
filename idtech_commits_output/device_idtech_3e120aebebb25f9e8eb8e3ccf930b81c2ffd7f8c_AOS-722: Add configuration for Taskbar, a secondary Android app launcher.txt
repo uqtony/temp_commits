@@ -1,0 +1,98 @@
+3e120aeb Brian Lee 2021-09-09
+
+AOS-722: Add configuration for Taskbar, a secondary Android app launcher
+
+01/ Taskbar is default built in for all projects
+02/ To disable Taskbar for specific project,
+    set "ENABLE_TASKBAR := false" before include ProductConfigCommon.mk
+03/ Set Taskbar as default secondary launcher
+04/ Add overlay value to enable freeform and desktop mode
+
+Change-Id: I38fc0f6879c6054539bb63258ca29738eea733a4
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index e41dba1e..2ea2ff08 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -36,6 +36,15 @@ PRODUCT_PROPERTY_OVERRIDES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.control_privapp_permissions=enforce
+ 
++# set ENABLE_TASKBAR := false to disable
++ifneq ($(ENABLE_TASKBAR),false)
++PRODUCT_PACKAGE_OVERLAYS += \
++    $(IMX_DEVICE_PATH)/overlay_taskbar
++
++PRODUCT_PACKAGES += \
++    TaskbarDebug
++
++endif
+ 
+ # -------@block_multimedia_codec-------
+ 
+diff --git a/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/core/res/res/values/config.xml b/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/core/res/res/values/config.xml
+new file mode 100644
+index 00000000..6d279d68
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/core/res/res/values/config.xml
+@@ -0,0 +1,31 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++/*
++** Copyright 2011, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++
++<!-- These resources are around just to allow their values to be customized
++     for different hardware and product builds. -->
++<resources>
++    <!-- This is the default launcher package with an activity to use on secondary displays that
++         support system decorations.
++         This launcher package must have an activity that supports multiple instances and has
++         corresponding launch mode set in AndroidManifest.
++         {@see android.view.Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS} -->
++    <!-- <string name="config_secondaryHomePackage" translatable="false">com.farmerbb.taskbar.androidx86</string> -->
++    <string name="config_secondaryHomePackage" translatable="false">com.farmerbb.taskbar.debug</string>
++    <!-- <string name="config_secondaryHomePackage" translatable="false">com.farmerbb.taskbar</string> -->
++</resources>
+diff --git a/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/packages/SettingsProvider/res/values/defaults.xml b/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+new file mode 100644
+index 00000000..63b7551e
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/overlay_taskbar/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++/**
++ * Copyright (c) 2009, The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++-->
++<resources>
++    <!-- Default for Settings.Global -->
++    <integer name="def_enable_freeform_support">1</integer>
++    <integer name="def_force_desktop_mode_on_external_displays">1</integer>
++</resources>

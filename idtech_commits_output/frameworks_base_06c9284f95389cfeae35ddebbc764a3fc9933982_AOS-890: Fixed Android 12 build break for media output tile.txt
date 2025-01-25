@@ -1,0 +1,95 @@
+06c9284f9538 Brian Lee 2022-03-10
+
+AOS-890: Fixed Android 12 build break for media output tile
+
+Fixed media output tile build break on Android 12
+
+Change-Id: Ibc32e47094627c1d6997e604034499273514a75e
+
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java b/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java
+index bbbfdb80bdb6..4d63570b6da2 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/tiles/MediaOutputTile.java
+@@ -2,6 +2,8 @@ package com.android.systemui.qs.tiles;
+ 
+ import android.content.Context;
+ import android.content.Intent;
++import android.os.Handler;
++import android.os.Looper;
+ import android.provider.Settings;
+ import android.media.MediaRouter;
+ import android.media.session.MediaController;
+@@ -9,15 +11,25 @@ import android.media.session.MediaSession.Token;
+ import android.media.session.MediaSessionManager;
+ import android.media.session.PlaybackState;
+ import android.service.quicksettings.Tile;
++import android.view.View;
+ 
++import androidx.annotation.Nullable;
++
++import com.android.internal.logging.MetricsLogger;
+ import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
+ import com.android.systemui.R;
+-import com.android.systemui.R.drawable;
++import com.android.systemui.broadcast.BroadcastDispatcher;
++import com.android.systemui.dagger.qualifiers.Background;
++import com.android.systemui.dagger.qualifiers.Main;
++import com.android.systemui.plugins.ActivityStarter;
++import com.android.systemui.plugins.FalsingManager;
+ import com.android.systemui.plugins.qs.QSTile.BooleanState;
++import com.android.systemui.plugins.statusbar.StatusBarStateController;
+ import com.android.systemui.qs.QSHost;
++import com.android.systemui.qs.logging.QSLogger;
+ import com.android.systemui.qs.tileimpl.QSTileImpl;
+ 
+-import com.android.settingslib.media.MediaOutputSliceConstants;
++import com.android.settingslib.media.MediaOutputConstants;
+ 
+ import javax.inject.Inject;
+ 
+@@ -32,8 +44,19 @@ public class MediaOutputTile extends QSTileImpl<BooleanState> {
+     private MediaController mMediaController = null;
+ 
+     @Inject
+-    public MediaOutputTile(QSHost host) {
+-        super(host);
++    public MediaOutputTile(
++            QSHost host,
++            @Background Looper backgroundLooper,
++            @Main Handler mainHandler,
++            FalsingManager falsingManager,
++            MetricsLogger metricsLogger,
++            StatusBarStateController statusBarStateController,
++            ActivityStarter activityStarter,
++            QSLogger qsLogger,
++            BroadcastDispatcher broadcastDispatcher
++    ) {
++        super(host, backgroundLooper, mainHandler, falsingManager, metricsLogger,
++                statusBarStateController, activityStarter, qsLogger);
+     }
+ 
+     @Override
+@@ -61,7 +84,7 @@ public class MediaOutputTile extends QSTileImpl<BooleanState> {
+     }
+ 
+     @Override
+-    protected void handleClick() {
++    protected void handleClick(@Nullable View view) {
+         String packageName = "";
+         Token sessionToken = null;
+ 
+@@ -74,10 +97,10 @@ public class MediaOutputTile extends QSTileImpl<BooleanState> {
+             .setAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+ 
+         mContext.sendBroadcast(new Intent()
+-            .setAction(MediaOutputSliceConstants.ACTION_LAUNCH_MEDIA_OUTPUT_DIALOG)
+-            .setPackage(MediaOutputSliceConstants.SYSTEMUI_PACKAGE_NAME)
+-            .putExtra(MediaOutputSliceConstants.EXTRA_PACKAGE_NAME, packageName)
+-            .putExtra(MediaOutputSliceConstants.KEY_MEDIA_SESSION_TOKEN, sessionToken));
++            .setAction(MediaOutputConstants.ACTION_LAUNCH_MEDIA_OUTPUT_DIALOG)
++            .setPackage(MediaOutputConstants.SYSTEMUI_PACKAGE_NAME)
++            .putExtra(MediaOutputConstants.EXTRA_PACKAGE_NAME, packageName)
++            .putExtra(MediaOutputConstants.KEY_MEDIA_SESSION_TOKEN, sessionToken));
+     }
+ 
+     @Override

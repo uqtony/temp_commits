@@ -1,0 +1,296 @@
+92ed0de max.yang 2020-06-18
+
+AOS-216: [Multiple DDR] Support to transfer dram source to meminfo raw data
+
+  1. Usage: python generate_meminfo.py
+  2. Everytime new dram timing phased in, we should update DRAM_TIMING_DATA
+     list in this script
+  3. It should input multiple timing.c and timing.o file and output single
+     mem_info.img for mem_info partition
+
+  TODO: Currently .o file under UBOOT_OBJ will be cleared before builing next
+        uboot rule, so we use pre-build image first and should find proper way
+        to make image dynamiclly.
+
+Change-Id: Id67b86f42acebdf015f0528ff1a252da9d782ea7
+
+diff --git a/generate_meminfo.py b/generate_meminfo.py
+new file mode 100644
+index 0000000..f3bada5
+--- /dev/null
++++ b/generate_meminfo.py
+@@ -0,0 +1,273 @@
++#!/usr/bin/env python
++
++import os
++import sys
++import subprocess
++import tempfile
++import struct
++import math
++
++'''
++!!!!! IMPORTANT !!!!
++1. Since we should design a big-enough data struct to put all necessary
++   elements, a 4-unsigned int size struct is used to put all arguments.
++   We expect to write 10 struct idt_dram_hdr objects into header block.
++   Take devboard's timing data for example:
++   { {   0,   0,   1, 111}, // index0: ddrc_cfg
++     {   0,   0,   3, 206}, // index1: ddrphy_cfg
++     {   0,   0,   0,   4}, // index2: fsp_msg
++     {3200,   0,   7,  34}, // index3: ddr_dram_fsp_msg[0]
++     { 400,   0,   8,  35}, // index4: ddr_dram_fsp_msg[1]
++     { 100,   0,   9,  35}, // index5: ddr_dram_fsp_msg[2]
++     {3200,   1,  10,  37}, // index6: ddr_dram_fsp_msg[3]
++     {   0,   0,  11, 719}, // index7: ddrphy_trained_csr
++     {   0,   0,  23, 588}, // index8: ddrphy_pie
++     {3200, 400, 100,   0}  // index9: fsp_table
++   }
++
++2. Here are original data structure from uboot dram timing source code.
++enum fw_type {
++        FW_1D_IMAGE,
++        FW_2D_IMAGE,
++};
++
++struct dram_cfg_param {
++        unsigned int reg;
++        unsigned int val;
++};
++
++struct dram_fsp_msg {
++        unsigned int drate;
++        enum fw_type fw_type;
++        struct dram_cfg_param *fsp_cfg;
++        unsigned int fsp_cfg_num;
++};
++
++struct dram_timing_info {
++        /* umctl2 config */
++        struct dram_cfg_param *ddrc_cfg;
++        unsigned int ddrc_cfg_num;
++        /* ddrphy config */
++        struct dram_cfg_param *ddrphy_cfg;
++        unsigned int ddrphy_cfg_num;
++        /* ddr fsp train info */
++        struct dram_fsp_msg *fsp_msg;
++        unsigned int fsp_msg_num;
++        /* ddr phy trained CSR */
++        struct dram_cfg_param *ddrphy_trained_csr;
++        unsigned int ddrphy_trained_csr_num;
++        /* ddr phy PIE */
++        struct dram_cfg_param *ddrphy_pie;
++        unsigned int ddrphy_pie_num;
++        /* initialized drate table */
++        unsigned int fsp_table[4];
++};
++'''
++
++#TODO find a way to update this, .o will be erased once we perform next u-boot build
++DRAM_TIMING_DATA = [['devboard', 'evt', '/PATH/TO/A300/lpddr4_timing_2g.c', '/PATH/TO/A300/lpddr4_timing_2g.o'],
++                    ['evk', 'evk', '/PATH/TO/PATH/TO/EVK/lpddr4_timing.c', '/PATH/TO/EVK/lpddr4_timing.o']
++                    ]
++
++BLOCK_SIZE = 512.0
++CFG_SIZE = 8 # sizeof(struct dram_cfg_param)
++FSP_MSG_ITEMS = 4
++FORMAT_STRING_MEMOBJ = ('I' # drate, 0 for nothing
++                        'I' # type, 0 or 1
++                        'I' # offset from header blk
++                        'I' # array_size
++                           )
++FORMAT_STRING_ROOT = ('16s' # name, align BDINFO_DATA_SIZE
++                      '16s' # feature, align BDINFO_DATA_SIZE
++                      'I'   # offset
++                      'I'   # size
++                           )
++
++class hdr_object(object):
++  def __init__(self, name, size, blob):
++    self.name = name
++    self.size = size
++    self.blob = blob
++
++class dram_timing(object):
++  def __init__(self, path):
++    self.mem_hdr = bytearray()
++    self.mem_body = bytearray()
++    self.body_offset = 1 # 0 for header, start from 1
++    self.hdr_array = []
++    self.fsp_msg_ary = []
++    self.ary_raw_info = []
++    with open(path, "r") as f:
++      f_data = f.read()
++      self.ddrc_cfg_name           = self.find_ary_name(f_data, ".ddrc_cfg")
++      self.ddrphy_cfg_name         = self.find_ary_name(f_data, ".ddrphy_cfg")
++      self.fsp_msg_name            = self.find_ary_name(f_data, ".fsp_msg")
++      self.handle_fsp_msg(f, self.fsp_msg_name)
++
++      self.ddrphy_trained_csr_name = self.find_ary_name(f_data, ".ddrphy_trained_csr")
++      self.ddrphy_pie_name         = self.find_ary_name(f_data, ".ddrphy_pie")
++
++      self.fsp_table               = self.find_ary_name(f_data, ".fsp_table").split(" ")
++      for i in range(FSP_MSG_ITEMS - len(self.fsp_table)):
++        self.fsp_table.append(0)
++
++  def handle_fsp_msg(self, f_ptr, name):
++    f_ptr.seek(0, 0)
++    for line in f_ptr:
++      if line.strip().startswith(".drate"):
++        drate = line.split('=')[1].strip().strip(',')
++        fw_type = f_ptr.next().split('=')[1].strip().strip(',')
++        fw_t = 0 if fw_type == "FW_1D_IMAGE" else 1
++        fsp_cfg = f_ptr.next().split('=')[1].strip().strip(',')
++        self.fsp_msg_ary.append([fsp_cfg, drate, fw_t])
++
++    print(self.fsp_msg_ary)
++
++  def find_ary_name(self, blob, target):
++    for line in blob.split('
+'):
++      if line.strip().startswith(target):
++        ll = line.strip().split('=')
++        if ll[0].strip() == target:
++          print('{} array_name: {}\''.format(target, ll[1].strip().replace(",", "")))
++          return ll[1].strip().replace(",", "").strip('{').strip('}').strip()
++    return None
++
++  def print_hdr(self):
++    print("---------------")
++    for item in self.hdr_array:
++      print('name: {}, size: {}'.format(item.name, item.size))
++    print("---------------")
++
++  def update_hdr(self, blob, name):
++    # item[0]: name, [1]:start, [2]:size
++    if name is None: # in case we need NULL object
++      self.hdr_array.append(hdr_object(None, 0, None))
++      return
++    for item in self.ary_raw_info:
++      if item[0] == ".data." + name:
++        self.hdr_array.append(hdr_object(name, item[2], blob[item[1] : item[1]+item[2]]))
++
++  def update_hdr_fsp_msg(self, blob, name):
++    # handle fsp_msg item
++    self.hdr_array.append(hdr_object(name, len(self.fsp_msg_ary), None))
++    # handle fsp_msg sub-item
++    for fsp_item in self.fsp_msg_ary:
++      self.update_hdr(blob, fsp_item[0])
++
++    # expect 4 elements, put 0 for rest items
++    for i in range(FSP_MSG_ITEMS - len(self.fsp_msg_ary)):
++      self.update_hdr(blob, None)
++
++  def update_obj(self, path):
++    p = subprocess.Popen(['objdump', '-h', path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
++    retcode = p.wait()
++    if retcode != 0:
++      raise ValueError('Error generating objdump file')
++    for line in p.stdout:
++      item = line.split()
++      # Idx  Name          Size      VMA               LMA               File off  Algn
++      if len(item) == 7 and item[1].startswith(".data"):
++        #                          name        start             size
++        self.ary_raw_info.append([item[1], int(item[5], 16), int(item[2], 16)])
++
++    with open(path, "r") as f:
++      obj_blob = f.read()
++
++    self.update_hdr(obj_blob, self.ddrc_cfg_name)
++    self.update_hdr(obj_blob, self.ddrphy_cfg_name)
++    self.update_hdr_fsp_msg(obj_blob, self.fsp_msg_name)
++    self.update_hdr(obj_blob, self.ddrphy_trained_csr_name)
++    self.update_hdr(obj_blob, self.ddrphy_pie_name)
++
++  def update_meminfo(self, hdr_obj, fsp_item=None):
++    drate = 0
++    fw_t  = 0
++    if fsp_item is not None:
++      drate = int(fsp_item[1])
++      fw_t  = int(fsp_item[2])
++
++    if hdr_obj.name is None:
++      # in case those elements not be initialized, leave all 0 in header
++      self.mem_hdr  += struct.pack(FORMAT_STRING_MEMOBJ, 0, 0, 0, 0)
++      return
++
++    self.mem_hdr  += struct.pack(FORMAT_STRING_MEMOBJ, drate, fw_t, self.body_offset, hdr_obj.size/CFG_SIZE)
++    # blob + padding (BLOCK_SIZE alignment)
++    self.mem_body += hdr_obj.blob + struct.pack(str(int(BLOCK_SIZE - (hdr_obj.size%BLOCK_SIZE))) + 'x')
++    self.body_offset += math.ceil(hdr_obj.size/BLOCK_SIZE)
++
++  def compose_meminfo(self):
++    # ddr_ddrc_cfg
++    self.update_meminfo(self.hdr_array[0])
++    # ddr_ddrphy_cfg
++    self.update_meminfo(self.hdr_array[1])
++
++    # fsp_msg
++    self.mem_hdr += struct.pack(FORMAT_STRING_MEMOBJ, 0, 0, 0, len(self.fsp_msg_ary))
++    # fsp_msg sub members, start from index:3
++    for i in range(FSP_MSG_ITEMS):
++      if self.hdr_array[3+i].name is None:
++        self.update_meminfo(self.hdr_array[3+i], None)
++      else:
++        self.update_meminfo(self.hdr_array[3+i], self.fsp_msg_ary[i])
++
++    # ddr_ddrphy_trained_csr
++    self.update_meminfo(self.hdr_array[7])
++    # ddr_phy_pie
++    self.update_meminfo(self.hdr_array[8])
++
++    # fsp_table
++    self.mem_hdr += struct.pack(FORMAT_STRING_MEMOBJ, int(self.fsp_table[0]), int(self.fsp_table[1]), int(self.fsp_table[2]), int(self.fsp_table[3]))
++
++    # padding header block
++    padding = int(BLOCK_SIZE - (len(self.mem_hdr)%BLOCK_SIZE))
++    self.mem_hdr += struct.pack(str(padding) + 'x')
++
++  def output_meminfo(self, path):
++    with open(path, "w") as f:
++      f.write(self.mem_hdr)
++      f.write(self.mem_body)
++
++def make_meminfo_obj(dram_code, dram_obj):
++  # get array name from source code
++  # init struct member array and sub-array
++  d_data = dram_timing(dram_code)
++
++  # parse and get raw data for each array name
++  # update header objects
++  d_data.update_obj(dram_obj)
++
++  d_data.print_hdr()
++
++  d_data.compose_meminfo()
++
++  #d_data.output_meminfo("./meminfo")
++
++  return d_data
++
++def main(argv):
++  mem_root_hdr = struct.pack('I', len(DRAM_TIMING_DATA))
++  mem_root_body = bytearray()
++  offset = 1 # first block for header
++
++  for item in DRAM_TIMING_DATA:
++    local_blob = bytearray()
++    single_mem_obj = make_meminfo_obj(item[2], item[3])
++    local_blob += single_mem_obj.mem_hdr
++    local_blob += single_mem_obj.mem_body
++    size = int(len(local_blob)/BLOCK_SIZE)
++    mem_root_hdr += struct.pack(FORMAT_STRING_ROOT, item[0], item[1], offset, size)
++
++    offset += size
++    mem_root_body += local_blob
++
++  # padding header block to BLOCK_SIZE
++  padding = int(BLOCK_SIZE - len(mem_root_hdr))
++  mem_root_hdr += struct.pack(str(padding) + 'x')
++
++  with open("./mem_info.img", "w") as f:
++    f.write(mem_root_hdr)
++    f.write(mem_root_body)
++
++if __name__ == '__main__':
++  main(sys.argv[1:])

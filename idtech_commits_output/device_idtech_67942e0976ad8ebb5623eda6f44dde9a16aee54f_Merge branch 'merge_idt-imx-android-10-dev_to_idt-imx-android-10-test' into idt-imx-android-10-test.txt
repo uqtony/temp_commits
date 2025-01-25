@@ -1,0 +1,176 @@
+67942e09 jenkins 2020-06-19
+
+Merge branch 'merge_idt-imx-android-10-dev_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: Ib07ceef5e72a326f11d4963769b09fcdef25c1ea
+
+diff --cc common/tools/fastboot_imx_flashall.bat
+index de78299c,c461fef2..291ede58
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@@ -41,8 -43,8 +44,9 @@@ set /A support_recovery=
+  set /A support_dualslot=0
+  set /A support_mcu_os=0
+  set /A support_dual_bootloader=0
+ +set /A support_dynamic_partition=0
+  set /A support_board_info=0
++ set /A support_mem_info=0
+  set /A write_bdinfo_serial=0
+  set /A support_idt_dual_spl=0
+  set /A support_idt_backup_spl=0
+@@@ -59,8 -61,8 +63,9 @@@ set product_partition=produc
+  set vbmeta_partition=vbmeta
+  set dtbo_partition=dtbo
+  set mcu_os_partition=mcu_os
+ +set super_partition=super
+  set board_info_partition=board_info
++ set mem_info_partition=mem_info
+  set /A flash_mcu=0
+  set /A statisc=0
+  set /A lock=0
+diff --cc common/tools/fastboot_imx_flashall.sh
+index c81af06d,da0bf792..44a25b57
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@@ -430,8 -385,8 +446,9 @@@ support_recovery=
+  support_dualslot=0
+  support_mcu_os=0
+  support_dual_bootloader=0
+ +support_dynamic_partition=0
+  support_board_info=0
++ support_mem_info=0
+  write_bdinfo_serial=0
+  support_idt_dual_spl=0
+  support_idt_backup_spl=0
+@@@ -447,8 -402,8 +464,9 @@@ product_partition="product
+  vbmeta_partition="vbmeta"
+  dtbo_partition="dtbo"
+  mcu_os_partition="mcu_os"
+ +super_partition="super"
+  board_info_partition="board_info"
++ mem_info_partition="mem_info"
+  flash_mcu=0
+  lock=0
+  erase=0
+diff --cc common/tools/uuu_imx_android_flash.bat
+index 2725e0d8,51645ba3..cf7c1f74
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@@ -44,12 -46,12 +47,13 @@@ set /A support_recovery=
+  set /A support_dualslot=0
+  set /A support_mcu_os=0
+  set /A support_trusty=0
+ +set /A support_dynamic_partition=0
+  set /A support_board_info=0
++ set /A support_mem_info=0
+  set /A write_bdinfo_serial=0
+ -set /A support_idt_dual_spl=1
+ -set /A support_idt_backup_spl=1
+ -set /A support_idt_spl_table=1
+ +set /A support_idt_dual_spl=0
+ +set /A support_idt_backup_spl=0
+ +set /A support_idt_spl_table=0
+  set boot_partition=boot
+  set recovery_partition=recovery
+  set system_partition=system
+@@@ -58,8 -60,8 +62,9 @@@ set product_partition=produc
+  set vbmeta_partition=vbmeta
+  set dtbo_partition=dtbo
+  set mcu_os_partition=mcu_os
+ +set super_partition=super
+  set board_info_partition=board_info
++ set mem_info_partition=mem_info
+  set /A flash_mcu=0
+  set /A statisc=0
+  set /A erase=0
+diff --cc common/tools/uuu_imx_android_flash.sh
+index 7d49da23,8a23ff35..0589068b
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@@ -457,12 -412,12 +471,13 @@@ support_recovery=
+  support_dualslot=0
+  support_mcu_os=0
+  support_trusty=0
+ +support_dynamic_partition=0
+  support_board_info=0
++ support_mem_info=0
+  write_bdinfo_serial=0
+ -support_idt_dual_spl=1
+ -support_idt_backup_spl=1
+ -support_idt_spl_table=1
+ +support_idt_dual_spl=0
+ +support_idt_backup_spl=0
+ +support_idt_spl_table=0
+  boot_partition="boot"
+  recovery_partition="recovery"
+  system_partition="system"
+@@@ -471,8 -426,8 +486,9 @@@ product_partition="product
+  vbmeta_partition="vbmeta"
+  dtbo_partition="dtbo"
+  mcu_os_partition="mcu_os"
+ +super_partition="super"
+  board_info_partition="board_info"
++ mem_info_partition="mem_info"
+  
+  flash_mcu=0
+  erase=0
+diff --cc imx8m/evk_a300/evk_a300.mk
+index 664584e9,b4c0d021..06063533
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@@ -76,23 -49,9 +76,24 @@@ PRODUCT_COPY_FILES += 
+      device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+      device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+      device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
+-     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
++     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++     device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img
+  
+ +ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ +PRODUCT_COPY_FILES += \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
+ +endif
+ +
+ +# Audio card json
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+ +    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+ +    device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+ +    device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+ +    device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+ +    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ +
+  ifeq ($(PRODUCT_IMX_TRUSTY),true)
+  PRODUCT_COPY_FILES += \
+      device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
+diff --cc imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 2e7c293c,0572a09a..51f81c5e
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@@ -80,23 -52,9 +80,24 @@@ PRODUCT_COPY_FILES += 
+      device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/device_owner_2.xml \
+      device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
+      device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
+-     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
++     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++     device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img
+  
+ +ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ +PRODUCT_COPY_FILES += \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake:lpmake \
+ +    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/dynamic_partiton_tools/lpmake.exe:lpmake.exe
+ +endif
+ +
+ +# Audio card json
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
+ +    device/idtech/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
+ +    device/idtech/common/audio-json/cdnhdmi_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/cdnhdmi_config.json \
+ +    device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+ +    device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+ +    device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ +
+  ifeq ($(PRODUCT_IMX_TRUSTY),true)
+  PRODUCT_COPY_FILES += \
+      device/idtech/common/security/rpmb_key_test.bin:rpmb_key_test.bin \

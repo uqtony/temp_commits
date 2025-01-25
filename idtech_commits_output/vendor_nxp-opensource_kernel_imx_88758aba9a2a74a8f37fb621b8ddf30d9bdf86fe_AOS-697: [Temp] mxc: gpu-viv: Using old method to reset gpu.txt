@@ -1,0 +1,43 @@
+88758aba9a2a Jay 2021-09-06
+
+AOS-697: [Temp] mxc: gpu-viv: Using old method to reset gpu
+
+symptom : IMX8MP Linux spend long time to probe GPU driver
+
+Change gcdFLOP_RESET from 1 to 0, using old method to reset
+gpu. If old method is deprecated then must revert this commit.
+
+Change-Id: Ia40ca837a2d159e19db799b9c1def75039979929
+
+diff --git a/drivers/mxc/gpu-viv/Kconfig b/drivers/mxc/gpu-viv/Kconfig
+index 4fdb044c84dc..c7c87c475bc2 100644
+--- a/drivers/mxc/gpu-viv/Kconfig
++++ b/drivers/mxc/gpu-viv/Kconfig
+@@ -7,4 +7,10 @@ config MXC_GPU_VIV
+ 	help
+          Say Y to get the GPU driver support.
+ 
++config GPU_OLD_RESET_METHOD
++	tristate "Use old reset method"
++
++	help
++	 Say Y to use old reset method to reset GPU
++
+ endmenu
+diff --git a/drivers/mxc/gpu-viv/hal/kernel/arch/gc_hal_kernel_hardware_func.h b/drivers/mxc/gpu-viv/hal/kernel/arch/gc_hal_kernel_hardware_func.h
+index 8aeef66c638c..24a86028c423 100644
+--- a/drivers/mxc/gpu-viv/hal/kernel/arch/gc_hal_kernel_hardware_func.h
++++ b/drivers/mxc/gpu-viv/hal/kernel/arch/gc_hal_kernel_hardware_func.h
+@@ -59,8 +59,11 @@
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+-
++#ifdef CONFIG_GPU_OLD_RESET_METHOD
++#define gcdFLOP_RESET           0
++#else
+ #define gcdFLOP_RESET           1
++#endif
+ #define gcdFLOP_RESET_PPU       1
+ #define gcdFLOP_RESET_NN        1
+ #define gcdFLOP_RESET_TP        1

@@ -1,0 +1,56 @@
+070dafa5 Arthur Chen 2019-11-26
+
+AOS-12: uuu: Enable to flash bootloader about 1GB RAM size setting for evk.
+
+Change-Id: I124d457bd6601e9476db97d1dc7c7b943827f569
+
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 30ab8dd7..fd1efb8d 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -78,6 +78,7 @@ options:
+                         including the name of yocto sdcard image, this parameter could be a relative path or an absolute path
+   -i                with this option used, after uboot for uuu loaded and executed to fastboot mode with target device chosen, this script will stop
+                         This option is for users to manually flash the images to partitions they want to
++  -R                with this option used, choose the u-boot about 1GB RAM setting.
+   -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+ EOF
+@@ -344,6 +345,8 @@ imx8mq_dtb_feature=(dual mipi-panel mipi)
+ imx8qxp_dtb_feature=()
+ imx8qm_dtb_feature=(hdmi mipi-panel md xen)
+ imx7ulp_dtb_feature=(evk-mipi evk mipi)
++ramsize=""
++ramsizetest=0
+ 
+ 
+ echo -e This script is validated with ${RED}uuu 1.3.102${STD} version, please align with this version.
+@@ -370,6 +373,7 @@ while [ $# -gt 0 ]; do
+         -y) yocto_image=$2; shift;;
+         -p) board=$2; shift;;
+         -i) intervene=1 ;;
++        -R) ramsizetest=1 ;;
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+@@ -398,6 +402,11 @@ if [ ${intervene} -eq 1 ] && [ ${daemon_mode} -eq 1 ]; then
+     echo -daemon mode will be igonred
+ fi
+ 
++# if ramsizetest is specified, assign 1GB RAM size
++if [ ${ramsizetest} -eq 1 ] ; then
++    ramsize="-ram1GB"
++fi
++
+ # for specified directory, make sure there is a slash at the end
+ if [[ "${image_directory}" != "" ]]; then
+      image_directory="${image_directory%/}/";
+@@ -589,7 +598,7 @@ fi
+ 
+ # default bootloader image name
+ bootloader_used_by_uuu=u-boot-${soc_name}-${board}-uuu.imx
+-bootloader_flashed_to_board="u-boot-${soc_name}${uboot_feature}.imx"
++bootloader_flashed_to_board="u-boot-${soc_name}${ramsize}${uboot_feature}.imx"
+ 
+ # find the names of the bootloader used by uuu
+ if [ "${soc_name}" = imx8mm ]; then

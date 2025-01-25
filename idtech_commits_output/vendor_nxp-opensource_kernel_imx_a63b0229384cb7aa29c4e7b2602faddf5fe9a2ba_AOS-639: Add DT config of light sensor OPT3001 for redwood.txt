@@ -1,0 +1,126 @@
+a63b0229384c Jay 2021-06-15
+
+AOS-639: Add DT config of light sensor OPT3001 for redwood
+
+Add configuration of device tree for light sensor OPT3001.
+Remove keypad configuration due to pin conflict and we also
+do not use keypad matrix in redwood.
+
+Change-Id: I0b28c9c5c82230f915675830cf008dabb3ed0478
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index c309b5163f8c..a7a804a8be94 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -142,6 +142,16 @@ reg_aud_1v8_vdd_dummy: fixed-regulator-1v8-vdd {
+ 		regulator-always-on;
+ 	};
+ 
++	reg_light_vdd: fixed-regulator-opt3001-vdd {
++		compatible = "regulator-fixed";
++		regulator-name = "opt3001_supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio4 22 GPIO_ACTIVE_HIGH>;
++		off-on-delay-us = <2000>;
++		enable-active-high;
++	};
++
+ 	brcmfmac: brcmfmac {
+ 		compatible = "cypress,brcmfmac";
+ 		pinctrl-names = "init", "idle", "default";
+@@ -228,42 +238,6 @@ sound-hdmi {
+ 				<192000>;
+ 	};
+ 
+-	matrix_keypad {
+-		compatible = "gpio-matrix-keypad";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_key>;
+-
+-		debounce-delay-ms = <5>;
+-		col-scan-delay-us = <2>;
+-		row-gpios = <
+-				&gpio4 20 GPIO_ACTIVE_HIGH
+-				&gpio4 1 GPIO_ACTIVE_HIGH
+-				&gpio4 0 GPIO_ACTIVE_HIGH>;
+-		col-gpios = <
+-				&gpio4 11 GPIO_ACTIVE_HIGH
+-				&gpio4 10 GPIO_ACTIVE_HIGH
+-				&gpio4 22 GPIO_ACTIVE_HIGH
+-				&gpio4 21 GPIO_ACTIVE_HIGH
+-				&gpio5 21 GPIO_ACTIVE_HIGH>;
+-
+-		linux,keymap = <
+-				MATRIX_KEY(0x0, 0x0, KEY_1)
+-				MATRIX_KEY(0x1, 0x0, KEY_2)
+-				MATRIX_KEY(0x2, 0x0, KEY_3)
+-				MATRIX_KEY(0x0, 0x1, KEY_4)
+-				MATRIX_KEY(0x1, 0x1, KEY_5)
+-				MATRIX_KEY(0x2, 0x1, KEY_6)
+-				MATRIX_KEY(0x0, 0x2, KEY_7)
+-				MATRIX_KEY(0x1, 0x2, KEY_8)
+-				MATRIX_KEY(0x2, 0x2, KEY_9)
+-				MATRIX_KEY(0x0, 0x3, KEY_NUMERIC_STAR)
+-				MATRIX_KEY(0x1, 0x3, KEY_0)
+-				MATRIX_KEY(0x2, 0x3, KEY_NUMERIC_POUND)
+-				MATRIX_KEY(0x0, 0x4, KEY_BACK)
+-				MATRIX_KEY(0x1, 0x4, KEY_BACKSPACE)
+-				MATRIX_KEY(0x2, 0x4, KEY_ENTER)>;
+-	};
+-
+ 	backlight0: backlight {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm1 0 50000 0>;
+@@ -697,6 +671,17 @@ tlv320aic31xx: tlv320aic31xx@18 {
+ 		status = "okay";
+ 	};
+ 
++	opt3001: opt3001@45 {
++		compatible = "ti,opt3001";
++		reg = <0x45>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_light_sensor>;
++		interrupt-parent = <&gpio4>;
++		interrupts = <21 IRQ_TYPE_EDGE_FALLING>;
++		opt3001-supply = <&reg_light_vdd>;
++		status = "okay";
++	};
++
+ 	lsm303agr_acc: lsm303agr_acc@19 {
+ 		compatible = "st,lsm303agr_acc";
+ 		reg = <0x19>;
+@@ -1174,19 +1159,6 @@ MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  //DSI_TE
+ 		>;
+ 	};
+ 
+-	pinctrl_key: keygrp {
+-		fsl,pins = <
+-			MX8MQ_IOMUXC_SAI1_MCLK_GPIO4_IO20			0x19  //KeySense_1, intput, row
+-			MX8MQ_IOMUXC_SAI1_RXC_GPIO4_IO1				0x19  //KeySense_2
+-			MX8MQ_IOMUXC_SAI1_RXFS_GPIO4_IO0			0x19  //KeySense_3
+-			MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11			0x19  //KeyScan_1, output, col
+-			MX8MQ_IOMUXC_SAI1_TXFS_GPIO4_IO10			0x19  //KeyScan_2
+-			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22			0x19  //KeyScan_3
+-			MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21			0x19  //KeyScan_4
+-			MX8MQ_IOMUXC_I2C4_SDA_GPIO5_IO21			0x19  //KeyScan_5
+-		>;
+-	};
+-
+ 	pinctrl_pca9539: pca9539grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6			0x19  //GPIO_01, nINT
+@@ -1223,6 +1195,13 @@ pinctrl_codec: codec-grp {
+ 			MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13		0x19		// AUDIO_RSTn
+ 		>;
+ 	};
++
++	pinctrl_light_sensor: opt3001-grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19		// ALS_INTn
++			MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19		// ALS_PWR_ON_RSTn
++		>;
++	};
+ };
+ 
+ &vpu {

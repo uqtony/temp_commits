@@ -1,0 +1,57 @@
+06d1222de owen.wen 2020-05-05
+
+enable debug for multi client IME
+
+Change-Id: I8dd889b30df67532af3056be604b00be6c3adbc7
+
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
+index 6f5d89d5a..04196bdf6 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
+@@ -31,7 +31,7 @@ import android.view.inputmethod.InputConnection;
+ 
+ final class ClientCallbackImpl implements MultiClientInputMethodServiceDelegate.ClientCallback {
+     private static final String TAG = "ClientCallbackImpl";
+-    private static final boolean DEBUG = false;
++    private static final boolean DEBUG = true;
+ 
+     private final MultiClientInputMethodServiceDelegate mDelegate;
+     private final SoftInputWindowManager mSoftInputWindowManager;
+@@ -159,6 +159,11 @@ final class ClientCallbackImpl implements MultiClientInputMethodServiceDelegate.
+         }
+         final int lastClientId = mInputMethod.mDisplayToLastClientId.get(mSelfReportedDisplayId);
+         if (lastClientId != mClientId) {
++            if (DEBUG) {
++                Log.v(TAG, "mSelfReportedDisplayId: " + mSelfReportedDisplayId
++                        + ", lastClientId: " + lastClientId
++                        + ", mClientId: " + mClientId);
++            }
+             // deactivate previous client and activate current.
+             mDelegate.setActive(lastClientId, false /* active */);
+             mDelegate.setActive(mClientId, true /* active */);
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
+index 0b146ad35..e0b18d43d 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
+@@ -30,7 +30,7 @@ import android.util.SparseIntArray;
+  */
+ public final class MultiClientInputMethod extends Service implements DisplayListener {
+     private static final String TAG = "MultiClientInputMethod";
+-    private static final boolean DEBUG = false;
++    private static final boolean DEBUG = true;
+ 
+     // last client that had active InputConnection for a given displayId.
+     final SparseIntArray mDisplayToLastClientId = new SparseIntArray();
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
+index afc66a413..ad52e3c91 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/SoftInputWindow.java
+@@ -34,7 +34,7 @@ import java.util.Arrays;
+ 
+ final class SoftInputWindow extends Dialog {
+     private static final String TAG = "SoftInputWindow";
+-    private static final boolean DEBUG = false;
++    private static final boolean DEBUG = true;
+ 
+     private final KeyboardView mKeyboardView;
+ 

@@ -1,0 +1,268 @@
+e7e4e786d George.Huang 2022-03-01
+
+AOS-887: fix conflicts from android-12.0.0_1.0.0
+
+Change-Id: I10c5f712dd0860a5e9b170b908e3c96e492aaaf4
+
+diff --git a/core/Makefile b/core/Makefile
+index 8b69d60a1..916c0c594 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -5269,7 +5269,14 @@ ifdef BOARD_PREBUILT_DTBOIMAGE
+ 	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+ 	$(hide) cp $(INSTALLED_DTBOIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
+ endif # BOARD_PREBUILT_DTBOIMAGE
+-<<<<<<< HEAD
++ifdef BOARD_PREBUILT_PVMFWIMAGE
++	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
++	$(hide) cp $(INSTALLED_PVMFWIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
++endif # BOARD_PREBUILT_PVMFWIMAGE
++ifdef BOARD_PREBUILT_BOOTLOADER
++	$(hide) mkdir -p $(zip_root)/IMAGES
++	$(hide) cp $(INSTALLED_BOOTLOADER_MODULE) $(zip_root)/IMAGES/
++endif
+ 
+ 	# IDtech added for image consistency
+ 	$(hide) mkdir -p $(zip_root)/IMAGES
+@@ -5317,16 +5324,6 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	$(hide) mkdir -p $(zip_root)/TEST_SIGN
+ 	cp $(PRODUCT_OUT)/*signed* $(zip_root)/TEST_SIGN/
+ 
+-=======
+-ifdef BOARD_PREBUILT_PVMFWIMAGE
+-	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+-	$(hide) cp $(INSTALLED_PVMFWIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
+-endif # BOARD_PREBUILT_PVMFWIMAGE
+-ifdef BOARD_PREBUILT_BOOTLOADER
+-	$(hide) mkdir -p $(zip_root)/IMAGES
+-	$(hide) cp $(INSTALLED_BOOTLOADER_MODULE) $(zip_root)/IMAGES/
+-endif
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ ifneq ($(strip $(BOARD_CUSTOMIMAGES_PARTITION_LIST)),)
+ 	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+ 	$(hide) $(foreach partition,$(BOARD_CUSTOMIMAGES_PARTITION_LIST), \
+diff --git a/core/build_id.mk b/core/build_id.mk
+index 8df45102e..0fb59d9ce 100644
+--- a/core/build_id.mk
++++ b/core/build_id.mk
+@@ -18,8 +18,4 @@
+ # (like "CRB01").  It must be a single word, and is
+ # capitalized by convention.
+ 
+-<<<<<<< HEAD
+-BUILD_ID=RQ2A.210505.002
+-=======
+ BUILD_ID=SQ1A.211205.008
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+diff --git a/core/version_defaults.mk b/core/version_defaults.mk
+index d9ecf3ce3..f429d7c72 100644
+--- a/core/version_defaults.mk
++++ b/core/version_defaults.mk
+@@ -240,11 +240,7 @@ ifndef PLATFORM_SECURITY_PATCH
+     #  It must be of the form "YYYY-MM-DD" on production devices.
+     #  It must match one of the Android Security Patch Level strings of the Public Security Bulletins.
+     #  If there is no $PLATFORM_SECURITY_PATCH set, keep it empty.
+-<<<<<<< HEAD
+-      PLATFORM_SECURITY_PATCH := 2021-05-05
+-=======
+       PLATFORM_SECURITY_PATCH := 2021-12-05
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ endif
+ .KATI_READONLY := PLATFORM_SECURITY_PATCH
+ 
+diff --git a/target/product/gsi/current.txt b/target/product/gsi/current.txt
+index a9ad44303..b817fc5d9 100644
+--- a/target/product/gsi/current.txt
++++ b/target/product/gsi/current.txt
+@@ -69,29 +69,10 @@ VNDK-core: android.hardware.graphics.allocator@3.0.so
+ VNDK-core: android.hardware.graphics.allocator@4.0.so
+ VNDK-core: android.hardware.graphics.bufferqueue@1.0.so
+ VNDK-core: android.hardware.graphics.bufferqueue@2.0.so
+-<<<<<<< HEAD
+-VNDK-core: android.hardware.graphics.composer@2.1.so
+-VNDK-core: android.hardware.graphics.composer@2.2.so
+-VNDK-core: android.hardware.graphics.composer@2.3.so
+-VNDK-core: android.hardware.graphics.composer@2.4.so
+-VNDK-core: android.hardware.health.storage@1.0.so
+-VNDK-core: android.hardware.health@1.0.so
+-VNDK-core: android.hardware.health@2.0.so
+-VNDK-core: android.hardware.health@2.1.so
+-VNDK-core: android.hardware.identity-V2-ndk_platform.so
+-VNDK-core: android.hardware.input.classifier@1.0.so
+-VNDK-core: android.hardware.input.common@1.0.so
+-VNDK-core: android.hardware.ir@1.0.so
+-VNDK-core: android.hardware.keymaster-V2-ndk_platform.so
+-VNDK-core: android.hardware.keymaster@3.0.so
+-VNDK-core: android.hardware.keymaster@4.0.so
+-VNDK-core: android.hardware.keymaster@4.1.so
+-VNDK-core: android.hardware.kioskled-V1-ndk_platform.so
+-=======
+ VNDK-core: android.hardware.health.storage-V1-ndk_platform.so
+ VNDK-core: android.hardware.identity-V3-ndk_platform.so
+ VNDK-core: android.hardware.keymaster-V3-ndk_platform.so
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
++VNDK-core: android.hardware.kioskled-V1-ndk_platform.so
+ VNDK-core: android.hardware.light-V1-ndk_platform.so
+ VNDK-core: android.hardware.media.bufferpool@2.0.so
+ VNDK-core: android.hardware.media.omx@1.0.so
+diff --git a/target/product/telephony_product.mk b/target/product/telephony_product.mk
+index 8ac1c7891..693e3864e 100644
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@ -19,15 +19,9 @@
+ 
+ ifneq (user,$(TARGET_BUILD_VARIANT))
+ PRODUCT_PACKAGES += \
+-    EmergencyInfo \
+     Dialer
+ endif
+ 
+ # /product packages
+ PRODUCT_PACKAGES += \
+-<<<<<<< HEAD
+-    CarrierConfig
+-=======
+-    Dialer \
+     ImsServiceEntitlement \
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+diff --git a/target/product/telephony_system_ext.mk b/target/product/telephony_system_ext.mk
+index f81a607f6..7b609bc2b 100644
+--- a/target/product/telephony_system_ext.mk
++++ b/target/product/telephony_system_ext.mk
+@@ -17,7 +17,11 @@
+ # This is the list of modules that are specific to products that have telephony
+ # hardware, and install to the system_ext partition.
+ 
++ifneq (user,$(TARGET_BUILD_VARIANT))
++PRODUCT_PACKAGES += \
++    EmergencyInfo \
++endif
++
+ # /system_ext packages
+ PRODUCT_PACKAGES += \
+     CarrierConfig \
+-    EmergencyInfo \
+diff --git a/tools/releasetools/common.py b/tools/releasetools/common.py
+index e62504d99..6b0249bb2 100644
+--- a/tools/releasetools/common.py
++++ b/tools/releasetools/common.py
+@@ -839,18 +839,14 @@ def LoadInfoDict(input_file, repacking=False):
+     for partition in PARTITIONS_WITH_BUILD_PROP:
+       fingerprint = build_info.GetPartitionFingerprint(partition)
+       if fingerprint:
+-<<<<<<< HEAD
+-        d["avb_{}_salt".format(partition)] = sha256(fingerprint.encode('utf-8')).hexdigest()
+-=======
+         d["avb_{}_salt".format(partition)] = sha256(
+-            fingerprint.encode()).hexdigest()
++            fingerprint.encode('utf-8')).hexdigest()
+ 
+     # Set the vbmeta digest if exists
+     try:
+       d["vbmeta_digest"] = read_helper("META/vbmeta_digest.txt").rstrip()
+     except KeyError:
+       pass
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+   try:
+     d["ab_partitions"] = read_helper("META/ab_partitions.txt").split("
+")
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index 831dbd0b3..43b3e353f 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -135,7 +135,6 @@ def EntriesForUserImages(input_file):
+     image = os.path.basename(image_path)
+     if OPTIONS.bootable_only and image not in('boot.img', 'recovery.img', 'bootloader'):
+       continue
+-<<<<<<< HEAD
+     if "SIGNED/" + image in namelist:
+       print('Replace by SIGNED one: {}'.format(image))
+       entries.append('{}:{}'.format("SIGNED/" + image, image))
+@@ -146,12 +145,7 @@ def EntriesForUserImages(input_file):
+        and not image.startswith("uuu") \
+        and not image == "mem_info.txt":
+       continue
+-    if image == "recovery-two-step.img":
+-=======
+-    if not image.endswith('.img') and image != 'bootloader':
+-      continue
+     if image == 'bootloader' and not OPTIONS.put_bootloader:
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+       continue
+     # Filter out super_empty and the images that are already in super partition.
+     if OPTIONS.put_super:
+diff --git a/tools/releasetools/ota_from_target_files.py b/tools/releasetools/ota_from_target_files.py
+index 87d8f353d..2ac091bfd 100755
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@ -233,11 +233,7 @@ import logging
+ import multiprocessing
+ import os
+ import os.path
+-<<<<<<< HEAD
+-import os
+-=======
+ import re
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ import shlex
+ import shutil
+ import struct
+@@ -286,11 +282,7 @@ OPTIONS.payload_signer_maximum_signature_size = None
+ OPTIONS.extracted_input = None
+ OPTIONS.skip_postinstall = False
+ OPTIONS.skip_compatibility_check = False
+-<<<<<<< HEAD
+-OPTIONS.output_metadata_path = None
+ OPTIONS.board_feature = None
+-=======
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ OPTIONS.disable_fec_computation = False
+ OPTIONS.disable_verity_computation = False
+ OPTIONS.partial = None
+@@ -784,7 +776,6 @@ def GetTargetFilesZipWithoutPostinstallConfig(input_file):
+   return target_file
+ 
+ 
+-<<<<<<< HEAD
+ def GetTargetFilesZipWithBoardFeature(input_file, product, board_feature, set_empty=False):
+   """Returns a target-files.zip that's with specific board_feature.
+ 
+@@ -839,7 +830,8 @@ def GetTargetFilesZipWithBoardFeature(input_file, product, board_feature, set_em
+   common.ZipClose(target_zip)
+ 
+   return target_file
+-=======
++
++
+ def ParseInfoDict(target_file_path):
+   with zipfile.ZipFile(target_file_path, 'r', allowZip64=True) as zfp:
+     return common.LoadInfoDict(zfp)
+@@ -914,7 +906,6 @@ def GetTargetFilesZipForPartialUpdates(input_file, ab_partitions):
+   common.ZipClose(partial_target_zip)
+ 
+   return partial_target_file
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+ 
+ def GetTargetFilesZipForRetrofitDynamicPartitions(input_file,
+@@ -1167,7 +1158,6 @@ def GenerateAbOtaPackage(target_file, output_file, source_file=None):
+     target_info.info_dict['ab_partitions'] = zfp.read(
+         AB_PARTITIONS).decode().strip().split("
+")
+ 
+-<<<<<<< HEAD
+   if OPTIONS.board_feature:
+     target_file = GetTargetFilesZipWithBoardFeature(target_file,
+         target_info.GetBuildProp('ro.build.product').split('_')[-1],
+@@ -1177,10 +1167,8 @@ def GenerateAbOtaPackage(target_file, output_file, source_file=None):
+         target_info.GetBuildProp('ro.build.product').split('_')[-1],
+         OPTIONS.board_feature, True)
+ 
+-=======
+   # Metadata to comply with Android OTA package format.
+   metadata = GetPackageMetadata(target_info, source_info)
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+   # Generate payload.
+   payload = Payload()
+ 

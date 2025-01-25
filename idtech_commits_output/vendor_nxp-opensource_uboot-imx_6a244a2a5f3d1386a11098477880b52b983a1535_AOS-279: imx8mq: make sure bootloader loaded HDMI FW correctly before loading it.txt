@@ -1,0 +1,85 @@
+6a244a2a5f George.Huang 2020-10-20
+
+AOS-279: imx8mq: make sure bootloader loaded HDMI FW correctly before loading it
+
+Symptom: imx8mq evk board kept rebooting in bootloader...
+
+Root Cause: bootloader loaded the corrupted HDMI FW without checking
+
+Solution: make sure bootloader loaded HDMI FW correctly before
+  reading the HDMI controller register
+
+Test Steps:
+  $ dd if=/dev/zero of=file10 bs=1 count=16
+  $ adb root
+  $ adb shell 'echo 0 > /sys/block/mmcblk0boot0/force_ro'
+  $ adb push file10 /data/local/tmp/file
+  $ adb shell 'dd if=/data/local/tmp/file of=/dev/block/mmcblk0boot0 bs=1 seek=$((0xa050))'
+  $ adb reboot
+
+Test Log:
+  Authenticate image from DDR location 0x401fcdc0...
+  Booting from bootloader_a...
+
+  U-Boot 2020.04-00003-g188878969e (Oct 20 2020 - 17:24:25 +0800)
+  CPU:   i.MX8MQ rev2.1 1500 MHz (running at 1000 MHz)
+  CPU:   Commercial temperature grade (0C to 95C) at 47C
+  Reset cause: POR
+  Model: NXP i.MX8MQ EVK
+  DRAM:  3 GiB
+  MMC:   FSL_SDHC: 0, FSL_SDHC: 1
+  Loading Environment from MMC... *** Warning - bad CRC, using default environment
+  [*]-Video Link 0imx8m_hdmi_probe
+  "Synchronous Abort" handler, esr 0x96000210
+  elr:000000004023c004 lr :000000004023bda4 (reloc)
+  elr:00000000ff742004 lr :00000000ff741da4
+  x0 :0000000032c00018 x1 :00000000fb6fd228
+  x2 :0000000032c00000 x3 :00000000ff7fadec
+  x4 :0000000000000814 x5 :000000000000576c
+  x6 :0000000000005734 x7 :0000000000000002
+  x8 :00000000fb6fd4a8 x9 :0000000000000008
+  x10:0000000000005730 x11:00000000fb6fd16c
+  x12:0000000000005690 x13:0000000000005684
+  x14:00000000fb6fd1fc x15:00000000fb6fd4a8
+  x16:0000000000001080 x17:0000000000000000
+  x18:00000000fb705dc8 x19:0000000000000001
+  x20:0000000000000000 x21:0000000000000000
+  x22:00000000fb70cab0 x23:00000000fb70b830
+  x24:00000000fb7098f0 x25:0000000000000001
+  x26:0000000000000000 x27:0000000000000000
+  x28:0000000000000000 x29:00000000fb6fd200
+  Code: a8c27bfd d65f03c0 52a65802 0b020000 (b9400000)
+  Resetting CPU ...
+
+Change-Id: I2ad904155e003f57cbea2ef099f043fe175eecb2
+
+diff --git a/drivers/video/imx/hdmi/imx8m_hdmi.c b/drivers/video/imx/hdmi/imx8m_hdmi.c
+index 5061700dfa..20a23e1e93 100644
+--- a/drivers/video/imx/hdmi/imx8m_hdmi.c
++++ b/drivers/video/imx/hdmi/imx8m_hdmi.c
+@@ -130,6 +130,22 @@ static int imx8m_hdmi_init(int vic,
+ 	/*================================================================== */
+ 	/* Parameterization done */
+ 	/*================================================================== */
++
++#ifdef CONFIG_IMX8MQ
++	/*
++	 * Before reading the HDMI controller register, check if ROM loaded
++	 * HDMI FW correctly. Otherwise, reading it causes exception, as ROM
++	 * will lock HDMI controller access.
++	 *
++	 */
++
++	/*printf("RDC_PDAP45 = 0x%08x
+", readl(0x303D04b4));*/
++	if (readl(0x303D04b4)&0x80000000) {
++		printf("HDMI Controller locked!
+");
++		return -EPERM;
++	}
++#endif
++
+ 	cdn_api_init();
+ 	debug("CDN_API_Init completed
+");
+ 

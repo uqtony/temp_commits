@@ -1,0 +1,317 @@
+b00afb7 AndrewS 2021-05-19
+
+AOS-541: support camera MJPEG format in HAL
+
+Support MJPEG in camera HAL, set camera stream as MJPEG and convert
+camera input frames from MJPEG to I420, then from I420 to YUYV,
+then follow the origin flow to decode to preview or store as
+picture.
+Also enlarge buffer for MJPEG frames.
+
+Change-Id: I7ef356c64db2df989914c3ab14e364db0c5e8b85
+
+diff --git a/camera/Android.bp b/camera/Android.bp
+index 2d1398a..8c0f5a0 100644
+--- a/camera/Android.bp
++++ b/camera/Android.bp
+@@ -61,6 +61,7 @@ imx_camera_defaults {
+                 "libgooglecamerahalutils",
+                 "libexif",
+                 "libjpeg",
++                "libyuv",
+                 "libjsoncpp",
+                 "liblog",
+                 "libutils",
+diff --git a/camera/CameraConfigurationParser.h b/camera/CameraConfigurationParser.h
+index d99e3f8..5214020 100644
+--- a/camera/CameraConfigurationParser.h
++++ b/camera/CameraConfigurationParser.h
+@@ -34,6 +34,7 @@ enum CscHw {
+   PXP,
+   IPU,
+   CPU,
++  NONE,
+ };
+ 
+ struct OmitFrame {
+diff --git a/camera/CameraDeviceHWLImpl.cpp b/camera/CameraDeviceHWLImpl.cpp
+index 17e7f83..0fecd3a 100644
+--- a/camera/CameraDeviceHWLImpl.cpp
++++ b/camera/CameraDeviceHWLImpl.cpp
+@@ -121,10 +121,17 @@ status_t CameraDeviceHwlImpl::initSensorStaticData()
+     int availFormats[MAX_SENSOR_FORMAT];
+     memset(sensorFormats, 0, sizeof(sensorFormats));
+     memset(availFormats, 0, sizeof(availFormats));
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.idt.camera_format", value, "");
+ 
+     // Don't support enum format, now hard code here.
+-    sensorFormats[index] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-    availFormats[index++] = v4l2_fourcc('Y', 'U', 'Y', 'V');
++    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
++        sensorFormats[index] = v4l2_fourcc('M', 'J', 'P', 'G');
++        availFormats[index++] = v4l2_fourcc('M', 'J', 'P', 'G');
++    } else {
++        sensorFormats[index] = v4l2_fourcc('Y', 'U', 'Y', 'V');
++        availFormats[index++] = v4l2_fourcc('Y', 'U', 'Y', 'V');
++    }
+     mSensorFormatCount =
+         changeSensorFormats(sensorFormats, mSensorFormats, index);
+     if (mSensorFormatCount == 0) {
+diff --git a/camera/CameraDeviceSessionHWLImpl.cpp b/camera/CameraDeviceSessionHWLImpl.cpp
+index 5ee4f3a..a05ef9c 100644
+--- a/camera/CameraDeviceSessionHWLImpl.cpp
++++ b/camera/CameraDeviceSessionHWLImpl.cpp
+@@ -72,6 +72,13 @@ status_t CameraDeviceSessionHwlImpl::Initialize(
+     if ((pMeta == NULL) || (pDev == NULL))
+         return BAD_VALUE;
+ 
++    // get camera format from property
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.idt.camera_format", value, "");
++    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
++        mMJPEG_format = true;
++    }
++
+     ALOGI("Initialize, meta %p, entry count %d", m_meta->GetStaticMeta(), (int)m_meta->GetStaticMeta()->GetEntryCount());
+ 
+     CameraSensorMetadata *cam_metadata = &(pDev->mSensorData);
+@@ -458,6 +465,11 @@ status_t CameraDeviceSessionHwlImpl::ProcessCapturedBuffer(ImxStreamBuffer *srcB
+             mJpegBuilder->reset();
+             mJpegBuilder->setMetadata(&requestMeta);
+ 
++            if (mMJPEG_format) {
++                fsl::ImageProcess *imageProcess = fsl::ImageProcess::getInstance();
++                CscHw csc_hw = NONE;
++                imageProcess->handleFrame(*dstBuf, *srcBuf, csc_hw);
++            }
+             ret = processJpegBuffer(srcBuf, dstBuf, &requestMeta);
+         } else
+             processFrameBuffer(srcBuf, dstBuf, &requestMeta);
+diff --git a/camera/CameraDeviceSessionHWLImpl.h b/camera/CameraDeviceSessionHWLImpl.h
+index e792f1e..ad53f56 100644
+--- a/camera/CameraDeviceSessionHWLImpl.h
++++ b/camera/CameraDeviceSessionHWLImpl.h
+@@ -273,6 +273,8 @@ private:
+     int recordIdx;
+     int callbackIdx;
+ 
++    bool mMJPEG_format = false;
++
+     std::unique_ptr<HalCameraMetadata> mSettings;
+ 
+     CscHw mCamBlitCopyType;
+diff --git a/camera/CameraUtils.cpp b/camera/CameraUtils.cpp
+index 0aefad1..51889f3 100644
+--- a/camera/CameraUtils.cpp
++++ b/camera/CameraUtils.cpp
+@@ -29,7 +29,6 @@ int32_t changeSensorFormats(int *src, int *dst, int len)
+         ALOGE("%s invalid parameters", __func__);
+         return 0;
+     }
+-
+     int32_t k = 0;
+     for (int32_t i=0; i<len && i<MAX_SENSOR_FORMAT; i++) {
+         switch (src[i]) {
+@@ -64,6 +63,10 @@ int32_t changeSensorFormats(int *src, int *dst, int len)
+                 dst[k++] = HAL_PIXEL_FORMAT_YCbCr_444_888;
+                 break;
+ 
++            case v4l2_fourcc('M', 'J', 'P', 'G'):
++                dst[k++] = HAL_PIXEL_FORMAT_YCbCr_422_I;
++                break;
++
+             default:
+                 ALOGE("Error: format:%c%c%c%c not supported!", src[i]&0xFF,
+                       (src[i]>>8)&0xFF, (src[i]>>16)&0xFF, (src[i]>>24)&0xFF);
+@@ -82,6 +85,8 @@ int getCaptureMode(int fd, int width, int height)
+     int ret = 0;
+     int capturemode = 0;
+     struct v4l2_frmsizeenum cam_frmsize;
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.idt.camera_format", value, "");
+ 
+     if (fd < 0) {
+         ALOGW("!!! %s, fd %d", __func__, fd);
+@@ -90,7 +95,11 @@ int getCaptureMode(int fd, int width, int height)
+ 
+     while (ret == 0) {
+         cam_frmsize.index = index++;
+-        cam_frmsize.pixel_format = v4l2_fourcc('Y', 'U', 'Y', 'V');
++        if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('M', 'J', 'P', 'G');
++	} else {
++            cam_frmsize.pixel_format = v4l2_fourcc('Y', 'U', 'Y', 'V');
++	}
+         ret = ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &cam_frmsize);
+         if ((cam_frmsize.discrete.width == (uint32_t)width) && (cam_frmsize.discrete.height == (uint32_t)height) && (ret == 0)) {
+             capturemode = cam_frmsize.index;
+@@ -121,7 +130,13 @@ int convertPixelFormatToV4L2Format(PixelFormat format, bool invert)
+             break;
+ 
+         case HAL_PIXEL_FORMAT_YCbCr_422_I:
+-            nFormat = v4l2_fourcc('Y', 'U', 'Y', 'V');
++            char value[PROPERTY_VALUE_MAX];
++            property_get("persist.idt.camera_format", value, "");
++            if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
++                nFormat = v4l2_fourcc('M', 'J', 'P', 'G');
++	    } else {
++                nFormat = v4l2_fourcc('Y', 'U', 'Y', 'V');
++	    }
+             break;
+         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+             nFormat = v4l2_fourcc('N', 'V', '1', '6');
+diff --git a/camera/ImageProcess.cpp b/camera/ImageProcess.cpp
+index bcf0206..15749fa 100644
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@ -15,6 +15,8 @@
+  */
+ #define LOG_TAG "ImageProcess"
+ 
++#include <libyuv.h>
++
+ #include <stdio.h>
+ #include <dlfcn.h>
+ #include <cutils/log.h>
+@@ -93,6 +95,13 @@ ImageProcess::ImageProcess()
+     mIpuFd = open("/dev/mxc_ipu", O_RDWR, 0);
+     mPxpFd = open("/dev/pxp_device", O_RDWR, 0);
+ 
++    // get camera format from property
++    char value[PROPERTY_VALUE_MAX];
++    property_get("persist.idt.camera_format", value, "");
++    if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
++        mMJPEG_format = true;
++    }
++
+     //When open pxp device, need allocate a channel at the same time.
+     int32_t ret = -1;
+     if (mPxpFd > 0) {
+@@ -262,6 +271,11 @@ int ImageProcess::handleFrame(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf,
+         srcBuf.mVirtAddr, srcBuf.mPhyAddr, srcBuf.mSize, srcBuf.mStream->width(), srcBuf.mStream->height(), srcBuf.mStream->format(),
+         dstBuf.mVirtAddr, dstBuf.mPhyAddr, dstBuf.mSize, dstBuf.mStream->width(), dstBuf.mStream->height(), dstBuf.mStream->format());
+ 
++    if (dstBuf.mStream->format() == HAL_PIXEL_FORMAT_BLOB) {
++        ret = convertMJPGToYUY2(srcBuf);
++        return ret;
++    }
++
+     switch (hw_type) {
+     case GPU_2D:
+         ret = handleFrameByGPU_2D(dstBuf, srcBuf);
+@@ -637,6 +651,57 @@ int ImageProcess::convertNV12toNV21(ImxStreamBuffer& dstBuf, ImxStreamBuffer& sr
+     return 0;
+ }
+ 
++// This function will convert MJPG stream to YUY2 stream and store it in input buffer
++// srcBuf: input frame from UVC MJPG stream
++int ImageProcess::convertMJPGToYUY2(ImxStreamBuffer& srcBuf)
++{
++    ImxStream *src = srcBuf.mStream;
++    uint32_t width = src->width();
++    uint32_t height = src->height();
++    uint32_t half_width = (width + 1) / 2;
++    uint32_t half_height = (height + 1) / 2;
++    uint8_t* y_component = NULL;
++    uint8_t* u_component = NULL;
++    uint8_t* v_component = NULL;
++    uint32_t ret = 0;
++
++    y_component = (uint8_t*)malloc(width * height);
++    if (!y_component) {
++        ret = -EINVAL;
++        goto err_out;
++    }
++    u_component = (uint8_t*)malloc(half_width * half_height);
++    if (!u_component) {
++        ret = -EINVAL;
++        goto err_out;
++    }
++    v_component = (uint8_t*)malloc(half_width * half_height);
++    if (!v_component) {
++        ret = -EINVAL;
++        goto err_out;
++    }
++    // convert MJPEG to I420
++    ret = libyuv::MJPGToI420((uint8_t *)srcBuf.mVirtAddr, srcBuf.mSize,
++                    y_component, width, u_component, half_width, v_component, half_width,
++                    width, height, width, height);
++    if (ret)
++        goto err_out;
++
++    // convert I420 to YUYV
++    ret = libyuv::I420ToYUY2(y_component, width, u_component, half_width, v_component, half_width,
++                  (uint8_t *)srcBuf.mVirtAddr, width*2, width, height);
++
++err_out:
++    if (y_component)
++        free(y_component);
++    if (u_component)
++        free(u_component);
++    if (v_component)
++        free(v_component);
++
++    return ret;
++}
++
+ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf)
+ {
+     // opencl g2d exists.
+@@ -669,6 +734,9 @@ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer&
+         cl_YUYVtoNV12SP(mCLHandle, (uint8_t *)srcBuf.mVirtAddr,
+                     (uint8_t *)dstBuf.mVirtAddr, dst->width(), dst->height(), false, bOutputCached);
+     } else if (src->format() == dst->format()) {
++        if (mMJPEG_format) {
++            convertMJPGToYUY2(srcBuf);
++	}
+         cl_YUYVCopyByLine(mCLHandle, (uint8_t *)dstBuf.mVirtAddr,
+                  dst->width(), dst->height(),
+                 (uint8_t *)srcBuf.mVirtAddr, src->width(), src->height(), false, bOutputCached);
+diff --git a/camera/ImageProcess.h b/camera/ImageProcess.h
+index 55665e5..2548005 100644
+--- a/camera/ImageProcess.h
++++ b/camera/ImageProcess.h
+@@ -42,6 +42,7 @@ public:
+ 
+ private:
+     int convertNV12toNV21(ImxStreamBuffer& dst, ImxStreamBuffer& src);
++    int convertMJPGToYUY2(ImxStreamBuffer& srcBuf);
+     int handleFrameByPXP(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByIPU(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByG2DCopy(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+@@ -92,6 +93,8 @@ private:
+     hwc_func3 mCLBlit;
+     hwc_func1 mCLFlush;
+     hwc_func1 mCLFinish;
++
++    bool mMJPEG_format = false;
+ };
+ 
+ }
+diff --git a/camera/USPStream.cpp b/camera/USPStream.cpp
+index 6ea8c55..2e0d530 100644
+--- a/camera/USPStream.cpp
++++ b/camera/USPStream.cpp
+@@ -206,7 +206,7 @@ int32_t USPStream::allocateBuffersLocked()
+     }
+ 
+ //    int32_t size = getFormatSize();
+-    int32_t size = ALIGN_PIXEL_16(mWidth) * ALIGN_PIXEL_16(mHeight) * 4;
++    int32_t size = ALIGN_PIXEL_16(mWidth) * ALIGN_PIXEL_16(mHeight) * 8;
+     if ((mWidth == 0) || (mHeight == 0) || (size == 0)) {
+         ALOGE("%s: width, height or size is 0", __func__);
+         return BAD_VALUE;
+diff --git a/camera/UvcStream.cpp b/camera/UvcStream.cpp
+index 47a4886..07895ab 100644
+--- a/camera/UvcStream.cpp
++++ b/camera/UvcStream.cpp
+@@ -87,7 +87,7 @@ int32_t UvcStream::getDeviceBufferSize()
+          }
+ 
+          case HAL_PIXEL_FORMAT_YCbCr_422_I:
+-            size = mWidth * mHeight * 2;
++            size = mWidth * mHeight * 8;
+              break;
+ 
+         default:

@@ -1,0 +1,174 @@
+a6f328b53d5d AndrewS 2021-12-29
+
+AOS-812: fix PD gpio irq bugs
+
+Change-Id: Iacc61d5d1291a8e5c6c3d11586b10b012bb04939
+
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 31f9bdb54bb3..904327fdb284 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -1082,14 +1082,14 @@ static irqreturn_t tps65994_interrupt(int irq, void *data)
+ 	struct tps65994 *tps = data;
+ 	u8 event[11];
+ 	u8 status[5];
++	u16 pwr_status;
++	enum typec_pwr_opmode mode;
+ 	int ret;
+ 
+-	mutex_lock(&tps->lock);
+-
+ 	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_INT_EVENT1, &event, NULL);
+ 	if (ret) {
+ 		dev_err(tps->dev, "%s: failed to read events
+", __func__);
+-		goto err_unlock;
++		goto err_out;
+ 	}
+ 
+ 	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS, status, NULL);
+@@ -1100,22 +1100,29 @@ static irqreturn_t tps65994_interrupt(int irq, void *data)
+ 
+ 	/* Handle plug insert or removal */
+ 	if (event[0] & TPS_REG_INT_PLUG_EVENT) {
+-		if (status[0] & TPS_STATUS_PLUG_PRESENT) {
+-			ret = tps65994_connect(tps, status[0]);
+-			if (ret)
+-				dev_err(tps->dev,
+-					"failed to register partner
+");
+-		} else {
+-			tps65994_disconnect(tps, status[0]);
++		ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_POWER_STATUS,
++					&pwr_status, NULL);
++		if (ret) {
++			dev_err(tps->dev, "%s: failed to read power status
+", __func__);
++			goto err_clear_ints;
+ 		}
++		mode = TPS_POWER_STATUS_PWROPMODE(pwr_status);
++		typec_set_pwr_opmode(tps->port, mode);
++		typec_set_pwr_role(tps->port, TPS_STATUS_PORTROLE(status[0]));
++		typec_set_vconn_role(tps->port, TPS_STATUS_VCONN(status[0]));
++
++		if (status[0] & TPS_STATUS_PLUG_PRESENT)
++			tps65994_set_data_role(tps, TPS_STATUS_DATAROLE(status[0]), true);
++		else
++			tps65994_set_data_role(tps, TPS_STATUS_DATAROLE(status[0]), false);
++
++		power_supply_changed(tps->psy);
+ 	}
+ 
+ err_clear_ints:
+ 	tps65994_i2c_write(tps->i2c_client, TPS_REG_INT_CLEAR1, event, 11);
+ 
+-err_unlock:
+-	mutex_unlock(&tps->lock);
+-
++err_out:
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1158,6 +1165,23 @@ static int tps65994_probe(struct i2c_client *client)
+ 	mutex_init(&tps->lock);
+ 	tps->dev = &client->dev;
+ 
++	/*
++	 * This fwnode has a "compatible" property, but is never populated as a
++	 * struct device. Instead we simply parse it to read the properties.
++	 * This breaks fw_devlink=on. To maintain backward compatibility
++	 * with existing DT files, we work around this by deleting any
++	 * fwnode_links to/from this fwnode.
++	 */
++	fwnode = device_get_named_child_node(&client->dev, "connector");
++	if (!fwnode)
++		return -ENODEV;
++
++	tps->role_sw = fwnode_usb_role_switch_get(fwnode);
++	if (IS_ERR(tps->role_sw)) {
++		ret = PTR_ERR(tps->role_sw);
++		goto err_fwnode_put;
++	}
++
+ 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+ 		dev_err(&client->dev,
+ 			"I2C/SMBus block functionality not supported!
+");
+@@ -1180,23 +1204,6 @@ static int tps65994_probe(struct i2c_client *client)
+ 	if (ret)
+ 		return ret;
+ 
+-	/*
+-	 * This fwnode has a "compatible" property, but is never populated as a
+-	 * struct device. Instead we simply parse it to read the properties.
+-	 * This breaks fw_devlink=on. To maintain backward compatibility
+-	 * with existing DT files, we work around this by deleting any
+-	 * fwnode_links to/from this fwnode.
+-	 */
+-	fwnode = device_get_named_child_node(&client->dev, "connector");
+-	if (!fwnode)
+-		return -ENODEV;
+-
+-	tps->role_sw = fwnode_usb_role_switch_get(fwnode);
+-	if (IS_ERR(tps->role_sw)) {
+-		ret = PTR_ERR(tps->role_sw);
+-		goto err_fwnode_put;
+-	}
+-
+ 	typec_cap.revision = USB_TYPEC_REV_1_2;
+ 	typec_cap.pd_revision = 0x200;
+ 	typec_cap.prefer_role = TYPEC_NO_PREFERRED_ROLE;
+@@ -1242,33 +1249,31 @@ static int tps65994_probe(struct i2c_client *client)
+ 
+ 	if (client->irq > 0) {
+ 		ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
+-						tps65994_interrupt,
+-						IRQF_TRIGGER_LOW | IRQF_ONESHOT,
++						tps65994_interrupt, IRQF_ONESHOT,
+ 						dev_name(&client->dev), tps);
+ 		if (ret) {
+-			tps65994_disconnect(tps, 0);
+-			typec_unregister_port(tps->port);
+-			goto err_role_put;
++			dev_err(&client->dev, "failed to request irq
+");
++			goto err_discon;
+ 		}
+ 	} else {
+ 		tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
+ 		if (IS_ERR(tps->extcon)) {
+ 			dev_err(&client->dev, "failed to allocate extcon device
+");
+ 			ret = PTR_ERR(tps->extcon);
+-			goto err_role_put;
++			goto err_discon;
+ 		}
+ 
+ 		ret = devm_extcon_dev_register(&client->dev, tps->extcon);
+ 		if (ret < 0) {
+ 			dev_err(&client->dev, "failed to register extcon device
+");
+-			goto err_role_put;
++			goto err_discon;
+ 		}
+ 
+ 		tps->tps65994_nb.notifier_call = tps65994_notifier;
+ 		ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
+ 		if (ret < 0) {
+ 			dev_err(&client->dev, "couldn't register notifier
+");
+-			goto err_role_put;
++			goto err_discon;
+ 		}
+ 	}
+ 
+@@ -1282,6 +1287,9 @@ static int tps65994_probe(struct i2c_client *client)
+ 
+ err_sysfs:
+ 	sysfs_remove_group(&tps->dev->kobj, &tps65994_group);
++err_discon:
++	tps65994_disconnect(tps, 0);
++	typec_unregister_port(tps->port);
+ err_role_put:
+ 	usb_role_switch_put(tps->role_sw);
+ err_fwnode_put:

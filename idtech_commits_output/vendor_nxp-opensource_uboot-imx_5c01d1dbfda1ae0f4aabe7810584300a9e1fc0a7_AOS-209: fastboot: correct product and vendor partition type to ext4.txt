@@ -1,0 +1,59 @@
+5c01d1dbfd George.Huang 2020-06-22
+
+AOS-209: fastboot: correct product and vendor partition type to ext4
+
+By default, the partition type is set to raw.
+So need to set product and vendor partition type to ext4.
+
+Test result:
+$ fastboot getvar all 2>&1 |grep product
+(bootloader) partition-type:product_a:ext4
+(bootloader) partition-type:product_b:ext4
+(bootloader) partition-size:product_a:0x70000000
+(bootloader) partition-size:product_b:0x70000000
+(bootloader) has-slot:product:yes
+
+Change-Id: I3ae4857cc5c697f76d1558edfa18d8e7155bc20b
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 1847e5a4c4..c0e1c82c9b 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -123,11 +123,15 @@ static int _fastboot_parts_add_ptable_entry(int ptable_index,
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR_A) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_OEM_B) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR_B) ||
++	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT_A) ||
++	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT_B) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DATA))
+ #else
+ 	if (!strcmp((const char *)info.name, FASTBOOT_PARTITION_SYSTEM) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DATA) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_DEVICE) ||
++	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_VENDOR) ||
++	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_PRODUCT) ||
+ 	    !strcmp((const char *)info.name, FASTBOOT_PARTITION_CACHE))
+ #endif
+ 		strcpy(ptable[ptable_index].fstype, "ext4");
+diff --git a/include/fb_fsl.h b/include/fb_fsl.h
+index ee38cebac3..97e38ffbee 100644
+--- a/include/fb_fsl.h
++++ b/include/fb_fsl.h
+@@ -63,6 +63,8 @@
+ #define FASTBOOT_PARTITION_VENDOR_A "vendor_a"
+ #define FASTBOOT_PARTITION_OEM_B "oem_b"
+ #define FASTBOOT_PARTITION_VENDOR_B "vendor_b"
++#define FASTBOOT_PARTITION_PRODUCT_A "product_a"
++#define FASTBOOT_PARTITION_PRODUCT_B "product_b"
+ #ifdef CONFIG_AVB_SUPPORT
+ #define FASTBOOT_PARTITION_VBMETA_A "vbmeta_a"
+ #define FASTBOOT_PARTITION_VBMETA_B "vbmeta_b"
+@@ -87,6 +89,8 @@
+ #define FASTBOOT_PARTITION_GPT "gpt"
+ #define FASTBOOT_PARTITION_MISC "misc"
+ #define FASTBOOT_PARTITION_FBMISC "fbmisc"
++#define FASTBOOT_PARTITION_VENDOR "vendor"
++#define FASTBOOT_PARTITION_PRODUCT "product"
+ #endif
+ 
+ #ifdef CONFIG_IMX_TRUSTY_OS

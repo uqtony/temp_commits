@@ -1,0 +1,90 @@
+18853b15 max.yang 2020-03-25
+
+AOS-26: [AVB] Update a test key for idtech signing vbmeta image
+
+  1. U-boot should embedded a key to validate public key of vbmeta
+  2. We might use release key to sign vbmeta so we can reduce a key
+     So make 2048 bits key, not 4096
+  3. evk_a300 is also added because enabling vp6820 will modify u-boot
+     to enable both evk and devboard.
+
+  *********************************
+  The key is generate by command:
+    ssh-keygen -t rsa -b 2048
+
+  The public key is dump by command:
+    avbtool extract_public_key --key idtech_key.pem  --output ./idtech_key.pub
+
+  The raw data dump from public key by command:
+    hexdump idtech_key.pub -ve '/1 "0x%02x,"' -e '1/8 "
+"'
+
+  The vbmeta is signed by the private key by setting flag "BOARD_AVB_KEY_PATH" and "BOARD_AVB_ALGORITHM"
+
+Change-Id: I18d9598551511495f4a7ec207e525d154037423d
+
+diff --git a/common/security/idt_testkey_rsa2048.pem b/common/security/idt_testkey_rsa2048.pem
+new file mode 100644
+index 00000000..37db9857
+--- /dev/null
++++ b/common/security/idt_testkey_rsa2048.pem
+@@ -0,0 +1,27 @@
++-----BEGIN RSA PRIVATE KEY-----
++MIIEowIBAAKCAQEA0nXwpZaZY94LXFPn3WpBGkuzpqvNq60NiiM1zcFF4zLhBgzj
++r+KiTfTp4jQWIKGkrYKxmFzUYvyuKx98a/oLSdpYmFpmijuZjeaRpDk09nq/qSNL
++R3eIhC3K/IpAs80w40TzijbAuUy5i8C+3fB5CUPiqU7NLcnYWDjI3fUKZW5SHyEi
++fu0uDFMvNX7035vHEaStcDva3Jqn0N2AiHcTbwCP34Cf4iM9W0dwWU//atR10YM3
++THOjkT0NpdU20x+wf4b3r5IGhuEqQvL+jqYM75JR4SaLslcfVIUp+vUExv76vzHa
++7NfvUCHDWYzQuEoFmx7Pv675gJw9OqhpKFNNBwIDAQABAoIBAB3vnL1RAJyN9vu5
++C6AY/w2oevNYOLcUtHpTq9GKjlBU6mEb8D8Sc5e3IJWGZydZFr1/e5d6jNNPsc58
++egw50uU8Y6G4KiG7fIoMo+bCJGBy8VQzqv+NZyO2B8uINs/cffm10xZz11IEMdhJ
++IF0dWXoR5+nBRbofneBeo2O++S2YE5eAsGv3bJd9NQt/ebERAVapRBea6I1oaT3Y
++MZXfUV1LUcsYsEcPDcmhqMHNvRIo7MUp/SUsLajk+DJSU/S2mU2kG1xHBbqlOogU
++x24377AUA6saSNIW9xQK+iefIp59nC3TErJND52XqVlJbYh7VgG1udKkpTFFZkUO
++yoWM3bECgYEA6+b9g9sRAobTa1+jhlJGAk7l6Rc/d+02qzJXZBHMJWpetrMrlvS0
++y6lUtSRdgkjVJipES5BiTWFcHcppbhZhlZIy3Vmu0kW2vFEl4FGQKEB5pLpc/S2a
++p2/Muek9UPMH8el6sZrivH82mnOB+dGhB+PVJn0heKncUkU/5XfYFx0CgYEA5GQS
++C8+HWi6BV9Xz5Sw15tKaAJM7i2fB1XOWxM2kai8f3mEn2Yj+fHD9C9mKVEWyqrbu
++42jET4MEHPgTrb23S07xwv78zGcXgNt3VyrQMpDJX5GBcZ5IG4nuCbrK60+zvAMM
++VX8Ag92gN8HFcrjwix26YLIJCBBLKY8qdkdRp3MCgYAi1hOt+xXB98MU4iS120R3
++ZstQ5pv6y8787Qw2vOIWzGR8Om0/d5eTU8gsj9g3OyYu4qL/Pa0mnDAMPi3fkfKL
++MfHM+kd0ydK4cItVWvYc25ibGOJOiQODomDrO2RQpfMQaFg0DhlZmLepi1EwYSKU
++lbKOYoAk34CnrY5IBrCkiQKBgA4Pxzio71lzEY2Z46lRfoQWpVqxtfHQUpPUyQyW
++6K+M9TZY3v46vAhnYH0RSL4FiImQN8cSlTucAm3SLEv/KUDevG3YCzJ+imjpmkBo
++p2blmTBkIgcfyqq/ZEN/F61DO/qwaVr+Ncbop0unh4OXtV+rVeVMMNgpQKdvZBri
++KznXAoGBAIwFBG9o03Y4R8QnpCq4aaLvXVqjt807UrXIQ3cI1SfGjJhezP5sc9qb
++Gk/ybRZ275AYrjp9nKHPC9aozSH4rbprKTqaTNnyFo9RLalBEBoXwkRRttebShkr
++DMaojgGKVwLWKIlY8Vwi8UMWSBfH1Mmd809Ab0oExkZNUEu/0OG1
++-----END RSA PRIVATE KEY-----
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index 8d14cf51..834365ec 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -95,9 +95,8 @@ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+ TARGET_USES_MKE2FS := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+ # define frame buffer count
+ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index cbb48fe3..40adedc2 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -95,9 +95,8 @@ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+ TARGET_USES_MKE2FS := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+ # define frame buffer count
+ NUM_FRAMEBUFFER_SURFACE_BUFFERS := 3

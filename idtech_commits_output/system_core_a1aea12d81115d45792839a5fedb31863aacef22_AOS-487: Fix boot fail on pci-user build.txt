@@ -1,0 +1,34 @@
+a1aea12d8 max.yang 2021-02-17
+
+AOS-487: Fix boot fail on pci-user build
+
+Symptom: system_server keep crashing during boot if there is no adbd
+Root Cause:
+    For PCI build, adbd should physically removed, then device starts service
+    fail. Google changed the behavior of failure handle.
+      - In Android 10, property_service always send "OK" back to bionic, init
+        process just print error log.
+      - In Android 11, init gets shared socket and send error message before
+        property_service sending "OK" back to bionic. Bionic will receive error
+        and raise jni runtime exception.
+Solution: Avoiding sending error code back to bionic through socket by init process.
+Note: Framework/JNI/Bionic behavior are almost similar between Android 10/11, only
+      init process' behavior changed.
+
+Change-Id: Id8813895eb2900d3bf6cb057c79485cf650fbe23
+
+diff --git a/init/init.cpp b/init/init.cpp
+index 942feb939..6d57b4742 100644
+--- a/init/init.cpp
++++ b/init/init.cpp
+@@ -450,6 +450,10 @@ static bool HandleControlMessage(std::string_view message, const std::string& na
+         LOG(ERROR) << "Control message: Could not ctl." << message << " for '" << name
+                    << "' from pid: " << from_pid << " (" << process_cmdline
+                    << "): " << result.error();
++
++        // IDTech added for PCI to avoid crashing on bionic
++        if (name.compare("adbd") == 0)
++                return true;
+         return false;
+     }
+ 

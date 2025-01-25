@@ -1,0 +1,26 @@
+8a3a4b1d George.Huang 2021-06-09
+
+AOS-654: fix: vp6820_8mn: ota failed related to spl_b node
+
+Error Log:
+E update_engine: [ERROR:utils.cc(626)] Opening block device /dev/block/by-name/spl_b: Permission denied (13)
+W update_engine: type=1400 audit(0.0:13): avc: denied { read } for name="mmcblk2boot1p1" dev="tmpfs" ino=325
+  scontext=u:r:update_engine:s0 tcontext=u:object_r:block_device:s0 tclass=blk_file permissive=0
+
+Change-Id: I4fc6af0edc1cfd201b5caf45000c7a1c2b8581d2
+
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 67a99b4c..21f6858a 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -117,8 +117,8 @@
+ /dev/block/by-name/idtechdata                u:object_r:idtechdata_block_device:s0
+ 
+ # spl
+-/dev/block/mmcblk0boot[01]                   u:object_r:spl_block_device:s0
+-/dev/block/mmcblk0boot[01]p[1-9]             u:object_r:spl_block_device:s0
++/dev/block/mmcblk[02]boot[01]                u:object_r:spl_block_device:s0
++/dev/block/mmcblk[02]boot[01]p[1-9]          u:object_r:spl_block_device:s0
+ 
+ /vendor/bin/hw/android\.hardware\.camera\.provider@2\.6-service-google       u:object_r:hal_camera_default_exec:s0
+ 

@@ -1,0 +1,173 @@
+91f10e9c423d owen.wen 2020-02-24
+
+AOS-83: Online validate signature during installation
+
+Check the SHA-256 digest of signature exist on AMS or not.
+If digest already exists on AMS, then allow to install; otherwise, we reject the installation.
+
+BTW, it will build break if I create a link for aar file itself
+    error: frameworks/base/ams/Android.bp:1:1: module "amsaar" variant "android_common":
+    Path is outside directory: ../../../vendor/idtech/prebuilt_apps/com.idtech.amsconnector/com.idtech.amsconnector.aar
+so I create a link for aar directory instead
+
+Change-Id: Ie749eaa5a0d989a46a4961be69242e1371f4b834
+
+diff --git a/Android.bp b/Android.bp
+index 7e043fcf5b6e..2fc16249952f 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -777,6 +777,7 @@ java_defaults {
+         "android.hardware.vibrator-V1.3-java",
+         "android.hardware.wifi-V1.0-java-constants",
+         "devicepolicyprotosnano",
++        "amsaar",
+     ],
+ 
+     required: [
+diff --git a/ams/Android.bp b/ams/Android.bp
+new file mode 100644
+index 000000000000..49d65fb877c6
+--- /dev/null
++++ b/ams/Android.bp
+@@ -0,0 +1,5 @@
++android_library_import {
++    name: "amsaar",
++    aars: ["aar/com.idtech.amsconnector.aar"],
++    sdk_version: "current",
++}
+diff --git a/ams/aar/com.idtech.amsconnector.aar b/ams/aar/com.idtech.amsconnector.aar
+new file mode 100644
+index 000000000000..53adf35f4404
+Binary files /dev/null and b/ams/aar/com.idtech.amsconnector.aar differ
+diff --git a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+index 858b22424ab3..f210f0118863 100644
+--- a/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
++++ b/core/java/android/util/apk/ApkSignatureSchemeV2Verifier.java
+@@ -41,6 +41,7 @@ import static android.util.apk.ApkSigningBlockUtils.findApkSignatureSchemeBlock;
+ import static android.util.apk.ApkSigningBlockUtils.getHexString;
+ 
+ import android.os.SystemProperties;
++import android.os.RemoteException;
+ import android.util.ArrayMap;
+ import android.util.Pair;
+ 
+@@ -76,6 +77,9 @@ import java.io.File;
+ import java.io.FileInputStream;
+ import java.util.HashMap;
+ import java.util.Iterator;
++import com.idtech.amsconnector.framework.*;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * APK Signature Scheme v2 verifier.
+@@ -97,6 +101,7 @@ public class ApkSignatureSchemeV2Verifier {
+ 
+     private static final int APK_SIGNATURE_SCHEME_V2_BLOCK_ID = 0x7109871a;
+ 
++    private static boolean onlineCheckResult = false;
+     /**
+      * Returns {@code true} if the provided APK contains an APK Signature Scheme V2 signature.
+      *
+@@ -309,6 +314,47 @@ public class ApkSignatureSchemeV2Verifier {
+                 throw new SignatureNotFoundException("IDtech signature of signature not found");
+             }
+         }
++        if (SystemProperties.get("ro.idt.signature_online_check").contains("true")) {
++            // the latch is used waiting for validateFingerprint return
++            CountDownLatch latch = new CountDownLatch(1);
++            String digestOfSignature = "";
++            try {
++                MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
++                digest.update(v2_signature);
++                byte messageDigest[] = digest.digest();
++                digestOfSignature = getHexString(messageDigest);
++            } catch (NoSuchAlgorithmException e) {
++                throw new RuntimeException("Error no such algorithm" + e.getMessage(), e);
++            }
++            try {
++                AMS4FConnector.shared().validateFingerprint(digestOfSignature, new AMS4FCallback<FingerprintValidationResult>() {
++                    @Override
++                    public void onResult(FingerprintValidationResult result) {
++                        if (result.isValid()) {
++                            onlineCheckResult = true;
++                        } else {
++                            onlineCheckResult = false;
++                        }
++                        latch.countDown();
++                    }
++                    @Override
++                    public void onFailure(int errCode, String errMessage) {
++                        onlineCheckResult = false;
++                        latch.countDown();
++                    }
++                });
++                // validateFingerprint has default 15 seconds timeout
++                // we can set any number greater than 15 here to wait the result from AMS
++                latch.await(60, TimeUnit.SECONDS);
++            } catch (InterruptedException e) {
++                throw new RuntimeException("Error interrupted" + e.getMessage(), e);
++            } catch (RemoteException e) {
++                throw new RuntimeException("Error communicating with remote host: " + e.getMessage(), e);
++            }
++            if (!onlineCheckResult) {
++                throw new SignatureNotFoundException("IDtech signature online check failed");
++            }
++        }
+     }
+ 
+     public static PublicKey LoadPublicKey(String path, String algorithm)
+@@ -330,6 +376,14 @@ public class ApkSignatureSchemeV2Verifier {
+         return publicKey;
+     }
+ 
++    private static String getHexString(byte[] b) {
++        String result = "";
++        for (int i = 0; i < b.length; i++) {
++            result += Integer.toString((b[i] & 0xff) + 0x100, 16).substring(1);
++        }
++        return result;
++    }
++
+     private static X509Certificate[] verifySigner(
+             ByteBuffer signerBlock,
+             Map<Integer, byte[]> contentDigests,
+diff --git a/core/java/android/util/apk/ApkSignatureVerifier.java b/core/java/android/util/apk/ApkSignatureVerifier.java
+index 4abf903a554d..3a6750b4443a 100644
+--- a/core/java/android/util/apk/ApkSignatureVerifier.java
++++ b/core/java/android/util/apk/ApkSignatureVerifier.java
+@@ -130,7 +130,8 @@ public class ApkSignatureVerifier {
+                     signerSigs, SignatureSchemeVersion.SIGNING_BLOCK_V2);
+         } catch (SignatureNotFoundException e) {
+             // throw exception if IDTech Scheme not found and sos is enabled
+-            if (SystemProperties.get("ro.idt.signature_of_signature").contains("true")) {
++            if (SystemProperties.get("ro.idt.signature_of_signature").contains("true") ||
++                SystemProperties.get("ro.idt.signature_online_check").contains("true")) {
+                 throw new PackageParserException(INSTALL_PARSE_FAILED_NO_CERTIFICATES,
+                         "No APK Signature Scheme IDTech signature in package " + apkPath, e);
+             }
+diff --git a/services/core/java/com/android/server/pm/PackageManagerService.java b/services/core/java/com/android/server/pm/PackageManagerService.java
+index 0d38b1d4b329..9d975e57cbd9 100644
+--- a/services/core/java/com/android/server/pm/PackageManagerService.java
++++ b/services/core/java/com/android/server/pm/PackageManagerService.java
+@@ -378,6 +378,7 @@ import java.util.function.BiConsumer;
+ import java.util.function.Consumer;
+ import java.util.function.Predicate;
+ 
++import com.idtech.amsconnector.framework.*;
+ /**
+  * Keep track of all those APKs everywhere.
+  * <p>
+@@ -3633,6 +3634,12 @@ public class PackageManagerService extends IPackageManager.Stub
+         mServiceStartWithDelay = SystemClock.uptimeMillis() + (60 * 1000L);
+ 
+         Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
++
++        try {
++            AMS4FConnector.shared().start(context, mHandler);
++        } catch (Exception e) {
++            logCriticalInfo(Log.ERROR, "AMS4FConnector start failed");
++        }
+     }
+ 
+     /**

@@ -1,0 +1,46 @@
+edf2c942b3a5 owen.wen 2022-03-24
+
+AOS-936: GKI: export idt function
+
+Symptom: build break
+
+idt_ignore_preenable_unused_clk not defined
+clk-imx8mq.c:692:12: error: a parameter list without types is only allowed in a function definition
+__exitcall(imx8mq_clk_exit);
+
+Change-Id: I0c886c3b7e1566ba7cf04a2d314f768e186cf1c3
+
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 826a75ac84a7..cc090899764a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -4574,6 +4574,7 @@ void idt_ignore_preenable_unused_clk(struct clk *tarClk)
+ 	tarClk->core->flags |= IDT_IGNORE_PREENABLE_UNUSED_CLK;
+ 	return;
+ }
++EXPORT_SYMBOL_GPL(idt_ignore_preenable_unused_clk);
+ 
+ struct clk_notifier_devres {
+ 	struct clk *clk;
+diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
+index 2989639b45e9..c908ba8deea8 100644
+--- a/drivers/clk/imx/clk-imx8mq.c
++++ b/drivers/clk/imx/clk-imx8mq.c
+@@ -40,6 +40,8 @@ static const char * const sys3_pll_out_sels[] = {"sys3_pll1_ref_sel", };
+ static const char * const dram_pll_out_sels[] = {"dram_pll1_ref_sel", };
+ static const char * const video2_pll_out_sels[] = {"video2_pll1_ref_sel", };
+ 
++extern void idt_ignore_preenable_unused_clk(struct clk *);
++
+ /* CCM ROOT */
+ static const char * const imx8mq_a53_sels[] = {"osc_25m", "arm_pll_out", "sys2_pll_500m", "sys2_pll_1000m",
+ 					"sys1_pll_800m", "sys1_pll_400m", "audio_pll1_out", "sys3_pll_out", };
+@@ -689,7 +691,7 @@ static void __exit imx8mq_clk_exit(void)
+ {
+ 	platform_driver_unregister(&imx8mq_clk_driver);
+ }
+-__exitcall(imx8mq_clk_exit);
++module_exit(imx8mq_clk_exit);
+ 
+ MODULE_AUTHOR("Abel Vesa <abel.vesa@nxp.com>");
+ MODULE_DESCRIPTION("NXP i.MX8MQ clock driver");

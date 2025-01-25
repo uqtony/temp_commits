@@ -1,0 +1,431 @@
+ccec60f8 AndrewS 2021-01-25
+
+AOS-484: add memtrack HAL only in userdebug build
+
+Symptom: init cannot find memtrack in user build
+Root Cause: memtrack HAL object for user build removed in previous change,
+            but manifest.xml not followed the change, so system still trying
+            to find memtrack in init stage, and enter endless loop to find
+            memtrack.
+Solution: Remove memtrack in manifest.xml, and create a new manifest_userdebug.xml,
+          which is for HALs in userdebug build, and add this .xml file only in
+          userdebug build.
+
+Change-Id: Iaf88ad5b43bb1a9efe5564b1a471b6f7426d2a6e
+
+diff --git a/imx8m/bigcypress_8mp/BoardConfig.mk b/imx8m/bigcypress_8mp/BoardConfig.mk
+index ac86f679..16a1d7a9 100644
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@ -64,6 +64,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/bigcypress_8mp/manifest.xml b/imx8m/bigcypress_8mp/manifest.xml
+index 8ad5615b..0627068d 100644
+--- a/imx8m/bigcypress_8mp/manifest.xml
++++ b/imx8m/bigcypress_8mp/manifest.xml
+@@ -120,15 +120,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/bigcypress_8mp/manifest_userdebug.xml b/imx8m/bigcypress_8mp/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index 03829c25..00e8330c 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -64,6 +64,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/bigcypress_8mq/manifest.xml b/imx8m/bigcypress_8mq/manifest.xml
+index d22bdad0..a3dcae8b 100644
+--- a/imx8m/bigcypress_8mq/manifest.xml
++++ b/imx8m/bigcypress_8mq/manifest.xml
+@@ -125,15 +125,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/bigcypress_8mq/manifest_userdebug.xml b/imx8m/bigcypress_8mq/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+index 0515aeeb..70dda5fd 100644
+--- a/imx8m/evk_a100/BoardConfig.mk
++++ b/imx8m/evk_a100/BoardConfig.mk
+@@ -62,6 +62,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/evk_a100/manifest.xml b/imx8m/evk_a100/manifest.xml
+index 6cc56b37..0cc1b570 100644
+--- a/imx8m/evk_a100/manifest.xml
++++ b/imx8m/evk_a100/manifest.xml
+@@ -154,15 +154,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/evk_a100/manifest_userdebug.xml b/imx8m/evk_a100/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/evk_a100/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/evk_a200/BoardConfig.mk b/imx8m/evk_a200/BoardConfig.mk
+index fae0d221..08d5c823 100644
+--- a/imx8m/evk_a200/BoardConfig.mk
++++ b/imx8m/evk_a200/BoardConfig.mk
+@@ -65,6 +65,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/evk_a200/manifest.xml b/imx8m/evk_a200/manifest.xml
+index 8ea9a8f9..47cd52ef 100644
+--- a/imx8m/evk_a200/manifest.xml
++++ b/imx8m/evk_a200/manifest.xml
+@@ -156,15 +156,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/evk_a200/manifest_userdebug.xml b/imx8m/evk_a200/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/evk_a200/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index c5239415..fa761cf1 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -65,6 +65,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/evk_a300/manifest.xml b/imx8m/evk_a300/manifest.xml
+index 5bc6303c..8d94e079 100644
+--- a/imx8m/evk_a300/manifest.xml
++++ b/imx8m/evk_a300/manifest.xml
+@@ -156,15 +156,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/evk_a300/manifest_userdebug.xml b/imx8m/evk_a300/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/evk_a300/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index 4a792d15..1c99a592 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -61,6 +61,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/vp6820_8mn/manifest.xml b/imx8m/vp6820_8mn/manifest.xml
+index 6603e3ef..7ec59d23 100644
+--- a/imx8m/vp6820_8mn/manifest.xml
++++ b/imx8m/vp6820_8mn/manifest.xml
+@@ -118,15 +118,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mn/manifest_userdebug.xml b/imx8m/vp6820_8mn/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/vp6820_8mn/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/vp6820_8mp/BoardConfig.mk b/imx8m/vp6820_8mp/BoardConfig.mk
+index 1e311a08..04aaadb7 100644
+--- a/imx8m/vp6820_8mp/BoardConfig.mk
++++ b/imx8m/vp6820_8mp/BoardConfig.mk
+@@ -64,6 +64,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/vp6820_8mp/manifest.xml b/imx8m/vp6820_8mp/manifest.xml
+index 8ad5615b..0627068d 100644
+--- a/imx8m/vp6820_8mp/manifest.xml
++++ b/imx8m/vp6820_8mp/manifest.xml
+@@ -120,15 +120,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mp/manifest_userdebug.xml b/imx8m/vp6820_8mp/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/vp6820_8mp/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index 6c4786cb..cffd5f65 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -64,6 +64,9 @@ endif
+ 
+ # Vendor Interface manifest and compatibility
+ DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++ifneq (,$(filter userdebug,$(TARGET_BUILD_VARIANT)))
++DEVICE_MANIFEST_FILE += $(IMX_DEVICE_PATH)/manifest_userdebug.xml
++endif
+ DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
+ 
+ TARGET_BOOTLOADER_BOARD_NAME := EVK
+diff --git a/imx8m/vp6820_8mq/manifest.xml b/imx8m/vp6820_8mq/manifest.xml
+index 9ba70a12..5eed04eb 100644
+--- a/imx8m/vp6820_8mq/manifest.xml
++++ b/imx8m/vp6820_8mq/manifest.xml
+@@ -125,15 +125,6 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
+-    <hal format="hidl">
+-        <name>android.hardware.memtrack</name>
+-        <transport>hwbinder</transport>
+-        <version>1.0</version>
+-        <interface>
+-            <name>IMemtrack</name>
+-            <instance>default</instance>
+-        </interface>
+-    </hal>
+     <hal format="hidl">
+         <name>android.hardware.audio</name>
+         <transport>hwbinder</transport>
+diff --git a/imx8m/vp6820_8mq/manifest_userdebug.xml b/imx8m/vp6820_8mq/manifest_userdebug.xml
+new file mode 100644
+index 00000000..0b8b4d89
+--- /dev/null
++++ b/imx8m/vp6820_8mq/manifest_userdebug.xml
+@@ -0,0 +1,12 @@
++<manifest version="1.0" type="device" target-level="4">
++    <kernel  target-level="5" />
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</manifest>

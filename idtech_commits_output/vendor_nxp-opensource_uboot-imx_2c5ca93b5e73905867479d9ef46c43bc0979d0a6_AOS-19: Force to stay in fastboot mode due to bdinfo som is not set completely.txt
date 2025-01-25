@@ -1,0 +1,104 @@
+2c5ca93b5e George.Huang 2019-11-07
+
+AOS-19: Force to stay in fastboot mode due to bdinfo som is not set completely
+
+Boot process should fallback to fastboot in case
+if *.som.* IDs we not programmed.
+
+Change-Id: I9cca44cec8be8d01bb0abf7cc00acd3c21dc4445
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index b34aa36c61..67946ced24 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -42,6 +42,7 @@
+ #endif
+ 
+ #include "fb_fsl_common.h"
++#include <persist_idt.h>
+ 
+ #if defined (CONFIG_ARCH_IMX8) || defined (CONFIG_ARCH_IMX8M)
+ #define DST_DECOMPRESS_LEN 1024*1024*32
+@@ -631,6 +632,10 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	AvbSlotVerifyData *avb_out_data = NULL;
+ 	AvbPartitionData *avb_loadpart = NULL;
+ 
++	if (!is_bdinfo_som_set()) {
++		goto fail;
++	}
++
+ 	/* get bootmode, default to boot "boot" */
+ 	if (argc > 1) {
+ 		is_recovery_mode =
+diff --git a/include/persist_idt.h b/include/persist_idt.h
+index e31c64892f..5851eaebe9 100644
+--- a/include/persist_idt.h
++++ b/include/persist_idt.h
+@@ -2,7 +2,7 @@
+  * Copyright (C) 2019 ID TECH
+  */
+ 
+-//#include <fsl_avb.h>
++#include <fastboot.h>
+ #include "../lib/libavb/libavb.h"
+ 
+ #ifndef __PERSIST_IDT_H__
+@@ -81,6 +81,8 @@ typedef enum {
+ 
+ bool is_bdinfo_var(char *cmd);
+ 
++bool is_bdinfo_som_set(void);
++
+ IdtInfoResult handle_bdinfo_var(bool do_set, char *cmd, char *arg, char *buffer, size_t size);
+ 
+ /* defined from lib/avb/fsl/fsl_avb.c */
+diff --git a/lib/persist_idt/persist_idt.c b/lib/persist_idt/persist_idt.c
+index 191104e50b..56cd249bff 100644
+--- a/lib/persist_idt/persist_idt.c
++++ b/lib/persist_idt/persist_idt.c
+@@ -7,6 +7,7 @@
+ #include <linux/string.h>
+ #include <persist_idt.h>
+ 
++IdtInfoResult bdinfo_read(BoardInfoData* bdinfo_data, char *err_msg, size_t err_msg_len);
+ 
+ static int strcmp_l1(const char *s1, const char *s2) {
+ 	if (!s1 || !s2)
+@@ -18,7 +19,8 @@ static int strcmp_l1(const char *s1, const char *s2) {
+ 
+ bool is_bdinfo_var(char *cmd)
+ {
+-	assert(cmd != NULL);
++	if (cmd == NULL)
++		return false;
+ 	if (!strcmp_l1("som-model", cmd) ||
+ 			!strcmp_l1("som-plc", cmd) ||
+ 			!strcmp_l1("som-rev", cmd) ||
+@@ -29,6 +31,24 @@ bool is_bdinfo_var(char *cmd)
+ 	return false;
+ }
+ 
++bool is_bdinfo_som_set(void)
++{
++	BoardInfoData bdinfo_data;
++	char response[FASTBOOT_RESPONSE_LEN];
++	if (bdinfo_read(&bdinfo_data, response, FASTBOOT_RESPONSE_LEN) != 0) {
++		printf("Error: bdinfo read failed: %s
+", response);
++		return false;
++	}
++	if ((strlen((const char *)bdinfo_data.som_rev) <= 0) ||
++			(strlen((const char *)bdinfo_data.som_plc) <= 0) ||
++			(strlen((const char *)bdinfo_data.som_model) <= 0)) {
++		printf("Error: bdinfo som is not set completely
+");
++		printf("Error: Force to stay in fastboot mode
+");
++		return false;
++	}
++	return true;
++}
++
+ bool bdinfo_data_verify_and_byteswap(const BoardInfoData* src, BoardInfoData* dest) {
+ 	/* Ensure magic is correct. */
+ 	if (avb_safe_memcmp(src->magic, BDINFO_MAGIC, BDINFO_MAGIC_LEN) != 0) {

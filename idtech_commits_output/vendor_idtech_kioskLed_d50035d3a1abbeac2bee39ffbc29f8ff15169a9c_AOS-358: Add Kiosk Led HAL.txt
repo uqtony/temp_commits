@@ -1,0 +1,186 @@
+d50035d jay deng 2020-10-20
+
+AOS-358: Add Kiosk Led HAL
+
+Add Idtech Kiosk Led HAL
+
+Change-Id: I3c022958d3199d8e31153e1f70878357331713f5
+
+diff --git a/Android.mk b/Android.mk
+new file mode 100644
+index 0000000..62f8224
+--- /dev/null
++++ b/Android.mk
+@@ -0,0 +1,36 @@
++#
++#   KIOSK LED
++#
++#   Copyright (c) 2020 ID TECH.
++#   Author: Jay Deng <jay.deng@idtechproducts.com>
++#
++#   This program is free software; you can redistribute it and/or modify
++#   it under the terms of the GNU General Public License version 2 as
++#   published by the Free Software Foundation.
++#
++
++LOCAL_PATH := $(call my-dir)
++
++include $(CLEAR_VARS)
++
++ifdef TARGET_BOARD_PLATFORM
++LOCAL_MODULE := kioskled.$(TARGET_BOARD_PLATFORM)
++else
++LOCAL_MODULE := kioskled.default
++endif
++
++LOCAL_MODULE_RELATIVE_PATH := hw
++
++LOCAL_C_INCLUDES += \
++    hardware/libhardware/include \
++    system/core/include
++
++LOCAL_SRC_FILES := kioskLed.cpp
++
++LOCAL_SHARED_LIBRARIES := liblog libcutils
++
++LOCAL_MODULE_TAGS := optional
++
++LOCAL_VENDOR_MODULE := true
++
++include $(BUILD_SHARED_LIBRARY)
+diff --git a/kioskLed.cpp b/kioskLed.cpp
+new file mode 100644
+index 0000000..a3e296f
+--- /dev/null
++++ b/kioskLed.cpp
+@@ -0,0 +1,128 @@
++/*
++ *  KIOSK LED
++ *
++ *  Copyright (c) 2020 ID TECH.
++ *  Author: Jay Deng <jay.deng@idtechproducts.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <hardware/hardware.h>
++#include <cutils/log.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <sys/ioctl.h>
++#include <utils/Log.h>
++#include <hardware/kioskLed.h>
++#include <stdlib.h>
++#include <string.h>
++#include <errno.h>
++
++#define DEF_KIOSK_LED_4		"/sys/class/leds/LED_KIOSK_4/brightness"
++#define DEF_KIOSK_LED_5		"/sys/class/leds/LED_KIOSK_5/brightness"
++#define DEF_KIOSK_LED_6		"/sys/class/leds/LED_KIOSK_6/brightness"
++#define DEF_KIOSK_LED_7		"/sys/class/leds/LED_KIOSK_7/brightness"
++
++enum {
++	KIOSK_LED_4 = 4,
++	KIOSK_LED_5,
++	KIOSK_LED_6,
++	KIOSK_LED_7,
++};
++
++struct kioskleds_module_t {
++	struct hw_module_t common;
++};
++
++static int kioskled_device_open(const struct hw_module_t* module,
++				const char* name, struct hw_device_t** device);
++
++static struct hw_module_methods_t kioskled_module_methods = {
++	.open = kioskled_device_open
++};
++
++struct kioskleds_module_t HAL_MODULE_INFO_SYM = {
++	.common = {
++		.tag = HARDWARE_MODULE_TAG,
++		.version_major = 1,
++		.version_minor = 0,
++		.id = KIOSKLED_HARDWARE_MODULE_ID,
++		.name = "Kiosk Led Module",
++		.author = "Jay Deng",
++		.methods = &kioskled_module_methods,
++	}
++};
++
++static int write_int(char const* path, int value)
++{
++	int fd;
++
++	fd = open(path, O_RDWR);
++	if (fd >= 0) {
++		char buffer[20];
++
++		int bytes = snprintf(buffer, sizeof(buffer), "%d
+", value);
++		ssize_t amt = write(fd, buffer, (size_t)bytes);
++		close(fd);
++		return amt == -1 ? -1 : 0;
++	}
++	return -1;
++}
++
++static void setKioskLed(__attribute__((unused))struct kioskLed_device_t* dev,
++					   int idx, int onOff)
++{
++	switch (idx) {
++		case KIOSK_LED_4:
++			write_int(DEF_KIOSK_LED_4, onOff);
++			break;
++
++		case KIOSK_LED_5:
++			write_int(DEF_KIOSK_LED_5, onOff);
++			break;
++
++		case KIOSK_LED_6:
++			write_int(DEF_KIOSK_LED_6, onOff);
++			break;
++
++		case KIOSK_LED_7:
++			write_int(DEF_KIOSK_LED_7, onOff);
++			break;
++
++		default:
++			ALOGE("[%s] Invalid led index
+", __func__);
++			break;
++	}
++	return;
++}
++
++static int kioskled_device_close(struct hw_device_t *device)
++{
++	struct kioskLed_device_t *ctx = (struct kioskLed_device_t*)device;
++	if (ctx)
++		free(ctx);
++	return 0;
++}
++
++/*****************************************************************************/
++static int kioskled_device_open(const struct hw_module_t* module,
++				const char* name, struct hw_device_t** device)
++{
++	if (strcmp(name, KIOSKLED_HARDWARE_MODULE_ID))
++		return -1;
++
++	struct kioskLed_device_t *dev = (struct kioskLed_device_t *)malloc(sizeof(struct kioskLed_device_t));
++	if (!dev)
++		return -1;
++
++	dev->common.tag		= HARDWARE_DEVICE_TAG;
++	dev->common.version	= 0;
++	dev->common.module	= (struct hw_module_t*) module;
++	dev->common.close	= kioskled_device_close;
++	dev->setKioskLed	= setKioskLed;
++
++	*device = &dev->common;
++	return 0;
++}

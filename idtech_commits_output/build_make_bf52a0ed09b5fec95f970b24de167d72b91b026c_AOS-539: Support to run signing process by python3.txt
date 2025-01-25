@@ -1,0 +1,223 @@
+bf52a0ed0 max.yang 2021-05-10
+
+AOS-539: Support to run signing process by python3
+
+Change-Id: I09e32b43bc25cae05381d8afe266af1a2dd2ab5f
+
+diff --git a/tools/releasetools/common.py b/tools/releasetools/common.py
+index ae7da2fb6..cc13888c9 100644
+--- a/tools/releasetools/common.py
++++ b/tools/releasetools/common.py
+@@ -702,7 +702,7 @@ def LoadInfoDict(input_file, repacking=False):
+     for partition in PARTITIONS_WITH_CARE_MAP:
+       fingerprint = build_info.GetPartitionFingerprint(partition)
+       if fingerprint:
+-        d["avb_{}_salt".format(partition)] = sha256(fingerprint).hexdigest()
++        d["avb_{}_salt".format(partition)] = sha256(fingerprint.encode('utf-8')).hexdigest()
+ 
+   return d
+ 
+diff --git a/tools/releasetools/idt_sign_ota_package.py b/tools/releasetools/idt_sign_ota_package.py
+index d96100955..6096e50e5 100644
+--- a/tools/releasetools/idt_sign_ota_package.py
++++ b/tools/releasetools/idt_sign_ota_package.py
+@@ -22,8 +22,8 @@ def usage():
+   sys.exit(1)
+ 
+ def sign_hash_by_ca(data, key):
+-  sig_hex = WS.doSign(key, data.encode('hex'), 1)
+-  sig = sig_hex.decode('hex')
++  sig_hex = WS.doSign(key, data, 1)
++  sig = bytearray.fromhex(sig_hex)
+   assert len(sig) == 256
+ 
+   return sig
+@@ -47,8 +47,8 @@ def handle_payload_files(orig_payload, output_zip):
+     phash = f_phash.read()
+     mhash = f_mhash.read()
+   with open(payload_sig, "wb") as f_psig, open(metadata_sig, "wb") as f_msig:
+-    f_psig.write(sign_hash_by_ca(phash, "SYS_Release"))
+-    f_msig.write(sign_hash_by_ca(mhash, "SYS_Release"))
++    f_psig.write(sign_hash_by_ca(phash.hex(), "SYS_Release"))
++    f_msig.write(sign_hash_by_ca(mhash.hex(), "SYS_Release"))
+ 
+   # Write back to payload
+   signed_payload_file = common.MakeTempFile(prefix="signed-payload-", suffix=".bin")
+@@ -109,7 +109,7 @@ def handle_metadata_file(input_zip, output_zip, cert_dir):
+   )
+ 
+   data = input_zip.read(METADATA_NAME)
+-  info = load_metadata(data)
++  info = load_metadata(data.decode())
+ 
+   for property_file in needed_property_files:
+     info[property_file.name] = property_file.Compute(output_zip)
+@@ -151,7 +151,7 @@ def replace_ca_signature(package):
+   h.update(package_bytes[:signed_len])
+   package_digest = h.hexdigest()
+ 
+-  sig = sign_hash_by_ca(package_digest.decode('hex'), "SYS_Release")
++  sig = sign_hash_by_ca(package_digest, "SYS_Release")
+   with open(package, 'rb+') as package_file:
+     package_file.seek(length - 6 - 256, 0) # footer and signature size
+     package_file.write(sig)
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 8e01691c0..bb85a17d3 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -21,7 +21,7 @@ from distutils.spawn import find_executable
+ from hashlib import sha256
+ 
+ # VERSION: Android Ver.Major.Minor
+-OTATOOL_VERSION = "11.01.006"
++OTATOOL_VERSION = "11.01.007"
+ 
+ WS = None
+ idt_key_map = {}
+@@ -49,15 +49,15 @@ def check_executable():
+   print("------------------")
+ 
+ def IDTReplaceCert(data):
+-  for old, new in idt_key_map.iteritems():
++  for old, new in idt_key_map.items():
+     print("    Replacing %s.x509.pem with %s.x509.pem" % (old, new))
+     try:
+       with open(old + ".x509.pem") as old_fp:
+         old_cert16 = base64.b16encode(
+-            common.ParseCertificate(old_fp.read())).lower()
++            common.ParseCertificate(old_fp.read())).decode().lower()
+       with open(idt_cert_dir + new + ".x509.pem") as new_fp:
+         new_cert16 = base64.b16encode(
+-            common.ParseCertificate(new_fp.read())).lower()
++            common.ParseCertificate(new_fp.read())).decode().lower()
+     except IOError as e:
+         print("    Error accessing %s: %s.
+Skip replacing %s.x509.pem with "
+                 "%s.x509.pem." % (e.filename, e.strerror, old, new))
+@@ -101,8 +101,8 @@ def idt_write_ota_certs(output_zip):
+   common.ZipWriteStr(output_zip, "SYSTEM/etc/security/otacerts.zip", temp_file.getvalue())
+ 
+ def sign_by_ca(data, key, is_hash = 0):
+-  sig_hex = WS.doSign(key, data.encode('hex'), is_hash)
+-  sig = sig_hex.decode('hex')
++  sig_hex = WS.doSign(key, data, is_hash)
++  sig = bytearray.fromhex(sig_hex)
+   assert len(sig) == 256
+ 
+   return sig
+@@ -111,7 +111,7 @@ def handle_apks_CA_sign(data, key):
+   # dump to_sign file
+   tmp_d = tempfile.mkdtemp()
+   apk_path = tmp_d + "/file.apk"
+-  with open(apk_path, "w") as unsigned:
++  with open(apk_path, "wb") as unsigned:
+     unsigned.write(data)
+     unsigned.flush()
+ 
+@@ -128,9 +128,9 @@ def handle_apks_CA_sign(data, key):
+ 
+   # CA signs to_sign file, output signature data
+   with open(apk_path + ".v2.hex", "r") as f_v2, open(apk_path + ".v3.hex", "r") as f_v3:
+-    v2_sig = sign_by_ca(f_v2.read().decode('hex'), key)
+-    v3_sig = sign_by_ca(f_v3.read().decode('hex'), key)
+-  with open(apk_path + "v2.sig.bin", "w") as f_sigv2, open(apk_path + "v3.sig.bin", "w") as f_sigv3:
++    v2_sig = sign_by_ca(f_v2.read(), key)
++    v3_sig = sign_by_ca(f_v3.read(), key)
++  with open(apk_path + "v2.sig.bin", "wb") as f_sigv2, open(apk_path + "v3.sig.bin", "wb") as f_sigv3:
+     f_sigv2.write(v2_sig)
+     f_sigv3.write(v3_sig)
+ 
+@@ -144,7 +144,7 @@ def handle_apks_CA_sign(data, key):
+   if retcode != 0:
+       raise ValueError('Error combining apk signature file, abort script')
+ 
+-  with open(apk_path, "r") as f_apk:
++  with open(apk_path, "rb") as f_apk:
+     signed = f_apk.read()
+ 
+   os.unlink("./cert.der")
+@@ -330,14 +330,14 @@ def handle_all_files_verbatim(input_zip, output_zip):
+       if stat.S_ISLNK(info.external_attr >> 16):
+         new_data = data
+       else:
+-        new_data = sign_target_files_apks.RewriteProps(data)
++        new_data = sign_target_files_apks.RewriteProps(data.decode())
+       common.ZipWriteStr(output_zip, out_info, new_data)
+ 
+     # Replace the certs in *mac_permissions.xml (there could be multiple, such
+     # as {system,vendor}/etc/selinux/{plat,nonplat}_mac_permissions.xml).
+     elif filename.endswith("mac_permissions.xml"):
+       print("Rewriting %s with new keys." % (filename,))
+-      new_data = IDTReplaceCert(data)
++      new_data = IDTReplaceCert(data.decode())
+       common.ZipWriteStr(output_zip, out_info, new_data)
+ 
+     elif filename in (
+@@ -387,12 +387,12 @@ def create_released_vbmeta(sign_env, output_zip, tmp_dir):
+   # output vbmeta.img-partial, vbmeta.img-to_sign
+   post_sign_vbmeta.main(new_args)
+ 
+-  with open(tmp_dir + "/IMAGES/vbmeta.img-to_sign", "r") as f_tosign, \
+-       open(tmp_dir + "/IMAGES/vbmeta.img-sig", "w") as f_sig:
++  with open(tmp_dir + "/IMAGES/vbmeta.img-to_sign", "rb") as f_tosign, \
++       open(tmp_dir + "/IMAGES/vbmeta.img-sig", "wb") as f_sig:
+     data_to_sign = f_tosign.read()
+     h = sha256()
+     h.update(data_to_sign)
+-    signature = sign_by_ca(h.hexdigest().decode('hex'), "AVBKey", is_hash = 1)
++    signature = sign_by_ca(h.hexdigest(), "AVBKey", is_hash = 1)
+     f_sig.write(signature)
+ 
+   # combine vbmeta.img-partial, vbmeta.img-sig
+@@ -408,8 +408,8 @@ def bootloader_gen_sig(tgt_img, prefix, key):
+   tgt_sig = tgt_img + "-" + prefix + key + ".sig"
+   sign_key = "CSF1" if key == "csf" else "IMG1"
+ 
+-  with open(to_sign, "r") as f_tosign, open(tgt_sig, "w") as f_sig:
+-    sig = sign_by_ca(f_tosign.read(), sign_key)
++  with open(to_sign, "rb") as f_tosign, open(tgt_sig, "wb") as f_sig:
++    sig = sign_by_ca(f_tosign.read().hex(), sign_key)
+     f_sig.write(sig)
+ 
+ def create_released_bootloader(sign_env, output_zip, tmp_dir):
+diff --git a/tools/releasetools/post_sign_vbmeta.py b/tools/releasetools/post_sign_vbmeta.py
+index e4e083477..9c8c7befd 100644
+--- a/tools/releasetools/post_sign_vbmeta.py
++++ b/tools/releasetools/post_sign_vbmeta.py
+@@ -158,7 +158,7 @@ class AvbVBMetaHeader(object):
+      self.flags,
+      self.release_string) = struct.unpack(self.FORMAT_STRING, data)
+ 
+-    if self.magic != 'AVB0':
++    if self.magic != b'AVB0':
+       raise ValueError('Given image does not look like a vbmeta image.')
+ 
+ def print_avb_header(hdr):
+@@ -227,7 +227,7 @@ def combine_sign_data(args):
+     sig_blob = f_sig.read()
+ 
+     (num_bits,) = struct.unpack('!I', pubkey_blob[0:4])
+-    modulus_blob = pubkey_blob[8:8 + num_bits/8]
++    modulus_blob = pubkey_blob[8:8 + num_bits // 8]
+     modulus = 0
+     for b in bytearray(modulus_blob):
+       modulus *= 256
+@@ -248,7 +248,7 @@ def combine_sign_data(args):
+                 'e=INTEGER:%s
+' % (hex(modulus).rstrip('L'), hex(exponent).rstrip('L')))
+ 
+     asn1_tmpfile = tempfile.NamedTemporaryFile()
+-    asn1_tmpfile.write(asn1_str)
++    asn1_tmpfile.write(asn1_str.encode('ascii'))
+     asn1_tmpfile.flush()
+     der_tmpfile = tempfile.NamedTemporaryFile()
+     p = subprocess.Popen(
+@@ -262,7 +262,7 @@ def combine_sign_data(args):
+         stdin=subprocess.PIPE,
+         stdout=subprocess.PIPE,
+         stderr=subprocess.PIPE)
+-    (pout, perr) = p.communicate(str(sig_blob))
++    (pout, perr) = p.communicate(sig_blob)
+     retcode = p.wait()
+     if retcode != 0:
+       raise ValueError('Error verifying data, abort writing: {}'.format(perr))

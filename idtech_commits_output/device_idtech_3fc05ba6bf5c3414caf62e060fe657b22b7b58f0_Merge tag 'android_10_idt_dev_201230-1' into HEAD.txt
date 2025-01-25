@@ -1,0 +1,118 @@
+3fc05ba6 George.Huang 2020-12-31
+
+Merge tag 'android_10_idt_dev_201230-1' into HEAD
+
+android_10_idt_dev_bigcypress_8mq-userdebug-daily_75
+
+Change-Id: Iba57feab850ead7f61966b23cf444af491b3e1fa
+
+diff --cc imx8m/ProductConfigCommon.mk
+index f7b239bb,302371b9..79d1c53e
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@@ -8,22 -8,10 +8,17 @@@ $(call inherit-product, packages/servic
+  endif
+  $(call inherit-product, $(TOPDIR)frameworks/base/data/sounds/AllAudio.mk)
+  $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
+ +
+ +# Installs gsi keys into ramdisk.
+ +$(call inherit-product, $(SRC_TARGET_DIR)/product/developer_gsi_keys.mk)
+ +$(call inherit-product, $(SRC_TARGET_DIR)/product/gsi_keys.mk)
+ +PRODUCT_PACKAGES += \
+ +    adb_debug.prop
+ +
+  # overrides
+  PRODUCT_BRAND := Android
+ -PRODUCT_MANUFACTURER := freescale
+ +PRODUCT_MANUFACTURER := nxp
+  
+- ifneq (user,$(TARGET_BUILD_VARIANT))
+- PRODUCT_PACKAGES += \
+-     SystemUpdaterSample \
+-     ethernet \
+-     CubeLiveWallpapers
+  ifneq ($(PRODUCT_IMX_CAR),true)
+  PRODUCT_PACKAGES += \
+      Camera \
+@@@ -42,18 -27,12 +34,13 @@@ endi
+  
+  # Android infrastructures
+  PRODUCT_PACKAGES += \
+-     CactusPlayer \
+      ExtractorPkg \
+      charger_res_images \
+ +    charger \
+-     libGLES_android \
+-     libRS \
+      libedid \
+      libion \
+-     librs_jni \
+      slideshow \
+      verity_warning_images_idt \
+-     vndk-sp
+  
+  # HAL
+  PRODUCT_PACKAGES += \
+diff --cc imx8m/bigcypress_8mp/BoardConfig.mk
+index 286c362e,3d285177..ac86f679
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@@ -118,13 -115,12 +119,13 @@@ BOARD_KERNEL_CMDLINE := init=/init andr
+  
+  # memory config
+  BOARD_KERNEL_CMDLINE += transparent_hugepage=never
+ +BOARD_KERNEL_CMDLINE += swiotlb=65536
+  
+  # display config
+- BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
++ BOARD_KERNEL_CMDLINE += androidboot.lcd_density=246 androidboot.primary_display=imx-drm
+  
+  # wifi config
+ -BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+ +BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
+  
+  # low memory device build config
+  ifeq ($(LOW_MEMORY),true)
+diff --cc imx8m/bigcypress_8mq/BoardConfig.mk
+index 13a11a9a,be4d1749..03829c25
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@@ -125,14 -123,10 +126,14 @@@ BOARD_KERNEL_CMDLINE += androidboot.fbT
+  BOARD_KERNEL_CMDLINE += transparent_hugepage=never cma=$(CMASIZE)
+  
+  # display config
+- BOARD_KERNEL_CMDLINE += androidboot.lcd_density=294 androidboot.primary_display=imx-dcss androidboot.gui_resolution=1080p
++ BOARD_KERNEL_CMDLINE += androidboot.lcd_density=246 androidboot.primary_display=imx-dcss androidboot.gui_resolution=1080p
+  
+  # wifi config
+ -BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+ +BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN moal.mod_para=wifi_mod_para.conf
+ +
+ +ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
+ +BOARD_KERNEL_CMDLINE += androidboot.vendor.sysrq=1
+ +endif
+  
+  ifeq ($(TARGET_USERIMAGES_USE_UBIFS),true)
+  ifeq ($(TARGET_USERIMAGES_USE_EXT4),true)
+diff --cc imx8m/vp6820_8mn/vp6820_8mn.mk
+index 96353f81,787dd61e..9fe3b534
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@@ -323,13 -308,12 +323,8 @@@ PRODUCT_PROPERTY_OVERRIDES += 
+      ro.frp.pst=/dev/block/by-name/presistdata
+  endif
+  
+ -# ro.product.first_api_level indicates the first api level the device has commercially launched on.
+ -PRODUCT_PROPERTY_OVERRIDES += \
+ -    ro.product.first_api_level=28
+ -
+  PRODUCT_PACKAGES += \
+      DirectAudioPlayer
+- ifneq (user,$(TARGET_BUILD_VARIANT))
+- # Tensorflow lite camera demo
+- PRODUCT_PACKAGES += \
+-                     tflitecamerademo
+- endif
+  
+  # Add oem unlocking option in settings.
+  PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata

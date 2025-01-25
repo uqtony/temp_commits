@@ -1,0 +1,87 @@
+6ba3610fbc AndrewS 2021-03-26
+
+AOS-534: store physical display id in a new list variable
+
+In HAL there's a structure to store displays that recognized
+during kernel init, and SurfaceFlinger will get displays from HAL,
+but currently SurfaceFlinger using map variable to store display data,
+so when frameworks get display info/id from SurfaceFlinger, the
+sequence might be different from HAL, and cause display orientation
+abnormal, so I add a new list variable to store display unique id,
+so that frameworks can get displays data in the same sequence as
+HAL and native.
+
+Change-Id: Ia0d0d5f9e296036e0a09990c7fe3f3a8648dc321
+
+diff --git a/services/surfaceflinger/SurfaceFlinger.cpp b/services/surfaceflinger/SurfaceFlinger.cpp
+index 79ffa12899..9dff3809fe 100644
+--- a/services/surfaceflinger/SurfaceFlinger.cpp
++++ b/services/surfaceflinger/SurfaceFlinger.cpp
+@@ -541,12 +541,8 @@ std::vector<PhysicalDisplayId> SurfaceFlinger::getPhysicalDisplayIds() const {
+ 
+     std::vector<PhysicalDisplayId> displayIds;
+     displayIds.reserve(mPhysicalDisplayTokens.size());
+-    displayIds.push_back(internalDisplayId->value);
+-
+-    for (const auto& [id, token] : mPhysicalDisplayTokens) {
+-        if (id != *internalDisplayId) {
+-            displayIds.push_back(id.value);
+-        }
++    for (const auto id : mPhysicalDisplayIdList) {
++        displayIds.push_back(id);
+     }
+ 
+     return displayIds;
+@@ -2460,8 +2456,24 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
+                 sp<IBinder> token = new BBinder();
+                 mCurrentState.displays.add(token, state);
+                 mPhysicalDisplayTokens.emplace(displayId, std::move(token));
++                mPhysicalDisplayIdList.push_back(displayId.value);
+ 
+                 mInterceptor->saveDisplayCreation(state);
++
++                // persist.service.bootanim.displays only referenced in bootanimation,
++                // so we only configure this property before boot finished.
++                if (!mBootFinished) {
++                    // create propperties for later use in bootanimation
++                    char value[PROPERTY_VALUE_MAX];
++                    property_get("persist.service.bootanim.displays", value, "");
++                    if (event.hwcDisplayId == 0) {
++                        strcpy(value, to_string(displayId).c_str());
++                    } else {
++                        strcat(value, ",");
++                        strcat(value, to_string(displayId).c_str());
++                    }
++                    property_set("persist.service.bootanim.displays", value);
++                }
+             } else {
+                 ALOGV("Recreating display %s", to_string(displayId).c_str());
+ 
+@@ -2478,6 +2490,7 @@ void SurfaceFlinger::processDisplayHotplugEventsLocked() {
+                 mInterceptor->saveDisplayDeletion(state.sequenceId);
+                 mCurrentState.displays.removeItemsAt(index);
+             }
++            mPhysicalDisplayIdList.remove(displayId.value);
+             mPhysicalDisplayTokens.erase(it);
+         }
+ 
+diff --git a/services/surfaceflinger/SurfaceFlinger.h b/services/surfaceflinger/SurfaceFlinger.h
+index ccaeb2d858..b8d47b9363 100644
+--- a/services/surfaceflinger/SurfaceFlinger.h
++++ b/services/surfaceflinger/SurfaceFlinger.h
+@@ -70,6 +70,7 @@
+ #include <functional>
+ #include <future>
+ #include <map>
++#include <list>
+ #include <memory>
+ #include <mutex>
+ #include <optional>
+@@ -1071,6 +1072,7 @@ private:
+     // it may be read from other threads with mStateLock held
+     std::map<wp<IBinder>, sp<DisplayDevice>> mDisplays GUARDED_BY(mStateLock);
+     std::unordered_map<DisplayId, sp<IBinder>> mPhysicalDisplayTokens GUARDED_BY(mStateLock);
++    std::list<PhysicalDisplayId> mPhysicalDisplayIdList GUARDED_BY(mStateLock);
+ 
+     std::unordered_map<BBinder*, wp<Layer>> mLayersByLocalBinderToken GUARDED_BY(mStateLock);
+ 

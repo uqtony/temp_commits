@@ -1,0 +1,32 @@
+d9c66de6c George.Huang 2020-09-09
+
+AOS-270: support to pack lpmake for target-file.zip
+
+lpmake is a command-line tool for generating a “super” partition image.
+
+Change-Id: Iaee5abd6954bef3bedbceea9d99e5c429f6c6b30
+
+diff --git a/core/Makefile b/core/Makefile
+index e398b1e4e..4796e4097 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4199,6 +4199,7 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	# Flashing script
+ 	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
+ 	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
++	cp $(PRODUCT_OUT)/lpmake* $(zip_root)/IMAGES/
+ 	# U-boot
+ 	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
+ 	# For dual bootloader option
+diff --git a/tools/releasetools/img_from_target_files.py b/tools/releasetools/img_from_target_files.py
+index 0a1f967ce..32b7b76be 100755
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@ -96,6 +96,7 @@ def CopyUserImages(input_tmp, output_zip):
+     if not image.endswith(".img") and not image.endswith(".sh") \
+        and not image.endswith(".imx") and not image.endswith(".bat") \
+        and not image.startswith("spl") \
++       and not image.startswith("lpmake") \
+        and not image == "mem_info.txt":
+       continue
+     if image == "recovery-two-step.img":

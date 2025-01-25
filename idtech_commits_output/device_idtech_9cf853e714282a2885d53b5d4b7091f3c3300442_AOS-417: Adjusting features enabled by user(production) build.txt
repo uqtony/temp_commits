@@ -1,0 +1,136 @@
+9cf853e7 max.yang 2020-11-27
+
+AOS-417: Adjusting features enabled by user(production) build
+
+  Adjustment according to page:
+    https://atlassian.idtechproducts.com/confluence/pages/viewpage.action?pageId=89470439
+
+  1. secure build separated to pci and user builds, most of packages should
+     also removed by user build
+  2. Enabling features under uboot/kernel by user build
+  3. watermark only enabled by pcidev build
+
+Change-Id: I9d995392eb44a1e28cff484153f7d2760e239628
+
+diff --git a/common/build/kernel.mk b/common/build/kernel.mk
+index 9b00e150..95beb0ca 100644
+--- a/common/build/kernel.mk
++++ b/common/build/kernel.mk
+@@ -118,7 +118,7 @@ KERNEL_CONFIG_ADDITION :=
+ endif
+ KERNEL_CONFIG_SECURE :=
+ ifneq ($(TARGET_KERNEL_SECURE_DEFCONF),)
+-ifeq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifeq (user,$(TARGET_BUILD_VARIANT))
+ KERNEL_CONFIG_SECURE := $(TARGET_DEVICE_DIR)/$(TARGET_KERNEL_SECURE_DEFCONF)
+ endif
+ endif
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index 9b0b6607..c514a417 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -120,14 +120,12 @@ $(UBOOTENVSH): | $(UBOOT_OUT)
+ 		echo 'export ROLLBACK_INDEX_IN_CONTAINER=' >> $@; \
+ 	fi
+ 
+-ifneq (user,$(filter user, $(TARGET_BUILD_VARIANT)))
++ifeq (user,$(TARGET_BUILD_VARIANT))
++IDTECH_BUILD := SECURE_BOOT=1
++else
+ IDTECH_BUILD := USERDEBUG=1
+ endif
+ 
+-ifeq (pci, $(findstring pci, $(TARGET_PRODUCT)))
+-IDTECH_BUILD += SECURE_BOOT=1
+-endif
+-
+ CST_PATH := ./vendor/idtech/cst
+ 
+ define pad_imx_uboot
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index dda4b614..ec6fd37e 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -12,7 +12,7 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
+ PRODUCT_BRAND := Android
+ PRODUCT_MANUFACTURER := freescale
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ PRODUCT_PACKAGES += \
+     SystemUpdaterSample \
+     ethernet \
+@@ -28,7 +28,7 @@ PRODUCT_PACKAGES += \
+ endif
+ endif
+ 
+-# watermark will be removed by pci, add it back on pcidev build
++# watermark only enabled by pcidev build
+ ifeq (pcidev, $(findstring pcidev, $(TARGET_PRODUCT)))
+ PRODUCT_COPY_FILES += \
+     device/idtech/common/watermark/setup.conf:/system/etc/setup.conf
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 680d7021..37731b6d 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -358,7 +358,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     DirectAudioPlayer
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index ed2ed5b0..ae7272e1 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -355,7 +355,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index 4917019b..766be360 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -314,7 +314,7 @@ PRODUCT_PROPERTY_OVERRIDES += \
+ 
+ PRODUCT_PACKAGES += \
+     DirectAudioPlayer
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
+diff --git a/imx8m/vp6820_8mp/vp6820_8mp.mk b/imx8m/vp6820_8mp/vp6820_8mp.mk
+index dba0bf0f..8d0e510a 100644
+--- a/imx8m/vp6820_8mp/vp6820_8mp.mk
++++ b/imx8m/vp6820_8mp/vp6820_8mp.mk
+@@ -358,7 +358,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     DirectAudioPlayer
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 601aadf2..38a78274 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -354,7 +354,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+ 
+-ifneq (pci, $(findstring pci, $(TARGET_PRODUCT)))
++ifneq (user,$(TARGET_BUILD_VARIANT))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo

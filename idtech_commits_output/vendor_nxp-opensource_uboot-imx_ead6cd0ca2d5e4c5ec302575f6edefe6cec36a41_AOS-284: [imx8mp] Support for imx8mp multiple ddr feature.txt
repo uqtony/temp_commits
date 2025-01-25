@@ -1,0 +1,75 @@
+ead6cd0ca2 max.yang 2020-08-06
+
+AOS-284: [imx8mp] Support for imx8mp multiple ddr feature
+
+  1. phys_size_t is unsigned long, use a cast to avoid overflow
+     (unsigned int could only represent 4G)
+  2. By NXP's design, the memory size is divided to 2 banks, idt's
+     dynamic get mem size is total size, we minus PHYS_SDRAM_2_SIZE
+     to keep original design for dram_init_banksize(), below assignment
+     keep as 3G, but not total ram size 6G:
+        gd->bd->bi_dram[bank].size = sdram_size;
+
+Change-Id: Id0fa6e949e69c5428ec9db1d4e927ef78fc0795d
+
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index 895746373a..b0451dc8eb 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -208,8 +208,16 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ #if defined(CONFIG_IDT_MULTIPLE_DDR)
+ 	unsigned int mem_size = PHYS_SDRAM_SIZE;
+ 	memcpy((void *)&mem_size, (void *)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+-	printf("idt set to ");
+-	*size = mem_size * 1024;
++	*size = (phys_size_t)mem_size * 1024;
++
++#ifdef PHYS_SDRAM_2_SIZE
++	/* Since dynamic dram feature will get total ram size from emmc, but by NXP's
++	 * design, it divided ram to 2 or more mem_banks and plus size when bank2 is
++	 * enabled.
++	 * So here we minus the size, then function caller will added it back
++	 */
++	*size -= PHYS_SDRAM_2_SIZE;
++#endif
+ #endif
+ 	return 0;
+ }
+diff --git a/board/freescale/imx8mp_evk/spl.c b/board/freescale/imx8mp_evk/spl.c
+index b26f5321bb..cfb732a0ad 100644
+--- a/board/freescale/imx8mp_evk/spl.c
++++ b/board/freescale/imx8mp_evk/spl.c
+@@ -26,6 +26,7 @@
+ #include <asm/arch/ddr.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
++extern void idt_spl_dram_init(void);
+ 
+ int spl_board_boot_device(enum boot_device boot_dev_spl)
+ {
+@@ -252,7 +253,11 @@ void board_init_f(ulong dummy)
+ 	power_init_board();
+ 
+ 	/* DDR initialization */
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	idt_spl_dram_init();
++#else
+ 	spl_dram_init();
++#endif
+ 
+ 	board_init_r(NULL, 0);
+ }
+diff --git a/include/idt_ddr_select.h b/include/idt_ddr_select.h
+index bbb2acc434..5d662072d5 100644
+--- a/include/idt_ddr_select.h
++++ b/include/idt_ddr_select.h
+@@ -13,6 +13,9 @@
+ // SRAM: 0x00900000 ~ 0x0093FFFF, 0x00940000 ~ 0x00977FFF
+ #define DEV_MEM_SIZE_BASE 0x93ff00  // pass mem size to uboot at tail of sram
+ #define MMC_BOOTDEV 1
++#elif defined(CONFIG_IMX8MP)
++#define DEV_MEM_SIZE_BASE 0x94ff00
++#define MMC_BOOTDEV 1
+ #elif defined(CONFIG_IMX8MQ)
+ // SRAM: 0x007E0000 ~ 0x0081FFFF
+ #define DEV_MEM_SIZE_BASE 0x81ff00  // pass mem size to uboot at tail of sram

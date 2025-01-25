@@ -1,0 +1,193 @@
+a423e977e89f AndrewS 2021-09-30
+
+AOS-745: correct device tree for LCM
+
+Currently set display-id as 840000, and because now LCM configure
+panel orientation as landscape, so we need to change hactive to
+800 and vactive to 480, if LCM vendor can change it as portrait
+ then we can change it back.
+
+Change-Id: I55fe34815ebad7f2627b841ba586a38e1dabc8be
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 678d2185b627..0f48279a4188 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -401,6 +401,11 @@ pwm_4 {
+ 		default-brightness-level = <0>;
+ 		status = "okay";
+ 	};
++
++	backlight: backlight {
++		compatible = "led-backlight";
++		leds = <&lcd_bl>;
++	};
+ };
+ 
+ &A53_0 {
+@@ -571,22 +576,21 @@ panel@0 {
+ 		spi-working-mode = <0>;
+ 		spi-cs-gpios = <&gpio5 13 GPIO_ACTIVE_HIGH>;
+ 		power-supply = <&reg_lcm_lcd_vdd>;
+-		reset-gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+ 		enable-gpios = <&gpio3 16 GPIO_ACTIVE_HIGH>;
+-		backlight = <&lcd_bl>;
++		backlight = <&backlight>;
+ 		status = "okay";
+ 
+ 		display-timings {
+ 			timing {
+ 				clock-frequency = <27770880>;
+-				hactive = <480>;
+-				vactive = <800>;
+-				hfront-porch = <12>;
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <48>;
+ 				hsync-len = <8>;
+-				hback-porch = <12>;
+-				vfront-porch = <48>;
++				hback-porch = <48>;
++				vfront-porch = <12>;
+ 				vsync-len =  <8>;
+-				vback-porch = <48>;
++				vback-porch = <12>;
+ 				hsync-active = <0>;
+ 				vsync-active = <0>;
+ 				de-active = <1>;
+@@ -1267,10 +1271,9 @@ MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B		0xc6
+ 		>;
+ 	};
+ 
+-	pinctrl_mipi_dsi_en: mipi_dsi_en {
++	pinctrl_mipi_bridge: mipibridgegrp {
+ 		fsl,pins = <
+-			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4			0x19  //DSI_RESET
+-			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  //DSI_TE
++			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4			0x19  //LCD_RSTn
+ 		>;
+ 	};
+ 
+@@ -1304,7 +1307,6 @@ MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19		// ALS_PROX_PWR_ON
+ 	pinctrl_lcd_module: lcd-module-grp {
+ 		fsl,pins = <
+ 			MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11		0x19		// LCD_PWR_ONn
+-			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19		// LCD_RSTn
+ 			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19		// LCD_DISP
+ 		>;
+ 	};
+@@ -1350,22 +1352,7 @@ hdmi_in: endpoint {
+ 
+ &lcdif {
+ 	status = "okay";
+-	max-memory-bandwidth = <1772421120>; /* 720x1280-32@60.1 */
+-
+-	assigned-clocks = <&clk IMX8MQ_CLK_LCDIF_PIXEL>,
+-			  <&clk IMX8MQ_VIDEO_PLL1_BYPASS>,
+-			  <&clk IMX8MQ_VIDEO_PLL1_REF_SEL>,
+-			  <&clk IMX8MQ_VIDEO_PLL1>;
+-	assigned-clock-parents = <&clk IMX8MQ_VIDEO_PLL1_OUT>,
+-				 <&clk IMX8MQ_VIDEO_PLL1>,
+-				 <&clk IMX8MQ_CLK_27M>;
+-	assigned-clock-rate = <126000000>, <0>, <0>, <1134000000>;
+-
+-	port@0 {
+-		lcdif_mipi_dsi: endpoint {
+-			remote-endpoint = <&mipi_dsi_in>;
+-		};
+-	};
++	max-memory-bandwidth = <1073741824>;	/* 1G */
+ };
+ 
+ &dphy {
+@@ -1379,52 +1366,15 @@ &mipi_dsi {
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 
+-	panel@0 {
+-		compatible = "himax,hx8394f";
+-		reg = <0>;
+-		display-id = "830000";
+-		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+-		pinctrl-names = "default";
+-		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
+-		dsi-lanes = <4>;
+-		video-mode = <2>;	/* 0: burst mode
+-							 * 1: non-burst mode with sync event
+-							 * 2: non-burst mode with sync pulse
+-							 */
+-		width-mm = <63>;
+-		height-mm = <111>;
+-
+-		display-timings {
+-			timing {
+-				clock-frequency = <82000000>;
+-				hactive = <720>;
+-				vactive = <1280>;
+-				hfront-porch = <62>;
+-				hsync-len = <20>;
+-				hback-porch = <110>;
+-				vfront-porch = <200>;
+-				vsync-len = <2>;
+-				vback-porch = <16>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <0>;
+-				pixelclk-active = <0>;
+-			};
+-		};
+-
+-		port {
+-			panel_in: endpoint {
+-				remote-endpoint = <&mipi_dsi_out>;
+-			};
+-		};
+-	};
+-
+ 	bridge@0 {
+ 		compatible = "chipone,icn6211";
+ 		reg = <0>;
+ 		vdd1-supply = <&reg_lcm_bridg_vdd>;
+ 		vdd2-supply = <&reg_lcm_bridg_vdd>;
+ 		vdd3-supply = <&reg_lcm_bridg_vdd>;
++		enable-gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++		display-id = "840000"; /* workaround to pass idt_target_panel check */
++		video-mode = <2>;       /* 0: burst mode */
+ 
+ 		ports {
+ 			#address-cells = <1>;
+@@ -1433,7 +1383,7 @@ ports {
+ 			port@0 {
+ 				reg = <0>;
+ 				bridge_in_dsi: endpoint {
+-					remote-endpoint = <&mipi_dsi_out_2>;
++					remote-endpoint = <&mipi_dsi_out>;
+ 				};
+ 			};
+ 
+@@ -1450,25 +1400,9 @@ ports {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		port@0 {
+-			reg = <0>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			mipi_dsi_in: endpoint@0 {
+-				remote-endpoint = <&lcdif_mipi_dsi>;
+-			};
+-		};
+-
+ 		port@1 {
+ 			reg = <1>;
+ 			mipi_dsi_out: endpoint {
+-				remote-endpoint = <&panel_in>;
+-			};
+-		};
+-
+-		port@2 {
+-			reg = <2>;
+-			mipi_dsi_out_2: endpoint {
+ 				remote-endpoint = <&bridge_in_dsi>;
+ 			};
+ 		};

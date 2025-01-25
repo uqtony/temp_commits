@@ -1,0 +1,155 @@
+8a9400238e4f AndrewS 2021-12-15
+
+AOS-812: hadle role switch by tps65994 irq
+
+Change-Id: Ia63882f47c363e315815e2a015d402a7ce9400e7
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+index c4077d792fc3..7c0e3acf6f0f 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+@@ -18,6 +18,18 @@ device-status {
+ 	};
+ };
+ 
++&i2c1 {
++	typec_tps65994: usb-pd@20 {
++		interrupt-parent = <&gpio1>;
++		interrupts = <23 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++};
++
++&usb_dwc3_0 {
++	/delete-property/ extcon;
++};
++
+ &iomuxc {
+ 	pinctrl_hog: hoggrp {
+ 		fsl,pins = <
+@@ -39,4 +51,10 @@ MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K		0x16
+ 			MX8MQ_IOMUXC_SPDIF_EXT_CLK_GPIO5_IO5			0x19  //STATUS_LED
+ 		>;
+ 	};
++
++	pinctrl_typec: typecgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_ENET_TXC_GPIO1_IO23			0x59  //PD_INT
++		>;
++	};
+ };
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 021c055a5cd7..31f9bdb54bb3 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -1077,6 +1077,48 @@ static struct attribute_group tps65994_group = {
+ 	.attrs = tps65994_attrs,
+ };
+ 
++static irqreturn_t tps65994_interrupt(int irq, void *data)
++{
++	struct tps65994 *tps = data;
++	u8 event[11];
++	u8 status[5];
++	int ret;
++
++	mutex_lock(&tps->lock);
++
++	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_INT_EVENT1, &event, NULL);
++	if (ret) {
++		dev_err(tps->dev, "%s: failed to read events
+", __func__);
++		goto err_unlock;
++	}
++
++	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS, status, NULL);
++	if (ret) {
++		dev_err(tps->dev, "%s: failed to read status
+", __func__);
++		goto err_clear_ints;
++	}
++
++	/* Handle plug insert or removal */
++	if (event[0] & TPS_REG_INT_PLUG_EVENT) {
++		if (status[0] & TPS_STATUS_PLUG_PRESENT) {
++			ret = tps65994_connect(tps, status[0]);
++			if (ret)
++				dev_err(tps->dev,
++					"failed to register partner
+");
++		} else {
++			tps65994_disconnect(tps, status[0]);
++		}
++	}
++
++err_clear_ints:
++	tps65994_i2c_write(tps->i2c_client, TPS_REG_INT_CLEAR1, event, 11);
++
++err_unlock:
++	mutex_unlock(&tps->lock);
++
++	return IRQ_HANDLED;
++}
++
+ static int tps65994_notifier(struct notifier_block *nb, unsigned long val,
+ 				void *priv)
+ {
+@@ -1198,24 +1240,36 @@ static int tps65994_probe(struct i2c_client *client)
+ 
+ 	i2c_set_clientdata(client, tps);
+ 
+-	tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
+-	if (IS_ERR(tps->extcon)) {
+-		dev_err(&client->dev, "failed to allocate extcon device
+");
+-		ret = PTR_ERR(tps->extcon);
+-		goto err_role_put;
+-	}
++	if (client->irq > 0) {
++		ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
++						tps65994_interrupt,
++						IRQF_TRIGGER_LOW | IRQF_ONESHOT,
++						dev_name(&client->dev), tps);
++		if (ret) {
++			tps65994_disconnect(tps, 0);
++			typec_unregister_port(tps->port);
++			goto err_role_put;
++		}
++	} else {
++		tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
++		if (IS_ERR(tps->extcon)) {
++			dev_err(&client->dev, "failed to allocate extcon device
+");
++			ret = PTR_ERR(tps->extcon);
++			goto err_role_put;
++		}
+ 
+-	ret = devm_extcon_dev_register(&client->dev, tps->extcon);
+-	if (ret < 0) {
+-		dev_err(&client->dev, "failed to register extcon device
+");
+-		goto err_role_put;
+-	}
++		ret = devm_extcon_dev_register(&client->dev, tps->extcon);
++		if (ret < 0) {
++			dev_err(&client->dev, "failed to register extcon device
+");
++			goto err_role_put;
++		}
+ 
+-	tps->tps65994_nb.notifier_call = tps65994_notifier;
+-	ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
+-	if (ret < 0) {
+-		dev_err(&client->dev, "couldn't register notifier
+");
+-		goto err_role_put;
++		tps->tps65994_nb.notifier_call = tps65994_notifier;
++		ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
++		if (ret < 0) {
++			dev_err(&client->dev, "couldn't register notifier
+");
++			goto err_role_put;
++		}
+ 	}
+ 
+ 	ret = sysfs_create_group(&tps->dev->kobj, &tps65994_group);

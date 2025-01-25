@@ -1,0 +1,318 @@
+6466a39789 max.yang 2020-06-18
+
+AOS-216: [Multiple DDR] Implementation of multiple DDR feature
+
+  1. This feature will read dram_timing data from emmc for ddr training
+  2. Make it stand along feature, should be enabled by products' defconfig
+  3. Since we need to get/find emmc at very early stage, we revised spl_mmc
+     static function and reuse its code to find device.
+
+Change-Id: I296c2ed6e2b2d460b84c727f257b99cb0668cdef
+
+diff --git a/board/freescale/imx8mq_evk/spl.c b/board/freescale/imx8mq_evk/spl.c
+index 48209c5d28..05431e67d9 100644
+--- a/board/freescale/imx8mq_evk/spl.c
++++ b/board/freescale/imx8mq_evk/spl.c
+@@ -26,6 +26,7 @@
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+ extern struct dram_timing_info dram_timing_b0;
++extern void idt_spl_dram_init(void);
+ 
+ void spl_dram_init(void)
+ {
+@@ -247,7 +248,11 @@ void board_init_f(ulong dummy)
+ 	power_init_board();
+ 
+ 	/* DDR initialization */
++#if defined(CONFIG_IDT_MULTIPLE_DDR)
++	idt_spl_dram_init();
++#else
+ 	spl_dram_init();
++#endif
+ 
+ 	board_init_r(NULL, 0);
+ }
+diff --git a/common/spl/spl_mmc.c b/common/spl/spl_mmc.c
+index 6fb201946b..e35500d860 100644
+--- a/common/spl/spl_mmc.c
++++ b/common/spl/spl_mmc.c
+@@ -133,7 +133,7 @@ static int spl_mmc_get_device_index(u32 boot_device)
+ 	return -ENODEV;
+ }
+ 
+-static int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device)
++int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device)
+ {
+ #if CONFIG_IS_ENABLED(DM_MMC)
+ 	struct udevice *dev;
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index f24351ac4f..7c03264fd9 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -124,6 +124,8 @@ source "drivers/w1-eeprom/Kconfig"
+ 
+ source "drivers/watchdog/Kconfig"
+ 
++source "drivers/idt/Kconfig"
++
+ config PHYS_TO_BUS
+ 	bool "Custom physical to bus address mapping"
+ 	help
+diff --git a/drivers/Makefile b/drivers/Makefile
+index a7bba3ed56..5ef6186cdb 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -58,6 +58,7 @@ obj-$(CONFIG_SPL_SATA_SUPPORT) += ata/ scsi/
+ obj-$(CONFIG_HAVE_BLOCK_DEVICE) += block/
+ obj-$(CONFIG_SPL_FPGA_SUPPORT) += fpga/
+ obj-$(CONFIG_SPL_THERMAL) += thermal/
++obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
+ 
+ endif
+ endif
+diff --git a/drivers/idt/Kconfig b/drivers/idt/Kconfig
+new file mode 100644
+index 0000000000..e6e11abc21
+--- /dev/null
++++ b/drivers/idt/Kconfig
+@@ -0,0 +1 @@
++source "drivers/idt/multiddr/Kconfig"
+diff --git a/drivers/idt/multiddr/Kconfig b/drivers/idt/multiddr/Kconfig
+new file mode 100644
+index 0000000000..d743082d4c
+--- /dev/null
++++ b/drivers/idt/multiddr/Kconfig
+@@ -0,0 +1,6 @@
++config IDT_MULTIPLE_DDR
++	bool "IDT multiple ddr timing selection"
++	help
++	  This feature for multiple ddr, IDT uses script to transfer
++	  multiple ddr dram timing data into mem_info.img, and SPL
++	  chooses data with information from board-info.
+diff --git a/drivers/idt/multiddr/Makefile b/drivers/idt/multiddr/Makefile
+new file mode 100644
+index 0000000000..e158eaf04a
+--- /dev/null
++++ b/drivers/idt/multiddr/Makefile
+@@ -0,0 +1,7 @@
++#
++## Copyright 2020 IDTech
++#
++
++ifdef CONFIG_IDT_MULTIPLE_DDR
++obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt_ddr_select.o
++endif
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+new file mode 100644
+index 0000000000..2a2ec20ff8
+--- /dev/null
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -0,0 +1,194 @@
++#include <common.h>
++#include <asm/arch/ddr.h>
++#include <errno.h>
++#include <mmc.h>
++#include <persist_idt.h>
++
++#define _DEBUG 0
++/*
++ *  !!! IMPORTANT !!!
++ * 1. Since we should design a big-enough data struct to put all necessary
++ *    elements, a 4-unsigned int size struct is used to put all arguments.
++ *    We expect to read header block to get 10 struct idt_dram_hdr objects
++ *    Take devboard's timing data for example:
++ *    { {   0,   0,   1, 111}, // index0: ddrc_cfg
++ *      {   0,   0,   3, 206}, // index1: ddrphy_cfg
++ *      {   0,   0,   0,   4}, // index2: fsp_msg
++ *      {3200,   0,   7,  34}, // index3: ddr_dram_fsp_msg[0]
++ *      { 400,   0,   8,  35}, // index4: ddr_dram_fsp_msg[1]
++ *      { 100,   0,   9,  35}, // index5: ddr_dram_fsp_msg[2]
++ *      {3200,   1,  10,  37}, // index6: ddr_dram_fsp_msg[3]
++ *      {   0,   0,  11, 719}, // index7: ddrphy_trained_csr
++ *      {   0,   0,  23, 588}, // index8: ddrphy_pie
++ *      {3200, 400, 100,   0}  // index9: fsp_table
++ *    }
++ * 2. Buffer's size below should define "big-enough"
++ *    If timing arrays become larger in the future, buffer size should be refined
++ *    The size check will added in meminfo tool
++*/
++
++extern int spl_mmc_find_device(struct mmc **mmcp, u32 boot_device);
++struct idt_dram_hdr {
++	unsigned int drate;
++	unsigned int type;
++	unsigned int offset;
++	unsigned int ary_size;
++};
++struct idt_mem_obj {
++	uint8_t platform[BDINFO_DATA_SIZE];
++	uint8_t feature[BDINFO_DATA_SIZE];
++	unsigned int obj_offset;
++	unsigned int obj_size;
++};
++struct idt_mem_root {
++	unsigned int total;
++	struct idt_mem_obj mem_obj_ary[];
++};
++#define BLOCK_SIZE  512
++#define BDINFO_BLOCK_BASE 16384
++#define ROOT_HDR_BLOCK_BASE 20480
++#define HDR_SIZE  BLOCK_SIZE/sizeof(struct idt_dram_hdr)
++
++char buf_ddrc_cfg[BLOCK_SIZE * 2]            __attribute__((section(".data")));
++char buf_ddrphy_cfg[BLOCK_SIZE * 4]          __attribute__((section(".data")));
++char buf_ddrphy_trained_csr[BLOCK_SIZE * 12] __attribute__((section(".data")));
++char buf_ddrphy_pie[BLOCK_SIZE * 10]         __attribute__((section(".data")));
++
++char buf_fsp_msg0[BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg1[BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg2[BLOCK_SIZE*2] __attribute__((section(".data")));
++char buf_fsp_msg3[BLOCK_SIZE*2] __attribute__((section(".data")));
++
++struct blk_desc* init_mmc_blk(void)
++{
++	int err = 0;
++	struct mmc *mmc = NULL;
++
++	err = spl_mmc_find_device(&mmc, 1);
++	if (err)
++		printf("IDT: fail to find mmc device
+");
++	err = mmc_init(mmc);
++	if (err)
++		printf("IDT: fail to init mmc
+");
++	err = blk_dselect_hwpart(mmc_get_blk_desc(mmc), 0);
++	if (err)
++		printf("IDT: fail to dselect hwpart
+");
++
++	return mmc_get_blk_desc(mmc);
++}
++
++void idt_read_block(struct blk_desc * dev_desc, unsigned int start_off, struct idt_dram_hdr* hdr, char* buf) {
++	int carry  = (((hdr->ary_size) * sizeof(struct dram_cfg_param)) % BLOCK_SIZE) == 0 ? 0 : 1;
++	int blocks =  ((hdr->ary_size) * sizeof(struct dram_cfg_param)  / BLOCK_SIZE) + carry;
++#if _DEBUG
++	printf("IDTech: read %d times from %d
+", blocks, start_off + hdr->offset);
++#endif
++	for (int i=0; i<blocks; i++) {
++		blk_dread(dev_desc, start_off + hdr->offset + i, 1, buf + (i*BLOCK_SIZE));
++	}
++}
++
++unsigned int read_mem_root_block(struct blk_desc * dev_desc) {
++	struct idt_mem_root* p_root = NULL;
++	struct BoardInfoData* p_bdinfo = NULL;
++	char bdinfo[BLOCK_SIZE] = "";
++	char root_buf[BLOCK_SIZE] = "";
++	blk_dread(dev_desc, BDINFO_BLOCK_BASE, 1, (void*) bdinfo);
++	blk_dread(dev_desc, ROOT_HDR_BLOCK_BASE, 1, (void*) root_buf);
++	p_root = (struct idt_mem_root*)root_buf;
++	p_bdinfo = (struct BoardInfoData*)bdinfo;
++
++#if _DEBUG
++	printf("IDTech New:bdinfo.mb_model: %s
+", p_bdinfo->mb_model);
++	printf("IDTech New:bdinfo.mb_plc: %s
+", p_bdinfo->mb_plc);
++#endif
++	for (int i=0; i<p_root->total; i++) {
++#if _DEBUG
++		printf("IDTech New:index: %u
+", i);
++		printf("IDTech New:obj.platform: %s
+", p_root->mem_obj_ary[i].platform);
++		printf("IDTech New:obj.feature: %s
+", p_root->mem_obj_ary[i].feature);
++		printf("IDTech New:obj.offset: %u
+", p_root->mem_obj_ary[i].obj_offset);
++		printf("IDTech New:obj.size: %u
+", p_root->mem_obj_ary[i].obj_size);
++#endif
++		if (memcmp(p_bdinfo->mb_model, p_root->mem_obj_ary[i].platform, BDINFO_DATA_SIZE) != 0)
++			continue;
++		if (memcmp(p_bdinfo->mb_plc, p_root->mem_obj_ary[i].feature, BDINFO_DATA_SIZE) != 0)
++			continue;
++		printf("idt: using dram index %u
+", i);
++		return p_root->mem_obj_ary[i].obj_offset;
++	}
++
++	// find no matched info, return 0
++	return 0;
++}
++
++void idt_spl_dram_init(void)
++{
++	struct dram_timing_info t_data;
++	struct blk_desc *dev_desc = init_mmc_blk();
++	struct idt_dram_hdr hdr[HDR_SIZE] = {};
++	struct dram_fsp_msg fsp_ary[4] = {};
++	unsigned int* idx = NULL;
++	unsigned dram_data_offset = read_mem_root_block(dev_desc);
++	unsigned int hdr_offset = ROOT_HDR_BLOCK_BASE + dram_data_offset;
++
++	blk_dread(dev_desc, hdr_offset, 1, (void*) hdr);
++#if _DEBUG
++        for (int i=0; i<10; i++) {
++	        printf("IDTech: got data %d %d %d %d
+", hdr[i].drate, hdr[i].type, hdr[i].offset, hdr[i].ary_size);
++        }
++#endif
++
++	idt_read_block(dev_desc, hdr_offset, &hdr[0], buf_ddrc_cfg);
++	idt_read_block(dev_desc, hdr_offset, &hdr[1], buf_ddrphy_cfg);
++	idt_read_block(dev_desc, hdr_offset, &hdr[7], buf_ddrphy_trained_csr);
++	idt_read_block(dev_desc, hdr_offset, &hdr[8], buf_ddrphy_pie);
++
++	idt_read_block(dev_desc, hdr_offset, &hdr[3], buf_fsp_msg0);
++	idt_read_block(dev_desc, hdr_offset, &hdr[4], buf_fsp_msg1);
++	idt_read_block(dev_desc, hdr_offset, &hdr[5], buf_fsp_msg2);
++	idt_read_block(dev_desc, hdr_offset, &hdr[6], buf_fsp_msg3);
++
++	// wrapping dram info
++	t_data.ddrc_cfg           = (struct dram_cfg_param *)buf_ddrc_cfg;
++	t_data.ddrphy_cfg         = (struct dram_cfg_param *)buf_ddrphy_cfg;
++	t_data.ddrphy_trained_csr = (struct dram_cfg_param *)buf_ddrphy_trained_csr;
++	t_data.ddrphy_pie         = (struct dram_cfg_param *)buf_ddrphy_pie;
++	t_data.ddrc_cfg_num           = hdr[0].ary_size;
++	t_data.ddrphy_cfg_num         = hdr[1].ary_size;
++	t_data.ddrphy_trained_csr_num = hdr[7].ary_size;
++	t_data.ddrphy_pie_num         = hdr[8].ary_size;
++
++	// handle fsp_msg
++	t_data.fsp_msg     = fsp_ary;
++	t_data.fsp_msg_num = hdr[2].ary_size;
++	// fsp_msg element
++	fsp_ary[0].drate       = hdr[3].drate;
++	fsp_ary[0].fw_type     = hdr[3].type;
++	fsp_ary[0].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg0;
++	fsp_ary[0].fsp_cfg_num = hdr[3].ary_size;
++
++	fsp_ary[1].drate       = hdr[4].drate;
++	fsp_ary[1].fw_type     = hdr[4].type;
++	fsp_ary[1].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg1;
++	fsp_ary[1].fsp_cfg_num = hdr[4].ary_size;
++
++	fsp_ary[2].drate       = hdr[5].drate;
++	fsp_ary[2].fw_type     = hdr[5].type;
++	fsp_ary[2].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg2;
++	fsp_ary[2].fsp_cfg_num = hdr[5].ary_size;
++
++	fsp_ary[3].drate       = hdr[6].drate;
++	fsp_ary[3].fw_type     = hdr[6].type;
++	fsp_ary[3].fsp_cfg     = (struct dram_cfg_param *)buf_fsp_msg3;
++	fsp_ary[3].fsp_cfg_num = hdr[6].ary_size;
++
++	// fsp_table
++	idx = (unsigned int*) &hdr[9];
++	t_data.fsp_table[0] = idx[0];
++	t_data.fsp_table[1] = idx[1];
++	t_data.fsp_table[2] = idx[2];
++	t_data.fsp_table[3] = idx[3];
++
++	ddr_init(&t_data);
++}

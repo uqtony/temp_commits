@@ -1,0 +1,70 @@
+5a0ea34a2b2d tonyshih 2022-03-02
+
+AOS-872: Improve proximity sensor handling
+
+Set following register to improve proximity sensor measurement.
+1. PS_IT=9T, increase integration time to increase counts.
+2. PS_HD=1, set PS output format to be 16 bits, to allow big data.
+3. PS_MPS=4, send multiple pulses once to increase counts.
+
+Change-Id: Iabb47d3830cd3a068f47da7eb8ef603f3706f4a8
+
+diff --git a/drivers/iio/light/vcnl4000.c b/drivers/iio/light/vcnl4000.c
+index 34e2b054bb03..fdf99b3cc16b 100644
+--- a/drivers/iio/light/vcnl4000.c
++++ b/drivers/iio/light/vcnl4000.c
+@@ -64,6 +64,7 @@
+ 
+ #define VCNL4200_AL_CONF	0x00 /* Ambient light configuration */
+ #define VCNL4200_PS_CONF1	0x03 /* Proximity configuration */
++#define VCNL4200_PS_CONF3	0x04 /* Proximity configuration */
+ #define VCNL4200_PS_DATA	0x08 /* Proximity data */
+ #define VCNL4200_AL_DATA	0x09 /* Ambient light data */
+ #define VCNL4200_DEV_ID		0x0e /* Device ID, slave address and version */
+@@ -95,6 +96,12 @@
+ #define VCNL4010_INT_DRDY \
+ 	(BIT(VCNL4010_INT_PROXIMITY) | BIT(VCNL4010_INT_ALS))
+ 
++#define VCNL4200_PS_IT_9T	(5 << 1) /* Set PS_IT=9T */
++#define VCNL4200_PS_IT_CLEAR	(7 << 1) /* Clear PS_IT */
++#define VCNL4200_PS_HD		BIT(11) /* PS output is 16 bits */
++#define VCNL4200_PS_MPS_4	(2 << 5) /* Set PS_MPS=4 pulses */
++#define VCNL4200_PS_MPS_8	(3 << 5) /* Set PS_MPS=8 pulses */
++
+ #define POLL_INTERVAL_MAX			1000
+ #define POLL_INTERVAL				1000
+ #define POLL_INTERVAL_MIN			500
+@@ -199,6 +206,22 @@ static int vcnl4000_init(struct vcnl4000_data *data)
+ 	return data->chip_spec->set_power_state(data, true);
+ };
+ 
++static void vcnl4200_set_proximity_config(struct vcnl4000_data *data)
++{
++	u16 val = 0;
++
++	val = i2c_smbus_read_word_data(data->client, VCNL4200_PS_CONF1);
++	val &= ~VCNL4200_PS_IT_CLEAR;
++	i2c_smbus_write_word_data(data->client, VCNL4200_PS_CONF1,
++			val | VCNL4200_PS_IT_9T | VCNL4200_PS_HD);
++
++	val = i2c_smbus_read_word_data(data->client, VCNL4200_PS_CONF3);
++	val &= ~VCNL4200_PS_MPS_8;
++	i2c_smbus_write_word_data(data->client, VCNL4200_PS_CONF3,
++			val | VCNL4200_PS_MPS_4);
++}
++
++
+ static int vcnl4200_set_power_state(struct vcnl4000_data *data, bool on)
+ {
+ 	u16 val = on ? 0 /* power on */ : 1 /* shut down */;
+@@ -216,8 +239,10 @@ static int vcnl4200_set_power_state(struct vcnl4000_data *data, bool on)
+ 		/* Wait at least one integration cycle before fetching data */
+ 		data->vcnl4200_al.last_measurement = ktime_get();
+ 		data->vcnl4200_ps.last_measurement = ktime_get();
++		vcnl4200_set_proximity_config(data);
+ 	}
+ 
++
+ 	return 0;
+ }
+ 

@@ -1,0 +1,231 @@
+363e249 George.Huang 2021-07-20
+
+AOS-683: Fix conflicts from merging android_11.0.0_2.2.0
+
+Change-Id: I0b1a4e6860a5eafd820576f279d6373d503142c9
+
+diff --git a/camera/CameraDeviceHWLImpl.h b/camera/CameraDeviceHWLImpl.h
+index 5ca6068..fd02a52 100644
+--- a/camera/CameraDeviceHWLImpl.h
++++ b/camera/CameraDeviceHWLImpl.h
+@@ -103,11 +103,6 @@ protected:
+ private:
+     uint32_t camera_id_ = 0;
+ 
+-<<<<<<< HEAD
+-  //  std::unique_ptr<HalCameraMetadata> static_metadata_;
+-    CameraMetadata *m_meta = nullptr;
+-=======
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+     HwlCameraProviderCallback mCallback;
+ 
+ public:
+@@ -124,11 +119,7 @@ public:
+     int mMaxWidth = 0;
+     int mMaxHeight = 0;
+ 
+-<<<<<<< HEAD
+-     // preview and picture format.
+-=======
+     // preview and picture format.
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+     PixelFormat mPicturePixelFormat = 0;
+     PixelFormat mPreviewPixelFormat = 0;
+ 
+@@ -138,10 +129,6 @@ public:
+ 
+     int mSensorFormats[MAX_SENSOR_FORMAT];
+     int mSensorFormatCount = 0;
+-<<<<<<< HEAD
+-    char mDevPath[CAMAERA_FILENAME_LENGTH];
+-=======
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 
+     std::vector<std::shared_ptr<char*>> mDevPath;
+ 
+diff --git a/camera/CameraDeviceSessionHWLImpl.cpp b/camera/CameraDeviceSessionHWLImpl.cpp
+index 5688dda..33cd511 100644
+--- a/camera/CameraDeviceSessionHWLImpl.cpp
++++ b/camera/CameraDeviceSessionHWLImpl.cpp
+@@ -94,7 +94,6 @@ status_t CameraDeviceSessionHwlImpl::Initialize(
+     if (pDev == NULL)
+         return BAD_VALUE;
+ 
+-<<<<<<< HEAD
+     // get camera format from property
+     char value[PROPERTY_VALUE_MAX];
+     property_get("persist.idt.camera_format", value, "");
+@@ -102,10 +101,7 @@ status_t CameraDeviceSessionHwlImpl::Initialize(
+         mMJPEG_format = true;
+     }
+ 
+-    ALOGI("Initialize, meta %p, entry count %d", m_meta->GetStaticMeta(), (int)m_meta->GetStaticMeta()->GetEntryCount());
+-=======
+     m_meta = pDev->m_meta->Clone();
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 
+     ALOGI("Initialize, meta %p, entry count %d", static_metadata_.get(), static_metadata_->GetEntryCount());
+ 
+@@ -876,13 +872,7 @@ int32_t CameraDeviceSessionHwlImpl::processJpegBuffer(ImxStreamBuffer *srcBuf, I
+             maxJpegSize);
+ 
+ err_out:
+-<<<<<<< HEAD
+-    if (mainJpeg != NULL) {
+-        delete mainJpeg;
+-    }
+-=======
+     delete mainJpeg;
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ 
+     if (thumbJpeg != NULL) {
+         delete thumbJpeg;
+@@ -1404,10 +1394,6 @@ status_t CameraDeviceSessionHwlImpl::SubmitRequests(
+         }
+ 
+         if (ret) {
+-<<<<<<< HEAD
+-            delete(pipeline_request);
+-            ALOGE("%s: pVideoStream->ConfigAndStart failed, ret %d", __func__, ret);
+-=======
+             delete(frame_request);
+             ALOGE("%s: pVideoStreams[%d]->ConfigAndStart failed, ret %d", __func__,i, ret);
+             int stream_size = pVideoStreams.size();
+@@ -1419,7 +1405,6 @@ status_t CameraDeviceSessionHwlImpl::SubmitRequests(
+                     pVideoStreams[i] = NULL;
+                 }
+             }
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+             return ret;
+         }
+     }
+diff --git a/camera/CameraMetadata.h b/camera/CameraMetadata.h
+index 949cf23..07639d6 100644
+--- a/camera/CameraMetadata.h
++++ b/camera/CameraMetadata.h
+@@ -76,11 +76,6 @@ private:
+     HalCameraMetadata *m_request_meta = nullptr; // meta from framework
+ 
+     mutable std::mutex metadata_lock_;
+-<<<<<<< HEAD
+-
+-    CameraDeviceHwlImpl *mDev = NULL;
+-=======
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ };
+ 
+ }  // namespace android
+diff --git a/camera/ISPWrapper.cpp b/camera/ISPWrapper.cpp
+index 092d52e..c5fb4fa 100644
+--- a/camera/ISPWrapper.cpp
++++ b/camera/ISPWrapper.cpp
+@@ -271,27 +271,6 @@ int ISPWrapper::viv_private_ioctl(const char *cmd, Json::Value& jsonRequest, Jso
+     ecs.count = 1;
+ 
+     ret = ioctl(m_fd, VIDIOC_G_EXT_CTRLS, &ecs);
+-<<<<<<< HEAD
+-    if (ret != 0)
+-        return ret;
+-
+-    strcpy(ec.string, jsonRequest.toStyledString().c_str());
+-
+-    ret = ioctl(m_fd, VIDIOC_S_EXT_CTRLS, &ecs);
+-    if (ret != 0)
+-        return ret;
+-
+-    ret = ioctl(m_fd, VIDIOC_G_EXT_CTRLS, &ecs);
+-    if (ret != 0)
+-        return ret;
+-
+-    Json::Reader reader;
+-    if (!reader.parse(ec.string, jsonResponse, true)) {
+-        ALOGE("Could not parse configuration file: %s",
+-          reader.getFormattedErrorMessages().c_str());
+-        return BAD_VALUE;
+-    }
+-=======
+     if (ret != 0) {
+         ALOGV("==== ret %, line %d", ret, __LINE__);
+   //      goto failed;
+@@ -318,7 +297,6 @@ int ISPWrapper::viv_private_ioctl(const char *cmd, Json::Value& jsonRequest, Jso
+         ret = jsonResponse["MC_RET"].asInt();
+ 
+ failed:
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+     delete ec.string;
+     ec.string = NULL;
+     return ret;
+diff --git a/camera/ImageProcess.cpp b/camera/ImageProcess.cpp
+index 6073b1e..115bbe2 100644
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@ -651,7 +651,6 @@ int ImageProcess::convertNV12toNV21(ImxStreamBuffer& dstBuf, ImxStreamBuffer& sr
+     return 0;
+ }
+ 
+-<<<<<<< HEAD
+ // This function will convert MJPG stream to YUY2 stream and store it in input buffer
+ // srcBuf: input frame from UVC MJPG stream
+ int ImageProcess::convertMJPGToYUY2(ImxStreamBuffer& srcBuf)
+@@ -701,7 +700,8 @@ err_out:
+         free(v_component);
+ 
+     return ret;
+-=======
++}
++
+ static void Revert16BitEndian(uint8_t *pSrc, uint8_t *pDst, uint32_t pixels)
+ {
+     ALOGV("enter Revert16BitEndian, src %p, dst %p, pixels %d", pSrc, pDst, pixels);
+@@ -713,7 +713,6 @@ static void Revert16BitEndian(uint8_t *pSrc, uint8_t *pDst, uint32_t pixels)
+     }
+ 
+     return;
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+ }
+ 
+ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf)
+@@ -748,19 +747,14 @@ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer&
+         cl_YUYVtoNV12SP(mCLHandle, (uint8_t *)srcBuf.mVirtAddr,
+                     (uint8_t *)dstBuf.mVirtAddr, dst->width(), dst->height(), false, bOutputCached);
+     } else if (src->format() == dst->format()) {
+-<<<<<<< HEAD
+         if (mMJPEG_format) {
+             convertMJPGToYUY2(srcBuf);
+-	}
+-        cl_YUYVCopyByLine(mCLHandle, (uint8_t *)dstBuf.mVirtAddr,
+-                 dst->width(), dst->height(),
+-=======
++        }
+         if (HAL_PIXEL_FORMAT_RAW16 == src->format())
+             Revert16BitEndian((uint8_t *)srcBuf.mVirtAddr, (uint8_t *)dstBuf.mVirtAddr, src->width()*src->height());
+         else
+             cl_YUYVCopyByLine(mCLHandle, (uint8_t *)dstBuf.mVirtAddr,
+                 dst->width(), dst->height(),
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+                 (uint8_t *)srcBuf.mVirtAddr, src->width(), src->height(), false, bOutputCached);
+     } else {
+         ALOGI("%s:%d, opencl don't support format convert from 0x%x to 0x%x",
+diff --git a/usb/Usb.cpp b/usb/Usb.cpp
+index 589b4ab..b17e87a 100644
+--- a/usb/Usb.cpp
++++ b/usb/Usb.cpp
+@@ -657,17 +657,9 @@ void *work(void *param) {
+   payload.uevent_fd = uevent_fd;
+   payload.usb = (android::hardware::usb::V1_1::implementation::Usb *)param;
+ 
+-<<<<<<< HEAD
+-  ret = fcntl(uevent_fd, F_SETFL, O_NONBLOCK);
+-  if (ret != 0) {
+-    ALOGE("uevent_init: set uevent_fd O_NONBLOCK flag failed
+");
+-    close(uevent_fd);
+-    return NULL;
+-=======
+   if (fcntl(uevent_fd, F_SETFL, O_NONBLOCK)) {
+     ALOGE("fcntl fail to set uevent_fd as nonblock mode");
+     goto error;
+->>>>>>> merge_android-11.0.0-2.2.0_to_idt-imx-android-11-test
+   }
+ 
+   ev.events = EPOLLIN;

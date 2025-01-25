@@ -1,0 +1,24 @@
+bdd5cbdf tonyshih 2021-12-23
+
+AOS-824: device doesn't reboot when temperature is over 90C
+
+1. Thermal driver trigger following two way to shutdown system, but neither works.
+2. orderly_poweroff() at reboot.c fail due to CONFIG_STATIC_USERMODEHELPER_PATH is set.
+3. thermal_emergency_poweroff() at thermal_core.c fail due to
+   CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=0.
+4. Refer to NXP Android-11_2.4.0, and set CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100.
+
+Change-Id: I289b4fa219624f345ae694f580570be55c0d5f10
+
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index 042b7ecf..d4c94122 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -31,6 +31,7 @@ CONFIG_VIDEO_DW9714=y
+ CONFIG_TYPEC_TPS65994=y
+ CONFIG_USB_G_SERIAL=m
+ CONFIG_USB_CDC_COMPOSITE=m
++CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100
+ 
+ CONFIG_PARAVIRT=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y

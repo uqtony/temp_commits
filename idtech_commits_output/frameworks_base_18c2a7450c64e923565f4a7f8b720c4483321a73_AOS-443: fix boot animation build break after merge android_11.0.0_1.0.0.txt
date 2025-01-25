@@ -1,0 +1,38 @@
+18c2a7450c64 AndrewS 2020-12-28
+
+AOS-443: fix boot animation build break after merge android_11.0.0_1.0.0
+
+Change-Id: I4cb0b464902a07c73c46621122bb267fee44e0a8
+
+diff --git a/cmds/bootanimation/BootAnimation.cpp b/cmds/bootanimation/BootAnimation.cpp
+index d3f5a07a69b9..911b95dcf3e4 100644
+--- a/cmds/bootanimation/BootAnimation.cpp
++++ b/cmds/bootanimation/BootAnimation.cpp
+@@ -390,13 +390,14 @@ status_t BootAnimation::readyToRun() {
+     char value[PROPERTY_VALUE_MAX];
+     property_get("ro.boot.idt_orientation", value, "0");
+     int orientation = atoi(value)/90;
+-    if ((orientation == ui::ROTATION_90) || (orientation == ui::ROTATION_270)) {
++    ui::Rotation rotation = ui::toRotation(orientation);
++    if ((rotation == ui::ROTATION_90) || (rotation == ui::ROTATION_270)) {
+         int temp = resolution.height;
+         resolution.height = resolution.width;
+         resolution.width = temp;
+-    } else if ((orientation != ui::ROTATION_0) && (orientation != ui::ROTATION_180)) {
+-        // set orientation to default if orientation value abnormal
+-        orientation = ui::ROTATION_0;
++    } else if ((rotation != ui::ROTATION_0) && (rotation != ui::ROTATION_180)) {
++        // set rotation to default if orientation value abnormal
++        rotation = ui::ROTATION_0;
+     }
+ 
+     resolution = limitSurfaceSize(resolution.width, resolution.height);
+@@ -406,7 +407,7 @@ status_t BootAnimation::readyToRun() {
+ 
+     SurfaceComposerClient::Transaction t;
+     Rect displayRect(resolution.getWidth(),resolution.getHeight());
+-    t.setDisplayProjection(mDisplayToken, orientation, displayRect, displayRect);
++    t.setDisplayProjection(mDisplayToken, rotation, displayRect, displayRect);
+ 
+     // this guest property specifies multi-display IDs to show the boot animation
+     // multiple ids can be set with comma (,) as separator, for example:

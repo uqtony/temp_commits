@@ -1,0 +1,61 @@
+59699902f983 Arthur Chen 2020-05-21
+
+AOS-200: [Display] Fix the issue about offset.
+
+    Fix the display showing with horizontal offset issue.
+    Tuning timing & power on sequence.
+
+Change-Id: I759c4e16c7fe637561f5ae7f693b836c66447ea3
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+index e3065e24c304..9e7c9ce44e31 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+@@ -1151,9 +1151,9 @@ timing {
+ 				clock-frequency = <82000000>;
+ 				hactive = <720>;
+ 				vactive = <1280>;
+-				hfront-porch = <92>;
++				hfront-porch = <62>;
+ 				hsync-len = <20>;
+-				hback-porch = <80>;
++				hback-porch = <110>;
+ 				vfront-porch = <200>;
+ 				vsync-len = <2>;
+ 				vback-porch = <16>;
+diff --git a/drivers/gpu/drm/panel/panel-himax-hx8394f.c b/drivers/gpu/drm/panel/panel-himax-hx8394f.c
+index e7a982d8b747..fef02be3a0ee 100644
+--- a/drivers/gpu/drm/panel/panel-himax-hx8394f.c
++++ b/drivers/gpu/drm/panel/panel-himax-hx8394f.c
+@@ -216,9 +216,14 @@ static int hm_panel_prepare(struct drm_panel *panel)
+ 
+ 	/* pull reset to low */
+ 	if (hm->reset != NULL) {
+-
++		gpiod_set_value(hm->reset, 0);
++		mdelay(10);
++		gpiod_set_value(hm->reset, 1);
++		mdelay(10);
++		gpiod_set_value(hm->reset, 0);
++		mdelay(10);
+ 		gpiod_set_value(hm->reset, 1);
+-		mdelay(50);	/* t4 */
++		mdelay(80);	/* t4 */
+ 
+ 		DRM_DEV_INFO(dev, "pull reset pin to high!
+");
+ 	}
+@@ -240,12 +245,11 @@ static int hm_panel_prepare(struct drm_panel *panel)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	mdelay(150);
++	mdelay(130);
+ 	ret = mipi_dsi_dcs_set_display_on(dsi);
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	mdelay(20);
+ 	hm->prepared = true;
+ 
+ 	return 0;

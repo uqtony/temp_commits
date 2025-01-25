@@ -1,0 +1,23 @@
+f8479787 AndrewS 2021-01-11
+
+AOS-480: Fix Android 11 vp6820_mn(A100) boot fail
+
+Symptom: vp6820_8mn kept in boot animation
+Root cause: Android ui permission denied to list/read cable.* under extcon
+            and then zygote kept re-launch due to above exceptions
+            (same root cause as AOS-477)
+Solution: Make sure extcon file-nodes have sysfs_extcon permissions
+
+Change-Id: If0c015b17f2e7dcc11d18542009f081de2d382c0
+
+diff --git a/imx8m/vp6820_8mn/sepolicy/genfs_contexts b/imx8m/vp6820_8mn/sepolicy/genfs_contexts
+index 7a63dc55..f9ec8e03 100644
+--- a/imx8m/vp6820_8mn/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mn/sepolicy/genfs_contexts
+@@ -22,3 +22,6 @@ genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/po
+ 
+ # for dumpstate to access the stat file
+ genfscon sysfs /devices/platform/b8500000.pmem/ndbus0/region0/namespace0.0/block/pmem0                                            u:object_r:sysfs_block_devices:s0
++
++# vp6820 type c controller as external connection
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a40000.i2c/i2c-2/2-0067/extcon   u:object_r:sysfs_extcon:s0

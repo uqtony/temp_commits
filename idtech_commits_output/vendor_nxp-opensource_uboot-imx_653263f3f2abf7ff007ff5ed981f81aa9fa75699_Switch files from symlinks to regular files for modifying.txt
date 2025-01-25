@@ -1,0 +1,1606 @@
+653263f3f2 George.Huang 2020-03-05
+
+Switch files from symlinks to regular files for modifying
+
+Change-Id: If0f2d3a6209245c81a2fad534b1d7ab27a6e0d72
+
+diff --git a/board/freescale/imx8mq_a300/Kconfig b/board/freescale/imx8mq_a300/Kconfig
+deleted file mode 120000
+index 8a492613ce..0000000000
+--- a/board/freescale/imx8mq_a300/Kconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-../imx8mq_evk/Kconfig
+\ No newline at end of file
+diff --git a/board/freescale/imx8mq_a300/Kconfig b/board/freescale/imx8mq_a300/Kconfig
+new file mode 100644
+index 0000000000..3f3bddf324
+--- /dev/null
++++ b/board/freescale/imx8mq_a300/Kconfig
+@@ -0,0 +1,14 @@
++if TARGET_IMX8MQ_EVK
++
++config SYS_BOARD
++	default "imx8mq_evk"
++
++config SYS_VENDOR
++	default "freescale"
++
++config SYS_CONFIG_NAME
++	default "imx8mq_evk"
++
++source "board/freescale/common/Kconfig"
++
++endif
+diff --git a/board/freescale/imx8mq_a300/Makefile b/board/freescale/imx8mq_a300/Makefile
+deleted file mode 120000
+index 8490943a39..0000000000
+--- a/board/freescale/imx8mq_a300/Makefile
++++ /dev/null
+@@ -1 +0,0 @@
+-../imx8mq_evk/Makefile
+\ No newline at end of file
+diff --git a/board/freescale/imx8mq_a300/Makefile b/board/freescale/imx8mq_a300/Makefile
+new file mode 100644
+index 0000000000..cf046963d2
+--- /dev/null
++++ b/board/freescale/imx8mq_a300/Makefile
+@@ -0,0 +1,12 @@
++#
++# Copyright 2017 NXP
++#
++# SPDX-License-Identifier:      GPL-2.0+
++#
++
++obj-y += imx8mq_evk.o
++
++ifdef CONFIG_SPL_BUILD
++obj-y += spl.o
++obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o lpddr4_timing_b0.o
++endif
+diff --git a/board/freescale/imx8mq_a300/README b/board/freescale/imx8mq_a300/README
+deleted file mode 120000
+index c71f05413e..0000000000
+--- a/board/freescale/imx8mq_a300/README
++++ /dev/null
+@@ -1 +0,0 @@
+-../imx8mq_evk/README
+\ No newline at end of file
+diff --git a/board/freescale/imx8mq_a300/README b/board/freescale/imx8mq_a300/README
+new file mode 100644
+index 0000000000..c1d400bcf9
+--- /dev/null
++++ b/board/freescale/imx8mq_a300/README
+@@ -0,0 +1,37 @@
++U-Boot for the NXP i.MX8MQ EVK board
++
++Quick Start
++===========
++- Build the ARM Trusted firmware binary
++- Get ddr and hdmi fimware
++- Build U-Boot
++- Boot
++
++Get and Build the ARM Trusted firmware
++======================================
++Note: srctree is U-Boot source directory
++Get ATF from: https://source.codeaurora.org/external/imx/imx-atf
++branch: imx_4.14.62_1.0.0_beta
++$ make PLAT=imx8mq bl31
++$ cp build/imx8mq/release/bl31.bin $(srctree)
++
++Get the ddr and hdmi firmware
++=============================
++$ wget https://www.nxp.com/lgfiles/NMG/MAD/YOCTO/firmware-imx-7.9.bin
++$ chmod +x firmware-imx-7.9.bin
++$ ./firmware-imx-7.9.bin
++$ cp firmware-imx-7.9/firmware/hdmi/cadence/signed_hdmi_imx8m.bin $(srctree)
++$ cp firmware-imx-7.9/firmware/ddr/synopsys/lpddr4*.bin $(srctree)
++
++Build U-Boot
++============
++$ export CROSS_COMPILE=aarch64-poky-linux-
++$ make imx8mq_evk_defconfig
++$ make flash.bin
++
++Burn the flash.bin to MicroSD card offset 33KB
++$sudo dd if=flash.bin of=/dev/sd[x] bs=1024 seek=33
++
++Boot
++====
++Set Boot switch SW801: 1100 and Bmode: 10 to boot from Micro SD.
+diff --git a/board/freescale/imx8mq_a300/imx8mq_evk.c b/board/freescale/imx8mq_a300/imx8mq_evk.c
+deleted file mode 120000
+index bdc6a2c56b..0000000000
+--- a/board/freescale/imx8mq_a300/imx8mq_evk.c
++++ /dev/null
+@@ -1 +0,0 @@
+-../imx8mq_evk/imx8mq_evk.c
+\ No newline at end of file
+diff --git a/board/freescale/imx8mq_a300/imx8mq_evk.c b/board/freescale/imx8mq_a300/imx8mq_evk.c
+new file mode 100644
+index 0000000000..941620eedf
+--- /dev/null
++++ b/board/freescale/imx8mq_a300/imx8mq_evk.c
+@@ -0,0 +1,349 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2018 NXP
++ */
++
++#include <common.h>
++#include <malloc.h>
++#include <errno.h>
++#include <asm/io.h>
++#include <miiphy.h>
++#include <netdev.h>
++#include <asm/mach-imx/iomux-v3.h>
++#include <asm-generic/gpio.h>
++#include <fsl_esdhc.h>
++#include <mmc.h>
++#include <asm/arch/imx8mq_pins.h>
++#include <asm/arch/sys_proto.h>
++#include <asm/mach-imx/gpio.h>
++#include <asm/mach-imx/mxc_i2c.h>
++#include <asm/arch/clock.h>
++#include <asm/mach-imx/video.h>
++#include <asm/arch/video_common.h>
++#include <spl.h>
++#include <power/pmic.h>
++#include <power/pfuze100_pmic.h>
++#include "../common/tcpc.h"
++#include "../common/pfuze.h"
++#include <usb.h>
++#include <dwc3-uboot.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++#define UART_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_FSEL1)
++
++#define WDOG_PAD_CTRL	(PAD_CTL_DSE6 | PAD_CTL_HYS | PAD_CTL_PUE)
++
++static iomux_v3_cfg_t const wdog_pads[] = {
++	IMX8MQ_PAD_GPIO1_IO02__WDOG1_WDOG_B | MUX_PAD_CTRL(WDOG_PAD_CTRL),
++};
++
++static iomux_v3_cfg_t const uart_pads[] = {
++	IMX8MQ_PAD_UART1_RXD__UART1_RX | MUX_PAD_CTRL(UART_PAD_CTRL),
++	IMX8MQ_PAD_UART1_TXD__UART1_TX | MUX_PAD_CTRL(UART_PAD_CTRL),
++};
++
++int board_early_init_f(void)
++{
++	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
++
++	imx_iomux_v3_setup_multiple_pads(wdog_pads, ARRAY_SIZE(wdog_pads));
++	set_wdog_reset(wdog);
++
++	imx_iomux_v3_setup_multiple_pads(uart_pads, ARRAY_SIZE(uart_pads));
++
++	return 0;
++}
++
++#ifdef CONFIG_FSL_QSPI
++int board_qspi_init(void)
++{
++	set_clk_qspi();
++
++	return 0;
++}
++#endif
++
++int dram_init(void)
++{
++	/* rom_pointer[1] contains the size of TEE occupies */
++	if (rom_pointer[1])
++		gd->ram_size = PHYS_SDRAM_SIZE - rom_pointer[1];
++	else
++		gd->ram_size = PHYS_SDRAM_SIZE;
++
++	return 0;
++}
++
++#ifdef CONFIG_FEC_MXC
++#define FEC_RST_PAD IMX_GPIO_NR(1, 9)
++static iomux_v3_cfg_t const fec1_rst_pads[] = {
++	IMX8MQ_PAD_GPIO1_IO09__GPIO1_IO9 | MUX_PAD_CTRL(NO_PAD_CTRL),
++};
++
++static void setup_iomux_fec(void)
++{
++	imx_iomux_v3_setup_multiple_pads(fec1_rst_pads,
++					 ARRAY_SIZE(fec1_rst_pads));
++
++	gpio_request(IMX_GPIO_NR(1, 9), "fec1_rst");
++	gpio_direction_output(IMX_GPIO_NR(1, 9), 0);
++	udelay(500);
++	gpio_direction_output(IMX_GPIO_NR(1, 9), 1);
++}
++
++static int setup_fec(void)
++{
++	struct iomuxc_gpr_base_regs *gpr =
++		(struct iomuxc_gpr_base_regs *)IOMUXC_GPR_BASE_ADDR;
++
++	setup_iomux_fec();
++
++	/* Use 125M anatop REF_CLK1 for ENET1, not from external */
++	clrsetbits_le32(&gpr->gpr[1],
++		IOMUXC_GPR_GPR1_GPR_ENET1_TX_CLK_SEL_MASK, 0);
++	return set_clk_enet(ENET_125MHZ);
++}
++
++int board_phy_config(struct phy_device *phydev)
++{
++	/* enable rgmii rxc skew and phy mode select to RGMII copper */
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x1f);
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x8);
++
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x05);
++	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, 0x100);
++
++	if (phydev->drv->config)
++		phydev->drv->config(phydev);
++	return 0;
++}
++#endif
++
++#ifdef CONFIG_USB_DWC3
++
++#define USB_PHY_CTRL0			0xF0040
++#define USB_PHY_CTRL0_REF_SSP_EN	BIT(2)
++
++#define USB_PHY_CTRL1			0xF0044
++#define USB_PHY_CTRL1_RESET		BIT(0)
++#define USB_PHY_CTRL1_COMMONONN		BIT(1)
++#define USB_PHY_CTRL1_ATERESET		BIT(3)
++#define USB_PHY_CTRL1_VDATSRCENB0	BIT(19)
++#define USB_PHY_CTRL1_VDATDETENB0	BIT(20)
++
++#define USB_PHY_CTRL2			0xF0048
++#define USB_PHY_CTRL2_TXENABLEN0	BIT(8)
++
++static struct dwc3_device dwc3_device_data = {
++#ifdef CONFIG_SPL_BUILD
++	.maximum_speed = USB_SPEED_HIGH,
++#else
++	.maximum_speed = USB_SPEED_SUPER,
++#endif
++	.base = USB1_BASE_ADDR,
++	.dr_mode = USB_DR_MODE_PERIPHERAL,
++	.index = 0,
++	.power_down_scale = 2,
++};
++
++int usb_gadget_handle_interrupts(void)
++{
++	dwc3_uboot_handle_interrupt(0);
++	return 0;
++}
++
++static void dwc3_nxp_usb_phy_init(struct dwc3_device *dwc3)
++{
++	u32 RegData;
++
++	RegData = readl(dwc3->base + USB_PHY_CTRL1);
++	RegData &= ~(USB_PHY_CTRL1_VDATSRCENB0 | USB_PHY_CTRL1_VDATDETENB0 |
++			USB_PHY_CTRL1_COMMONONN);
++	RegData |= USB_PHY_CTRL1_RESET | USB_PHY_CTRL1_ATERESET;
++	writel(RegData, dwc3->base + USB_PHY_CTRL1);
++
++	RegData = readl(dwc3->base + USB_PHY_CTRL0);
++	RegData |= USB_PHY_CTRL0_REF_SSP_EN;
++	writel(RegData, dwc3->base + USB_PHY_CTRL0);
++
++	RegData = readl(dwc3->base + USB_PHY_CTRL2);
++	RegData |= USB_PHY_CTRL2_TXENABLEN0;
++	writel(RegData, dwc3->base + USB_PHY_CTRL2);
++
++	RegData = readl(dwc3->base + USB_PHY_CTRL1);
++	RegData &= ~(USB_PHY_CTRL1_RESET | USB_PHY_CTRL1_ATERESET);
++	writel(RegData, dwc3->base + USB_PHY_CTRL1);
++}
++#endif
++
++#ifdef CONFIG_USB_TCPC
++struct tcpc_port port;
++struct tcpc_port_config port_config = {
++	.i2c_bus = 0,
++	.addr = 0x50,
++	.port_type = TYPEC_PORT_UFP,
++	.max_snk_mv = 20000,
++	.max_snk_ma = 3000,
++	.max_snk_mw = 15000,
++	.op_snk_mv = 9000,
++};
++
++#define USB_TYPEC_SEL IMX_GPIO_NR(3, 15)
++
++static iomux_v3_cfg_t ss_mux_gpio[] = {
++	IMX8MQ_PAD_NAND_RE_B__GPIO3_IO15 | MUX_PAD_CTRL(NO_PAD_CTRL),
++};
++
++void ss_mux_select(enum typec_cc_polarity pol)
++{
++	if (pol == TYPEC_POLARITY_CC1)
++		gpio_direction_output(USB_TYPEC_SEL, 1);
++	else
++		gpio_direction_output(USB_TYPEC_SEL, 0);
++}
++
++static int setup_typec(void)
++{
++	int ret;
++
++	imx_iomux_v3_setup_multiple_pads(ss_mux_gpio, ARRAY_SIZE(ss_mux_gpio));
++	gpio_request(USB_TYPEC_SEL, "typec_sel");
++
++	ret = tcpc_init(&port, port_config, &ss_mux_select);
++	if (ret) {
++		printf("%s: tcpc init failed, err=%d
+",
++		       __func__, ret);
++	}
++
++	return ret;
++}
++#endif
++
++#if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_IMX8M)
++int board_usb_init(int index, enum usb_init_type init)
++{
++	int ret = 0;
++	imx8m_usb_power(index, true);
++
++	if (index == 0 && init == USB_INIT_DEVICE) {
++#ifdef CONFIG_USB_TCPC
++		ret = tcpc_setup_ufp_mode(&port);
++#endif
++		dwc3_nxp_usb_phy_init(&dwc3_device_data);
++		return dwc3_uboot_init(&dwc3_device_data);
++	} else if (index == 0 && init == USB_INIT_HOST) {
++#ifdef CONFIG_USB_TCPC
++		ret = tcpc_setup_dfp_mode(&port);
++#endif
++		return ret;
++	}
++
++	return 0;
++}
++
++int board_usb_cleanup(int index, enum usb_init_type init)
++{
++	int ret = 0;
++	if (index == 0 && init == USB_INIT_DEVICE) {
++		dwc3_uboot_exit(index);
++	} else if (index == 0 && init == USB_INIT_HOST) {
++#ifdef CONFIG_USB_TCPC
++		ret = tcpc_disable_src_vbus(&port);
++#endif
++	}
++
++	imx8m_usb_power(index, false);
++
++	return ret;
++}
++#endif
++
++int board_init(void)
++{
++#ifdef CONFIG_FSL_QSPI
++	board_qspi_init();
++#endif
++
++#ifdef CONFIG_FEC_MXC
++	setup_fec();
++#endif
++
++#if defined(CONFIG_USB_DWC3) || defined(CONFIG_USB_XHCI_IMX8M)
++	init_usb_clk();
++#endif
++
++#ifdef CONFIG_USB_TCPC
++	setup_typec();
++#endif
++	return 0;
++}
++
++int board_late_init(void)
++{
++#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++	env_set("board_name", "EVK");
++	env_set("board_rev", "iMX8MQ");
++#endif
++
++#ifdef CONFIG_ENV_IS_IN_MMC
++	board_late_mmc_env_init();
++#endif
++
++	return 0;
++}
++
++#ifdef CONFIG_FSL_FASTBOOT
++#ifdef CONFIG_ANDROID_RECOVERY
++int is_recovery_key_pressing(void)
++{
++	return 0; /*TODO*/
++}
++#endif /*CONFIG_ANDROID_RECOVERY*/
++#endif /*CONFIG_FSL_FASTBOOT*/
++
++#if defined(CONFIG_VIDEO_IMXDCSS)
++
++struct display_info_t const displays[] = {{
++	.bus	= 0, /* Unused */
++	.addr	= 0, /* Unused */
++	.pixfmt	= GDF_32BIT_X888RGB,
++	.detect	= NULL,
++	.enable	= NULL,
++#ifndef CONFIG_VIDEO_IMXDCSS_1080P
++	.mode	= {
++		.name           = "HDMI", /* 720P60 */
++		.refresh        = 60,
++		.xres           = 1280,
++		.yres           = 720,
++		.pixclock       = 13468, /* 74250  kHz */
++		.left_margin    = 110,
++		.right_margin   = 220,
++		.upper_margin   = 5,
++		.lower_margin   = 20,
++		.hsync_len      = 40,
++		.vsync_len      = 5,
++		.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
++		.vmode          = FB_VMODE_NONINTERLACED
++	}
++#else
++	.mode	= {
++		.name           = "HDMI", /* 1080P60 */
++		.refresh        = 60,
++		.xres           = 1920,
++		.yres           = 1080,
++		.pixclock       = 6734, /* 148500 kHz */
++		.left_margin    = 148,
++		.right_margin   = 88,
++		.upper_margin   = 36,
++		.lower_margin   = 4,
++		.hsync_len      = 44,
++		.vsync_len      = 5,
++		.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
++		.vmode          = FB_VMODE_NONINTERLACED
++	}
++#endif
++} };
++size_t display_count = ARRAY_SIZE(displays);
++
++#endif /* CONFIG_VIDEO_IMXDCSS */
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+deleted file mode 120000
+index cf23c1d733..0000000000
+--- a/configs/imx8mq_a300_devboard_android_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_defconfig b/configs/imx8mq_a300_devboard_android_defconfig
+new file mode 100644
+index 0000000000..0b626160b4
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_defconfig
+@@ -0,0 +1,86 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_REGEX=n
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+deleted file mode 120000
+index 6aa69a703b..0000000000
+--- a/configs/imx8mq_a300_devboard_android_dual_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_dual_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_dual_defconfig b/configs/imx8mq_a300_devboard_android_dual_defconfig
+new file mode 100644
+index 0000000000..d5eb4c2161
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_dual_defconfig
+@@ -0,0 +1,90 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_SPL_LIBDISK_SUPPORT=y
++CONFIG_DUAL_BOOTLOADER=y
++CONFIG_SPL_MMC_WRITE=y
++CONFIG_REGEX=n
++CONFIG_SPL_DOS_PARTITION=n
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_defconfig b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+deleted file mode 120000
+index bda1d039cb..0000000000
+--- a/configs/imx8mq_a300_devboard_android_trusty_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_trusty_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_defconfig b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+new file mode 100644
+index 0000000000..87cd7a1bc1
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_trusty_defconfig
+@@ -0,0 +1,88 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_IMX_TRUSTY_OS=y
++CONFIG_REGEX=n
++CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+deleted file mode 120000
+index 359a0b4fae..0000000000
+--- a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_trusty_dual_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+new file mode 100644
+index 0000000000..440d75b80e
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_trusty_dual_defconfig
+@@ -0,0 +1,92 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_SPL_LIBDISK_SUPPORT=y
++CONFIG_DUAL_BOOTLOADER=y
++CONFIG_SPL_MMC_WRITE=y
++CONFIG_IMX_TRUSTY_OS=y
++CONFIG_REGEX=n
++CONFIG_SPL_DOS_PARTITION=n
++CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+deleted file mode 120000
+index 2572b1f54e..0000000000
+--- a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_trusty_secure_unlock_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+new file mode 100644
+index 0000000000..ea7ec1f91f
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+@@ -0,0 +1,89 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_IMX_TRUSTY_OS=y
++CONFIG_SECURE_UNLOCK=y
++CONFIG_REGEX=n
++CONFIG_TRUSTY_UNLOCK_PERMISSION=y
+diff --git a/configs/imx8mq_a300_devboard_android_uuu_defconfig b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+deleted file mode 120000
+index 7411119994..0000000000
+--- a/configs/imx8mq_a300_devboard_android_uuu_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_uuu_defconfig
+\ No newline at end of file
+diff --git a/configs/imx8mq_a300_devboard_android_uuu_defconfig b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+new file mode 100644
+index 0000000000..7c3e698783
+--- /dev/null
++++ b/configs/imx8mq_a300_devboard_android_uuu_defconfig
+@@ -0,0 +1,87 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_SDP_LOADADDR=0x40400000
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_SPL_USB_GADGET=y
++CONFIG_SPL_USB_SDP_SUPPORT=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++
+diff --git a/configs/vp6820_8mq_evk_ram1GB_android_defconfig b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+deleted file mode 120000
+index cf23c1d733..0000000000
+--- a/configs/vp6820_8mq_evk_ram1GB_android_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android_defconfig
+\ No newline at end of file
+diff --git a/configs/vp6820_8mq_evk_ram1GB_android_defconfig b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+new file mode 100644
+index 0000000000..0b626160b4
+--- /dev/null
++++ b/configs/vp6820_8mq_evk_ram1GB_android_defconfig
+@@ -0,0 +1,86 @@
++CONFIG_ARM=y
++CONFIG_ARCH_IMX8M=y
++CONFIG_SYS_TEXT_BASE=0x40200000
++CONFIG_SYS_MALLOC_F_LEN=0x2000
++CONFIG_TARGET_IMX8MQ_EVK=y
++CONFIG_SPL_SERIAL_SUPPORT=y
++CONFIG_ARCH_MISC_INIT=y
++CONFIG_SPL=y
++CONFIG_FIT=y
++CONFIG_FIT_EXTERNAL_OFFSET=0x3000
++CONFIG_SPL_LOAD_FIT=y
++CONFIG_SPL_FIT_GENERATOR="arch/arm/mach-imx/mkimage_fit_atf.sh"
++CONFIG_SYS_EXTRA_OPTIONS="IMX_CONFIG=arch/arm/mach-imx/imx8m/imximage.cfg,ANDROID_SUPPORT"
++CONFIG_SPL_BOARD_INIT=y
++CONFIG_HUSH_PARSER=y
++CONFIG_BOOTDELAY=1
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_I2C=y
++CONFIG_CMD_CACHE=y
++CONFIG_CMD_REGULATOR=y
++CONFIG_CMD_EXT2=y
++CONFIG_CMD_EXT4=y
++CONFIG_CMD_EXT4_WRITE=y
++CONFIG_CMD_FAT=y
++CONFIG_CMD_MEMTEST=y
++CONFIG_OF_CONTROL=y
++CONFIG_DEFAULT_DEVICE_TREE="fsl-imx8mq-evk"
++CONFIG_ENV_IS_IN_MMC=y
++CONFIG_SAVED_DRAM_TIMING_BASE=0x40000000
++CONFIG_DM_GPIO=y
++CONFIG_DM_I2C=y
++CONFIG_SYS_I2C_MXC=y
++CONFIG_DM_MMC=y
++CONFIG_DM_ETH=y
++CONFIG_PINCTRL=y
++CONFIG_PINCTRL_IMX8M=y
++CONFIG_DM_REGULATOR=y
++CONFIG_DM_REGULATOR_FIXED=y
++CONFIG_DM_REGULATOR_GPIO=y
++CONFIG_DM_THERMAL=y
++CONFIG_NXP_TMU=y
++CONFIG_USB_TCPC=y
++CONFIG_USB=y
++CONFIG_DM_USB=y
++
++CONFIG_SPI=y
++CONFIG_DM_SPI=y
++CONFIG_DM_SPI_FLASH=y
++CONFIG_FSL_QSPI=y
++CONFIG_CMD_SF=y
++CONFIG_SPI_FLASH=y
++CONFIG_SPI_FLASH_STMICRO=y
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SF_DEFAULT_BUS=0
++CONFIG_SF_DEFAULT_CS=0
++CONFIG_SF_DEFAULT_SPEED=40000000
++CONFIG_SF_DEFAULT_MODE=0
++
++CONFIG_VIDEO=y
++CONFIG_VIDEO_IMX8_HDMI=y
++CONFIG_LZ4=y
++CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_BCB_SUPPORT=y
++CONFIG_USB_GADGET=y
++CONFIG_FASTBOOT=y
++CONFIG_USB_FUNCTION_FASTBOOT=y
++CONFIG_CMD_FASTBOOT=y
++CONFIG_ANDROID_BOOT_IMAGE=y
++CONFIG_FASTBOOT_UUU_SUPPORT=n
++CONFIG_FSL_FASTBOOT=y
++CONFIG_FASTBOOT_BUF_ADDR=0x44800000
++CONFIG_FASTBOOT_BUF_SIZE=0x19000000
++CONFIG_FASTBOOT_FLASH=y
++CONFIG_EFI_PARTITION=y
++CONFIG_USB_GADGET_VENDOR_NUM=0x0525
++CONFIG_USB_GADGET_PRODUCT_NUM=0xa4a5
++CONFIG_USB_GADGET_MANUFACTURER="FSL"
++CONFIG_USB_GADGET_DOWNLOAD=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_XHCI_IMX8M=y
++CONFIG_USB_XHCI_DWC3=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_DWC3_GADGET=y
++CONFIG_LIBAVB=y
++CONFIG_APPEND_BOOTARGS=y
++CONFIG_REGEX=n
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+deleted file mode 120000
+index 348e8bfe15..0000000000
+--- a/include/configs/imx8mq_a300.h
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk.h
+\ No newline at end of file
+diff --git a/include/configs/imx8mq_a300.h b/include/configs/imx8mq_a300.h
+new file mode 100644
+index 0000000000..4b04801fd4
+--- /dev/null
++++ b/include/configs/imx8mq_a300.h
+@@ -0,0 +1,298 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright 2018 NXP
++ */
++
++#ifndef __IMX8M_EVK_H
++#define __IMX8M_EVK_H
++
++#include <linux/sizes.h>
++#include <asm/arch/imx-regs.h>
++#include "imx_env.h"
++
++#ifdef CONFIG_SECURE_BOOT
++#define CONFIG_CSF_SIZE			0x2000 /* 8K region */
++#endif
++
++#define CONFIG_SPL_TEXT_BASE		0x7E1000
++#define CONFIG_SPL_MAX_SIZE		(148 * 1024)
++#define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
++#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
++#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300
++#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
++
++#ifdef CONFIG_SPL_BUILD
++/*#define CONFIG_ENABLE_DDR_TRAINING_DEBUG*/
++#define CONFIG_SPL_WATCHDOG_SUPPORT
++#define CONFIG_SPL_DRIVERS_MISC_SUPPORT
++#define CONFIG_SPL_POWER_SUPPORT
++#define CONFIG_SPL_I2C_SUPPORT
++#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv8/u-boot-spl.lds"
++#define CONFIG_SPL_STACK		0x187FF0
++#define CONFIG_SPL_LIBCOMMON_SUPPORT
++#define CONFIG_SPL_LIBGENERIC_SUPPORT
++#define CONFIG_SPL_GPIO_SUPPORT
++#define CONFIG_SPL_MMC_SUPPORT
++#define CONFIG_SPL_BSS_START_ADDR      0x00180000
++#define CONFIG_SPL_BSS_MAX_SIZE        0x2000	/* 8 KB */
++#define CONFIG_SYS_SPL_MALLOC_START    0x42200000
++#define CONFIG_SYS_SPL_MALLOC_SIZE    0x80000	/* 512 KB */
++#define CONFIG_SYS_SPL_PTE_RAM_BASE    0x41580000
++#define CONFIG_SYS_ICACHE_OFF
++#define CONFIG_SYS_DCACHE_OFF
++
++/* malloc f used before GD_FLG_FULL_MALLOC_INIT set */
++#define CONFIG_MALLOC_F_ADDR		0x182000
++/* For RAW image gives a error info not panic */
++#define CONFIG_SPL_ABORT_ON_RAW_IMAGE
++
++#undef CONFIG_DM_MMC
++#undef CONFIG_DM_PMIC
++#undef CONFIG_DM_PMIC_PFUZE100
++
++#define CONFIG_SYS_I2C
++#define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
++#define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
++#define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
++
++#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++
++#define CONFIG_POWER
++#define CONFIG_POWER_I2C
++#define CONFIG_POWER_PFUZE100
++#define CONFIG_POWER_PFUZE100_I2C_ADDR 0x08
++#endif
++
++#define CONFIG_REMAKE_ELF
++
++#define CONFIG_BOARD_EARLY_INIT_F
++#define CONFIG_BOARD_LATE_INIT
++
++#undef CONFIG_CMD_EXPORTENV
++#undef CONFIG_CMD_IMPORTENV
++#undef CONFIG_CMD_IMLS
++
++#undef CONFIG_CMD_CRC32
++#undef CONFIG_BOOTM_NETBSD
++
++/* ENET Config */
++/* ENET1 */
++#if defined(CONFIG_CMD_NET)
++#define CONFIG_CMD_PING
++#define CONFIG_CMD_DHCP
++#define CONFIG_CMD_MII
++#define CONFIG_MII
++#define CONFIG_ETHPRIME                 "FEC"
++
++#define CONFIG_FEC_MXC
++#define CONFIG_FEC_XCV_TYPE             RGMII
++#define CONFIG_FEC_MXC_PHYADDR          0
++#define FEC_QUIRK_ENET_MAC
++
++#define CONFIG_PHY_GIGE
++#define IMX_FEC_BASE			0x30BE0000
++
++#define CONFIG_PHYLIB
++#define CONFIG_PHY_ATHEROS
++#endif
++
++/*
++ * Another approach is add the clocks for inmates into clks_init_on
++ * in clk-imx8mq.c, then clk_ingore_unused could be removed.
++ */
++#define JAILHOUSE_ENV \
++	"jh_clk=   " \
++	"jh_mmcboot=setenv fdt_file fsl-imx8mq-evk-root.dtb; " \
++		"setenv jh_clk clk_ignore_unused; " \
++			   "if run loadimage; then " \
++				   "run mmcboot; " \
++			   "else run jh_netboot; fi;  " \
++	"jh_netboot=setenv fdt_file fsl-imx8mq-evk-root.dtb; setenv jh_clk clk_ignore_unused; run netboot;   "
++
++#define CONFIG_MFG_ENV_SETTINGS \
++	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
++	"initrd_addr=0x43800000 " \
++	"initrd_high=0xffffffffffffffff " \
++	"emmc_dev=0 "\
++	"sd_dev=1 " \
++
++/* Initial environment variables */
++#define CONFIG_EXTRA_ENV_SETTINGS		\
++	CONFIG_MFG_ENV_SETTINGS \
++	JAILHOUSE_ENV \
++	"script=boot.scr " \
++	"image=Image " \
++	"console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200 " \
++	"fdt_addr=0x43000000 "			\
++	"fdt_high=0xffffffffffffffff "		\
++	"boot_fdt=try " \
++	"fdt_file=fsl-imx8mq-evk.dtb " \
++	"initrd_addr=0x43800000 "		\
++	"initrd_high=0xffffffffffffffff " \
++	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)" " \
++	"mmcpart=" __stringify(CONFIG_SYS_MMC_IMG_LOAD_PART) " " \
++	"mmcroot=" CONFIG_MMCROOT " rootwait rw " \
++	"mmcautodetect=yes " \
++	"mmcargs=setenv bootargs ${jh_clk} console=${console} root=${mmcroot}  " \
++	"loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script}; " \
++	"bootscript=echo Running bootscript from mmc ...; " \
++		"source " \
++	"loadimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${image} " \
++	"loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file} " \
++	"mmcboot=echo Booting from mmc ...; " \
++		"run mmcargs; " \
++		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
++			"if run loadfdt; then " \
++				"booti ${loadaddr} - ${fdt_addr}; " \
++			"else " \
++				"echo WARN: Cannot load the DT; " \
++			"fi; " \
++		"else " \
++			"echo wait for boot; " \
++		"fi; " \
++	"netargs=setenv bootargs ${jh_clk} console=${console} " \
++		"root=/dev/nfs " \
++		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp " \
++	"netboot=echo Booting from net ...; " \
++		"run netargs;  " \
++		"if test ${ip_dyn} = yes; then " \
++			"setenv get_cmd dhcp; " \
++		"else " \
++			"setenv get_cmd tftp; " \
++		"fi; " \
++		"${get_cmd} ${loadaddr} ${image}; " \
++		"if test ${boot_fdt} = yes || test ${boot_fdt} = try; then " \
++			"if ${get_cmd} ${fdt_addr} ${fdt_file}; then " \
++				"booti ${loadaddr} - ${fdt_addr}; " \
++			"else " \
++				"echo WARN: Cannot load the DT; " \
++			"fi; " \
++		"else " \
++			"booti; " \
++		"fi; "
++
++#define CONFIG_BOOTCOMMAND \
++	   "mmc dev ${mmcdev}; if mmc rescan; then " \
++		   "if run loadbootscript; then " \
++			   "run bootscript; " \
++		   "else " \
++			   "if run loadimage; then " \
++				   "run mmcboot; " \
++			   "else run netboot; " \
++			   "fi; " \
++		   "fi; " \
++	   "else booti ${loadaddr} - ${fdt_addr}; fi"
++
++/* Link Definitions */
++#define CONFIG_LOADADDR			0x40480000
++
++#define CONFIG_SYS_LOAD_ADDR           CONFIG_LOADADDR
++
++#define CONFIG_SYS_INIT_RAM_ADDR        0x40000000
++#define CONFIG_SYS_INIT_RAM_SIZE        0x80000
++#define CONFIG_SYS_INIT_SP_OFFSET \
++	(CONFIG_SYS_INIT_RAM_SIZE - GENERATED_GBL_DATA_SIZE)
++#define CONFIG_SYS_INIT_SP_ADDR \
++	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
++
++#define CONFIG_ENV_OVERWRITE
++#define CONFIG_ENV_OFFSET               (64 * SZ_64K)
++#define CONFIG_ENV_SIZE			0x1000
++#define CONFIG_SYS_MMC_ENV_DEV		1   /* USDHC2 */
++#define CONFIG_MMCROOT			"/dev/mmcblk1p2"  /* USDHC2 */
++
++/* Size of malloc() pool */
++#define CONFIG_SYS_MALLOC_LEN		((CONFIG_ENV_SIZE + (2 * 1024)) * 1024)
++
++#define CONFIG_SYS_SDRAM_BASE           0x40000000
++#define PHYS_SDRAM                      0x40000000
++#define PHYS_SDRAM_SIZE			0xC0000000 /* 3GB DDR */
++
++#define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
++#define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
++					(PHYS_SDRAM_SIZE >> 1))
++
++#define CONFIG_BAUDRATE			115200
++
++#define CONFIG_MXC_UART
++#define CONFIG_MXC_UART_BASE		UART1_BASE_ADDR
++
++/* Monitor Command Prompt */
++#undef CONFIG_SYS_PROMPT
++#define CONFIG_SYS_PROMPT		"u-boot=> "
++#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
++#define CONFIG_SYS_CBSIZE		1024
++#define CONFIG_SYS_MAXARGS		64
++#define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
++#define CONFIG_SYS_PBSIZE		(CONFIG_SYS_CBSIZE + \
++					sizeof(CONFIG_SYS_PROMPT) + 16)
++
++#define CONFIG_IMX_BOOTAUX
++
++#define CONFIG_CMD_MMC
++#define CONFIG_FSL_ESDHC
++#define CONFIG_FSL_USDHC
++
++#define CONFIG_SYS_FSL_USDHC_NUM	2
++#define CONFIG_SYS_FSL_ESDHC_ADDR       0
++
++#define CONFIG_SUPPORT_EMMC_BOOT	/* eMMC specific */
++#define CONFIG_SYS_MMC_IMG_LOAD_PART	1
++
++#ifdef CONFIG_FSL_QSPI
++#define FSL_QSPI_FLASH_SIZE		(SZ_32M)
++#define FSL_QSPI_FLASH_NUM		1
++#endif
++
++#define CONFIG_MXC_GPIO
++
++#define CONFIG_MXC_OCOTP
++#define CONFIG_CMD_FUSE
++
++/* I2C Configs */
++#define CONFIG_SYS_I2C_SPEED		  100000
++
++/* USB configs */
++#ifndef CONFIG_SPL_BUILD
++#define CONFIG_CMD_USB
++#define CONFIG_USB_STORAGE
++
++#define CONFIG_CMD_USB_MASS_STORAGE
++#define CONFIG_USB_GADGET_MASS_STORAGE
++#define CONFIG_USB_FUNCTION_MASS_STORAGE
++
++#define CONFIG_CMD_READ
++
++#endif
++
++#define CONFIG_SERIAL_TAG
++#define CONFIG_FASTBOOT_USB_DEV 0
++
++
++#define CONFIG_USB_MAX_CONTROLLER_COUNT         2
++
++#define CONFIG_USBD_HS
++#define CONFIG_USB_GADGET_VBUS_DRAW 2
++
++#define CONFIG_OF_SYSTEM_SETUP
++
++#ifndef CONFIG_SPL_BUILD
++#define CONFIG_DM_PMIC
++#endif
++
++/* Framebuffer */
++#ifdef CONFIG_VIDEO
++#define CONFIG_VIDEO_IMXDCSS
++#define CONFIG_VIDEO_BMP_RLE8
++#define CONFIG_SPLASH_SCREEN
++#define CONFIG_SPLASH_SCREEN_ALIGN
++#define CONFIG_BMP_16BPP
++#define CONFIG_VIDEO_LOGO
++#define CONFIG_VIDEO_BMP_LOGO
++#define CONFIG_IMX_VIDEO_SKIP
++#endif
++
++#if defined(CONFIG_ANDROID_SUPPORT)
++#include "imx8mq_evk_android.h"
++#endif
++#endif
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+deleted file mode 120000
+index 61b70efc4b..0000000000
+--- a/include/configs/imx8mq_a300_android.h
++++ /dev/null
+@@ -1 +0,0 @@
+-imx8mq_evk_android.h
+\ No newline at end of file
+diff --git a/include/configs/imx8mq_a300_android.h b/include/configs/imx8mq_a300_android.h
+new file mode 100644
+index 0000000000..e0fdf64331
+--- /dev/null
++++ b/include/configs/imx8mq_a300_android.h
+@@ -0,0 +1,89 @@
++/*
++ * Copyright 2017 NXP
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef IMX8MQ_EVK_ANDROID_H
++#define IMX8MQ_EVK_ANDROID_H
++
++#define CONFIG_CMD_READ
++
++#define CONFIG_ANDROID_AB_SUPPORT
++#define CONFIG_AVB_SUPPORT
++#define CONFIG_SUPPORT_EMMC_RPMB
++#ifdef CONFIG_ANDROID_AB_SUPPORT
++#define CONFIG_SYSTEM_RAMDISK_SUPPORT
++#endif
++#define CONFIG_AVB_FUSE_BANK_SIZEW 0
++#define CONFIG_AVB_FUSE_BANK_START 0
++#define CONFIG_AVB_FUSE_BANK_END 0
++#define CONFIG_FASTBOOT_LOCK
++#define FSL_FASTBOOT_FB_DEV "mmc"
++
++#ifdef CONFIG_SYS_MALLOC_LEN
++#undef CONFIG_SYS_MALLOC_LEN
++#define CONFIG_SYS_MALLOC_LEN           (64 * SZ_1M)
++#endif
++
++#define CONFIG_ANDROID_RECOVERY
++
++#define CONFIG_CMD_BOOTA
++#define CONFIG_CMD_MMC_RPMB 1
++#define CONFIG_SUPPORT_RAW_INITRD
++#define CONFIG_SERIAL_TAG
++
++#undef CONFIG_EXTRA_ENV_SETTINGS
++#undef CONFIG_BOOTCOMMAND
++
++#define CONFIG_EXTRA_ENV_SETTINGS		\
++	"splashpos=m,m "			\
++	"fdt_high=0xffffffffffffffff "		\
++	"initrd_high=0xffffffffffffffff "	\
++
++/* Enable mcu firmware flash */
++#ifdef CONFIG_FLASH_MCUFIRMWARE_SUPPORT
++#define ANDROID_MCU_FRIMWARE_DEV_TYPE DEV_MMC
++#define ANDROID_MCU_FIRMWARE_START 0x500000
++#define ANDROID_MCU_FIRMWARE_SIZE  0x40000
++#define ANDROID_MCU_FIRMWARE_HEADER_STACK 0x20020000
++#endif
++
++#if !defined(CONFIG_IMX_TRUSTY_OS) || !defined(CONFIG_DUAL_BOOTLOADER)
++#undef CONFIG_FSL_CAAM_KB
++#endif
++
++#ifdef CONFIG_DUAL_BOOTLOADER
++#define CONFIG_SPL_MMC_WRITE 1
++
++#ifdef CONFIG_IMX_TRUSTY_OS
++#define BOOTLOADER_RBIDX_OFFSET  0x1E000
++#define BOOTLOADER_RBIDX_START   0x1F000
++#define BOOTLOADER_RBIDX_LEN     0x08
++#define BOOTLOADER_RBIDX_INITVAL 0
++#endif
++
++#endif
++
++#ifdef CONFIG_IMX_TRUSTY_OS
++#define AVB_RPMB
++#define KEYSLOT_HWPARTITION_ID 2
++#define KEYSLOT_BLKS             0x1FFF
++#define NS_ARCH_ARM64 1
++#endif
++
++#ifdef CONFIG_SPL_BUILD
++#define CONFIG_ENV_IS_NOWHERE
++#undef CONFIG_ANDROID_BOOT_IMAGE
++#undef CONFIG_ANDROID_RECOVERY
++#undef CONFIG_ENV_IS_IN_MMC
++#undef CONFIG_LIB_UUID
++#undef CONFIG_CMD_UUID
++#undef CONFIG_LIB_RAND
++#undef CONFIG_SHA1
++#undef CONFIG_SHA256
++#endif
++
++#define AVB_AB_I_UNDERSTAND_LIBAVB_AB_IS_DEPRECATED
++
++#endif /* IMX8MQ_EVK_ANDROID_H */

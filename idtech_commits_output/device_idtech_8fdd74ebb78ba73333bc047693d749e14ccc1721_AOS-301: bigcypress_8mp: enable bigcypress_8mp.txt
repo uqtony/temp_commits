@@ -1,0 +1,145 @@
+8fdd74eb AndrewS 2020-08-26
+
+AOS-301: bigcypress_8mp: enable bigcypress_8mp
+
+Change-Id: Iaa27202bb03f59f6c0e6cd9233192a65c7842e8c
+
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index 5dfa06db..59427243 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -34,6 +34,8 @@ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq.mk \
+   $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq_drm.mk \
+   $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq_secure.mk \
++  $(LOCAL_DIR)/bigcypress_8mp/bigcypress_8mp.mk \
++  $(LOCAL_DIR)/bigcypress_8mp/bigcypress_8mp_secure.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_drm.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_secure.mk \
+@@ -56,6 +58,9 @@ COMMON_LUNCH_CHOICES := \
+   bigcypress_8mq_drm-user \
+   bigcypress_8mq_drm-userdebug \
+   bigcypress_8mq_secure-user \
++  bigcypress_8mp-user \
++  bigcypress_8mp-userdebug \
++  bigcypress_8mp_secure-user \
+   vp6820_8mq-user \
+   vp6820_8mq-userdebug \
+   vp6820_8mq_drm-user \
+diff --git a/imx8m/bigcypress_8mp/BoardConfig.mk b/imx8m/bigcypress_8mp/BoardConfig.mk
+index c89555ea..cc6430ac 100644
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@ -33,7 +33,7 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ # Product-specific compile-time definitions.
+ #
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mp
+ 
+ include device/idtech/imx8m/BoardConfigCommon.mk
+ 
+@@ -139,7 +139,7 @@ endif
+ 
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mp/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/bigcypress_8mp/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+diff --git a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+index bdc837bc..0953e652 100644
+--- a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+@@ -2,14 +2,6 @@
+ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+-# u-boot target
+-TARGET_BOOTLOADER_CONFIG := imx8mp-devboard:imx8mp_a200_devboard_android_defconfig:signed
+-TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty:imx8mp_a200_devboard_android_trusty_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-secure-unlock:imx8mp_a200_devboard_android_trusty_secure_unlock_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-dual:imx8mp_a200_devboard_android_dual_defconfig:signed
+-TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-trusty-dual:imx8mp_a200_devboard_android_trusty_dual_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mp-devboard-evk-uuu:imx8mp_a200_devboard_android_uuu_defconfig:signed
+-
+ TARGET_BOOTLOADER_CONFIG += imx8mp-evk:imx8mp_evk_android_defconfig:signed
+ TARGET_BOOTLOADER_CONFIG += imx8mp-evk-trusty:imx8mp_evk_android_trusty_defconfig
+ TARGET_BOOTLOADER_CONFIG += imx8mp-evk-trusty-secure-unlock:imx8mp_evk_android_trusty_secure_unlock_defconfig
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 751fe5c7..322ac016 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -1,7 +1,7 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mp
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mp
+ 
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+@@ -14,9 +14,9 @@ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+ endif
+ 
+ # Overrides
+-PRODUCT_NAME := vp6820_8mp
+-PRODUCT_DEVICE := vp6820_8mp
+-PRODUCT_MODEL := VP6820_8MP
++PRODUCT_NAME := bigcypress_8mp
++PRODUCT_DEVICE := bigcypress_8mp
++PRODUCT_MODEL := BIGCYPRESS_8MP
+ 
+ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ 
+@@ -107,7 +107,7 @@ PRODUCT_COPY_FILES += \
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mp/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
++    device/idtech/imx8m/bigcypress_8mp/camera_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mp.json
+ 
+ # ONLY devices that meet the CDD's requirements may declare these features
+ PRODUCT_COPY_FILES += \
+@@ -145,7 +145,7 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
+ 
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mp/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
++    device/idtech/imx8m/bigcypress_8mp/powerhint_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mp.json
+ 
+ # fastboot_imx_flashall scripts, fsl-sdcard-partition script uuu_imx_android_flash scripts
+ PRODUCT_COPY_FILES += \
+@@ -155,7 +155,7 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
+     device/idtech/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
+ 
+-# Copy media_codecs.xml for 1GB vp6820_8mp board
++# Copy media_codecs.xml for 1GB bigcypress_8mp board
+ ifeq ($(LOW_MEMORY),true)
+ PRODUCT_COPY_FILES += \
+     $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/imx8mp/media_codecs_no_vpu.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs.xml
+@@ -235,7 +235,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.thermal@2.0-service.imx
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mp/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
++    device/idtech/imx8m/bigcypress_8mp/thermal_info_config_imx8mp.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mp.json
+ 
+ # Neural Network HAL and lib
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/bigcypress_8mp/init.rc b/imx8m/bigcypress_8mp/init.rc
+index 73d644a7..36314922 100644
+--- a/imx8m/bigcypress_8mp/init.rc
++++ b/imx8m/bigcypress_8mp/init.rc
+@@ -81,7 +81,7 @@ on early-boot
+     setprop ro.lmk.critical_upgrade true
+ 
+     # Set the host name which used in console
+-    export HOSTNAME vp6820_8mp
++    export HOSTNAME bigcypress_8mp
+ 
+     # Set permission for IIM node
+     symlink /dev/mxs_viim /dev/mxc_mem

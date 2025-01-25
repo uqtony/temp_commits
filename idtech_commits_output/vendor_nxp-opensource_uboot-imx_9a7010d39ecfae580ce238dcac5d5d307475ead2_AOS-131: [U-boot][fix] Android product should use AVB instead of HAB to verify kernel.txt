@@ -1,0 +1,37 @@
+9a7010d39e max.yang 2020-03-31
+
+AOS-131: [U-boot][fix] Android product should use AVB instead of HAB to verify kernel
+
+  Symptom: Device fail to boot into kernel in secure-user build
+  Root Cause: U-boot tried to use HAB to verify and fail
+  Solution: Android product should use AVB, skip this check when CONFIG_AVB_SUPPORT is on
+  Fail log:
+    Error: Invalid IVT structure
+
+    Allowed IVT structure:
+    IVT HDR       = 0x4X2000D1
+    IVT ENTRY     = 0xXXXXXXXX
+    IVT RSV1      = 0x0
+    IVT DCD       = 0x0
+    IVT BOOT_DATA = 0xXXXXXXXX
+    IVT SELF      = 0xXXXXXXXX
+    IVT CSF       = 0xXXXXXXXX
+    IVT RSV2      = 0x0
+    Authenticate Image Fail, Please check
+    resetting ...
+
+Change-Id: I71f54dc73fc5a223dbe3a2834199789311fbe34a
+
+diff --git a/cmd/booti.c b/cmd/booti.c
+index 8be994919d..1b2113c7fc 100644
+--- a/cmd/booti.c
++++ b/cmd/booti.c
+@@ -41,7 +41,7 @@ static int booti_start(cmd_tbl_t *cmdtp, int flag, int argc,
+ 	if (ret != 0)
+ 		return 1;
+ 
+-#ifdef CONFIG_SECURE_BOOT
++#if defined(CONFIG_SECURE_BOOT) && !defined(CONFIG_AVB_SUPPORT)
+ 	extern int authenticate_image(
+ 		uint32_t ddr_start, uint32_t raw_image_size);
+ 	if (authenticate_image(ld, image_size) != 0) {

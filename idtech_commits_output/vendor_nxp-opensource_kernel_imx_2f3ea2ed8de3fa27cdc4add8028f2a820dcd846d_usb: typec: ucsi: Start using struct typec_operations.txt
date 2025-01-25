@@ -1,0 +1,85 @@
+2f3ea2ed8de3 George.Huang 2020-10-29
+
+usb: typec: ucsi: Start using struct typec_operations
+
+Symptom: build break
+  drivers/usb/typec/hd3ss3220.c:195:23: error: no member named 'dr_set' in 'struct typec_capability'
+          hd3ss3220->typec_cap.dr_set = hd3ss3220_dr_set;
+          ~~~~~~~~~~~~~~~~~~~~ ^
+
+Root Cause: struct typec_capability is deprecated
+
+Solution: start using struct typec_operations
+
+Reference:
+  commit 0534741a06a66c2be078d81340877856298eb1db
+  Author: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+  Date:   Mon Nov 4 17:24:22 2019 +0300
+
+      UPSTREAM: usb: typec: tps6598x: Start using struct typec_operations
+
+      Supplying the operation callbacks as part of a struct
+      typec_operations instead of as part of struct
+      typec_capability during port registration. After this there
+      is not need to keep the capabilities stored anywhere in the
+      driver.
+
+Change-Id: I660fe6623d900d7fd42d112b320bedbedba6242f
+
+diff --git a/drivers/usb/typec/hd3ss3220.c b/drivers/usb/typec/hd3ss3220.c
+index cb268827bfdb..117a7285d0cf 100644
+--- a/drivers/usb/typec/hd3ss3220.c
++++ b/drivers/usb/typec/hd3ss3220.c
+@@ -39,7 +39,6 @@ struct hd3ss3220 {
+ 	struct regmap *regmap;
+ 	struct extcon_dev *extcon;
+ 	struct typec_port *port;
+-	struct typec_capability typec_cap;
+ };
+ 
+ static const unsigned int hd3ss3220_cable[] = {
+@@ -80,10 +79,9 @@ static int hd3ss3220_attached_state_detect(struct hd3ss3220 *hd3ss3220)
+ 	return attached_state;
+ }
+ 
+-static int hd3ss3220_dr_set(const struct typec_capability *cap, enum typec_data_role role)
++static int hd3ss3220_dr_set(struct typec_port *port, enum typec_data_role role)
+ {
+-	struct hd3ss3220 *hd3ss3220 = container_of(cap, struct hd3ss3220,
+-						typec_cap);
++	struct hd3ss3220 *hd3ss3220 = typec_get_drvdata(port);
+ 	int ret = 0;
+ 
+ 	if (role == TYPEC_HOST) {
+@@ -155,9 +153,14 @@ static const struct regmap_config config = {
+ 	.max_register = 0x0A,
+ };
+ 
++static const struct typec_operations hd3ss3220_ops = {
++	.dr_set = hd3ss3220_dr_set,
++	};
++
+ static int hd3ss3220_probe(struct i2c_client *client,
+ 		const struct i2c_device_id *id)
+ {
++	struct typec_capability typec_cap = { };
+ 	struct hd3ss3220 *hd3ss3220;
+ 	int ret;
+ 	unsigned int data;
+@@ -191,11 +194,12 @@ static int hd3ss3220_probe(struct i2c_client *client,
+ 		goto err;
+ 	}
+ 
+-	hd3ss3220->typec_cap.prefer_role = TYPEC_NO_PREFERRED_ROLE;
+-	hd3ss3220->typec_cap.dr_set = hd3ss3220_dr_set;
+-	hd3ss3220->typec_cap.type = TYPEC_PORT_DRP;
++	typec_cap.prefer_role = TYPEC_NO_PREFERRED_ROLE;
++	typec_cap.driver_data = hd3ss3220;
++	typec_cap.ops = &hd3ss3220_ops;
++	typec_cap.type = TYPEC_PORT_DRP;
+ 
+-	hd3ss3220->port = typec_register_port(&client->dev, &hd3ss3220->typec_cap);
++	hd3ss3220->port = typec_register_port(&client->dev, &typec_cap);
+ 	if (IS_ERR(hd3ss3220->port)) {
+ 		ret = PTR_ERR(hd3ss3220->port);
+ 		goto err;

@@ -1,0 +1,37 @@
+27ec495 George.Huang 2019-11-20
+
+AOS-22: Only open self.tgt_txt_path one time for better performance
+
+Change-Id: I911380efe40651cd24c8a783447e9124cd9de41b
+
+diff --git a/board_info_gen.py b/board_info_gen.py
+index 04d9be5..d08e59b 100755
+--- a/board_info_gen.py
++++ b/board_info_gen.py
+@@ -82,14 +82,18 @@ class GenBoardInfo(object):
+     msg_out = hexdump(msg_in, result='return').split("
+")
+ 
+     # Replace lines at related binary offset in self.tgt_txt_path
+-    for line_cfg in msg_out:
+-      offset=line_cfg.split(" ")[0] # addrend: 00000000:
+-      with fileinput.FileInput(self.tgt_txt_path, inplace=True) as file:
+-        for line in file:
+-          if line.startswith(offset):
+-            print(line_cfg)
++    with fileinput.FileInput(self.tgt_txt_path, inplace=True) as file:
++      for line in file:
++        offset=line.split(" ")[0] # addrend: 00000000:
++        for line_cfg in msg_out:
++          if line_cfg.startswith(offset):
++            break
+           else:
+-            print(line, end='')
++            line_cfg = ""
++        if line_cfg:
++          print(line_cfg)
++        else:
++          print(line, end='')
+     return True
+ 
+   def restore_image(self):

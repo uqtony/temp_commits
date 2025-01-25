@@ -1,0 +1,104 @@
+dba85080628d owen.wen 2021-12-03
+
+AOS-774: idg_spi: fix idg_console_tool failure
+
+Symptom: idg_console_tool get version fail rate 80%
+RootCause: delay_usecs has garbage value since using kmalloc and K81 only
+           maintain response 100ms by default
+Solution: using kzalloc instead of kmalloc
+Change-Id: I17e10b56b1cb4876dbd50577019a0303dfdd3e1d
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index d4e42632a59c..66383da5629e 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -52,7 +52,7 @@ static struct spi_device *idg_spi_tty;
+ 
+ struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
+ {
+-	struct mt_fifo *fifo = kmalloc(sizeof(struct mt_fifo), GFP_KERNEL);
++	struct mt_fifo *fifo = kzalloc(sizeof(struct mt_fifo), GFP_KERNEL);
+ 	static char *buffer;
+ 
+ 	if (fifo != NULL) {
+@@ -61,14 +61,14 @@ struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
+ 		fifo->msg_avail = msg_cnt;
+ 		fifo->msg_size = msg_size;
+ 		fifo->msg_cnt = 0;
+-		buffer = kmalloc(msg_size * msg_cnt * sizeof(char), GFP_KERNEL);
++		buffer = kzalloc(msg_size * msg_cnt * sizeof(char), GFP_KERNEL);
+ 		if (buffer == NULL) {
+ 			kfree(fifo);
+ 			fifo = NULL;
+ 			goto fifo_error;
+ 		}
+ 		fifo->data = buffer;
+-		fifo->sem = kmalloc(sizeof(struct semaphore), GFP_KERNEL);
++		fifo->sem = kzalloc(sizeof(struct semaphore), GFP_KERNEL);
+ 		if (fifo->sem == NULL) {
+ 			kfree(fifo->sem);
+ 			kfree(fifo->data);
+@@ -77,7 +77,7 @@ struct mt_fifo *fifo_create(int msg_size, int msg_cnt)
+ 			goto fifo_error;
+ 		}
+ 		sema_init(fifo->sem, 0);
+-		fifo->sem_buf = kmalloc(sizeof(struct semaphore), GFP_KERNEL);
++		fifo->sem_buf = kzalloc(sizeof(struct semaphore), GFP_KERNEL);
+ 		if (fifo->sem_buf == NULL) {
+ 			kfree(fifo->sem_buf);
+ 			kfree(fifo->sem);
+@@ -476,13 +476,13 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	spi_message_init(&m);
+ 	idg_tty = (struct spi_device *)file->private_data;
+ 	idg_dev = spi_get_drvdata(idg_tty);
+-	x_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	x_init = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+ 	if (x_init == NULL) {
+ 		status = -ENOMEM;
+ 		pr_err("%s: idgv2 spi tty write failed(%d)", DRVNAME, status);
+ 		goto tty_write_out;
+ 	}
+-	x_init->ptp_sts = kmalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
++	x_init->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+ 	if (!x_init->ptp_sts) {
+ 		status = -ENOMEM;
+ 		pr_err("%s: idgv2 spi tty write failed(%d)", DRVNAME, status);
+@@ -635,23 +635,23 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 
+ 	spi_message_init(&m);
+ 	spi_message_init(&m_s);
+-	x_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	x_init = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+ 	if (x_init == NULL) {
+ 		status = -ENOMEM;
+ 		goto spi_report_out;
+ 	}
+-	x_init->ptp_sts = kmalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
++	x_init->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+ 	if (!x_init->ptp_sts) {
+ 		status = -ENOMEM;
+ 		goto spi_report_out;
+ 	}
+ 	x = x_init;
+-	x_s_init = kmalloc(sizeof(struct spi_transfer), GFP_KERNEL);
++	x_s_init = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+ 	if (x_s_init == NULL) {
+ 		status = -ENOMEM;
+ 		goto spi_report_out;
+ 	}
+-	x_s_init->ptp_sts = kmalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
++	x_s_init->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+ 	if (!x_s_init->ptp_sts) {
+ 		status = -ENOMEM;
+ 		goto spi_report_out;
+@@ -1160,7 +1160,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 		goto setup_error;
+ 	}
+ 	dev_info(&spi->dev, "idg_spi driver spi setuped
+");
+-	idg_dev = kmalloc(sizeof(struct idg_spi_device), GFP_KERNEL);
++	idg_dev = kzalloc(sizeof(struct idg_spi_device), GFP_KERNEL);
+ 	if (idg_dev == NULL) {
+ 		dev_err(&spi->dev, "idg_spi_device initial failed
+");
+ 		err = -ENOMEM;

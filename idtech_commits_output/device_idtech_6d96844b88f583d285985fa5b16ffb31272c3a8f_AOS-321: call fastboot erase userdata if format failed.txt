@@ -1,0 +1,35 @@
+6d96844b George.Huang 2020-09-17
+
+AOS-321: call fastboot erase userdata if format failed
+
+Some user's fastboot tool is too old to execute fastboot format properly.
+So fallback to use "fastboot erase" once if "fastboot format" failed
+
+Change-Id: I0068c2a737bbec4bd449878d85a4e8b10744724b
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index dc410533..86468e87 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -238,6 +238,7 @@ if %erase% == 1 (
+     )
+     %fastboot_tool% erase misc
+     %fastboot_tool% format userdata
++    if NOT [%ERRORLEVEL%] == [0] %fastboot_tool% erase userdata
+ )
+ if %lock% == 1 %fastboot_tool% oem lock
+ 
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 1d14510c..ec119320 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -643,7 +643,8 @@ if [ ${erase} -eq 1 ]; then
+         ${fastboot_tool} erase cache
+     fi
+     ${fastboot_tool} erase misc
+-    ${fastboot_tool} format userdata
++    ${fastboot_tool} format userdata ||
++    ${fastboot_tool} erase userdata
+ fi
+ 
+ if [ ${lock} -eq 1 ]; then

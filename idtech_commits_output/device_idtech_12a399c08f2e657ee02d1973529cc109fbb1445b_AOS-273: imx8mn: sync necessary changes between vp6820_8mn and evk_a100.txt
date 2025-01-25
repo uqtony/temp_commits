@@ -1,0 +1,100 @@
+12a399c0 George.Huang 2020-07-31
+
+AOS-273: imx8mn: sync necessary changes between vp6820_8mn and evk_a100
+
+- check command:
+  $ diff -qrf evk_8mq/ evk_a300/
+  $ diff -qrf evk_a300/ vp6820_8mq/
+  $ diff -qrf evk_8mp/ evk_a200/
+  $ diff -qrf evk_a200/ vp6820_8mp/
+
+- TODO: Need to patch blow files in the future
+  evk_a100/camera_config_imx8mn.json for camera
+  evk_a100/manifest.xml for radio
+  vp6820_8mn/camera_config_imx8mn.json for camera
+  vp6820_8mn/manifest.xml for radio
+  vp6820_8mn/init.imx8mn.rc for spl_[a|b]
+  vp6820_8mn/sepolicy/file_contexts for spl_[a|b]
+
+Change-Id: I67920c41cd6ad82621a990a6d851d6a8a498956d
+
+diff --git a/imx8m/evk_a100/android_addition_defconfig b/imx8m/evk_a100/android_addition_defconfig
+index e6ab522a..d7438a76 100644
+--- a/imx8m/evk_a100/android_addition_defconfig
++++ b/imx8m/evk_a100/android_addition_defconfig
+@@ -21,6 +21,9 @@ CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM=y
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_KPROBE_EVENTS=y
+ CONFIG_UPROBE_EVENTS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
+ 
+ CONFIG_PARAVIRT=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y
+diff --git a/imx8m/evk_a100/sepolicy/file_contexts b/imx8m/evk_a100/sepolicy/file_contexts
+index a2ed0b69..31b9a760 100644
+--- a/imx8m/evk_a100/sepolicy/file_contexts
++++ b/imx8m/evk_a100/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+diff --git a/imx8m/evk_a100/ueventd.freescale.rc b/imx8m/evk_a100/ueventd.freescale.rc
+index 9645107b..1ec39fa4 100644
+--- a/imx8m/evk_a100/ueventd.freescale.rc
++++ b/imx8m/evk_a100/ueventd.freescale.rc
+@@ -18,3 +18,9 @@
+ 
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++#quectel port
++/dev/ttyUSB*              0660   radio        radio
++/dev/cdc-wdm*             0660   radio        radio
++/dev/qcqmi*               0660   radio        radio
++/dev/cdc-acm*             0660   radio        radio
+diff --git a/imx8m/vp6820_8mn/android_addition_defconfig b/imx8m/vp6820_8mn/android_addition_defconfig
+index e6ab522a..d7438a76 100644
+--- a/imx8m/vp6820_8mn/android_addition_defconfig
++++ b/imx8m/vp6820_8mn/android_addition_defconfig
+@@ -21,6 +21,9 @@ CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM=y
+ CONFIG_ENABLE_DEFAULT_TRACERS=y
+ CONFIG_KPROBE_EVENTS=y
+ CONFIG_UPROBE_EVENTS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
+ 
+ CONFIG_PARAVIRT=y
+ CONFIG_NETFILTER_XT_TARGET_CT=y
+diff --git a/imx8m/vp6820_8mn/sepolicy/file_contexts b/imx8m/vp6820_8mn/sepolicy/file_contexts
+index a2ed0b69..31b9a760 100644
+--- a/imx8m/vp6820_8mn/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mn/sepolicy/file_contexts
+@@ -23,6 +23,7 @@
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+diff --git a/imx8m/vp6820_8mn/ueventd.freescale.rc b/imx8m/vp6820_8mn/ueventd.freescale.rc
+index 9645107b..1ec39fa4 100644
+--- a/imx8m/vp6820_8mn/ueventd.freescale.rc
++++ b/imx8m/vp6820_8mn/ueventd.freescale.rc
+@@ -18,3 +18,9 @@
+ 
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++#quectel port
++/dev/ttyUSB*              0660   radio        radio
++/dev/cdc-wdm*             0660   radio        radio
++/dev/qcqmi*               0660   radio        radio
++/dev/cdc-acm*             0660   radio        radio

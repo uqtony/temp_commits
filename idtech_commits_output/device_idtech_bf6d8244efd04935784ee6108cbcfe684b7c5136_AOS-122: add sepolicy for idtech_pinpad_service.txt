@@ -1,0 +1,51 @@
+bf6d8244 owen.wen 2020-03-26
+
+AOS-122: add sepolicy for idtech_pinpad_service
+
+allow platform_app to find idtech_pinpad_service(check if the service exist)
+create idtech_pinpad_service type service as a set of service_manager_type
+set com.idtech.eventhub type to idtech_pinpad_service
+allow system_server to create(default_service_manager->addService) idtech_pinpad_service
+add above setting to system by setting BOARD_PLAT_PRIVATE_SEPOLICY_DIR
+because system_server reside in system partition so add sepolicy in BOARD_PLAT_PRIVATE_SEPOLICY_DIR
+
+Change-Id: If7d8d03f5d6eedbbf1c5e1f8dd347f66e73ec524
+
+diff --git a/imx8m/sepolicy_system/private/platform_app.te b/imx8m/sepolicy_system/private/platform_app.te
+new file mode 100644
+index 00000000..5213c1e5
+--- /dev/null
++++ b/imx8m/sepolicy_system/private/platform_app.te
+@@ -0,0 +1 @@
++allow platform_app idtech_pinpad_service:service_manager find;
+diff --git a/imx8m/sepolicy_system/private/service.te b/imx8m/sepolicy_system/private/service.te
+new file mode 100644
+index 00000000..0fe78707
+--- /dev/null
++++ b/imx8m/sepolicy_system/private/service.te
+@@ -0,0 +1 @@
++type idtech_pinpad_service,    service_manager_type;
+diff --git a/imx8m/sepolicy_system/private/service_contexts b/imx8m/sepolicy_system/private/service_contexts
+new file mode 100644
+index 00000000..b9c4077a
+--- /dev/null
++++ b/imx8m/sepolicy_system/private/service_contexts
+@@ -0,0 +1 @@
++com.idtech.pinpad                       u:object_r:idtech_pinpad_service:s0
+diff --git a/imx8m/sepolicy_system/private/system_server.te b/imx8m/sepolicy_system/private/system_server.te
+new file mode 100644
+index 00000000..a5a28161
+--- /dev/null
++++ b/imx8m/sepolicy_system/private/system_server.te
+@@ -0,0 +1,2 @@
++add_service(system_server, idtech_pinpad_service);
++allow system_server idtech_pinpad_service:service_manager find;
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index 40adedc2..d6de8668 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -152,3 +152,4 @@ TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
++BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private

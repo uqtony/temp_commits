@@ -1,0 +1,89 @@
+6f33bf35c2 Jay 2022-02-16
+
+AOS-780: redwood: support video pll source adustment
+
+add tag video-pll-source to get video pll clock source
+from device tree. For imx8mq support clock source as below.
+HDMI 27M not support in uboot.
+
+  0: OSC 25M
+  1: OSC 27M
+  ===========
+  2: HDMI 27M
+
+Change-Id: Ibf3e2f8bfca8a698e9ecbdaf8ec4ae987bd8a18e
+
+diff --git a/arch/arm/include/asm/arch-imx8m/clock.h b/arch/arm/include/asm/arch-imx8m/clock.h
+index 1c2e606d81..9745eb9ead 100644
+--- a/arch/arm/include/asm/arch-imx8m/clock.h
++++ b/arch/arm/include/asm/arch-imx8m/clock.h
+@@ -270,7 +270,7 @@ void init_uart_clk(u32 index);
+ void init_usb_clk(void);
+ void init_wdog_clk(void);
+ void init_clk_ecspi(u32 index);
+-void init_mipi_clk(void);
++void init_mipi_clk(u32 video_src);
+ unsigned int mxc_get_clock(enum mxc_clock clk);
+ int clock_enable(enum clk_ccgr_index index, bool enable);
+ int clock_root_enabled(enum clk_root_index clock_id);
+diff --git a/arch/arm/mach-imx/imx8m/clock_imx8mq.c b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+index 7a65facf2b..3ce257ee3c 100644
+--- a/arch/arm/mach-imx/imx8m/clock_imx8mq.c
++++ b/arch/arm/mach-imx/imx8m/clock_imx8mq.c
+@@ -538,7 +538,7 @@ void init_clk_usdhc(u32 index)
+ 	}
+ }
+ 
+-void init_mipi_clk(void)
++void init_mipi_clk(u32 video_src)
+ {
+ 	/* MIPI power on */
+ 	writel(0x0000ffff, (GPC_BASE_ADDR + 0xEC));
+@@ -546,8 +546,12 @@ void init_mipi_clk(void)
+ 
+ 	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_BYPASS_MASK);
+ 	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_PD_MASK);
+-	setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_REFCLK_SEL_OSC_27M |
+-		     FRAC_PLL_LOCK_SEL_MASK);
++	if (video_src == 0 || video_src == 1)
++		setbits_le32(&ana_pll->video_pll_cfg0, video_src << 16 |
++				FRAC_PLL_LOCK_SEL_MASK);
++	else
++		setbits_le32(&ana_pll->video_pll_cfg0, FRAC_PLL_REFCLK_SEL_OSC_27M |
++				FRAC_PLL_LOCK_SEL_MASK);
+ 	clrbits_le32(&ana_pll->video_pll_cfg0,
+ 		     FRAC_PLL_COUNTCLK_SEL_MASK | BIT(0));
+ 
+diff --git a/drivers/video/nxp/imx/nw_dsi_imx.c b/drivers/video/nxp/imx/nw_dsi_imx.c
+index 7a38124821..a3c99a3bb1 100644
+--- a/drivers/video/nxp/imx/nw_dsi_imx.c
++++ b/drivers/video/nxp/imx/nw_dsi_imx.c
+@@ -26,7 +26,7 @@
+ 
+ 
+ #ifdef CONFIG_IMX8MQ
+-extern void init_mipi_clk(void);
++extern void init_mipi_clk(u32 video_src);
+ #endif /* CONFIG_IMX8MQ */
+ 
+ struct nw_dsi_imx_priv {
+@@ -102,6 +102,7 @@ static int nw_dsi_imx_probe(struct udevice *dev)
+ {
+ 	struct nw_dsi_imx_priv *priv = dev_get_priv(dev);
+ 	struct mipi_dsi_device *device = &priv->device;
++	u32 video_pll_src = 2;
+ 	int ret;
+ 
+ 	device->dev = dev;
+@@ -111,8 +112,9 @@ static int nw_dsi_imx_probe(struct udevice *dev)
+ 		printf("fail to get data lanes property %d
+", ret);
+ 		return -EINVAL;
+ 	}
++	dev_read_u32(dev, "video-pll-source", &video_pll_src);
+ #ifdef CONFIG_IMX8MQ
+-	init_mipi_clk();
++	init_mipi_clk(video_pll_src);
+ #endif /* CONFIG_IMX8MQ */
+ 
+ 	return ret;

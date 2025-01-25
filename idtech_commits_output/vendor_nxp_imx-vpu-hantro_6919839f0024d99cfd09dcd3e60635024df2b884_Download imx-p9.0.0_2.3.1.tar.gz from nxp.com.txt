@@ -1,0 +1,139 @@
+6919839 George.Huang 2020-01-21
+
+Download imx-p9.0.0_2.3.1.tar.gz from nxp.com
+
+Change-Id: I6560303759c5884e562704f0c14364aaa6ca38ac
+
+diff --git a/decoder_sw/software/source/common/decapi.c b/decoder_sw/software/source/common/decapi.c
+index f64f79a..a1135d0 100755
+--- a/decoder_sw/software/source/common/decapi.c
++++ b/decoder_sw/software/source/common/decapi.c
+@@ -859,6 +859,9 @@ static enum DecRet Vp9Init(const void** inst, struct DecConfig config,
+   dec_cfg.use_ringbuffer = config.use_ringbuffer;
+   dec_cfg.output_format = format;
+   dec_cfg.use_cts_test = 0;
++#ifdef USE_EXTERNAL_BUFFER
++  dec_cfg.use_adaptive_buffers = 0;
++#endif
+   if (config.use_8bits_output)
+     dec_cfg.pixel_format = DEC_OUT_PIXEL_CUT_8BIT;
+   else if (config.use_p010_output)
+diff --git a/decoder_sw/software/source/h264high/legacy/h264hwd_pic_param_set.c b/decoder_sw/software/source/h264high/legacy/h264hwd_pic_param_set.c
+index 34e225f..bc8c3f0 100755
+--- a/decoder_sw/software/source/h264high/legacy/h264hwd_pic_param_set.c
++++ b/decoder_sw/software/source/h264high/legacy/h264hwd_pic_param_set.c
+@@ -349,9 +349,11 @@ u32 h264bsdDecodePicParamSet(strmData_t *p_strm_data, picParamSet_t *p_pic_param
+       return(tmp);
+     if ((itmp < -12) || (itmp > 12)) {
+       ERROR_PRINT("second_chroma_qp_index_offset");
+-      return(HANTRO_NOK);
+-    }
+-    p_pic_param_set->chroma_qp_index_offset2 = itmp;
++      /* ignore this error, use chroma_qp_index_offset instead */
++      p_pic_param_set->transform8x8_flag = 0;
++      p_pic_param_set->chroma_qp_index_offset2 = p_pic_param_set->chroma_qp_index_offset;
++    } else
++      p_pic_param_set->chroma_qp_index_offset2 = itmp;
+   } else {
+     p_pic_param_set->scaling_matrix_present_flag = 0;
+     p_pic_param_set->transform8x8_flag = 0;
+diff --git a/decoder_sw/software/source/inc/vp9decapi.h b/decoder_sw/software/source/inc/vp9decapi.h
+index 2633431..e262c5a 100755
+--- a/decoder_sw/software/source/inc/vp9decapi.h
++++ b/decoder_sw/software/source/inc/vp9decapi.h
+@@ -147,6 +147,10 @@ struct Vp9DecConfig {
+   u32 use_fetch_one_pic;
+   u32 use_secure_mode;      /* Secure mode */
+   u32 use_cts_test;      /* all output buffers are reallocted in this mode if resolution change to bigger */
++#ifdef USE_EXTERNAL_BUFFER
++  u32 use_adaptive_buffers; // When sequence changes, if old output buffers (number/size) are sufficient for new sequence,
++                            // old buffers will be used instead of reallocating output buffer.
++#endif
+   enum DecPictureFormat output_format;
+   enum DecPicturePixelFormat pixel_format;
+ };
+diff --git a/decoder_sw/software/source/vp9/vp9decapi.c b/decoder_sw/software/source/vp9/vp9decapi.c
+index 2a151f4..ade20d3 100755
+--- a/decoder_sw/software/source/vp9/vp9decapi.c
++++ b/decoder_sw/software/source/vp9/vp9decapi.c
+@@ -226,6 +226,7 @@ enum DecRet Vp9DecInit(Vp9DecInst *dec_inst, const void *dwl, struct Vp9DecConfi
+ 
+   dec_cont->output_format = dec_cfg->output_format;
+ #ifdef USE_EXTERNAL_BUFFER
++  dec_cont->use_adaptive_buffers = dec_cfg->use_adaptive_buffers;
+   dec_cont->buffer_num_added = 0;
+   dec_cont->ext_buffer_config  = 0;
+   if (dec_cont->down_scale_enabled)
+@@ -887,7 +888,11 @@ i32 Vp9DecodeHeaders(struct Vp9DecContainer *dec_cont,
+       new_buff_size = asic_buff->pp_size;
+     }
+ 
+-    if (dec_cont->ext_buffer_size < new_buff_size &&
++    if (((dec_cont->use_adaptive_buffers &&
++      dec_cont->ext_buffer_size < new_buff_size) ||
++      (!dec_cont->use_adaptive_buffers &&
++      ((NEXT_MULTIPLE(dec_cont->width, 8)) * (NEXT_MULTIPLE(dec_cont->height, 8)) !=
++      asic_buff->width * asic_buff->height))) &&
+       (Vp9CheckSupport(dec_cont) == HANTRO_OK) &&
+       dec->key_frame && dec->resolution_change == 0 &&
+       dec_cont->cts_test && dec_cont->dec_stat == VP9DEC_DECODING) {
+diff --git a/decoder_sw/software/source/vp9/vp9hwd_container.h b/decoder_sw/software/source/vp9/vp9hwd_container.h
+index 9a3ff3a..fb8d502 100755
+--- a/decoder_sw/software/source/vp9/vp9hwd_container.h
++++ b/decoder_sw/software/source/vp9/vp9hwd_container.h
+@@ -221,6 +221,7 @@ struct Vp9DecContainer {
+ 
+   BufferQueue bq;
+ #ifdef USE_EXTERNAL_BUFFER
++  u32 use_adaptive_buffers;
+   u32 num_pp_buffers;
+   BufferQueue pp_bq;  /* raster/dscale buffer queue for free raster output buffer. */
+   u32 min_buffer_num; /* Minimum external buffer needed. */
+diff --git a/openmax_il/source/decoder/codec_vp9.c b/openmax_il/source/decoder/codec_vp9.c
+index fd50c73..3900315 100755
+--- a/openmax_il/source/decoder/codec_vp9.c
++++ b/openmax_il/source/decoder/codec_vp9.c
+@@ -68,6 +68,7 @@ typedef struct CODEC_VP9
+     OMX_U32 frame_count;
+     struct Vp9DecPicture out_pic[MAX_BUFFERS];
+     OMX_BOOL secure_mode;
++    OMX_BOOL headers_rdy;
+ } CODEC_VP9;
+ 
+ CODEC_STATE decoder_setframebuffer_vp9(CODEC_PROTOTYPE * arg, BUFFER *buff,
+@@ -270,6 +271,7 @@ static CODEC_STATE decoder_decode_vp9(CODEC_PROTOTYPE * arg,
+         break;
+     case DEC_HDRS_RDY:
+         DBGT_PDEBUG("Headers ready");
++        this->headers_rdy = 1;
+         stat = CODEC_HAS_INFO;
+         break;
+     case DEC_ADVANCED_TOOLS:
+@@ -296,6 +298,17 @@ static CODEC_STATE decoder_decode_vp9(CODEC_PROTOTYPE * arg,
+         DBGT_PDEBUG("Buffer size %d, number of buffers %d",
+             info.next_buf_size, info.buf_num);
+ #endif
++        /* Port reconfig, reset output params */
++        if (this->headers_rdy)
++        {
++            this->headers_rdy = 0;
++            // Reset output relatived parameters
++            this->out_index_w = 0;
++            this->out_index_r = 0;
++            this->out_num = 0;
++            memset(this->out_pic, 0, sizeof(struct Vp9DecPicture)*MAX_BUFFERS);
++        }
++
+         stat = CODEC_WAITING_FRAME_BUFFER;
+     }
+         break;
+@@ -720,6 +733,9 @@ CODEC_PROTOTYPE *HantroHwDecOmx_decoder_create_vp9(const void *DWLInstance,
+ #endif
+     dec_cfg.use_secure_mode = this->secure_mode = g2Conf->bEnableSecureMode;
+     dec_cfg.use_cts_test = g2Conf->bEnableCtsTest;
++#ifdef USE_EXTERNAL_BUFFER
++    dec_cfg.use_adaptive_buffers = g2Conf->bEnableAdaptiveBuffers ? 1 : 0;
++#endif
+     DBGT_PDEBUG("Output format %u, pixel format %u, RFC %u",
+         dec_cfg.output_format, dec_cfg.pixel_format, dec_cfg.use_video_compressor);
+     enum DecRet ret = Vp9DecInit(&this->instance, DWLInstance, &dec_cfg);

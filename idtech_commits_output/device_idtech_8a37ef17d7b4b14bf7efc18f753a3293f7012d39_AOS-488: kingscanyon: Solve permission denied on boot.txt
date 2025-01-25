@@ -1,0 +1,35 @@
+8a37ef17 George.Huang 2021-04-07
+
+AOS-488: kingscanyon: Solve permission denied on boot
+
+For genfs_contexts file, no wildcard for use
+ - cannot use [0-9] or *
+ - Add filenode instead
+
+Error Log:
+avc: denied { read } for comm="Binder:254_2" name="wakeup4" dev="sysfs" ino=21582 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:254_2" name="wakeup2" dev="sysfs" ino=21313 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_rtc:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:254_2" name="wakeup5" dev="sysfs" ino=27168 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_net:s0 tclass=dir permissive=0
+avc: denied { read } for comm="Binder:254_2" name="wakeup3" dev="sysfs" ino=21492 scontext=u:r:system_suspend:s0 tcontext=u:object_r:sysfs_batteryinfo:s0 tclass=dir permissive=0
+
+Change-Id: Ic3b83cdd7856fa8572e14e73e57592baaf6ac5ce
+
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+index f0755433..ce149099 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/genfs_contexts
+@@ -16,10 +16,14 @@ genfscon sysfs /devices/platform/soc@0/33c00000.pcie/pci0000:00/0000:00:00.0/000
+ 
+ # android.system.suspend@1.0-service
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net/eth0/wakeup0                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net/eth0/wakeup5                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup                         u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup                           u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup2                 u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/wakeup3                 u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/virtual/power_supply/battery/wakeup3                                                                       u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/battery/wakeup4                                                                       u:object_r:sysfs_wakeup:s0
++genfscon sysfs /devices/virtual/power_supply/usb/wakeup4                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/virtual/power_supply/usb/wakeup5                                                                           u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup6    u:object_r:sysfs_wakeup:s0
+ genfscon sysfs /devices/platform/soc@0/33800000.pcie/pci0000:00/0000:00:00.0/0000:01:00.0/wakeup/wakeup7                           u:object_r:sysfs_wakeup:s0

@@ -1,0 +1,78 @@
+293b09e24e George.Huang 2020-09-17
+
+AOS-334: align spl related partitions size to 4KB
+
+- The partition size should also be multiple of 4 KiB
+  which request by OTA generation process
+
+- Before this change, the size of spl_[a|b] and spl_bak_[a|b]
+  aren not 4K alignment.
+  spl_length = 2M - 33K =  2015K = 503.75 x 4K
+
+- So adjust spl_length (2015K) to be spl_length_4k_aligned (2012K)
+  spl_length_4k_aligned = floor(2015K / 4K) x 4K = 2012K = 503 x 4K
+
+Change-Id: I7e1a190357daa4c55d26e20b35bfc198d9678b65
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 8938335c58..be1e022826 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -237,23 +237,23 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	ptable[PTN_ALL_INDEX].partition_id = user_partition;
+ 	strcpy(ptable[PTN_ALL_INDEX].fstype, "device");
+ 
+-	/* Bootloader aka spl_a */
++	unsigned int factor = (4096/512);
+ 	unsigned int spl_start = bootloader_mmc_offset() / dev_desc->blksz;
++	unsigned int spl_length = (ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++	unsigned int spl_length_4k_aligned = (unsigned int)(spl_length / factor) * factor;
++
++	/* Bootloader aka spl_a */
+ 	strcpy(ptable[PTN_BOOTLOADER_INDEX].name, FASTBOOT_PARTITION_BOOTLOADER);
+-	ptable[PTN_BOOTLOADER_INDEX].start =
+-				spl_start;
+-	ptable[PTN_BOOTLOADER_INDEX].length =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++	ptable[PTN_BOOTLOADER_INDEX].start = spl_start;
++	ptable[PTN_BOOTLOADER_INDEX].length = spl_length_4k_aligned;
+ 	ptable[PTN_BOOTLOADER_INDEX].partition_id = boot_partition;
+ 	ptable[PTN_BOOTLOADER_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 	strcpy(ptable[PTN_BOOTLOADER_INDEX].fstype, "raw");
+ 
+ 	/* Bootloader1 aka spl_b */
+ 	strcpy(ptable[PTN_BOOTLOADER1_INDEX].name, FASTBOOT_PARTITION_BOOTLOADER1);
+-	ptable[PTN_BOOTLOADER1_INDEX].start =
+-				spl_start;
+-	ptable[PTN_BOOTLOADER1_INDEX].length =
+-				(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++	ptable[PTN_BOOTLOADER1_INDEX].start = spl_start;
++	ptable[PTN_BOOTLOADER1_INDEX].length = spl_length_4k_aligned;
+ 	ptable[PTN_BOOTLOADER1_INDEX].partition_id = boot_partition + 1;
+ 	ptable[PTN_BOOTLOADER1_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 	strcpy(ptable[PTN_BOOTLOADER1_INDEX].fstype, "raw");
+@@ -262,20 +262,16 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	if (is_imx8mq()) {
+ 		/* spl_bak_a */
+ 		strcpy(ptable[PTN_BACKUP_SPL_INDEX].name, FASTBOOT_PARTITION_SPLBACKUP_A);
+-		ptable[PTN_BACKUP_SPL_INDEX].start =
+-					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
+-		ptable[PTN_BACKUP_SPL_INDEX].length =
+-					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX].start = (spl_length + spl_start) + spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX].length = spl_length_4k_aligned;
+ 		ptable[PTN_BACKUP_SPL_INDEX].partition_id = boot_partition;
+ 		ptable[PTN_BACKUP_SPL_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 		strcpy(ptable[PTN_BACKUP_SPL_INDEX].fstype, "raw");
+ 
+ 		/* spl_bak_b */
+ 		strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].name, FASTBOOT_PARTITION_SPLBACKUP_B);
+-		ptable[PTN_BACKUP_SPL_INDEX + 1].start =
+-					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 + spl_start;
+-		ptable[PTN_BACKUP_SPL_INDEX + 1].length =
+-					(ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX + 1].start = (spl_length + spl_start) + spl_start;
++		ptable[PTN_BACKUP_SPL_INDEX + 1].length = spl_length_4k_aligned;
+ 		ptable[PTN_BACKUP_SPL_INDEX + 1].partition_id = boot_partition + 1;
+ 		ptable[PTN_BACKUP_SPL_INDEX + 1].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 		strcpy(ptable[PTN_BACKUP_SPL_INDEX + 1].fstype, "raw");

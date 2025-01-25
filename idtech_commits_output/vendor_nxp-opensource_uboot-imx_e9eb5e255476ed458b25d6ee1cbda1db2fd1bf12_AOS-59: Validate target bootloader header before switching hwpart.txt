@@ -1,0 +1,70 @@
+e9eb5e2554 George.Huang 2020-01-30
+
+AOS-59: Validate target bootloader header before switching hwpart
+
+Change-Id: I5b60a751a7bb58c04722390d1b6c9e3d1c5beca1
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index d1c0ac4969..8f971bfb6e 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -667,13 +667,39 @@ int check_uboot_header(struct mmc *mmc, unsigned long sector) {
+ 	return -1;
+ }
+ 
++/* copied from common/spl/spl_mmc.c */
++/* copied from board/freescale/imx8mn_evk/spl.c */
++#define UBOOT_RAW_SECTOR_OFFSET 0x40
++unsigned long __weak mmc_get_uboot_raw_sector(struct mmc *mmc, size_t blk_offset_uboot)
++{
++	if (blk_offset_uboot == 0)
++		return CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR - UBOOT_RAW_SECTOR_OFFSET;
++
++	return CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR;
++}
++
++int check_bootloader_header(struct mmc *mmc, unsigned long sector) {
++	struct image_header *header = (struct image_header *)(CONFIG_SYS_TEXT_BASE -
++	         sizeof(struct image_header));
++	unsigned long count = 0;
++	count = blk_dread(mmc_get_blk_desc(mmc), sector, 1, header);
++	if (count == 0) {
++		printf("ERROR: Failed to read bootloader header
+");
++		return -1;
++	}
++	if (IS_ENABLED(CONFIG_SPL_LOAD_FIT) && image_get_magic(header) == FDT_MAGIC)
++		return 0;
++
++	return -1;
++}
++
+ int check_hwpart_with_current_slot(void) {
+ 	int mmcc = mmc_get_env_dev();
+ 	struct blk_desc *dev_desc = NULL;
+ 	struct mmc *mmc;
+ 	int hwpart = -1, slot_part = -1;
+ 	size_t target_slot;
+-	size_t blk_offset_uboot = 0;
++	size_t blk_offset_uboot = 0, blk_offset_bootloader = 0;
+ 	AvbABData ab_data, ab_data_orig;
+ 
+ 	mmc = find_mmc_device(mmcc);
+@@ -723,6 +749,13 @@ int check_hwpart_with_current_slot(void) {
+ 		printf("ERROR: Can not find valid uboot header with slot_part=%d
+", slot_part);
+ 		return -1;
+ 	}
++	/* make sure bootloader header equals FDT_MAGIC (0xd00dfeed) */
++	blk_offset_bootloader = (size_t)mmc_get_uboot_raw_sector(mmc, blk_offset_uboot);
++	printf("check_bootloader_header at offset=0x%x blocks with hwpart=%d ...
+", (unsigned int)blk_offset_bootloader, slot_part);
++	if (check_bootloader_header(mmc, blk_offset_bootloader) != 0) {
++		printf("ERROR: Can not find valid bootloader magic with slot_part=%d
+", slot_part);
++		return -1;
++	}
+ 	/* store slot_part */
+ 	printf("Force to set hwpart from %d to %d due to the changed slot
+", hwpart, slot_part);
+ 	mmc_set_part_conf(mmc, (u8)1, (u8)slot_part, (u8)0);

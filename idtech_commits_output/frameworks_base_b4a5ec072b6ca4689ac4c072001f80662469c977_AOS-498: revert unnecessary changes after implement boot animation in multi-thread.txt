@@ -1,0 +1,70 @@
+b4a5ec072b6c AndrewS 2021-01-22
+
+AOS-498: revert unnecessary changes after implement boot animation in multi-thread
+
+Change-Id: I16c2e4d142ac758c120b2ef1baf2e9edbe08c947
+
+diff --git a/services/core/java/com/android/server/display/DisplayManagerService.java b/services/core/java/com/android/server/display/DisplayManagerService.java
+index 11f8401a6e1a..ae4ad0bb4e11 100644
+--- a/services/core/java/com/android/server/display/DisplayManagerService.java
++++ b/services/core/java/com/android/server/display/DisplayManagerService.java
+@@ -1597,8 +1597,7 @@ public final class DisplayManagerService extends SystemService {
+ 
+         // For multiple display, need to configure display for each display device.
+         LogicalDisplay configureDisplay = findLogicalDisplayForDeviceLocked(device);
+-        final boolean displayEnabled = (mWindowManagerInternal == null)?false:mWindowManagerInternal.ismDisplayEnabledLocked();
+-        configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF, displayEnabled);
++        configureDisplay.configureDisplayLocked(t, device, info.state == Display.STATE_OFF);
+ 
+         final Optional<Integer> viewportType = getViewportType(info);
+         if (viewportType.isPresent()) {
+diff --git a/services/core/java/com/android/server/display/LogicalDisplay.java b/services/core/java/com/android/server/display/LogicalDisplay.java
+index 8eebd36b047e..cf272a883a22 100644
+--- a/services/core/java/com/android/server/display/LogicalDisplay.java
++++ b/services/core/java/com/android/server/display/LogicalDisplay.java
+@@ -372,11 +372,9 @@ final class LogicalDisplay {
+      */
+     public void configureDisplayLocked(SurfaceControl.Transaction t,
+             DisplayDevice device,
+-            boolean isBlanked,
+-            boolean displayEnabled) {
++            boolean isBlanked) {
+         // Set the layer stack.
+-        final int selectedLayer = displayEnabled?mLayerStack:0;
+-        device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : selectedLayer);
++        device.setLayerStackLocked(t, isBlanked ? BLANK_LAYER_STACK : mLayerStack);
+ 
+         // Set the color mode and allowed display mode.
+         if (device == mPrimaryDisplayDevice) {
+diff --git a/services/core/java/com/android/server/wm/WindowManagerInternal.java b/services/core/java/com/android/server/wm/WindowManagerInternal.java
+index 94875a759595..315014c1b248 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerInternal.java
++++ b/services/core/java/com/android/server/wm/WindowManagerInternal.java
+@@ -305,11 +305,6 @@ public abstract class WindowManagerInternal {
+     */
+     public abstract boolean isKeyguardShowingAndNotOccluded();
+ 
+-    /**
+-     * @return Whether the display been enabled.
+-     */
+-    public abstract boolean ismDisplayEnabledLocked();
+-
+     /**
+      * Gets the frame of a window given its token.
+      *
+diff --git a/services/core/java/com/android/server/wm/WindowManagerService.java b/services/core/java/com/android/server/wm/WindowManagerService.java
+index c1ed82c455ac..b013ef5ce057 100644
+--- a/services/core/java/com/android/server/wm/WindowManagerService.java
++++ b/services/core/java/com/android/server/wm/WindowManagerService.java
+@@ -7385,11 +7385,6 @@ public class WindowManagerService extends IWindowManager.Stub
+             return WindowManagerService.this.isKeyguardShowingAndNotOccluded();
+         }
+ 
+-        @Override
+-        public boolean ismDisplayEnabledLocked() {
+-            return WindowManagerService.this.mDisplayEnabled;
+-        }
+-
+         @Override
+         public void showGlobalActions() {
+             WindowManagerService.this.showGlobalActions();

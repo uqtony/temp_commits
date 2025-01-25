@@ -1,0 +1,2382 @@
+473bb024dde7 jenkins 2020-06-19
+
+Merge branch 'merge_idt-imx-android-10-dev_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: Ib028e5de36b40e087c6e13dee3780dfcb2180028
+
+diff --cc arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index 24038bb11ec6,f302bc48efa2..ef26d00256d4
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@@ -11,5 -92,1159 +11,1161 @@@
+  
+  / {
+  	model = "IDTECH A300 EVT-0 DEVBOARD EVT-0";
+ -	compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
+  	idt,prod-id = "idt_a300_evt-0_devboard_evt-0";
+++<<<<<<< HEAD
+++=======
++ 
++ 	#define TWO_WIRE_UART1 1
++ 	#if TWO_WIRE_UART1
++ 	chosen {
++ 		bootargs = "console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200";
++ 		stdout-path = &uart1;
++ 	};
++ 	#endif
++ 
++ 	regulators {
++ 		compatible = "simple-bus";
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 
++ 		reg_usdhc2_vmmc: usdhc2_vmmc {
++ 			compatible = "regulator-fixed";
++ 			regulator-name = "VSD_3V3";
++ 			regulator-min-microvolt = <3300000>;
++ 			regulator-max-microvolt = <3300000>;
++ 			gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++ 			off-on-delay = <20000>;
++ 			enable-active-high;
++ 		};
++ 
++ 		reg_gpio_dvfs: regulator-gpio {
++ 			compatible = "regulator-gpio";
++ 			pinctrl-names = "default";
++ 			pinctrl-0 = <&pinctrl_dvfs>;
++ 			regulator-min-microvolt = <900000>;
++ 			regulator-max-microvolt = <1000000>;
++ 			regulator-name = "gpio_dvfs";
++ 			regulator-type = "voltage";
++ 			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++ 			states = <900000 0x1 1000000 0x0>;
++ 		};
++ 	};
++ 
++ 	bt_rfkill {
++ 		compatible = "fsl,mxc_bt_rfkill";
++ 		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++ 		active-low;
++ 		status ="okay";
++ 	};
++ 
++ 	brcmfmac: brcmfmac {
++ 		compatible = "cypress,brcmfmac";
++ 		pinctrl-names = "init", "idle", "default";
++ 		pinctrl-0 = <&pinctrl_wlan_init>;
++ 		pinctrl-1 = <&pinctrl_wlan_init>;
++ 		pinctrl-2 = <&pinctrl_wlan>;
++ 	};
++ 
++ 	sound-rt5640 {
++ 		compatible = "fsl,imx-audio-rt5640";
++ 		model = "rt5640-audio";
++ 		audio-cpu = <&sai2>;
++ 		audio-codec = <&rt5640>;
++ 		audio-routing =
++ 			"Headphone", "HPOL",
++ 			"Headphone", "HPOR",
++ 			"Speaker", "SPOLP",
++ 			"Speaker", "SPOLN",
++ 			"Line Out", "LOUTL",
++ 			"Line Out", "LOUTR",
++ 			"MICBIAS1", "Headphone Mic",
++ 			"IN2P", "MICBIAS1";
++ 		status = "okay";
++ 	};
++ 
++ 	wm8524: wm8524 {
++ 		compatible = "wlf,wm8524";
++ 		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
++ 		clock-names = "mclk";
++ 		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
++ 	};
++ 
++ 	sound-wm8524 {
++ 		compatible = "fsl,imx-audio-wm8524";
++ 		model = "wm8524-audio";
++ 		audio-cpu = <&sai2>;
++ 		audio-codec = <&wm8524>;
++ 		audio-routing =
++ 			"Line Out Jack", "LINEVOUTL",
++ 			"Line Out Jack", "LINEVOUTR";
++ 		status = "disabled";
++ 	};
++ 
++ 	sound-hdmi {
++ 		compatible = "fsl,imx8mq-evk-cdnhdmi",
++ 				"fsl,imx-audio-cdnhdmi";
++ 		model = "imx-audio-hdmi";
++ 		audio-cpu = <&sai4>;
++ 		protocol = <1>;
++ 		hdmi-out;
++ 		constraint-rate = <44100>,
++ 				<88200>,
++ 				<176400>,
++ 				<32000>,
++ 				<48000>,
++ 				<96000>,
++ 				<192000>;
++ 	};
++ 
++ 	sound-hdmi-arc {
++ 		compatible = "fsl,imx-audio-spdif";
++ 		model = "imx-hdmi-arc";
++ 		spdif-controller = <&spdif2>;
++ 		spdif-in;
++ 	};
++ 
++ 	matrix_keypad {
++ 		compatible = "gpio-matrix-keypad";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_key>;
++ 
++ 		debounce-delay-ms = <5>;
++ 		col-scan-delay-us = <2>;
++ 		row-gpios = <
++ 				&gpio4 20 GPIO_ACTIVE_HIGH
++ 				&gpio4 1 GPIO_ACTIVE_HIGH
++ 				&gpio4 0 GPIO_ACTIVE_HIGH>;
++ 		col-gpios = <
++ 				&gpio4 11 GPIO_ACTIVE_HIGH
++ 				&gpio4 10 GPIO_ACTIVE_HIGH
++ 				&gpio4 22 GPIO_ACTIVE_HIGH
++ 				&gpio4 21 GPIO_ACTIVE_HIGH
++ 				&gpio5 21 GPIO_ACTIVE_HIGH>;
++ 
++ 		linux,keymap = <
++ 				MATRIX_KEY(0x0, 0x0, KEY_1)
++ 				MATRIX_KEY(0x1, 0x0, KEY_2)
++ 				MATRIX_KEY(0x2, 0x0, KEY_3)
++ 				MATRIX_KEY(0x0, 0x1, KEY_4)
++ 				MATRIX_KEY(0x1, 0x1, KEY_5)
++ 				MATRIX_KEY(0x2, 0x1, KEY_6)
++ 				MATRIX_KEY(0x0, 0x2, KEY_7)
++ 				MATRIX_KEY(0x1, 0x2, KEY_8)
++ 				MATRIX_KEY(0x2, 0x2, KEY_9)
++ 				MATRIX_KEY(0x0, 0x3, KEY_NUMERIC_STAR)
++ 				MATRIX_KEY(0x1, 0x3, KEY_0)
++ 				MATRIX_KEY(0x2, 0x3, KEY_NUMERIC_POUND)
++ 				MATRIX_KEY(0x0, 0x4, KEY_BACK)
++ 				MATRIX_KEY(0x1, 0x4, KEY_BACKSPACE)
++ 				MATRIX_KEY(0x2, 0x4, KEY_ENTER)>;
++ 	};
++ 
++ 	backlight0: backlight {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm1 0 50000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <80>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_2 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm2 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_3 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm3 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_4 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm4 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ };
++ 
++ &clk {
++ 	assigned-clocks = <&clk IMX8MQ_AUDIO_PLL1>, <&clk IMX8MQ_AUDIO_PLL2>;
++ 	assigned-clock-rates = <786432000>, <722534400>;
++ };
++ 
++ &iomuxc {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_hog>;
++ 
++ 	imx8mq-evk {
++ 		pinctrl_hog: hoggrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_DATA06_GPIO3_IO12		0x19  //GPIO_05, DNI
++ 				MX8MQ_IOMUXC_SAI5_MCLK_GPIO3_IO25		0x51  //LTE_VBAT_EN
++ 				MX8MQ_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x51  //LTE_AP_READY
++ 				MX8MQ_IOMUXC_SAI5_RXC_GPIO3_IO20		0x51  //LTE_PWR_KEY
++ 				MX8MQ_IOMUXC_SAI3_RXFS_GPIO4_IO28		0x19  //LTE_RI
++ 				MX8MQ_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x19  //LTE_RESET_N
++ 				MX8MQ_IOMUXC_GPIO1_IO14_GPIO1_IO14		0x51  //LTE_VBUS_DET
++ 				MX8MQ_IOMUXC_SAI3_RXC_GPIO4_IO29		0x19  //HUB_RESET
++ 				MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10		0x19  //GPIO_03, VL53L1X_INT
++ 				MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13		0x19  //GPIO_06, LSM303_INT1
++ 				//MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15		0x19  //USB1_SS_SEL, LSM303_INT2
++ 				MX8MQ_IOMUXC_NAND_DATA03_GPIO3_IO9		0x19  //LTE_EXT_CODEC_EN, INT_MAG
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi1_pwn: csi1_pwn_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3		0x19
++ 			>;
++ 		};
++ 		pinctrl_csi2_pwn: csi2_pwn_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi_rst: csi_rst_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi_clk: csi_clk_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
++ 			>;
++ 		};
++ 
++ 		pinctrl_fec1: fec1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC		0x3
++ 				MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO	0x23
++ 				MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x1f
++ 				MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x91
++ 				MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x91
++ 				MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x91
++ 				MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x91
++ 				MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x1f
++ 				MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x91
++ 				MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
++ 				MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
++ 				MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9	0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c1: i2c1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
++ 				MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c2: i2c2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL			0x40000067
++ 				MX8MQ_IOMUXC_I2C2_SDA_I2C2_SDA			0x40000067
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c3: i2c3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C3_SCL_I2C3_SCL			0x40000067
++ 				MX8MQ_IOMUXC_I2C3_SDA_I2C3_SDA			0x40000067
++ 			>;
++ 		};
++ 
++ 		pinctrl_pcie0: pcie0grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C4_SCL_PCIE1_CLKREQ_B	0x76 /* open drain, pull up */
++ 				MX8MQ_IOMUXC_SAI5_RXD1_GPIO3_IO22		0x16  //PCIE_nRST
++ 				MX8MQ_IOMUXC_SAI5_RXD2_GPIO3_IO23		0x16  //PCIE_nDIS
++ 			>;
++ 		};
++ 
++ 		pinctrl_ecspi1: ecspi1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_MISO_ECSPI1_MISO		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_ecspi2: ecspi2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK	0x82
++ 				MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI	0x82
++ 				MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO	0x82
++ 			>;
++ 		};
++ 
++ 		pinctrl_dvfs: dvfsgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13	0x16  //PWM_LED
++ 			>;
++ 		};
++ 
++ 		pinctrl_typec: typecgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15	0x16
++ 				MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3	0x17059  //TCPC_nINT
++ 			>;
++ 		};
++ 
++ 		#if TWO_WIRE_UART1
++ 		pinctrl_uart1: uart1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX	0x49
++ 			>;
++ 		};
++ 
++ 		pinctrl_uart3: uart3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART3_RXD_UART3_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART3_TXD_UART3_DCE_TX	0x49
++ 			>;
++ 		};
++ 		#else
++ 		pinctrl_uart1: uart1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX	0x49
++ 				MX8MQ_IOMUXC_UART3_RXD_UART1_DCE_CTS_B	0x49
++ 				MX8MQ_IOMUXC_UART3_TXD_UART1_DCE_RTS_B	0x49
++ 			>;
++ 		};
++ 		#endif
++ 
++ 		pinctrl_uart2: uart2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART2_RXD_UART2_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART2_TXD_UART2_DCE_TX	0x49
++ 				MX8MQ_IOMUXC_UART4_RXD_UART2_DCE_CTS_B	0x49
++ 				MX8MQ_IOMUXC_UART4_TXD_UART2_DCE_RTS_B	0x49
++ 				MX8MQ_IOMUXC_NAND_CLE_GPIO3_IO5		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1: usdhc1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE 		0x83
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x8d
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xcd
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x8d
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x9f
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xdf
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x9f
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_gpio: usdhc2grpgpio {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12	0x41
++ 				MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19	0x41
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2: usdhc2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x8d
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xcd
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x9f
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xdf
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_sai2: sai2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI2_TXFS_SAI2_TX_SYNC		0xd6  //I2S_LRCLK
++ 				MX8MQ_IOMUXC_SAI2_TXC_SAI2_TX_BCLK		0xd6  //I2S_BCLK
++ 				MX8MQ_IOMUXC_SAI2_MCLK_SAI2_MCLK		0xd6  //I2S_MCLK
++ 				MX8MQ_IOMUXC_SAI2_TXD0_SAI2_TX_DATA0		0xd6  //I2S_DACDAT
++ 				MX8MQ_IOMUXC_SAI2_RXD0_SAI2_RX_DATA0		0xd6  //I2S_ADCDAT
++ 			>;
++ 		};
++ 
++ 		pinctrl_wdog: wdoggrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B 0xc6
++ 			>;
++ 		};
++ 
++ 		pinctrl_wlan: wlangrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x16
++ 			>;
++ 		};
++ 
++ 		pinctrl_wlan_init: wlan_initgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO00_GPIO1_IO0		0x16
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c1_dsi_ts_int: dsi_ts_int {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_WE_B_GPIO3_IO17		0x19  //DSI_TS_nINT
++ 				MX8MQ_IOMUXC_NAND_WP_B_GPIO3_IO18		0x19  //DSI_TS_RESET
++ 			>;
++ 		};
++ 
++ 		pinctrl_mipi_dsi_en: mipi_dsi_en {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19  //DSI_RESET
++ 				MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  //DSI_TE
++ 
++ 			>;
++ 		};
++ 
++ 		pinctrl_key: keygrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI1_MCLK_GPIO4_IO20		0x19  //KeySense_1, intput, row
++ 				MX8MQ_IOMUXC_SAI1_RXC_GPIO4_IO1			0x19  //KeySense_2
++ 				MX8MQ_IOMUXC_SAI1_RXFS_GPIO4_IO0		0x19  //KeySense_3
++ 				MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11		0x19  //KeyScan_1, output, col
++ 				MX8MQ_IOMUXC_SAI1_TXFS_GPIO4_IO10		0x19  //KeyScan_2
++ 				MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19  //KeyScan_3
++ 				MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19  //KeyScan_4
++ 				MX8MQ_IOMUXC_I2C4_SDA_GPIO5_IO21		0x19  //KeyScan_5
++ 			>;
++ 		};
++ 
++ 		pinctrl_pca9539: pca9539grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6		0x19  //GPIO_01, nINT
++ 				MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1		0x51  //GPIO_02, nRST
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm1: pwm1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_EXT_CLK_PWM1_OUT		0x06  //PWM1
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm2: pwm2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_RX_PWM2_OUT			0x06  //PWM2
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm3: pwm3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_TX_PWM3_OUT			0x06  //PWM3
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm4: pwm4grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI3_MCLK_PWM4_OUT			0x06  //PWM4
++ 			>;
++ 		};
++ 	};
++ };
++ 
++ &fec1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_fec1>;
++ 	phy-mode = "rgmii-id";
++ 	phy-handle = <&ethphy0>;
++ 	fsl,magic-packet;
++ 	status = "okay";
++ 
++ 	mdio {
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 
++ 		ethphy0: ethernet-phy@0 {
++ 			compatible = "ethernet-phy-ieee802.3-c22";
++ 			reg = <0>;
++ 			at803x,led-act-blind-workaround;
++ 			at803x,eee-disabled;
++ 		};
++ 	};
++ };
++ 
++ &ecspi1 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_ecspi1>;
++ 	fsl,spi-num-chipselects = <1>;
++ 	dmas = <&sdma2 10 24 0>, <&sdma2 11 24 0>;
++ 	dma-names = "rx", "tx";
++ 	status = "okay";
++ 
++ 	/* for ttyIDG & ttyIDGV5 device entry */
++ 	idg_spi@0 {
++ 		reg = <0>;
++ 		compatible = "idtech,idg-spi";
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
++ 		spi-max-frequency = <4000000>; /* 4 MHz */
++ 		spi-bits-per-word = <8>; /* 8 bits */
++ 		spi-working-mode = <0>; /* SPI_MODE_0 */
++ 		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
++ 		/* idg-keep-sense */
++ 		status = "okay";
++ 	};
++ };
++ 
++ &ecspi2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_ecspi2>;
++ 	fsl,spi-num-chipselects = <1>;
++ 	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
++ 	status = "okay";
++ };
++ 
++ &i2c1 {
++ 	clock-frequency = <400000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c1>;
++ 	status = "okay";
++ 
++ 	pmic: pfuze100@8 {
++ 		compatible = "fsl,pfuze100";
++ 		reg = <0x08>;
++ 
++ 		regulators {
++ 			sw1a_reg: sw1ab {
++ 				regulator-min-microvolt = <300000>;
++ 				regulator-max-microvolt = <1875000>;
++ 			};
++ 
++ 			sw1c_reg: sw1c {
++ 				regulator-min-microvolt = <300000>;
++ 				regulator-max-microvolt = <1875000>;
++ 			};
++ 
++ 			sw2_reg: sw2 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			sw3a_reg: sw3ab {
++ 				regulator-min-microvolt = <400000>;
++ 				regulator-max-microvolt = <1975000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			sw4_reg: sw4 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			swbst_reg: swbst {
++ 				regulator-min-microvolt = <5000000>;
++ 				regulator-max-microvolt = <5150000>;
++ 			};
++ 
++ 			snvs_reg: vsnvs {
++ 				regulator-min-microvolt = <1000000>;
++ 				regulator-max-microvolt = <3000000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vref_reg: vrefddr {
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen1_reg: vgen1 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <1550000>;
++ 			};
++ 
++ 			vgen2_reg: vgen2 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <1550000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen3_reg: vgen3 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen4_reg: vgen4 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen5_reg: vgen5 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen6_reg: vgen6 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 			};
++ 		};
++ 	};
++ 
++ 	tp_ili9881h:ili9881h_mipi1@41{
++ 		compatible = "ili9881h_i2c";
++ 		reg = <0x41>;
++ 		pinctrl-names = "default", "gpio";
++ 		pinctrl-0 = <&pinctrl_i2c1_dsi_ts_int>;
++ 		ili9881h,interrupts-gpio = <&gpio3 17 IRQ_TYPE_EDGE_RISING>;
++ 		ili9881h,reset-gpio = <&gpio3 18 GPIO_ACTIVE_HIGH>;
++ 		status = "okay";
++ 	};
++ };
++ 
++ &i2c2 {
++ 	clock-frequency = <100000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c2>;
++ 	status = "okay";
++ 
++ 	ov2685_mipi: ov2685_mipi@10 {
++ 		compatible = "ovti,ov2685_mipi";
++ 		reg = <0x10>;
++ 		status = "okay";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi_clk>;
++ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		clock-names = "csi_mclk";
++ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
++ 		assigned-clock-rates = <20000000>;
++ 		csi_id = <1>;
++ 		pwn-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
++ 		mclk = <20000000>;
++ 		mclk_source = <0>;
++ 		port {
++ 			ov2685_mipi2_ep: endpoint {
++ 				remote-endpoint = <&mipi2_sensor_ep>;
++ 			};
++ 		};
++ 	};
++ 
++ 	ov5640_mipi: ov5640_mipi@3c {
++ 		compatible = "ovti,ov5640_mipi";
++ 		reg = <0x3c>;
++ 		status = "okay";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_csi1_pwn>, <&pinctrl_csi_rst>;
++ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		clock-names = "csi_mclk";
++ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
++ 		assigned-clock-rates = <20000000>;
++ 		csi_id = <0>;
++ 		pwn-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
++ 		rst-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
++ 		mclk = <20000000>;
++ 		mclk_source = <0>;
++ 		port {
++ 			ov5640_mipi1_ep: endpoint {
++ 				remote-endpoint = <&mipi1_sensor_ep>;
++ 			};
++ 		};
++ 	};
++ };
++ 
++ &i2c3 {
++ 	clock-frequency = <100000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c3>;
++ 	status = "okay";
++ 
++ 	rt5640: rt5640@1c {
++ 		compatible = "realtek,rt5640";
++ 		reg = <0x1c>;
++ 		 /* For headphone detection: AUD_nMUTE, ALC5640_INT */
++ 		interrupt-parent = <&gpio1>;
++ 		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
++ 		realtek,jack-detect-source = <2>; /* JD1 */
++ 	};
++ 
++ 	lsm303agr_acc: lsm303agr_acc@19 {
++ 		compatible = "st,lsm303agr_acc";
++ 		reg = <0x19>;
++ 	};
++ 
++ 	lsm303agr_mag: lsm303agr_mag@1e {
++ 		compatible = "st,lsm303agr_mag";
++ 		reg = <0x1e>;
++ 	};
++ 
++ 	vl53l1x: vl53l1x@29 {
++ 		compatible = "st,vl53l1x";
++ 		reg = <0x29>;
++ 		st,xshut-gpio = <&exp1 3 GPIO_ACTIVE_HIGH>;  // add for gpio control
++ 	};
++ 
++ 	typec_hd3ss3220: hd3ss3220@67 {
++ 		compatible = "ti,hd3ss3220";
++ 		reg = <0x67>;
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++ 	};
++ 
++ 	exp1: gpio@74 {
++ 		compatible = "nxp,pca9539";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_pca9539>;
++ 		reg = <0x74>;
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++ 		#gpio-cells = <2>;
++ 		gpio-controller;
++ 	};
++ };
++ 
++ &pcie0{
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pcie0>;
++ 	disable-gpio = <&gpio3 23 GPIO_ACTIVE_LOW>;
++ 	reset-gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
++ 	ext_osc = <1>;
++ 	status = "okay";
++ };
++ 
++ #if TWO_WIRE_UART1
++ &uart1 { /* console */
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart1>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	status = "okay";
++ };
++ 
++ &uart3 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart3>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART3>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	status = "okay";
++ };
++ #else
++ &uart1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart1>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	fsl,uart-has-rtscts;
++ 	status = "okay";
++ };
++ #endif
++ 
++ &uart2 { /* BT */
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart2>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_SYS1_PLL_80M>;
++ 	fsl,uart-has-rtscts;
++ 	status = "okay";
++ };
++ 
++ &usdhc1 {
++ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++ 	pinctrl-0 = <&pinctrl_usdhc1>;
++ 	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++ 	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++ 	bus-width = <8>;
++ 	non-removable;
++ 	status = "okay";
++ };
++ 
++ &usdhc2 {
++ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++ 	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
++ 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
++ 	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
++ 	bus-width = <4>;
++ 	cd-gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++ 	vmmc-supply = <&reg_usdhc2_vmmc>;
++ 	status = "okay";
++ };
++ 
++ &usb3_phy0 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_0 {
++ 	status = "okay";
++ 	extcon = <&typec_hd3ss3220>;
++ 	dr_mode = "otg";
++ 	hnp-disable;
++ 	srp-disable;
++ 	adp-disable;
++ };
++ 
++ &usb3_phy1 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_1 {
++ 	status = "okay";
++ 	dr_mode = "host";
++ };
++ 
++ &sai2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_sai2>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SAI2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	clocks = <&clk IMX8MQ_CLK_SAI2_IPG>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_SAI2_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_AUDIO_PLL1_OUT>,
++ 		<&clk IMX8MQ_AUDIO_PLL2_OUT>;
++ 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
++ 	status = "okay";
++ };
++ 
++ &sai4 {
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SAI4>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	clocks = <&clk IMX8MQ_CLK_SAI4_IPG>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_SAI4_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_AUDIO_PLL1_OUT>,
++ 		<&clk IMX8MQ_AUDIO_PLL2_OUT>;
++ 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
++ 	status = "okay";
++ };
++ 
++ &spdif2 {
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	status = "okay";
++ };
++ 
++ &gpu_pd {
++ 	power-supply = <&sw1a_reg>;
++ };
++ 
++ &vpu_pd {
++ 	power-supply = <&sw1c_reg>;
++ };
++ 
++ &gpu {
++ 	gpu-noc-priority = <0x80000600>;
++ 	status = "okay";
++ };
++ 
++ &vpu {
++ 	status = "okay";
++ };
++ 
++ &wdog1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_wdog>;
++ 	fsl,ext-reset-output;
++ 	status = "okay";
++ };
++ 
++ &mu {
++ 	status = "okay";
++ };
++ 
++ &A53_0 {
++ 	operating-points = <
++ 		/* kHz    uV */
++ 		1500000 1000000
++ 		1300000 1000000
++ 		1000000 900000
++ 		800000  900000
++ 	>;
++ 	dc-supply = <&reg_gpio_dvfs>;
++ };
++ 
++ &hdmi {
++ 	status = "okay";
++ };
++ 
++ &dcss {
++ 	status = "okay";
++ 	disp-dev = "hdmi_disp";
++ };
++ 
++ &lcdif {
++ 	status = "okay";
++ 	max-res = <720>, <1280>;
++ 
++ 	port@0 {
++ 		lcdif_mipi_dsi: endpoint {
++ 			remote-endpoint = <&mipi_dsi_in>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_dsi_phy {
++ 	status = "okay";
++ };
++ 
++ &mipi_dsi {
++ 	status = "okay";
++ 	as_bridge;
++ 	sync-pol = <1>;
++ 
++ 	port@1 {
++ 		mipi_dsi_in: endpoint {
++ 			remote-endpoint = <&lcdif_mipi_dsi>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_dsi_bridge {
++ 	status = "okay";
++ 
++ 	panel@0 {
++ 		compatible = "ilitek,ili9881cc";
++ 		reg = <0>;
++ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++ 		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++ 		dsi-lanes = <4>;
++ 		video-mode = <2>;	/* 0: burst mode
++ 							 * 1: non-burst mode with sync event
++ 							 * 2: non-burst mode with sync pulse
++ 							 */
++ 		panel-width-mm = <63>;
++ 		panel-height-mm = <111>;
++ 
++ 		display-timings {
++ 			timing {
++ 				clock-frequency = <82000000>;
++ 				hactive = <720>;
++ 				vactive = <1280>;
++ 				hfront-porch = <92>;
++ 				hsync-len = <20>;
++ 				hback-porch = <80>;
++ 				vfront-porch = <200>;
++ 				vsync-len = <2>;
++ 				vback-porch = <16>;
++ 				hsync-active = <0>;
++ 				vsync-active = <0>;
++ 				de-active = <0>;
++ 				pixelclk-active = <0>;
++ 			};
++ 		};
++ 
++ 		port {
++ 			panel1_in: endpoint {
++ 				remote-endpoint = <&mipi_dsi_bridge_out>;
++ 			};
++ 		};
++ 	};
++ 
++ 	port@2 {
++ 		mipi_dsi_bridge_out: endpoint {
++ 			remote-endpoint = <&panel1_in>;
++ 		};
++ 	};
++ };
++ 
++ &pwm1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm1>;
++ 	status = "okay";
++ };
++ 
++ &pwm2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm2>;
++ 	status = "okay";
++ };
++ 
++ &pwm3 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm3>;
++ 	status = "okay";
++ };
++ 
++ &pwm4 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm4>;
++ 	status = "okay";
++ };
++ 
++ &csi1_bridge {
++ 	fsl,mipi-mode;
++ 	fsl,two-8bit-sensor-mode;
++ 	status = "okay";
++ 
++ 	port {
++ 		csi1_ep: endpoint {
++ 			remote-endpoint = <&csi1_mipi_ep>;
++ 		};
++ 	};
++ };
++ 
++ &csi2_bridge {
++ 	fsl,mipi-mode;
++ 	fsl,two-8bit-sensor-mode;
++ 	status = "okay";
++ 
++ 	port {
++ 		csi2_ep: endpoint {
++ 			remote-endpoint = <&csi2_mipi_ep>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_csi_1 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	status = "okay";
++ 	port {
++ 		mipi1_sensor_ep: endpoint@0 {
++ 			remote-endpoint = <&ov5640_mipi1_ep>;
++ 			data-lanes = <1 2>;
++ 		};
++ 
++ 		csi1_mipi_ep: endpoint@1 {
++ 			remote-endpoint = <&csi1_ep>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_csi_2 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	status = "okay";
++ 	port {
++ 		mipi2_sensor_ep: endpoint@0 {
++ 			remote-endpoint = <&ov2685_mipi2_ep>;
++ 			data-lanes = <1 2>;
++ 		};
++ 
++ 		csi2_mipi_ep: endpoint@1 {
++ 			remote-endpoint = <&csi2_ep>;
++ 		};
++ 	};
++ };
++ 
++ &crypto {
++        status = "disabled";
++ };
++ 
++ &resmem {
++ 	carveout_region: imx_ion@0 {
++ 		compatible = "imx-ion-pool";
++ 		reg = <0x0 0xf6000000 0 0x8000000>;
++ 	};
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  };
+diff --cc arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+index 7e30d65f1999,236710cd8c03..99d1a88b075c
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+@@@ -11,5 -92,1180 +11,1182 @@@
+  
+  / {
+  	model = "IDTECH A300 EVT-0 DEVBOARD EVT-1";
+ -	compatible = "fsl,imx8mq-evk", "fsl,imx8mq";
+  	idt,prod-id = "idt_a300_evt-0_devboard_evt-1";
+++<<<<<<< HEAD
+++=======
++ 
++ 	#define TWO_WIRE_UART1 1
++ 	#if TWO_WIRE_UART1
++ 	chosen {
++ 		bootargs = "console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200";
++ 		stdout-path = &uart1;
++ 	};
++ 	#endif
++ 
++ 	regulators {
++ 		compatible = "simple-bus";
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 
++ 		reg_usdhc2_vmmc: usdhc2_vmmc {
++ 			compatible = "regulator-fixed";
++ 			regulator-name = "VSD_3V3";
++ 			regulator-min-microvolt = <3300000>;
++ 			regulator-max-microvolt = <3300000>;
++ 			gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++ 			off-on-delay = <20000>;
++ 			enable-active-high;
++ 		};
++ 
++ 		reg_gpio_dvfs: regulator-gpio {
++ 			compatible = "regulator-gpio";
++ 			pinctrl-names = "default";
++ 			pinctrl-0 = <&pinctrl_dvfs>;
++ 			regulator-min-microvolt = <900000>;
++ 			regulator-max-microvolt = <1000000>;
++ 			regulator-name = "gpio_dvfs";
++ 			regulator-type = "voltage";
++ 			gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++ 			states = <900000 0x1 1000000 0x0>;
++ 		};
++ 	};
++ 
++ 	bt_rfkill {
++ 		compatible = "fsl,mxc_bt_rfkill";
++ 		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++ 		active-low;
++ 		status ="okay";
++ 	};
++ 
++ 	brcmfmac: brcmfmac {
++ 		compatible = "cypress,brcmfmac";
++ 		pinctrl-names = "init", "idle", "default";
++ 		pinctrl-0 = <&pinctrl_wlan_init>;
++ 		pinctrl-1 = <&pinctrl_wlan_init>;
++ 		pinctrl-2 = <&pinctrl_wlan>;
++ 	};
++ 
++ 	sound-rt5640 {
++ 		compatible = "fsl,imx-audio-rt5640";
++ 		model = "rt5640-audio";
++ 		audio-cpu = <&sai2>;
++ 		audio-codec = <&rt5640>;
++ 		audio-routing =
++ 			"Headphone", "HPOL",
++ 			"Headphone", "HPOR",
++ 			"Speaker", "SPOLP",
++ 			"Speaker", "SPOLN",
++ 			"Line Out", "LOUTL",
++ 			"Line Out", "LOUTR",
++ 			"MICBIAS1", "Headphone Mic",
++ 			"IN2P", "MICBIAS1";
++ 		status = "okay";
++ 	};
++ 
++ 	wm8524: wm8524 {
++ 		compatible = "wlf,wm8524";
++ 		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
++ 		clock-names = "mclk";
++ 		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
++ 	};
++ 
++ 	sound-wm8524 {
++ 		compatible = "fsl,imx-audio-wm8524";
++ 		model = "wm8524-audio";
++ 		audio-cpu = <&sai2>;
++ 		audio-codec = <&wm8524>;
++ 		audio-routing =
++ 			"Line Out Jack", "LINEVOUTL",
++ 			"Line Out Jack", "LINEVOUTR";
++ 		status = "disabled";
++ 	};
++ 
++ 	sound-hdmi {
++ 		compatible = "fsl,imx8mq-evk-cdnhdmi",
++ 				"fsl,imx-audio-cdnhdmi";
++ 		model = "imx-audio-hdmi";
++ 		audio-cpu = <&sai4>;
++ 		protocol = <1>;
++ 		hdmi-out;
++ 		constraint-rate = <44100>,
++ 				<88200>,
++ 				<176400>,
++ 				<32000>,
++ 				<48000>,
++ 				<96000>,
++ 				<192000>;
++ 	};
++ 
++ 	sound-hdmi-arc {
++ 		compatible = "fsl,imx-audio-spdif";
++ 		model = "imx-hdmi-arc";
++ 		spdif-controller = <&spdif2>;
++ 		spdif-in;
++ 	};
++ 
++ 	matrix_keypad {
++ 		compatible = "gpio-matrix-keypad";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_key>;
++ 
++ 		debounce-delay-ms = <5>;
++ 		col-scan-delay-us = <2>;
++ 		row-gpios = <
++ 				&gpio4 20 GPIO_ACTIVE_HIGH
++ 				&gpio4 1 GPIO_ACTIVE_HIGH
++ 				&gpio4 0 GPIO_ACTIVE_HIGH>;
++ 		col-gpios = <
++ 				&gpio4 11 GPIO_ACTIVE_HIGH
++ 				&gpio4 10 GPIO_ACTIVE_HIGH
++ 				&gpio4 22 GPIO_ACTIVE_HIGH
++ 				&gpio4 21 GPIO_ACTIVE_HIGH
++ 				&gpio5 21 GPIO_ACTIVE_HIGH>;
++ 
++ 		linux,keymap = <
++ 				MATRIX_KEY(0x0, 0x0, KEY_1)
++ 				MATRIX_KEY(0x1, 0x0, KEY_2)
++ 				MATRIX_KEY(0x2, 0x0, KEY_3)
++ 				MATRIX_KEY(0x0, 0x1, KEY_4)
++ 				MATRIX_KEY(0x1, 0x1, KEY_5)
++ 				MATRIX_KEY(0x2, 0x1, KEY_6)
++ 				MATRIX_KEY(0x0, 0x2, KEY_7)
++ 				MATRIX_KEY(0x1, 0x2, KEY_8)
++ 				MATRIX_KEY(0x2, 0x2, KEY_9)
++ 				MATRIX_KEY(0x0, 0x3, KEY_NUMERIC_STAR)
++ 				MATRIX_KEY(0x1, 0x3, KEY_0)
++ 				MATRIX_KEY(0x2, 0x3, KEY_NUMERIC_POUND)
++ 				MATRIX_KEY(0x0, 0x4, KEY_BACK)
++ 				MATRIX_KEY(0x1, 0x4, KEY_BACKSPACE)
++ 				MATRIX_KEY(0x2, 0x4, KEY_ENTER)>;
++ 	};
++ 
++ 	backlight0: backlight {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm1 0 50000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <80>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_2 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm2 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_3 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm3 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ 
++ 	pwm_4 {
++ 		compatible = "pwm-backlight";
++ 		pwms = <&pwm4 0 1000000 0>;
++ 		brightness-levels = <	0  1  2  3  4  5  6  7  8  9
++ 					10 11 12 13 14 15 16 17 18 19
++ 					20 21 22 23 24 25 26 27 28 29
++ 					30 31 32 33 34 35 36 37 38 39
++ 					40 41 42 43 44 45 46 47 48 49
++ 					50 51 52 53 54 55 56 57 58 59
++ 					60 61 62 63 64 65 66 67 68 69
++ 					70 71 72 73 74 75 76 77 78 79
++ 					80 81 82 83 84 85 86 87 88 89
++ 					90 91 92 93 94 95 96 97 98 99
++ 					100>;
++ 		default-brightness-level = <0>;
++ 		status = "okay";
++ 	};
++ };
++ 
++ &clk {
++ 	assigned-clocks = <&clk IMX8MQ_AUDIO_PLL1>, <&clk IMX8MQ_AUDIO_PLL2>;
++ 	assigned-clock-rates = <786432000>, <722534400>;
++ };
++ 
++ &iomuxc {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_hog>;
++ 
++ 	imx8mq-evk {
++ 		pinctrl_hog: hoggrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_DATA06_GPIO3_IO12		0x19  //GPIO_05, DNI
++ 				MX8MQ_IOMUXC_SAI5_MCLK_GPIO3_IO25		0x51  //LTE_VBAT_EN
++ 				MX8MQ_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x51  //LTE_AP_READY
++ 				MX8MQ_IOMUXC_SAI5_RXC_GPIO3_IO20		0x51  //LTE_PWR_KEY
++ 				MX8MQ_IOMUXC_SAI3_RXFS_GPIO4_IO28		0x19  //LTE_RI
++ 				MX8MQ_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x19  //LTE_RESET_N
++ 				MX8MQ_IOMUXC_GPIO1_IO14_GPIO1_IO14		0x51  //LTE_VBUS_DET
++ 				MX8MQ_IOMUXC_SAI3_RXC_GPIO4_IO29		0x19  //HUB_RESET
++ 				MX8MQ_IOMUXC_NAND_DATA04_GPIO3_IO10		0x19  //GPIO_03, VL53L1X_INT
++ 				MX8MQ_IOMUXC_NAND_DATA07_GPIO3_IO13		0x19  //GPIO_06, LSM303_INT1
++ 				//MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15		0x19  //USB1_SS_SEL, LSM303_INT2
++ 				MX8MQ_IOMUXC_NAND_DATA03_GPIO3_IO9		0x19  //LTE_EXT_CODEC_EN, INT_MAG
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi1_pwn: csi1_pwn_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3		0x19
++ 			>;
++ 		};
++ 		pinctrl_csi2_pwn: csi2_pwn_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO05_GPIO1_IO5		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi_rst: csi_rst_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO06_GPIO1_IO6		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_csi_clk: csi_clk_grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
++ 			>;
++ 		};
++ 
++ 		pinctrl_fec1: fec1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC		0x3
++ 				MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO	0x23
++ 				MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x1f
++ 				MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x1f
++ 				MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x91
++ 				MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x91
++ 				MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x91
++ 				MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x91
++ 				MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x1f
++ 				MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x91
++ 				MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
++ 				MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
++ 				MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9	0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c1: i2c1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
++ 				MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c2: i2c2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL			0x40000067
++ 				MX8MQ_IOMUXC_I2C2_SDA_I2C2_SDA			0x40000067
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c3: i2c3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C3_SCL_I2C3_SCL			0x40000067
++ 				MX8MQ_IOMUXC_I2C3_SDA_I2C3_SDA			0x40000067
++ 			>;
++ 		};
++ 
++ 		pinctrl_pcie0: pcie0grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_I2C4_SCL_PCIE1_CLKREQ_B	0x76 /* open drain, pull up */
++ 				MX8MQ_IOMUXC_SAI5_RXD1_GPIO3_IO22		0x16  //PCIE_nRST
++ 				MX8MQ_IOMUXC_SAI5_RXD2_GPIO3_IO23		0x16  //PCIE_nDIS
++ 			>;
++ 		};
++ 
++ 		pinctrl_ecspi1: ecspi1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_MISO_ECSPI1_MISO		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK		0x19
++ 				MX8MQ_IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_ecspi2: ecspi2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK	0x82
++ 				MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI	0x82
++ 				MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO	0x82
++ 			>;
++ 		};
++ 
++ 		pinctrl_dvfs: dvfsgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13	0x16  //PWM_LED
++ 			>;
++ 		};
++ 
++ 		pinctrl_typec: typecgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15	0x16
++ 				MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3	0x17059  //TCPC_nINT
++ 			>;
++ 		};
++ 
++ 		#if TWO_WIRE_UART1
++ 		pinctrl_uart1: uart1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX	0x49
++ 			>;
++ 		};
++ 
++ 		pinctrl_uart3: uart3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART3_RXD_UART3_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART3_TXD_UART3_DCE_TX	0x49
++ 			>;
++ 		};
++ 		#else
++ 		pinctrl_uart1: uart1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX	0x49
++ 				MX8MQ_IOMUXC_UART3_RXD_UART1_DCE_CTS_B	0x49
++ 				MX8MQ_IOMUXC_UART3_TXD_UART1_DCE_RTS_B	0x49
++ 			>;
++ 		};
++ 		#endif
++ 
++ 		pinctrl_uart2: uart2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_UART2_RXD_UART2_DCE_RX	0x49
++ 				MX8MQ_IOMUXC_UART2_TXD_UART2_DCE_TX	0x49
++ 				MX8MQ_IOMUXC_UART4_RXD_UART2_DCE_CTS_B	0x49
++ 				MX8MQ_IOMUXC_UART4_TXD_UART2_DCE_RTS_B	0x49
++ 				MX8MQ_IOMUXC_NAND_CLE_GPIO3_IO5		0x19
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1: usdhc1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE 		0x83
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x8d
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xcd
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xcd
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x8d
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x9f
++ 				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xdf
++ 				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xdf
++ 				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x9f
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_gpio: usdhc2grpgpio {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12	0x41
++ 				MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19	0x41
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2: usdhc2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x8d
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xcd
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xcd
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x9f
++ 				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xdf
++ 				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xdf
++ 				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 			>;
++ 		};
++ 
++ 		pinctrl_sai2: sai2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI2_TXFS_SAI2_TX_SYNC		0xd6  //I2S_LRCLK
++ 				MX8MQ_IOMUXC_SAI2_TXC_SAI2_TX_BCLK		0xd6  //I2S_BCLK
++ 				MX8MQ_IOMUXC_SAI2_MCLK_SAI2_MCLK		0xd6  //I2S_MCLK
++ 				MX8MQ_IOMUXC_SAI2_TXD0_SAI2_TX_DATA0		0xd6  //I2S_DACDAT
++ 				MX8MQ_IOMUXC_SAI2_RXD0_SAI2_RX_DATA0		0xd6  //I2S_ADCDAT
++ 			>;
++ 		};
++ 
++ 		pinctrl_wdog: wdoggrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B 0xc6
++ 			>;
++ 		};
++ 
++ 		pinctrl_wlan: wlangrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO00_ANAMIX_REF_CLK_32K	0x16
++ 			>;
++ 		};
++ 
++ 		pinctrl_wlan_init: wlan_initgrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_GPIO1_IO00_GPIO1_IO0		0x16
++ 			>;
++ 		};
++ 
++ 		pinctrl_i2c1_dsi_ts_int: dsi_ts_int {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_WE_B_GPIO3_IO17		0x19  //DSI_TS_nINT
++ 				MX8MQ_IOMUXC_NAND_WP_B_GPIO3_IO18		0x19  //DSI_TS_RESET
++ 			>;
++ 		};
++ 
++ 		pinctrl_mipi_dsi_en: mipi_dsi_en {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19  //DSI_RESET
++ 				MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  //DSI_TE
++ 
++ 			>;
++ 		};
++ 
++ 		pinctrl_key: keygrp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI1_MCLK_GPIO4_IO20		0x19  //KeySense_1, intput, row
++ 				MX8MQ_IOMUXC_SAI1_RXC_GPIO4_IO1			0x19  //KeySense_2
++ 				MX8MQ_IOMUXC_SAI1_RXFS_GPIO4_IO0		0x19  //KeySense_3
++ 				MX8MQ_IOMUXC_SAI1_TXC_GPIO4_IO11		0x19  //KeyScan_1, output, col
++ 				MX8MQ_IOMUXC_SAI1_TXFS_GPIO4_IO10		0x19  //KeyScan_2
++ 				MX8MQ_IOMUXC_SAI2_RXC_GPIO4_IO22		0x19  //KeyScan_3
++ 				MX8MQ_IOMUXC_SAI2_RXFS_GPIO4_IO21		0x19  //KeyScan_4
++ 				MX8MQ_IOMUXC_I2C4_SDA_GPIO5_IO21		0x19  //KeyScan_5
++ 			>;
++ 		};
++ 
++ 		pinctrl_pca9539: pca9539grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_NAND_DATA00_GPIO3_IO6		0x19  //GPIO_01, nINT
++ 				MX8MQ_IOMUXC_GPIO1_IO01_GPIO1_IO1		0x51  //GPIO_02, nRST
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm1: pwm1grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_EXT_CLK_PWM1_OUT		0x06  //PWM1
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm2: pwm2grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_RX_PWM2_OUT			0x06  //PWM2
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm3: pwm3grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SPDIF_TX_PWM3_OUT			0x06  //PWM3
++ 			>;
++ 		};
++ 
++ 		pinctrl_pwm4: pwm4grp {
++ 			fsl,pins = <
++ 				MX8MQ_IOMUXC_SAI3_MCLK_PWM4_OUT			0x06  //PWM4
++ 			>;
++ 		};
++ 	};
++ };
++ 
++ &fec1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_fec1>;
++ 	phy-mode = "rgmii-id";
++ 	phy-handle = <&ethphy0>;
++ 	fsl,magic-packet;
++ 	status = "okay";
++ 
++ 	mdio {
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 
++ 		ethphy0: ethernet-phy@0 {
++ 			compatible = "ethernet-phy-ieee802.3-c22";
++ 			reg = <0>;
++ 			at803x,led-act-blind-workaround;
++ 			at803x,eee-disabled;
++ 		};
++ 	};
++ };
++ 
++ &ecspi1 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_ecspi1>;
++ 	fsl,spi-num-chipselects = <1>;
++ 	dmas = <&sdma2 10 24 0>, <&sdma2 11 24 0>;
++ 	dma-names = "rx", "tx";
++ 	status = "okay";
++ 
++ 	/* for ttyIDG & ttyIDGV5 device entry */
++ 	idg_spi@0 {
++ 		reg = <0>;
++ 		compatible = "idtech,idg-spi";
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
++ 		spi-max-frequency = <4000000>; /* 4 MHz */
++ 		spi-bits-per-word = <8>; /* 8 bits */
++ 		spi-working-mode = <0>; /* SPI_MODE_0 */
++ 		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
++ 		/* idg-keep-sense */
++ 		status = "okay";
++ 	};
++ };
++ 
++ &ecspi2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_ecspi2>;
++ 	fsl,spi-num-chipselects = <1>;
++ 	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
++ 	status = "okay";
++ };
++ 
++ &i2c1 {
++ 	clock-frequency = <400000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c1>;
++ 	status = "okay";
++ 
++ 	pmic: pfuze100@8 {
++ 		compatible = "fsl,pfuze100";
++ 		reg = <0x08>;
++ 
++ 		regulators {
++ 			sw1a_reg: sw1ab {
++ 				regulator-min-microvolt = <300000>;
++ 				regulator-max-microvolt = <1875000>;
++ 			};
++ 
++ 			sw1c_reg: sw1c {
++ 				regulator-min-microvolt = <300000>;
++ 				regulator-max-microvolt = <1875000>;
++ 			};
++ 
++ 			sw2_reg: sw2 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			sw3a_reg: sw3ab {
++ 				regulator-min-microvolt = <400000>;
++ 				regulator-max-microvolt = <1975000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			sw4_reg: sw4 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			swbst_reg: swbst {
++ 				regulator-min-microvolt = <5000000>;
++ 				regulator-max-microvolt = <5150000>;
++ 			};
++ 
++ 			snvs_reg: vsnvs {
++ 				regulator-min-microvolt = <1000000>;
++ 				regulator-max-microvolt = <3000000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vref_reg: vrefddr {
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen1_reg: vgen1 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <1550000>;
++ 			};
++ 
++ 			vgen2_reg: vgen2 {
++ 				regulator-min-microvolt = <800000>;
++ 				regulator-max-microvolt = <1550000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen3_reg: vgen3 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen4_reg: vgen4 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen5_reg: vgen5 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 				regulator-always-on;
++ 			};
++ 
++ 			vgen6_reg: vgen6 {
++ 				regulator-min-microvolt = <1800000>;
++ 				regulator-max-microvolt = <3300000>;
++ 			};
++ 		};
++ 	};
++ 
++ 	tp_goodix:gt911_mipi1@5d{
++ 		compatible = "goodix,gt911";
++ 		reg = <0x5d>;
++ 		status = "okay";
++ 
++ 		irq-gpio = <&gpio3 17 IRQ_TYPE_EDGE_RISING>;
++ 		reset-gpio = <&gpio3 18 GPIO_ACTIVE_HIGH>;
++ 		irq-flags = <2>;
++ 
++ 		touchscreen-max-id = <3>;
++ 		touchscreen-size-x = <720>;
++ 		touchscreen-size-y = <1280>;
++ 		touchscreen-max-w = <512>;
++ 		touchscreen-max-p = <512>;
++ 		touchscreen-key-map = <172>, <158>; /*KEY_HOMEPAGE=172, KEY_BACK=158,KEY_MENU=139*/
++ 
++ 		goodix,slide-wakeup = <0>;
++ 		goodix,type-a-report = <0>;
++ 		goodix,driver-send-cfg = <0>;
++ 		goodix,resume-in-workqueue = <0>;
++ 		goodix,int-sync = <1>;
++ 		goodix,swap-x2y = <0>;
++ 		goodix,esd-protect = <1>;
++ 		goodix,auto-update-cfg = <0>;
++ 		goodix,power-off-sleep = <0>;
++ 		goodix,pen-suppress-finger = <0>;
++ 		goodix,cfg-group0 = [
++ 			53 D0 02 00 05 05 F5 D5 21 48 2D 0F 5A 41 0E 05 00 00 32 32 20 00 05 14 14 1A 14 8B 2B 00
++ 		];
++ 	};
++ };
++ 
++ &i2c2 {
++ 	clock-frequency = <100000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c2>;
++ 	status = "okay";
++ 
++ 	ov2685_mipi: ov2685_mipi@10 {
++ 		compatible = "ovti,ov2685_mipi";
++ 		reg = <0x10>;
++ 		status = "okay";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_csi2_pwn>, <&pinctrl_csi_clk>;
++ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		clock-names = "csi_mclk";
++ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
++ 		assigned-clock-rates = <20000000>;
++ 		csi_id = <1>;
++ 		pwn-gpios = <&gpio1 5 GPIO_ACTIVE_LOW>;
++ 		mclk = <20000000>;
++ 		mclk_source = <0>;
++ 		port {
++ 			ov2685_mipi2_ep: endpoint {
++ 				remote-endpoint = <&mipi2_sensor_ep>;
++ 			};
++ 		};
++ 	};
++ 
++ 	ov5640_mipi: ov5640_mipi@3c {
++ 		compatible = "ovti,ov5640_mipi";
++ 		reg = <0x3c>;
++ 		status = "okay";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_csi1_pwn>, <&pinctrl_csi_rst>;
++ 		clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		clock-names = "csi_mclk";
++ 		assigned-clocks = <&clk IMX8MQ_CLK_CLKO2>;
++ 		assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_200M>;
++ 		assigned-clock-rates = <20000000>;
++ 		csi_id = <0>;
++ 		pwn-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
++ 		rst-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
++ 		mclk = <20000000>;
++ 		mclk_source = <0>;
++ 		port {
++ 			ov5640_mipi1_ep: endpoint {
++ 				remote-endpoint = <&mipi1_sensor_ep>;
++ 			};
++ 		};
++ 	};
++ };
++ 
++ &i2c3 {
++ 	clock-frequency = <100000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c3>;
++ 	status = "okay";
++ 
++ 	rt5640: rt5640@1c {
++ 		compatible = "realtek,rt5640";
++ 		reg = <0x1c>;
++ 		 /* For headphone detection: AUD_nMUTE, ALC5640_INT */
++ 		interrupt-parent = <&gpio1>;
++ 		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
++ 		realtek,jack-detect-source = <2>; /* JD1 */
++ 	};
++ 
++ 	lsm303agr_acc: lsm303agr_acc@19 {
++ 		compatible = "st,lsm303agr_acc";
++ 		reg = <0x19>;
++ 	};
++ 
++ 	lsm303agr_mag: lsm303agr_mag@1e {
++ 		compatible = "st,lsm303agr_mag";
++ 		reg = <0x1e>;
++ 	};
++ 
++ 	vl53l1x: vl53l1x@29 {
++ 		compatible = "st,vl53l1x";
++ 		reg = <0x29>;
++ 		st,xshut-gpio = <&exp1 3 GPIO_ACTIVE_HIGH>;  // add for gpio control
++ 	};
++ 
++ 	typec_hd3ss3220: hd3ss3220@67 {
++ 		compatible = "ti,hd3ss3220";
++ 		reg = <0x67>;
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
++ 	};
++ 
++ 	exp1: gpio@74 {
++ 		compatible = "nxp,pca9539";
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_pca9539>;
++ 		reg = <0x74>;
++ 		interrupt-parent = <&gpio3>;
++ 		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++ 		#gpio-cells = <2>;
++ 		gpio-controller;
++ 	};
++ };
++ 
++ &pcie0{
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pcie0>;
++ 	disable-gpio = <&gpio3 23 GPIO_ACTIVE_LOW>;
++ 	reset-gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
++ 	ext_osc = <1>;
++ 	status = "okay";
++ };
++ 
++ #if TWO_WIRE_UART1
++ &uart1 { /* console */
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart1>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	status = "okay";
++ };
++ 
++ &uart3 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart3>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART3>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	status = "okay";
++ };
++ #else
++ &uart1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart1>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
++ 	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++ 	fsl,uart-has-rtscts;
++ 	status = "okay";
++ };
++ #endif
++ 
++ &uart2 { /* BT */
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart2>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_UART2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_SYS1_PLL_80M>;
++ 	fsl,uart-has-rtscts;
++ 	status = "okay";
++ };
++ 
++ &usdhc1 {
++ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++ 	pinctrl-0 = <&pinctrl_usdhc1>;
++ 	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++ 	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++ 	bus-width = <8>;
++ 	non-removable;
++ 	status = "okay";
++ };
++ 
++ &usdhc2 {
++ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++ 	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
++ 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
++ 	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
++ 	bus-width = <4>;
++ 	cd-gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
++ 	vmmc-supply = <&reg_usdhc2_vmmc>;
++ 	status = "okay";
++ };
++ 
++ &usb3_phy0 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_0 {
++ 	status = "okay";
++ 	extcon = <&typec_hd3ss3220>;
++ 	dr_mode = "otg";
++ 	hnp-disable;
++ 	srp-disable;
++ 	adp-disable;
++ };
++ 
++ &usb3_phy1 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_1 {
++ 	status = "okay";
++ 	dr_mode = "host";
++ };
++ 
++ &sai2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_sai2>;
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SAI2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	clocks = <&clk IMX8MQ_CLK_SAI2_IPG>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_SAI2_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_AUDIO_PLL1_OUT>,
++ 		<&clk IMX8MQ_AUDIO_PLL2_OUT>;
++ 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
++ 	status = "okay";
++ };
++ 
++ &sai4 {
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SAI4>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	clocks = <&clk IMX8MQ_CLK_SAI4_IPG>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_SAI4_ROOT>, <&clk IMX8MQ_CLK_DUMMY>,
++ 		<&clk IMX8MQ_CLK_DUMMY>, <&clk IMX8MQ_AUDIO_PLL1_OUT>,
++ 		<&clk IMX8MQ_AUDIO_PLL2_OUT>;
++ 	clock-names = "bus", "mclk0", "mclk1", "mclk2", "mclk3", "pll8k", "pll11k";
++ 	status = "okay";
++ };
++ 
++ &spdif2 {
++ 	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF2>;
++ 	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++ 	assigned-clock-rates = <24576000>;
++ 	status = "okay";
++ };
++ 
++ &gpu_pd {
++ 	power-supply = <&sw1a_reg>;
++ };
++ 
++ &vpu_pd {
++ 	power-supply = <&sw1c_reg>;
++ };
++ 
++ &gpu {
++ 	gpu-noc-priority = <0x80000600>;
++ 	status = "okay";
++ };
++ 
++ &vpu {
++ 	status = "okay";
++ };
++ 
++ &wdog1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_wdog>;
++ 	fsl,ext-reset-output;
++ 	status = "okay";
++ };
++ 
++ &mu {
++ 	status = "okay";
++ };
++ 
++ &A53_0 {
++ 	operating-points = <
++ 		/* kHz    uV */
++ 		1500000 1000000
++ 		1300000 1000000
++ 		1000000 900000
++ 		800000  900000
++ 	>;
++ 	dc-supply = <&reg_gpio_dvfs>;
++ };
++ 
++ &hdmi {
++ 	status = "okay";
++ };
++ 
++ &dcss {
++ 	status = "okay";
++ 	disp-dev = "hdmi_disp";
++ };
++ 
++ &lcdif {
++ 	status = "okay";
++ 	max-res = <720>, <1280>;
++ 
++ 	port@0 {
++ 		lcdif_mipi_dsi: endpoint {
++ 			remote-endpoint = <&mipi_dsi_in>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_dsi_phy {
++ 	status = "okay";
++ };
++ 
++ &mipi_dsi {
++ 	status = "okay";
++ 	as_bridge;
++ 	sync-pol = <1>;
++ 
++ 	port@1 {
++ 		mipi_dsi_in: endpoint {
++ 			remote-endpoint = <&lcdif_mipi_dsi>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_dsi_bridge {
++ 	status = "okay";
++ 
++ 	panel@0 {
++ 		compatible = "himax,hx8394f";
++ 		reg = <0>;
++ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++ 		reset-gpio = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++ 		dsi-lanes = <4>;
++ 		video-mode = <2>;	/* 0: burst mode
++ 					 	* 1: non-burst mode with sync event
++ 					 	* 2: non-burst mode with sync pulse
++ 						 */
++ 		panel-width-mm = <63>;
++ 		panel-height-mm = <111>;
++ 
++ 		display-timings {
++ 			timing {
++ 				clock-frequency = <82000000>;
++ 				hactive = <720>;
++ 				vactive = <1280>;
++ 				hfront-porch = <62>;
++ 				hsync-len = <20>;
++ 				hback-porch = <110>;
++ 				vfront-porch = <200>;
++ 				vsync-len = <2>;
++ 				vback-porch = <16>;
++ 				hsync-active = <0>;
++ 				vsync-active = <0>;
++ 				de-active = <0>;
++ 				pixelclk-active = <0>;
++ 			};
++ 		};
++ 
++ 		port {
++ 			panel1_in: endpoint {
++ 				remote-endpoint = <&mipi_dsi_bridge_out>;
++ 			};
++ 		};
++ 	};
++ 
++ 	port@2 {
++ 		mipi_dsi_bridge_out: endpoint {
++ 			remote-endpoint = <&panel1_in>;
++ 		};
++ 	};
++ };
++ 
++ &pwm1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm1>;
++ 	status = "okay";
++ };
++ 
++ &pwm2 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm2>;
++ 	status = "okay";
++ };
++ 
++ &pwm3 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm3>;
++ 	status = "okay";
++ };
++ 
++ &pwm4 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_pwm4>;
++ 	status = "okay";
++ };
++ 
++ &csi1_bridge {
++ 	fsl,mipi-mode;
++ 	fsl,two-8bit-sensor-mode;
++ 	status = "okay";
++ 
++ 	port {
++ 		csi1_ep: endpoint {
++ 			remote-endpoint = <&csi1_mipi_ep>;
++ 		};
++ 	};
++ };
++ 
++ &csi2_bridge {
++ 	fsl,mipi-mode;
++ 	fsl,two-8bit-sensor-mode;
++ 	status = "okay";
++ 
++ 	port {
++ 		csi2_ep: endpoint {
++ 			remote-endpoint = <&csi2_mipi_ep>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_csi_1 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	status = "okay";
++ 	port {
++ 		mipi1_sensor_ep: endpoint@0 {
++ 			remote-endpoint = <&ov5640_mipi1_ep>;
++ 			data-lanes = <1 2>;
++ 		};
++ 
++ 		csi1_mipi_ep: endpoint@1 {
++ 			remote-endpoint = <&csi1_ep>;
++ 		};
++ 	};
++ };
++ 
++ &mipi_csi_2 {
++ 	#address-cells = <1>;
++ 	#size-cells = <0>;
++ 	status = "okay";
++ 	port {
++ 		mipi2_sensor_ep: endpoint@0 {
++ 			remote-endpoint = <&ov2685_mipi2_ep>;
++ 			data-lanes = <1 2>;
++ 		};
++ 
++ 		csi2_mipi_ep: endpoint@1 {
++ 			remote-endpoint = <&csi2_ep>;
++ 		};
++ 	};
++ };
++ 
++ &crypto {
++        status = "disabled";
++ };
++ 
++ &resmem {
++ 	carveout_region: imx_ion@0 {
++ 		compatible = "imx-ion-pool";
++ 		reg = <0x0 0xf6000000 0 0x8000000>;
++ 	};
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  };
+diff --cc sound/soc/codecs/rt5640.c
+index fc8f2ed5308b,b3ab97ee33e0..6de47bdaaf33
+--- a/sound/soc/codecs/rt5640.c
++++ b/sound/soc/codecs/rt5640.c
+@@@ -2825,9 -2934,11 +2932,16 @@@ static int rt5640_i2c_probe(struct i2c_
+  	regmap_update_bits(rt5640->regmap, RT5640_DUMMY1,
+  				RT5640_MCLK_DET, RT5640_MCLK_DET);
+  
+++<<<<<<< HEAD
+ +	rt5640->hp_mute = true;
+ +	rt5640->irq = i2c->irq;
+++=======
++ 	rt5640->hp_mute = 1;
++ 	rt5640->irq = irq;
++ #if !(IDTECH_CUSTOMIZED_DESIGN) /* no button support yet */
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  	INIT_DELAYED_WORK(&rt5640->bp_work, rt5640_button_press_work);
++ #endif /* no button support yet */
+  	INIT_WORK(&rt5640->jack_work, rt5640_jack_work);
+  
+  	/* Make sure work is stopped on probe-error / remove */

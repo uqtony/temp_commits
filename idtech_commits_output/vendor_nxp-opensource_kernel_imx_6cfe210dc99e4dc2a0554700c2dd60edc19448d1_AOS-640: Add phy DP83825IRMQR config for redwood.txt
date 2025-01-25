@@ -1,0 +1,77 @@
+6cfe210dc99e Jay 2021-06-15
+
+AOS-640: Add phy DP83825IRMQR config for redwood
+
+Add device tree config of DP83825IRMQR phy for redwood.
+
+Change-Id: Ic87f6f2d27f510e651f6d466b1ad7af0469909a1
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 6af6824c669e..4d04e2845d8b 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -382,7 +382,7 @@ opp-800M {
+ &fec1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_fec1>;
+-	phy-mode = "rgmii-id";
++	phy-mode = "rmii";
+ 	phy-handle = <&ethphy0>;
+ 	fsl,magic-packet;
+ 	status = "okay";
+@@ -393,15 +393,9 @@ mdio {
+ 
+ 		ethphy0: ethernet-phy@0 {
+ 			compatible = "ethernet-phy-ieee802.3-c22";
+-			rxen-skew-psec = <0>;
+-			rxd0-skew-psec = <0>;
+-			rxd1-skew-psec = <0>;
+-			rxd2-skew-psec = <0>;
+-			rxd3-skew-psec = <0>;
+-			rxc-skew-psec = <1000>;
+ 			reg = <0>;
+-			at803x,led-act-blind-workaround;
+-			at803x,eee-disabled;
++			interrupt-parent = <&gpio1>;
++			interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
+ 		};
+ 	};
+ };
+@@ -906,21 +900,22 @@ MX8MQ_IOMUXC_GPIO1_IO15_CCMSRCGPCMIX_CLKO2	0x59
+ 
+ 	pinctrl_fec1: fec1grp {
+ 		fsl,pins = <
+-			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC				0x3
+-			MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO			0x23
+-			MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3		0x56
+-			MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2		0x56
+-			MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		0x56
+-			MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		0x56
+-			MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3		0x56
+-			MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2		0x56
+-			MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		0x56
+-			MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		0x56
+-			MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC		0x56
+-			MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC		0x56
+-			MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x56
+-			MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x56
+-			MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9			0x19
++			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3		// ENET_MDC
++			MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO		0x23		// ENET_MDIO
++
++			MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		0x56		// G_R50_ENET_TD0
++			MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		0x56		// G_R50_ENET_TD1
++			MX8MQ_IOMUXC_ENET_TD2_ENET1_TX_CLK		0x4000001f	// G_R50_ENET_TD2
++			MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x56		// G_R50_ENET_TX_CTL
++
++			MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		0x56		// G_R50_ENET_RD0
++			MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		0x56		// G_R50_ENET_RD1
++			MX8MQ_IOMUXC_ENET_RXC_ENET1_RX_ER		0x56		// G_R50_ENET_RXC
++			MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x56		// ENET_CRS_DV
++
++			MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9		0x19		// ENET_RSTn
++			MX8MQ_IOMUXC_GPIO1_IO11_GPIO1_IO11		0x19		// ENET_INTn
++			MX8MQ_IOMUXC_SAI1_TXFS_GPIO4_IO10		0x19		// ENET_PWR_ON
+ 		>;
+ 	};
+ 

@@ -1,0 +1,60 @@
+7f99d22d George.Huang 2022-01-27
+
+AOS-874: redood: bringup_script: it's not necessary to wait for boot_complete
+
+- can run the script when adbd is ready
+
+- current boot time:
+  first boot:  adb_devices: 38 sec / boot_complete: 86 sec
+  second boot: adb_devices: 17 sec / boot_complete: 30 sec
+
+Change-Id: I16753d1a26d6456d40daeb9a2d3d22ed382a48d1
+
+diff --git a/imx8m/bringup_test_stageall.bat b/imx8m/bringup_test_stageall.bat
+index 787bcffc..1bfcf64a 100644
+--- a/imx8m/bringup_test_stageall.bat
++++ b/imx8m/bringup_test_stageall.bat
+@@ -1,5 +1,5 @@
+ 
+-@echo off
++::@echo off
+ 
+ set /A test_idx=0
+ ::set test_script=/data/local/tmp/bringup_test.sh
+@@ -7,17 +7,7 @@ set test_script=/product/bin/bringup_test.sh
+ set adb_tool=adb.exe
+ 
+ %adb_tool% wait-for-device
+-FOR /L %%x in (0, 1, 2) DO (
+-  FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop sys.boot_completed') DO set rst=%%a
+-  if [%rst%] == [1] (goto break)
+-  timeout /t 5 >nul
+-)
+-FOR /L %%x in (0, 1, 6) DO (
+-  FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop sys.boot_completed') DO set rst=%%a
+-  if [%rst%] == [1] (goto break)
+-  timeout /t 5 >nul
+-)
+-:break
++timeout /t 1 >nul
+ 
+ %adb_tool% root
+ %adb_tool% shell setenforce 0
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+index ce3466b4..2732dd59 100755
+--- a/imx8m/bringup_test_stageall.sh
++++ b/imx8m/bringup_test_stageall.sh
+@@ -6,12 +6,7 @@ test_idx=0
+ test_script="/product/bin/bringup_test.sh"
+ 
+ adb wait-for-device
+-for i in $(seq 0 90); do
+-  sleep 1
+-  rst=`adb shell getprop sys.boot_completed`
+-  [ -z "$rst" ] && continue
+-  [ "$rst" -eq 1 ] && break
+-done
++sleep 1
+ adb root
+ adb shell setenforce 0
+ SN=`adb shell getprop ro.serialno`

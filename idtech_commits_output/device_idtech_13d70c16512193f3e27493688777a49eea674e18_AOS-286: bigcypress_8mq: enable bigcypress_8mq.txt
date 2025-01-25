@@ -1,0 +1,229 @@
+13d70c16 George.Huang 2020-08-06
+
+AOS-286: bigcypress_8mq: enable bigcypress_8mq
+
+Change-Id: I470a1b1249600690d02a7bcca2e4ceb5944f0fba
+
+diff --git a/imx8m/AndroidProducts.mk b/imx8m/AndroidProducts.mk
+index f85e9332..5dfa06db 100644
+--- a/imx8m/AndroidProducts.mk
++++ b/imx8m/AndroidProducts.mk
+@@ -31,6 +31,9 @@ PRODUCT_MAKEFILES := \
+   $(LOCAL_DIR)/evk_a300/evk_a300_drm.mk \
+   $(LOCAL_DIR)/evk_a200/evk_a200.mk \
+   $(LOCAL_DIR)/evk_a100/evk_a100.mk \
++  $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq.mk \
++  $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq_drm.mk \
++  $(LOCAL_DIR)/bigcypress_8mq/bigcypress_8mq_secure.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_drm.mk \
+   $(LOCAL_DIR)/vp6820_8mq/vp6820_8mq_secure.mk \
+@@ -48,6 +51,11 @@ COMMON_LUNCH_CHOICES := \
+   evk_a200-userdebug \
+   evk_a100-user \
+   evk_a100-userdebug \
++  bigcypress_8mq-user \
++  bigcypress_8mq-userdebug \
++  bigcypress_8mq_drm-user \
++  bigcypress_8mq_drm-userdebug \
++  bigcypress_8mq_secure-user \
+   vp6820_8mq-user \
+   vp6820_8mq-userdebug \
+   vp6820_8mq_drm-user \
+diff --git a/imx8m/bigcypress_8mq/AndroidTee.mk b/imx8m/bigcypress_8mq/AndroidTee.mk
+index ef1138fb..72d257db 100644
+--- a/imx8m/bigcypress_8mq/AndroidTee.mk
++++ b/imx8m/bigcypress_8mq/AndroidTee.mk
+@@ -4,7 +4,7 @@ MAKE += SHELL=/bin/bash
+ define build_uboot_w_tee
+ 	$(MAKE) -C bootable/bootloader/arm-trusted-firmware/ -B CROSS_COMPILE=aarch64-linux-android- PLAT=imx8mq V=1 SPD=opteed DECRYPTED_BUFFER_START=$(DECRYPTED_BUFFER_START) DECRYPTED_BUFFER_LEN=$(DECRYPTED_BUFFER_LEN) DECODED_BUFFER_START=$(DECODED_BUFFER_START) DECODED_BUFFER_LEN=$(DECODED_BUFFER_LEN) bl31; \
+ 	cp bootable/bootloader/arm-trusted-firmware/build/imx8mq/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.;\
+-	aarch64-linux-android-objcopy -O binary out/target/product/vp6820_8mq/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++	aarch64-linux-android-objcopy -O binary out/target/product/bigcypress_8mq/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8M  flash_hdmi_spl_uboot; \
+ 	cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(PRODUCT_OUT)/u-boot-$(strip $(2)).imx;
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index 1d3118c4..8f7d7c13 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -33,7 +33,7 @@ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ # Product-specific compile-time definitions.
+ #
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mq
+ 
+ include device/idtech/imx8m/BoardConfigCommon.mk
+ 
+@@ -135,7 +135,7 @@ endif
+ 
+ LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
+ LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mq/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/bigcypress_8mq/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
+diff --git a/imx8m/bigcypress_8mq/UbootKernelBoardConfig.mk b/imx8m/bigcypress_8mq/UbootKernelBoardConfig.mk
+index 7ef63f1f..fda517b3 100644
+--- a/imx8m/bigcypress_8mq/UbootKernelBoardConfig.mk
++++ b/imx8m/bigcypress_8mq/UbootKernelBoardConfig.mk
+@@ -1,22 +1,8 @@
+ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+-# u-boot target for a300 devboard
+-TARGET_BOOTLOADER_CONFIG := imx8mq-devboard:imx8mq_a300_devboard_android_defconfig:signed
+-TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-dual:imx8mq_a300_devboard_android_dual_defconfig:signed
+-ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty:imx8mq_a300_devboard_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty-secure-unlock:imx8mq_a300_devboard_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-trusty-dual:imx8mq_a300_devboard_android_trusty_dual_defconfig
+-endif
+-
+-# u-boot target used by uuu for a300 devboard
+-TARGET_BOOTLOADER_CONFIG += imx8mq-devboard-evk-uuu:imx8mq_a300_devboard_android_uuu_defconfig:signed
+-
+ # u-boot target for imx8mq_evk
+ TARGET_BOOTLOADER_CONFIG += imx8mq-evk:vp6820_8mq_evk_android_defconfig:signed
+-# u-boot target for imx8mq_evk with RAM 1GB setting
+-TARGET_BOOTLOADER_CONFIG += imx8mq-evk-ram1GB:vp6820_8mq_evk_ram1GB_android_defconfig
+ TARGET_BOOTLOADER_CONFIG += imx8mq-evk-dual:vp6820_8mq_evk_android_dual_defconfig:signed
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mq-evk-trusty:vp6820_8mq_evk_android_trusty_defconfig
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq.mk b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+index 0983bec1..da2bab70 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq.mk
+@@ -1,11 +1,11 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
+-$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mq
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ 
+ # Overrides
+-PRODUCT_NAME := vp6820_8mq
++PRODUCT_NAME := bigcypress_8mq
+ 
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+index 30c06c2c..b0663712 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_common.mk
+@@ -1,7 +1,7 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mq
+ 
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+@@ -18,9 +18,9 @@ $(shell touch $(IMX_DEVICE_PATH)/fstab.freescale)
+ endif
+ 
+ # Overrides
+-PRODUCT_NAME := vp6820_8mq
+-PRODUCT_DEVICE := vp6820_8mq
+-PRODUCT_MODEL := VP6820_8MQ
++PRODUCT_NAME := bigcypress_8mq
++PRODUCT_DEVICE := bigcypress_8mq
++PRODUCT_MODEL := BIGCYPRESS_8MQ
+ 
+ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ 
+@@ -142,7 +142,7 @@ PRODUCT_COPY_FILES += \
+     $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy
+ 
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mq/powerhint_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mq.json
++    device/idtech/imx8m/bigcypress_8mq/powerhint_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mq.json
+ 
+ # fastboot_imx_flashall scripts, fsl-sdcard-partition script and uuu_imx_android_flash scripts
+ PRODUCT_COPY_FILES += \
+@@ -235,7 +235,7 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     android.hardware.thermal@2.0-service.imx
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mq/thermal_info_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mq.json
++    device/idtech/imx8m/bigcypress_8mq/thermal_info_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mq.json
+ 
+ # Neural Network HAL and lib
+ PRODUCT_PACKAGES += \
+@@ -284,7 +284,7 @@ PRODUCT_PACKAGES += \
+ endif
+ 
+ PRODUCT_COPY_FILES += \
+-    device/idtech/imx8m/vp6820_8mq/camera_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mq.json
++    device/idtech/imx8m/bigcypress_8mq/camera_config_imx8mq.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mq.json
+ 
+ # Keymaster HAL
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_drm.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_drm.mk
+index 5921aaef..facea07c 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_drm.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_drm.mk
+@@ -1,11 +1,11 @@
+ # This is a FSL Android Reference Design platform based on i.MX8MQ board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mq
+ 
+ PRODUCT_IMX_DRM := true
+ 
+-# copy drm specific files before inherit vp6820_8mq.mk, otherwise copy is ignored
++# copy drm specific files before inherit bigcypress_8mq.mk, otherwise copy is ignored
+ PRODUCT_COPY_FILES += \
+ 	$(IMX_DEVICE_PATH)/audio_policy_configuration_drm.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+ 	$(IMX_DEVICE_PATH)/init.imx8mq.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.freescale.imx8mq.main.rc \
+@@ -14,13 +14,13 @@ PRODUCT_COPY_FILES += \
+ 
+ 
+ $(call inherit-product, $(TOPDIR)device/idtech/imx8m/optee-packages.mk)
+-$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq.mk)
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq.mk)
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ 
+ 
+ # Overrides
+-PRODUCT_NAME := vp6820_8mq_drm
++PRODUCT_NAME := bigcypress_8mq_drm
+ 
+ CFG_DRM_SECURE_DATA_PATH ?= y
+ CFG_RDC_SECURE_DATA_PATH ?= y
+diff --git a/imx8m/bigcypress_8mq/bigcypress_8mq_secure.mk b/imx8m/bigcypress_8mq/bigcypress_8mq_secure.mk
+index cedda5b8..3334523b 100644
+--- a/imx8m/bigcypress_8mq/bigcypress_8mq_secure.mk
++++ b/imx8m/bigcypress_8mq/bigcypress_8mq_secure.mk
+@@ -1,8 +1,8 @@
+ # This is a FSL Android Reference Design platform based on i.MX8QP ARD board
+ # It will inherit from FSL core product which in turn inherit from Google generic
+ 
+-IMX_DEVICE_PATH := device/idtech/imx8m/vp6820_8mq
+-$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/vp6820_8mq_common.mk)
++IMX_DEVICE_PATH := device/idtech/imx8m/bigcypress_8mq
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/bigcypress_8mq_common.mk)
+ 
+ # Overrides
+-PRODUCT_NAME := vp6820_8mq_secure
++PRODUCT_NAME := bigcypress_8mq_secure
+diff --git a/imx8m/bigcypress_8mq/init.rc b/imx8m/bigcypress_8mq/init.rc
+index 2caa61b2..53e108f5 100644
+--- a/imx8m/bigcypress_8mq/init.rc
++++ b/imx8m/bigcypress_8mq/init.rc
+@@ -81,7 +81,7 @@ on early-boot
+     setprop ro.lmk.critical_upgrade true
+ 
+     # Set the host name which used in console
+-    export HOSTNAME vp6820_8mq
++    export HOSTNAME bigcypress_8mq
+ 
+     # Set permission for IIM node
+     symlink /dev/mxs_viim /dev/mxc_mem

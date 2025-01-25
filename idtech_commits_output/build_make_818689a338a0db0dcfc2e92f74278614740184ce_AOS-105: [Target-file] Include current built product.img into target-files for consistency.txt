@@ -1,0 +1,26 @@
+818689a33 George.Huang 2020-03-02
+
+AOS-105: [Target-file] Include current built product.img into target-files for consistency
+
+Symptom:
+  It will cause device dm-verity device corrupted and reboot after updating OTA
+  [ 5.150600] reboot: Restarting system with command 'dm-verity device corrupted'
+
+Root-Cause:
+  product.img are not consistent between out/ and target-files.zip
+
+Change-Id: I223f1565c805b9536ac7d3a1481c189f78c4aa11
+
+diff --git a/core/Makefile b/core/Makefile
+index 343f5d2d1..dbf7519b9 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4163,6 +4163,8 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	# system image and system.map
+ 	$(hide) cp $(INSTALLED_SYSTEMIMAGE) $(zip_root)/IMAGES/
+ 	$(hide) cp $(systemimage_intermediates)/system.map $(zip_root)/IMAGES/
++	# product image
++	$(hide) cp $(INSTALLED_PRODUCTIMAGE_TARGET) $(zip_root)/IMAGES/
+ 	# IDtech specific dtbo/vbmeta image
+ 	cp $(PRODUCT_OUT)/dtbo.img $(zip_root)/IMAGES/
+ 	cp $(PRODUCT_OUT)/vbmeta.img $(zip_root)/IMAGES/

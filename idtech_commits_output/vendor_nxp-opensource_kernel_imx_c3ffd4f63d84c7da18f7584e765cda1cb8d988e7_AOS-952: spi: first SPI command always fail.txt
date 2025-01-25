@@ -1,0 +1,81 @@
+c3ffd4f63d84 owen.wen 2022-03-28
+
+AOS-952: spi: first SPI command always fail
+
+Symptom: first SPI command always fail of every boot
+RootCause: clock keep high when chip select set, clock should keep log since
+           K81 and a300 using SPI MODE 0
+Solution: let SPI controller driver control chip select, so chip select can be
+          set after clock keep low
+Change-Id: I2d2cc66d3fb061345b4f123ee19bc7e44b743a26
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 85563ee2dc7e..51de19a0264b 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -355,7 +355,6 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 
+ #endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
+ 	x->tx_nbits = SPI_NBITS_SINGLE;
+ 	x->rx_buf = idg_rx;
+@@ -370,7 +369,6 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	m.spi = idg_tty;
+ 	spi_message_add_tail(x, &m);
+ 	status = spi_sync(idg_tty, &m);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ 	mutex_unlock(&idg_dev->lock);
+ 
+ tty_write_out:
+@@ -499,7 +497,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi_xfer->speed_hz = idg_dev->clock_freq;
+ 	spi_xfer->bits_per_word = idg_dev->bits_per_word;
+ 	mutex_lock(&idg_dev->lock);
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi_msg.spi = spi;
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -590,7 +587,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		fifo_add_msg(fifo, data);
+ 	}
+ finish_spi:
+-	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_CLEAR);
+ kzalloc_fail:
+ 	if (spi_xfer->ptp_sts != NULL)
+ 		kfree(spi_xfer->ptp_sts);
+@@ -693,8 +689,8 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	idg_dev->bits_per_word = spi->bits_per_word;
+ 	idg_spi_tty = spi;
+ 
+-	idg_dev->spi_cs = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_LOW);
+-	if (!idg_dev->spi_cs) {
++	spi->cs_gpiod = devm_gpiod_get(&spi->dev, "spi-cs", GPIOD_OUT_LOW);
++	if (!spi->cs_gpiod) {
+ 		dev_err(&spi->dev, "chipselect is not exist
+");
+ 		err = -ENODATA;
+ 		goto idg_dev_error;
+@@ -786,7 +782,7 @@ static int idg_spi_probe(struct spi_device *spi)
+ 	misc_deregister(&idg_spi_tty_misc);
+ 	misc_deregister(&idg_spi_tty_misc_secure);
+ idg_gpio_error:
+-	kfree(idg_dev->spi_cs);
++	kfree(spi->cs_gpiod);
+ idg_dev_error:
+ 	kfree(idg_dev);
+ setup_error:
+diff --git a/drivers/misc/idg_spi.h b/drivers/misc/idg_spi.h
+index 4a51fd3b3ccc..b59f9ff61bbb 100644
+--- a/drivers/misc/idg_spi.h
++++ b/drivers/misc/idg_spi.h
+@@ -86,8 +86,6 @@
+ struct idg_spi_device {
+ 				/* spi related */
+ 	struct spi_device	*spi_dev;
+-				/* CS control by gpio */
+-	struct gpio_desc	*spi_cs;
+ 	int			clock_freq;
+ 	int			idg_irq;
+ 	int			poweron_gpio;

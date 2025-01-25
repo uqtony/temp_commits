@@ -1,0 +1,166 @@
+28408b06e2 Arthur Chen 2020-10-21
+
+AOS-364: centered AVB warning screen position.
+
+    -for centered layout position with dynamic resolution support.
+    -the IDT_WARNING_OFFSET_* values are adjustions which depended on
+    current features' characteristics.
+    If we will use some spectial features in the future.
+    The IDT_WARNING_OFFSET_* values are needed to be adjusted again.
+
+Change-Id: I6ef9ed6a2faea3678e9ece3b4735ab1cbee778ba
+
+diff --git a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+index 1296064d40..ae5a9bb5d7 100644
+--- a/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
++++ b/drivers/fastboot/fb_fsl/fastboot_lock_unlock.c
+@@ -570,6 +570,8 @@ int idt_display_unlock_warning()
+ {
+ 	int ret;
+ 	struct udevice *dev;
++	int width = 0;
++	int height = 0;
+ 	char *binfo_rotate = NULL;
+ 	int degree = 0;
+ 
+@@ -583,9 +585,11 @@ int idt_display_unlock_warning()
+ 	if (!ret) {
+ 		/* clear screen first */
+ 		idt_image_clear(dev);
++		width = (video_get_xsize(dev)/2) - IDT_WARNING_OFFSET_X;
++		height = (video_get_ysize(dev)/2) - IDT_WARNING_OFFSET_Y;
+ 		/* Draw the orange warning bmp logo */
+ 		ret = bmp_display((ulong)orange_warning_bmp_bitmap,
+-					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
++					width, height,
+ 					false, true);
+ 		/* Show warning text. */
+ 		if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev)) {
+@@ -593,31 +597,31 @@ int idt_display_unlock_warning()
+ 			return -1;
+ 		}
+ 		/* Adjust the cursor postion, the (x, y) are hard-coded here. */
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 6);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 6);
+ 		vidconsole_put_string(dev, "The bootloader is unlocked and software");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 7);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 7);
+ 		vidconsole_put_string(dev, "integrity cannot be guaranteed. Any data");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 8);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 8);
+ 		vidconsole_put_string(dev, "stored on the device may be available to");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 9);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 9);
+ 		vidconsole_put_string(dev, "attackers. Do not store any sensitive data");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 10);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 10);
+ 		vidconsole_put_string(dev, "on the device.");
+ 		/* Jump one line to show the link */
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 13);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 13);
+ 		vidconsole_put_string(dev, "Visit this link on another device:");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 14);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 14);
+ 		vidconsole_put_string(dev, "g.co/ABH");
+ 
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 20);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 20);
+ 		vidconsole_put_string(dev, "PRESS POWER BUTTON TO CONTINUE...");
+ 		/* sync frame buffer */
+ 		idt_image_rotate(dev->parent, degree);
+diff --git a/include/image_idt.h b/include/image_idt.h
+index 7a74b7133b..fd582c7e34 100644
+--- a/include/image_idt.h
++++ b/include/image_idt.h
+@@ -11,6 +11,9 @@
+ #include <asm/unaligned.h>
+ #include <asm/io.h>
+ #define IMX8MQ_DCSS_DPR_FRAME_CTRL0		0x32e18070
++/* for dynamic centered the layout position */
++#define IDT_WARNING_OFFSET_X			0xA0
++#define IDT_WARNING_OFFSET_Y			0xF0
+ 
+ #ifndef __IMAGE_IDT_H__
+ #define __IMAGE_IDT_H__
+diff --git a/lib/verifiedstate_idt/idt_red_warning.c b/lib/verifiedstate_idt/idt_red_warning.c
+index 1498f04c8e..d3da6445aa 100644
+--- a/lib/verifiedstate_idt/idt_red_warning.c
++++ b/lib/verifiedstate_idt/idt_red_warning.c
+@@ -27,6 +27,8 @@ void idt_show_red_warning_and_shutdown(void)
+ #ifdef CONFIG_AVB_WARNING_LOGO
+ 	int ret = 0, count = 0;
+ 	struct udevice *dev;
++	int width = 0;
++	int height = 0;
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)
+ 	char *binfo_rotate = NULL;
+ 	int degree = 0;
+@@ -41,15 +43,17 @@ void idt_show_red_warning_and_shutdown(void)
+ 	if (!ret) {
+ 		/* clear screen first */
+ 		/* Draw the red warning bmp logo */
++		width = (video_get_xsize(dev)/2) - IDT_WARNING_OFFSET_X;
++		height = (video_get_ysize(dev)/2) - IDT_WARNING_OFFSET_Y;
+ #ifdef CONFIG_IDT_ROTATION
+ 		idt_image_clear(dev);
+ 		ret = bmp_display((ulong)red_warning_logo_bitmap,
+-					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS,
++					width, height,
+ 					false, true);
+ #else /* !CONFIG_IDT_ROTATION */
+ 		video_clear(dev);
+ 		ret = bmp_display((ulong)red_warning_logo_bitmap,
+-					CONFIG_AVB_WARNING_LOGO_COLS, CONFIG_AVB_WARNING_LOGO_ROWS);
++					width, height);
+ #endif /* CONFIG_IDT_ROTATION */
+ 		/* Show warning text. */
+ 		if (uclass_first_device_err(UCLASS_VIDEO_CONSOLE, &dev)) {
+@@ -57,22 +61,22 @@ void idt_show_red_warning_and_shutdown(void)
+ 			return;
+ 		}
+ 		/* Adjust the cursor postion, the (x, y) are hard-coded here. */
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 6);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 6);
+ 		vidconsole_put_string(dev, "No valid operating system could be found");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 7);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 7);
+ 		vidconsole_put_string(dev, "The device will not boot");
+ 		/* Jump one line to show the link */
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 13);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 13);
+ 		vidconsole_put_string(dev, "Visit this link on another device:");
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 14);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 14);
+ 		vidconsole_put_string(dev, "g.co/ABH");
+ 
+-		vidconsole_position_cursor(dev, CONFIG_AVB_WARNING_LOGO_COLS/VIDEO_FONT_WIDTH,
+-						CONFIG_AVB_WARNING_LOGO_ROWS/VIDEO_FONT_HEIGHT + 20);
++		vidconsole_position_cursor(dev, width/VIDEO_FONT_WIDTH,
++						height/VIDEO_FONT_HEIGHT + 20);
+ 		vidconsole_put_string(dev, "PRESS POWER BUTTON TO SHUTDOWN...");
+ 		/* sync frame buffer */
+ #if defined(CONFIG_IDT_ROTATION) && defined(CONFIG_VIDEO_IMX8M_DCSS)

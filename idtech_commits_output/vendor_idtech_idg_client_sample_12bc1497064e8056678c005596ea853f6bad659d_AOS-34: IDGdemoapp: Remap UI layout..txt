@@ -1,0 +1,423 @@
+12bc149 Arthur Chen 2020-01-07
+
+AOS-34: IDGdemoapp: Remap UI layout.
+
+    Info from textview to be listview as console.
+    Add hex data converter to show invisiable ascii to be hex number.
+    Improved with single socket connection.
+
+Change-Id: I641c088dee623143715891d156daba55be0babd3
+
+diff --git a/IDGdemoapp/res/layout/main_activity.xml b/IDGdemoapp/res/layout/main_activity.xml
+index 0a52052..94fad13 100644
+--- a/IDGdemoapp/res/layout/main_activity.xml
++++ b/IDGdemoapp/res/layout/main_activity.xml
+@@ -12,6 +12,7 @@
+         <LinearLayout
+             android:layout_width="match_parent"
+             android:layout_height="match_parent"
++            android:layout_weight="3"
+             android:orientation="vertical">
+ 
+             <Button
+@@ -21,31 +22,54 @@
+                 android:layout_weight="1"
+                 android:textSize="60dp"
+                 android:textStyle="bold|italic"
+-                android:layout_alignBottom="@+id/textView1"
+                 android:layout_alignParentRight="true"
+                 android:text="Start" />
+ 
+             <TextView
+-                android:id="@+id/textView2"
++                android:id="@+id/textView1"
+                 android:layout_width="match_parent"
+-                android:layout_height="wrap_content"
++                android:layout_height="120dp"
+                 android:layout_weight="3"
+                 android:textSize="60dp"
+                 android:textStyle="bold"
+-                android:layout_alignLeft="@+id/textView1"
+-                android:layout_below="@+id/textView1"
++                android:layout_below="@+id/but1"
+                 android:text="Not Connect" />
+ 
+             <TextView
+-                android:id="@+id/textView1"
++                android:id="@+id/textView2"
+                 android:layout_width="match_parent"
+-                android:layout_height="wrap_content"
++                android:layout_height="50dp"
+                 android:layout_weight="3"
++                android:textSize="60dp"
+                 android:textStyle="bold"
++                android:layout_below="@+id/textView1"
++                android:text="IDG:" />
++
++        </LinearLayout>
++
++        <LinearLayout
++            android:layout_width="match_parent"
++            android:layout_height="match_parent"
++            android:layout_weight="1"
++            android:orientation="vertical">
++
++            <TextView
++                android:id="@+id/textView3"
++                android:layout_width="match_parent"
++                android:layout_height="20dp"
++                android:layout_weight="3"
++                android:text="IDG info:"
+                 android:textSize="60dp"
+-                android:layout_alignParentLeft="true"
+-                android:layout_alignParentTop="true"
+-                android:text="IP" />
++                android:textStyle="bold" />
++
++            <ListView
++                android:id="@+id/listView1"
++                android:layout_width="match_parent"
++                android:layout_height="250dp"
++                android:layout_weight="3"
++                android:textStyle="bold"
++                android:layout_below="@+id/textView3" />
++
+ 
+             <EditText
+                 android:id="@+id/edit1"
+@@ -56,7 +80,6 @@
+                 android:inputType="textNoSuggestions"
+                 android:textSize="60dp"
+                 android:textStyle="bold|italic"
+-                android:layout_alignBottom="@+id/textView1"
+                 android:layout_alignParentRight="true"
+                 android:hint="IDG VERSION (29000000)" />
+ 
+diff --git a/IDGdemoapp/res/layout/mytextform.xml b/IDGdemoapp/res/layout/mytextform.xml
+new file mode 100644
+index 0000000..047caad
+--- /dev/null
++++ b/IDGdemoapp/res/layout/mytextform.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<TextView xmlns:android="http://schemas.android.com/apk/res/android"
++    android:id="@android:id/text1"
++    android:paddingTop="1dp"
++    android:paddingBottom="1dp"
++    android:layout_width="fill_parent"
++    android:layout_height="wrap_content"
++    android:textSize="50sp">
++</TextView>
+diff --git a/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java b/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
+index 4ad80a7..32b38d7 100644
+--- a/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
++++ b/IDGdemoapp/src/com/idtech/idgdemoapp/MainActivity.java
+@@ -9,8 +9,9 @@ import android.os.Message;
+ import android.os.StrictMode;
+ import android.util.Log;
+ import android.view.View;
+-import android.view.Window;
++import android.widget.ArrayAdapter;
+ import android.widget.Button;
++import android.widget.ListView;
+ import android.widget.TextView;
+ import android.widget.EditText;
+ import android.widget.Toast;
+@@ -21,13 +22,13 @@ import java.io.BufferedWriter;
+ import java.io.IOException;
+ import java.io.InputStreamReader;
+ import java.io.OutputStreamWriter;
+-import java.io.PrintWriter;
+ import java.net.InetAddress;
+ import java.net.NetworkInterface;
+ import java.net.ServerSocket;
+ import java.net.Socket;
+ import java.net.SocketException;
+ import java.util.ArrayList;
++import java.util.Arrays;
+ import java.util.Enumeration;
+ import java.util.List;
+ import java.util.concurrent.ExecutorService;
+@@ -35,22 +36,24 @@ import java.util.concurrent.Executors;
+ 
+ public class MainActivity extends Activity {
+ 
+-    private static final int PORT = 8080;
+-    private static final int IDGservport = 281;
++    private static final int PORT = 1221;
+     private static final String Localhost = "127.0.0.1";
+-    private List<Socket> mList = new ArrayList<Socket>();
+-    private volatile ServerSocket server=null;
+-    private ExecutorService mExecutorService = null;
++    private static final String Hex = "0123456789ABCDEF";
+     private String hostip;
++    private ListView mListview;
+     private TextView mText1;
+-    private TextView mText2;
+     private EditText mEdit1;
+     private Button mBut1 = null;
+     private Button mBut2 = null;
+-    private Handler myHandler = null;
+     private volatile boolean flag = true;
+-    private Handler handler = new Handler();
+-    String s ;
++    public Handler myHandler = new Handler();
++    public Thread myThread;
++    private static String data = "" ;
++    private ArrayList<String> listItems=new ArrayList<String>();
++    private ArrayAdapter madapter;
++    private Socket socket;
++    private BufferedWriter out;
++    private BufferedReader in;
+ 
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+@@ -63,10 +66,12 @@ public class MainActivity extends Activity {
+         hostip = getLocalIpAddress();
+ 
+         mText1 = (TextView) findViewById(R.id.textView1);
+-        mText1.setText(hostip);
++        mText1.setText("Local IP: " + hostip);
+         mText1.setEnabled(false);
+ 
+-        mText2 = (TextView) findViewById(R.id.textView2);
++        mListview = (ListView) findViewById(R.id.listView1);
++        madapter = new ArrayAdapter(this, R.layout.mytextform, listItems);
++        mListview.setAdapter(madapter);
+ 
+         mBut1 = (Button) findViewById(R.id.but1);
+         mBut1.setOnClickListener(new Button1ClickListener());
+@@ -76,122 +81,88 @@ public class MainActivity extends Activity {
+ 
+         mEdit1 = (EditText) findViewById(R.id.edit1);
+ 
+-        myHandler = new Handler() {
+-            @SuppressLint("HandlerLeak")
+-            public void handleMessage(Message msg){
+-                if(msg.what == 0x1234){
+-                    mText2.append("
+" + msg.obj.toString());
+-                }
+-            }
+-        };
++        myThread = new Thread(readData);
+     }
+ 
+-    private final class Button1ClickListener implements View.OnClickListener{
++    private final class Button1ClickListener implements View.OnClickListener {
+         @Override
+         public void onClick(View v) {
+             // TODO Auto-generated method stub
+             if (mBut1.getText().toString().equals("Start")) {
+-                ServerThread serverThread = new ServerThread();
+-                flag = true;
+-                serverThread.start();
+                 mBut1.setText("Stop");
+-                mText1.setText(getLocalIpAddress());
+-                /* show IP address */
+-                Toast toast = Toast.makeText(MainActivity.this, "IP address: "+getLocalIpAddress(), Toast.LENGTH_LONG);
+-                toast.show();
++                mText1.setText("IDG enabled");
++                myThread.start();
+             } else {
+                 try {
+-                    flag = false;
+-                    server.close();
+-                    for (int p = 0; p < mList.size(); p++) {
+-                        Socket s = mList.get(p);
+-                        s.close();
+-                    }
+-                    mExecutorService.shutdownNow();
+-                    mBut1.setText("Start");
++                    socket.close();
+                     mText1.setText("Not Connect");
+                     Log.v("Socket-status","Service have been closed");
+                 } catch (IOException e) {
+                     // TODO Auto-generated catch block
+                     e.printStackTrace();
+                 }
++                finish();
+             }
+         }
+     }
+ 
+-    private final class Button2ClickListener implements View.OnClickListener{
++    private final class Button2ClickListener implements View.OnClickListener {
+         @Override
+         public void onClick(View v) {
+             // TODO Auto-generated method stub
+-            Socket clientSocket;
+-            BufferedWriter bw;
+             String input = mEdit1.getText().toString();
+-                try {
+-
+-                    InetAddress serverIp = InetAddress.getByName(Localhost);
+-                    clientSocket = new Socket(serverIp, IDGservport);
+-
+-                    Log.v("socket","Socket created");
+-                    bw = new BufferedWriter(new OutputStreamWriter(clientSocket.getOutputStream()));
++            try {
++                Log.v("socket", "Socket created");
++                out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+ 
+-                    Log.v("socket","Socket output created");
+-                    while (clientSocket.isConnected()) {
+-                        bw.write(input);
+-                        bw.flush();
+-                        bw.close();
+-                    }
+-                } catch (Exception e) {
+-                    e.printStackTrace();
+-                    Log.e("text", "Socket connection = " + e.toString());
++                Log.v("socket", "Socket output created");
++                if (socket.isConnected()) {
++                    out.write(input);
++                    out.flush();
+                 }
++
++            } catch (Exception e) {
++                e.printStackTrace();
++                Log.e("text", "Socket connection = " + e.toString());
++            }
++            mText1.setText("wait K81");
+         }
+     }
+ 
+-    class ServerThread extends Thread {
++    private Runnable updateText = new Runnable() {
+         public void run() {
++            listItems.add("
+" + data);
++            madapter.notifyDataSetChanged();
++            mListview.setSelection(madapter.getCount() - 1);
++            mText1.setText("Get K81 response!");
++            data = "";
++        }
++    };
++
++    private Runnable readData = new Runnable() {
++        public void run() {
++
++            InetAddress serverIp;
++            char[] buf = new char[2048];
++            int len, i;
+             try {
+-                server = new ServerSocket(PORT);
+-            } catch (IOException e1) {
+-                e1.printStackTrace();
+-            }
+-            mExecutorService = Executors.newCachedThreadPool();
+-            Socket client = null;
+-            while(flag) {
+-                try {
+-                    Log.v("test", String.valueOf(flag));
+-                    client = server.accept();
+-                    handler.post(new Runnable() {
+-                        public void run() {
+-                            mText1.setText("Connected.");
+-                        }
+-                    });
+-                    try {
+-                        handler.post(new Runnable() {
+-                            public void run() {
+-                                mText2.setText(s);
+-                            }
+-                        });
+-                    } catch (Exception e) {
+-                        handler.post(new Runnable() {
+-                            public void run() {
+-                                mText2.setText(s);
+-                            }
+-                        });
++                serverIp = InetAddress.getByName(Localhost);
++                socket = new Socket(serverIp, PORT);
++                in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
++                while (socket.isConnected()) {
++                    len = in.read(buf,0,2048);
++                    if(len != 0) {
++                        data = "";
++                        data = new String(buf);
++                        myHandler.post(updateText);
++                        Arrays.fill(buf, ' ');
+                     }
+-
+-                    mList.add(client);
+-                    mExecutorService.execute(new Service(client));
+-                } catch ( IOException e) {
+-                    e.printStackTrace();
+-                    handler.post(new Runnable() {
+-                        public void run() {
+-                            mText2.setText("Disconnceted");
+-                        }
+-                    });
+                 }
++            } catch (IOException e) {
++                e.printStackTrace();
+             }
+         }
+-    }
++    };
+ 
+     @SuppressLint("LongLogTag")
+     public static String getLocalIpAddress() {
+@@ -212,60 +183,4 @@ public class MainActivity extends Activity {
+         }
+         return null;
+     }
+-
+-    class Service implements Runnable {
+-        private volatile boolean kk = true;
+-        private Socket socket;
+-        private BufferedReader in = null;
+-        private String msg = "";
+-
+-        public Service(Socket socket) {
+-            this.socket = socket;
+-            try {
+-                in = new BufferedReader(new InputStreamReader(socket.getInputStream(), "UTF-8"));
+-            } catch (IOException e) {
+-                e.printStackTrace();
+-            }
+-        }
+-
+-        public void run() {
+-            while (kk) {
+-                try {
+-                    if ((msg = in.readLine())!= null) {
+-                        if (msg.equals("exit")) {
+-                            mList.remove(socket);
+-                            break;
+-                        } else {
+-                            Message msgLocal = new Message();
+-                            msgLocal.what = 0x1234;
+-                            msgLocal.obj = msg+" （From IDG serv）" ;
+-
+-                            System.out.println(msgLocal.obj.toString());
+-                            System.out.println(msg);
+-                            myHandler.sendMessage(msgLocal);
+-                            msg = socket.getInetAddress() + ":" + msg+"（From IDG serv）";
+-                            this.sendmsg(msg);
+-                        }
+-                    }
+-                } catch (IOException e) {
+-                    System.out.println("close");
+-                    kk = false;
+-                    // TODO Auto-generated catch block
+-                    e.printStackTrace();
+-                }
+-            }
+-        }
+-
+-        public void sendmsg(String msg) {
+-            System.out.println(msg);
+-            PrintWriter pout = null;
+-            try {
+-                pout = new PrintWriter(new BufferedWriter(
+-                        new OutputStreamWriter(socket.getOutputStream())), true);
+-                pout.println(msg);
+-            } catch (IOException e) {
+-                e.printStackTrace();
+-            }
+-        }
+-    }
+ }

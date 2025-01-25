@@ -1,0 +1,312 @@
+c3ecff8 jenkins 2020-10-22
+
+Download imx-android-10.0.0_2.5.0.tar.gz from nxp.com
+
+Change-Id: I60d433dd234b6928bf1c0ebf3024c283b3a61b0e
+
+diff --git a/Android.mk b/Android.mk
+index 095f789..ce19fe8 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -19,6 +19,7 @@ LOCAL_MODULE := lib_nb_amr_dec_v2_arm9_elinux
+ LOCAL_MODULE_SUFFIX := .so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_CHECK_ELF_FILES := false
+ ifeq ($(ANDROID_VERSION_GE_O), true)
+ LOCAL_VENDOR_MODULE := true
+ endif
+@@ -57,6 +58,7 @@ LOCAL_MODULE := lib_wb_amr_dec_arm9_elinux
+ LOCAL_MODULE_SUFFIX := .so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_CHECK_ELF_FILES := false
+ ifeq ($(ANDROID_VERSION_GE_O), true)
+ LOCAL_VENDOR_MODULE := true
+ endif
+@@ -86,6 +88,7 @@ LOCAL_MODULE := lib_flac_dec_v2_arm11_elinux
+ LOCAL_MODULE_SUFFIX := .so
+ LOCAL_MODULE_TAGS := optional
+ LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_CHECK_ELF_FILES := false
+ ifeq ($(ANDROID_VERSION_GE_O), true)
+ LOCAL_VENDOR_MODULE := true
+ endif
+@@ -110,42 +113,6 @@ LOCAL_SRC_FILES := lib/lib_flac_dec_v2_arm11_elinux.so
+ endif
+ include $(BUILD_PREBUILT)
+ 
+-include $(CLEAR_VARS)
+-LOCAL_MODULE := lib_H263_dec_v2_arm11_elinux
+-LOCAL_MODULE_SUFFIX := .so
+-LOCAL_MODULE_TAGS := optional
+-LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+-ifeq ($(ANDROID_VERSION_GE_O), true)
+-LOCAL_VENDOR_MODULE := true
+-endif
+-ifeq ($(TARGET_ARCH),arm64)
+-LOCAL_MULTILIB := 32
+-LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
+-LOCAL_SRC_FILES_32 := lib/lib_H263_dec_v2_arm11_elinux.so
+-else
+-LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
+-LOCAL_SRC_FILES := lib/lib_H263_dec_v2_arm11_elinux.so
+-endif
+-include $(BUILD_PREBUILT)
+-
+-include $(CLEAR_VARS)
+-LOCAL_MODULE := lib_peq_v2_arm11_elinux
+-LOCAL_MODULE_SUFFIX := .so
+-LOCAL_MODULE_TAGS := optional
+-LOCAL_MODULE_CLASS := SHARED_LIBRARIES
+-ifeq ($(ANDROID_VERSION_GE_O), true)
+-LOCAL_VENDOR_MODULE := true
+-endif
+-ifeq ($(TARGET_ARCH),arm64)
+-LOCAL_MULTILIB := 32
+-LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
+-LOCAL_SRC_FILES_32 := lib/lib_peq_v2_arm11_elinux.so
+-else
+-LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
+-LOCAL_SRC_FILES := lib/lib_peq_v2_arm11_elinux.so
+-endif
+-include $(BUILD_PREBUILT)
+-
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := libvpu-malone
+ LOCAL_MODULE_SUFFIX := .so
+@@ -212,21 +179,11 @@ LOCAL_MODULE := lib_mp3_parser_arm11_elinux.3.0
+ include $(LOCAL_PATH)/library_common.mk
+ include $(BUILD_PREBUILT)
+ 
+-include $(CLEAR_VARS)
+-LOCAL_MODULE := lib_wav_parser_arm11_elinux.3.0
+-include $(LOCAL_PATH)/library_common.mk
+-include $(BUILD_PREBUILT)
+-
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := lib_flac_parser_arm11_elinux.3.0
+ include $(LOCAL_PATH)/library_common.mk
+ include $(BUILD_PREBUILT)
+ 
+-include $(CLEAR_VARS)
+-LOCAL_MODULE := lib_ape_parser_arm11_elinux.3.0
+-include $(LOCAL_PATH)/library_common.mk
+-include $(BUILD_PREBUILT)
+-
+ include $(CLEAR_VARS)
+ LOCAL_MODULE := lib_dsf_parser_arm11_elinux.3.0
+ include $(LOCAL_PATH)/library_common.mk
+diff --git a/fsl-codec.mk b/fsl-codec.mk
+index 3778fdf..0c935ab 100755
+--- a/fsl-codec.mk
++++ b/fsl-codec.mk
+@@ -31,9 +31,7 @@ PRODUCT_COPY_FILES += \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_dec_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp3_dec_v2_arm12_elinux.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3d_wrap_arm12_elinux_android.so:$(FSL_CODEC_OUT_PATH)/lib_mp3d_wrap_arm12_elinux_android.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_nb_amr_enc_v2_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_nb_amr_enc_v2_arm11_elinux.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wb_amr_enc_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_wb_amr_enc_arm11_elinux.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp4_muxer_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp4_muxer_arm11_elinux.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_enc_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp3_enc_v2_arm12_elinux.so
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wb_amr_enc_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_wb_amr_enc_arm11_elinux.so
+ 
+ # for pi9, parsers are handled by Android.mk
+ ifneq ($(ANDROID_VERSION_EQ_P), true)
+@@ -47,9 +45,7 @@ PRODUCT_COPY_FILES += \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_amr_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_amr_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_aac_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_mp3_parser_arm11_elinux.3.0.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wav_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_wav_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_flac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_flac_parser_arm11_elinux.3.0.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_ape_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_ape_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib/lib_dsf_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_dsf_parser_arm11_elinux.3.0.so
+ endif
+ 
+@@ -78,10 +74,8 @@ PRODUCT_COPY_FILES += \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_amr_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_amr_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_aac_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_mp3_parser_arm11_elinux.3.0.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_wav_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_wav_parser_arm11_elinux.3.0.so \
+     $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_dsf_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_dsf_parser_arm11_elinux.3.0.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_flac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_flac_parser_arm11_elinux.3.0.so \
+-    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_ape_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_ape_parser_arm11_elinux.3.0.so
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_flac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_flac_parser_arm11_elinux.3.0.so
+ endif
+ 
+ endif
+diff --git a/ghdr/common/fsl_parser.h b/ghdr/common/fsl_parser.h
+index 3215912..75a07cc 100644
+--- a/ghdr/common/fsl_parser.h
++++ b/ghdr/common/fsl_parser.h
+@@ -753,6 +753,7 @@ typedef    int32 (*FslParserGetVideoDisplayHeight)(FslParserHandle parserHandle,
+ 
+ typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
+ 
++typedef    int32 (*FslParserGetVideoThumbnailTime)(FslParserHandle parserHandle, uint32 trackNum, uint64 *outTs);
+ 
+ /************************************************************************************************************
+  *
+@@ -894,6 +895,9 @@ typedef int32 (*FslParserGetAudioPresentationInfo)(FslParserHandle parserHandle,
+                                                 uint32 * spokenSubtitlesAvailable,
+                                                 uint32 * dialogueEnhancementAvailable);
+ 
++/* optional */
++typedef int32 (*FslParserFlush)( FslParserHandle parserHandle, uint32 trackNum);
++
+ 
+ /************************************************************************************************************
+  *
+@@ -945,6 +949,7 @@ enum /* API function ID */
+     PARSER_API_GET_VIDEO_DISPLAY_WIDTH      = 56,
+     PARSER_API_GET_VIDEO_DISPLAY_HEIGHT     = 57,
+     PARSER_API_GET_VIDEO_FRAME_COUNT        = 58,
++    PARSER_API_GET_VIDEO_FRAME_THUMBNAIL_TIME = 59,
+ 
+     /* audio properties */
+     PARSER_API_GET_AUDIO_NUM_CHANNELS       = 60,
+@@ -977,7 +982,9 @@ enum /* API function ID */
+ 
+     PARSER_API_GET_SAMPLE_CRYPTO_INFO = 117,
+ 
+-    PARSER_API_SEEK  = 120
++    PARSER_API_SEEK  = 120,
++
++    PARSER_API_FLUSH_TRACK  = 121
+ 
+ 
+ };
+diff --git a/ghdr/hantro_VC8000E_enc/hevcencapi.h b/ghdr/hantro_VC8000E_enc/hevcencapi.h
+index 177e41d..b9a84d9 100755
+--- a/ghdr/hantro_VC8000E_enc/hevcencapi.h
++++ b/ghdr/hantro_VC8000E_enc/hevcencapi.h
+@@ -564,6 +564,18 @@ extern "C"
+ 	u32 height;
+   } VCEncOverlayArea;
+ 
++  /**
++   * color description in the vui which coded in the sps(sequence parameter sets).
++   * only valid when video signal type present flag in the vui is set.
++   */
++  typedef struct
++  {
++      u8 vuiColorDescripPresentFlag;                        /* color description present in the vui.0- not present, 1- present */
++      u8 vuiColorPrimaries;                                 /* Color's Primaries */
++      u8 vuiTransferCharacteristics;                        /* Transfer Characteristics */
++      u8 vuiMatrixCoefficients;                             /* Matrix Coefficients */
++  }VuiColorDescription;
++
+   /* Coding control parameters */
+   typedef struct
+   {
+@@ -705,7 +717,6 @@ extern "C"
+ 	/* for HDR10 */
+ 	Hdr10DisplaySei    Hdr10Display;
+ 	Hdr10LightLevelSei Hdr10LightLevel;
+-	Hdr10ColorVui      Hdr10Color;
+ 
+ 	u32 RpsInSliceHeader;
+ 
+@@ -1321,6 +1332,10 @@ extern "C"
+   /* Get pass1 updated GopSize*/
+   i32 VCEncGetPass1UpdatedGopSize(VCEncInst inst);
+ 
++  /*Set color description.*/
++  i32 VCEncSetVuiColorDescription(VCEncInst inst, u32 vuiVideoSignalTypePresentFlag, u32 vuiVideoFormat,
++        u32 vuiColorDescripPresentFlag, u32 vuiColorPrimaries, u32 vuiTransferCharacteristics, u32 vuiMatrixCoefficients);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/lib/lib_H263_dec_v2_arm11_elinux.so b/lib/lib_H263_dec_v2_arm11_elinux.so
+deleted file mode 100755
+index 850f470..0000000
+Binary files a/lib/lib_H263_dec_v2_arm11_elinux.so and /dev/null differ
+diff --git a/lib/lib_aac_parser_arm11_elinux.3.0.so b/lib/lib_aac_parser_arm11_elinux.3.0.so
+index d15fd15..1c28163 100755
+Binary files a/lib/lib_aac_parser_arm11_elinux.3.0.so and b/lib/lib_aac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_ape_parser_arm11_elinux.3.0.so b/lib/lib_ape_parser_arm11_elinux.3.0.so
+deleted file mode 100755
+index 49116a7..0000000
+Binary files a/lib/lib_ape_parser_arm11_elinux.3.0.so and /dev/null differ
+diff --git a/lib/lib_flac_parser_arm11_elinux.3.0.so b/lib/lib_flac_parser_arm11_elinux.3.0.so
+index c44c85f..00329c4 100755
+Binary files a/lib/lib_flac_parser_arm11_elinux.3.0.so and b/lib/lib_flac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mp3_enc_v2_arm12_elinux.so b/lib/lib_mp3_enc_v2_arm12_elinux.so
+deleted file mode 100755
+index b11eb9a..0000000
+Binary files a/lib/lib_mp3_enc_v2_arm12_elinux.so and /dev/null differ
+diff --git a/lib/lib_mp3_parser_arm11_elinux.3.0.so b/lib/lib_mp3_parser_arm11_elinux.3.0.so
+index 15fe475..8d919bb 100755
+Binary files a/lib/lib_mp3_parser_arm11_elinux.3.0.so and b/lib/lib_mp3_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mp4_muxer_arm11_elinux.so b/lib/lib_mp4_muxer_arm11_elinux.so
+deleted file mode 100755
+index d3666fb..0000000
+Binary files a/lib/lib_mp4_muxer_arm11_elinux.so and /dev/null differ
+diff --git a/lib/lib_mp4_parser_arm11_elinux.3.0.so b/lib/lib_mp4_parser_arm11_elinux.3.0.so
+index fc92a2a..b28ba04 100755
+Binary files a/lib/lib_mp4_parser_arm11_elinux.3.0.so and b/lib/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mpg2_parser_arm11_elinux.3.0.so b/lib/lib_mpg2_parser_arm11_elinux.3.0.so
+index 0497a12..a29d9fe 100755
+Binary files a/lib/lib_mpg2_parser_arm11_elinux.3.0.so and b/lib/lib_mpg2_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_peq_v2_arm11_elinux.so b/lib/lib_peq_v2_arm11_elinux.so
+deleted file mode 100755
+index e6d6490..0000000
+Binary files a/lib/lib_peq_v2_arm11_elinux.so and /dev/null differ
+diff --git a/lib/lib_wav_parser_arm11_elinux.3.0.so b/lib/lib_wav_parser_arm11_elinux.3.0.so
+deleted file mode 100755
+index c94e370..0000000
+Binary files a/lib/lib_wav_parser_arm11_elinux.3.0.so and /dev/null differ
+diff --git a/lib/libfsl_jpeg_enc_arm11_elinux.so b/lib/libfsl_jpeg_enc_arm11_elinux.so
+deleted file mode 100755
+index 7e8f50a..0000000
+Binary files a/lib/libfsl_jpeg_enc_arm11_elinux.so and /dev/null differ
+diff --git a/lib/libhantro_vc8000e.so b/lib/libhantro_vc8000e.so
+index 9c29b1a..8ffcff5 100755
+Binary files a/lib/libhantro_vc8000e.so and b/lib/libhantro_vc8000e.so differ
+diff --git a/lib64/lib_aac_parser_arm11_elinux.3.0.so b/lib64/lib_aac_parser_arm11_elinux.3.0.so
+index 7ef7046..6d1acd6 100755
+Binary files a/lib64/lib_aac_parser_arm11_elinux.3.0.so and b/lib64/lib_aac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_aacd_wrap_arm_android.so b/lib64/lib_aacd_wrap_arm_android.so
+index 1c2914d..477ddc1 100755
+Binary files a/lib64/lib_aacd_wrap_arm_android.so and b/lib64/lib_aacd_wrap_arm_android.so differ
+diff --git a/lib64/lib_ape_parser_arm11_elinux.3.0.so b/lib64/lib_ape_parser_arm11_elinux.3.0.so
+deleted file mode 100755
+index 36df1f8..0000000
+Binary files a/lib64/lib_ape_parser_arm11_elinux.3.0.so and /dev/null differ
+diff --git a/lib64/lib_flac_parser_arm11_elinux.3.0.so b/lib64/lib_flac_parser_arm11_elinux.3.0.so
+index 1984adc..c5baeaf 100755
+Binary files a/lib64/lib_flac_parser_arm11_elinux.3.0.so and b/lib64/lib_flac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mp3_dec_arm_android.so b/lib64/lib_mp3_dec_arm_android.so
+index f9634c2..b7c0917 100755
+Binary files a/lib64/lib_mp3_dec_arm_android.so and b/lib64/lib_mp3_dec_arm_android.so differ
+diff --git a/lib64/lib_mp3_parser_arm11_elinux.3.0.so b/lib64/lib_mp3_parser_arm11_elinux.3.0.so
+index 2cdc880..8902630 100755
+Binary files a/lib64/lib_mp3_parser_arm11_elinux.3.0.so and b/lib64/lib_mp3_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mp4_muxer_arm11_elinux.so b/lib64/lib_mp4_muxer_arm11_elinux.so
+deleted file mode 100755
+index 469a350..0000000
+Binary files a/lib64/lib_mp4_muxer_arm11_elinux.so and /dev/null differ
+diff --git a/lib64/lib_mp4_parser_arm11_elinux.3.0.so b/lib64/lib_mp4_parser_arm11_elinux.3.0.so
+index 6e9132a..7ae38df 100755
+Binary files a/lib64/lib_mp4_parser_arm11_elinux.3.0.so and b/lib64/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mpg2_parser_arm11_elinux.3.0.so b/lib64/lib_mpg2_parser_arm11_elinux.3.0.so
+index 6d32269..c7141e0 100755
+Binary files a/lib64/lib_mpg2_parser_arm11_elinux.3.0.so and b/lib64/lib_mpg2_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_wav_parser_arm11_elinux.3.0.so b/lib64/lib_wav_parser_arm11_elinux.3.0.so
+deleted file mode 100755
+index 60fb59c..0000000
+Binary files a/lib64/lib_wav_parser_arm11_elinux.3.0.so and /dev/null differ
+diff --git a/lib64/libhantro_vc8000e.so b/lib64/libhantro_vc8000e.so
+index 8579fcd..da0b750 100755
+Binary files a/lib64/libhantro_vc8000e.so and b/lib64/libhantro_vc8000e.so differ
+diff --git a/release_branch_info.txt b/release_branch_info.txt
+index 4162ddd..d7bd61a 100644
+--- a/release_branch_info.txt
++++ b/release_branch_info.txt
+@@ -4,4 +4,5 @@ master : master
+ #imx_android-10.0_2.0.0 : MM_04.05.03_1911_L5.4.0
+ #imx_android-10.0_2.1.0 : MM_04.05.04_2002_L5.4.3
+ #automotive-10.0.0_2.2.0: MM_04.05.04_2002_L5.4.3
+-imx_android-10.0_2.3.0 : MM_04.05.05_2005_L5.4.24
++#imx_android-10.0_2.3.0 : MM_04.05.05_2005_L5.4.24
++imx_android-10.0_2.5.0 : MM_04.05.06_2008_L5.4.47

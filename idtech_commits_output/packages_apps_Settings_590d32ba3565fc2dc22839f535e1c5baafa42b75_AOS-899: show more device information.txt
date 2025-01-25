@@ -1,0 +1,373 @@
+590d32ba35 Brian Lee 2022-04-19
+
+AOS-899: show more device information
+
+01/ Add serial number in Device identifier
+02/ Add model number
+03/ Add product name
+04/ modified hardware version
+05/ Add card reader slot
+
+Change-Id: I2ad73dee6c5aa4cce6f6d6d9cbe6f2f7f8635d2f
+
+diff --git a/res/values/strings.xml b/res/values/strings.xml
+index c4609fb1f5..8a9577538c 100644
+--- a/res/values/strings.xml
++++ b/res/values/strings.xml
+@@ -3378,6 +3378,14 @@
+     <string name="build_number">Build number</string>
+     <!-- About phone screen, tapping this button will take user to a seperate UI to check Google Play system update [CHAR LIMIT=60] -->
+     <string name="module_version">Google Play system update</string>
++    <!-- Label for device's product name [CHAR LIMIT=40] -->
++    <string name="product_name">Product name</string>
++    <!-- Label for device's model number [CHAR LIMIT=40] -->
++    <string name="model_no">Model number</string>
++    <!-- Label for device's card reader name [CHAR LIMIT=40] -->
++    <string name="card_reader_name">Card reader</string>
++    <!-- Label for device's card reader version [CHAR LIMIT=40] -->
++    <string name="card_reader_revision">Card reader version</string>
+ 
+     <!-- About phone screen, show when a value of some status item is unavailable. -->
+     <string name="device_info_not_available">Not available</string>
+diff --git a/res/xml/hardware_info.xml b/res/xml/hardware_info.xml
+index 10de2990ae..2054c0a81f 100644
+--- a/res/xml/hardware_info.xml
++++ b/res/xml/hardware_info.xml
+@@ -30,6 +30,15 @@
+         settings:controller="com.android.settings.deviceinfo.hardwareinfo.DeviceModelPreferenceController"
+         settings:enableCopying="true"/>
+ 
++    <!-- Product Name -->
++    <Preference
++        android:key="hardware_info_device_product_name"
++        android:title="@string/product_name"
++        android:summary="@string/summary_placeholder"
++        android:selectable="false"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.ProductNamePreferenceController"
++        settings:enableCopying="true"/>
++
+     <!-- SerialNumber -->
+     <Preference
+         android:key="hardware_info_device_serial"
+@@ -39,6 +48,24 @@
+         settings:controller="com.android.settings.deviceinfo.hardwareinfo.SerialNumberPreferenceController"
+         settings:enableCopying="true"/>
+ 
++    <!-- Model Number -->
++    <Preference
++        android:key="hardware_info_device_model_no"
++        android:title="@string/model_no"
++        android:summary="@string/summary_placeholder"
++        android:selectable="false"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.ModelNumberPreferenceController"
++        settings:enableCopying="true"/>
++
++    <!-- Board serial number
++    <Preference
++        android:key="hardware_info_device_board_serial"
++        android:title="@string/board_serial_number"
++        android:summary="@string/summary_placeholder"
++        android:selectable="false"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.BoardSerialNumberPreferenceController"
++        settings:enableCopying="true"/>
++    -->
+     <!-- Hardware revision -->
+     <Preference
+         android:key="hardware_info_device_revision"
+@@ -48,4 +75,21 @@
+         settings:controller="com.android.settings.deviceinfo.hardwareinfo.HardwareRevisionPreferenceController"
+         settings:enableCopying="true"/>
+ 
++    <!-- Credit Card Reader Name -->
++    <Preference
++        android:key="hardware_info_device_card_reader_name"
++        android:title="@string/card_reader_name"
++        android:summary="@string/summary_placeholder"
++        android:selectable="false"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.CardReaderNamePreferenceController"
++        settings:enableCopying="true"/>
++
++    <!-- Credit Card Reader Revision-->
++    <Preference
++        android:key="hardware_info_device_card_reader_revision"
++        android:title="@string/card_reader_revision"
++        android:summary="@string/summary_placeholder"
++        android:selectable="false"
++        settings:controller="com.android.settings.deviceinfo.hardwareinfo.CardReaderRevisionPreferenceController"
++        settings:enableCopying="true"/>
+ </PreferenceScreen>
+diff --git a/res/xml/my_device_info.xml b/res/xml/my_device_info.xml
+index 818069b57a..73ec9ee3f6 100644
+--- a/res/xml/my_device_info.xml
++++ b/res/xml/my_device_info.xml
+@@ -137,6 +137,16 @@
+     <PreferenceCategory
+         android:title="@string/my_device_info_device_identifiers_category_title">
+ 
++        <!-- SerialNumber -->
++        <Preference
++            android:key="hardware_info_device_serial"
++            android:order="43"
++            android:title="@string/status_serial_number"
++            android:summary="@string/summary_placeholder"
++            android:selectable="false"
++            settings:controller="com.android.settings.deviceinfo.hardwareinfo.SerialNumberPreferenceController"
++            settings:enableCopying="true"/>
++
+         <!--IP address -->
+         <Preference
+             android:key="wifi_ip_address"
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderNamePreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderNamePreferenceController.java
+new file mode 100644
+index 0000000000..cd9c7e1025
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderNamePreferenceController.java
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.hardwareinfo;
++
++import android.content.Context;
++import android.os.SystemProperties;
++import android.text.TextUtils;
++
++import com.android.settings.R;
++import com.android.settings.core.BasePreferenceController;
++import com.android.settings.slices.Sliceable;
++
++public class CardReaderNamePreferenceController extends BasePreferenceController {
++
++    public CardReaderNamePreferenceController(Context context, String preferenceKey) {
++        super(context, preferenceKey);
++    }
++
++    @Override
++    public int getAvailabilityStatus() {
++        return mContext.getResources().getBoolean(R.bool.config_show_device_model) &&
++                !TextUtils.isEmpty(getSummary()) ? AVAILABLE : UNSUPPORTED_ON_DEVICE;
++    }
++
++    @Override
++    public boolean useDynamicSliceSummary() {
++        return true;
++    }
++
++    @Override
++    public void copy() {
++        Sliceable.setCopyContent(mContext, getSummary(),
++                mContext.getText(R.string.card_reader_name));
++    }
++
++    @Override
++    public CharSequence getSummary() {
++        /* TODO: get name from IDG command*/
++        return "K81";
++    }
++}
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderRevisionPreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderRevisionPreferenceController.java
+new file mode 100644
+index 0000000000..6c7fa7edf7
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/CardReaderRevisionPreferenceController.java
+@@ -0,0 +1,55 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.hardwareinfo;
++
++import android.content.Context;
++import android.os.SystemProperties;
++import android.text.TextUtils;
++
++import com.android.settings.R;
++import com.android.settings.core.BasePreferenceController;
++import com.android.settings.slices.Sliceable;
++
++public class CardReaderRevisionPreferenceController extends BasePreferenceController {
++
++    public CardReaderRevisionPreferenceController(Context context, String preferenceKey) {
++        super(context, preferenceKey);
++    }
++
++    @Override
++    public int getAvailabilityStatus() {
++        return mContext.getResources().getBoolean(R.bool.config_show_device_model) &&
++                !TextUtils.isEmpty(getSummary()) ? AVAILABLE : UNSUPPORTED_ON_DEVICE;
++    }
++
++    @Override
++    public boolean useDynamicSliceSummary() {
++        return true;
++    }
++
++    @Override
++    public void copy() {
++        Sliceable.setCopyContent(mContext, getSummary(),
++                mContext.getText(R.string.card_reader_revision));
++    }
++
++    @Override
++    public CharSequence getSummary() {
++        /* TODO: get version from IDG command*/
++        return SystemProperties.get("ro.boot.hardware.revision");
++    }
++}
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/HardwareRevisionPreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/HardwareRevisionPreferenceController.java
+index e5fd3daa94..fa1659d446 100644
+--- a/src/com/android/settings/deviceinfo/hardwareinfo/HardwareRevisionPreferenceController.java
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/HardwareRevisionPreferenceController.java
+@@ -49,6 +49,6 @@ public class HardwareRevisionPreferenceController extends BasePreferenceControll
+ 
+     @Override
+     public CharSequence getSummary() {
+-        return SystemProperties.get("ro.boot.hardware.revision");
++        return SystemProperties.get("ro.boot.idt.hwrev");
+     }
+ }
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/ModelNumberPreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/ModelNumberPreferenceController.java
+new file mode 100644
+index 0000000000..1f7fe8b03e
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/ModelNumberPreferenceController.java
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.hardwareinfo;
++
++import android.content.Context;
++import android.os.SystemProperties;
++import android.text.TextUtils;
++
++import com.android.settings.R;
++import com.android.settings.core.BasePreferenceController;
++import com.android.settings.slices.Sliceable;
++
++public class ModelNumberPreferenceController extends BasePreferenceController {
++
++    public ModelNumberPreferenceController(Context context, String preferenceKey) {
++        super(context, preferenceKey);
++    }
++
++    @Override
++    public int getAvailabilityStatus() {
++        return mContext.getResources().getBoolean(R.bool.config_show_device_model) &&
++                !TextUtils.isEmpty(getSummary()) ? AVAILABLE : UNSUPPORTED_ON_DEVICE;
++    }
++
++    @Override
++    public boolean useDynamicSliceSummary() {
++        return true;
++    }
++
++    @Override
++    public void copy() {
++        Sliceable.setCopyContent(mContext, getSummary(),
++                mContext.getText(R.string.model_no));
++    }
++
++    @Override
++    public CharSequence getSummary() {
++        return SystemProperties.get("ro.boot.idt.modelno");
++    }
++}
+diff --git a/src/com/android/settings/deviceinfo/hardwareinfo/ProductNamePreferenceController.java b/src/com/android/settings/deviceinfo/hardwareinfo/ProductNamePreferenceController.java
+new file mode 100644
+index 0000000000..cd4ff30616
+--- /dev/null
++++ b/src/com/android/settings/deviceinfo/hardwareinfo/ProductNamePreferenceController.java
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (C) 2019 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++package com.android.settings.deviceinfo.hardwareinfo;
++
++import android.content.Context;
++import android.os.SystemProperties;
++import android.text.TextUtils;
++
++import com.android.settings.R;
++import com.android.settings.core.BasePreferenceController;
++import com.android.settings.slices.Sliceable;
++
++public class ProductNamePreferenceController extends BasePreferenceController {
++
++    public ProductNamePreferenceController(Context context, String preferenceKey) {
++        super(context, preferenceKey);
++    }
++
++    @Override
++    public int getAvailabilityStatus() {
++        return mContext.getResources().getBoolean(R.bool.config_show_device_model) &&
++                !TextUtils.isEmpty(getSummary()) ? AVAILABLE : UNSUPPORTED_ON_DEVICE;
++    }
++
++    @Override
++    public boolean useDynamicSliceSummary() {
++        return true;
++    }
++
++    @Override
++    public void copy() {
++        Sliceable.setCopyContent(mContext, getSummary(),
++                mContext.getText(R.string.product_name));
++    }
++
++    @Override
++    public CharSequence getSummary() {
++        return SystemProperties.get("ro.boot.idt.productname");
++    }
++}

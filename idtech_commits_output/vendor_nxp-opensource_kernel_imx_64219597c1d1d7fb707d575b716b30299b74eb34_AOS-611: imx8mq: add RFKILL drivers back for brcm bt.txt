@@ -1,0 +1,109 @@
+64219597c1d1 George.Huang 2021-05-20
+
+AOS-611: imx8mq: add RFKILL drivers back for brcm bt
+
+Change-Id: I11d4e5c6e84cfea4c309be5587cb2e36a4ae7ac1
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index 121172e0648a..9b983ede3c09 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -140,12 +140,12 @@ sound-rt5640 {
+ 		status = "okay";
+ 	};
+ 
+-	modem_reset: modem-reset {
+-		compatible = "gpio-reset";
+-		reset-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++	bt_rfkill {
++		compatible = "fsl,mxc_bt_rfkill";
++		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+ 		reset-delay-us = <2000>;
+ 		reset-post-delay-ms = <40>;
+-		#reset-cells = <0>;
++		status ="okay";
+ 	};
+ 
+ 	resmem: reserved-memory {
+@@ -767,7 +767,6 @@ &uart2 { /* BT */
+ 	assigned-clocks = <&clk IMX8MQ_CLK_UART2>;
+ 	assigned-clock-parents = <&clk IMX8MQ_SYS1_PLL_80M>;
+ 	fsl,uart-has-rtscts;
+-	resets = <&modem_reset>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk-pcie1-m2.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk-pcie1-m2.dts
+index 652b32644021..eb185127f58f 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk-pcie1-m2.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk-pcie1-m2.dts
+@@ -15,8 +15,8 @@
+ #include "imx8mq-evk.dts"
+ 
+ / {
+-	modem_reset: modem-reset {
+-		reset-gpios = <&gpio3 5 GPIO_ACTIVE_HIGH>;
++	bt_rfkill {
++		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_HIGH>;
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index 5c028187ff24..38a83522aeeb 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -113,12 +113,12 @@ rpmsg_reserved: rpmsg@0xb8000000 {
+ 		};
+ 	};
+ 
+-	modem_reset: modem-reset {
+-		compatible = "gpio-reset";
+-		reset-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
++	bt_rfkill {
++		compatible = "fsl,mxc_bt_rfkill";
++		bt-power-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+ 		reset-delay-us = <2000>;
+ 		reset-post-delay-ms = <40>;
+-		#reset-cells = <0>;
++		status ="okay";
+ 	};
+ 
+ 	resmem: reserved-memory {
+@@ -843,7 +843,6 @@ &uart3 { /* BT */
+ 	assigned-clocks = <&clk IMX8MQ_CLK_UART3>;
+ 	assigned-clock-parents = <&clk IMX8MQ_SYS1_PLL_80M>;
+ 	fsl,uart-has-rtscts;
+-	resets = <&modem_reset>;
+ 	status = "okay";
+ };
+ 
+diff --git a/drivers/bluetooth/Kconfig b/drivers/bluetooth/Kconfig
+index 4e73a531b377..27e570293d1e 100644
+--- a/drivers/bluetooth/Kconfig
++++ b/drivers/bluetooth/Kconfig
+@@ -105,6 +105,13 @@ config BT_HCIUART_SERDEV
+ 	depends on SERIAL_DEV_BUS && BT_HCIUART
+ 	default y
+ 
++config MACH_IMX_BLUETOOTH_RFKILL
++	tristate "i.MX Bluetooth rfkill interface support"
++	default y
++	depends on RFKILL
++	help
++          Say Y to get the standard rfkill interface of Bluetooth
++
+ config BT_HCIUART_H4
+ 	bool "UART (H4) protocol support"
+ 	depends on BT_HCIUART
+diff --git a/drivers/bluetooth/Makefile b/drivers/bluetooth/Makefile
+index 1a58a3ae142c..e4dada3267cb 100644
+--- a/drivers/bluetooth/Makefile
++++ b/drivers/bluetooth/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_BT_HCIBFUSB)	+= bfusb.o
+ obj-$(CONFIG_BT_HCIDTL1)	+= dtl1_cs.o
+ obj-$(CONFIG_BT_HCIBT3C)	+= bt3c_cs.o
+ obj-$(CONFIG_BT_HCIBLUECARD)	+= bluecard_cs.o
++obj-$(CONFIG_MACH_IMX_BLUETOOTH_RFKILL) += mx8_bt_rfkill.o
+ 
+ obj-$(CONFIG_BT_HCIBTUSB)	+= btusb.o
+ obj-$(CONFIG_BT_HCIBTSDIO)	+= btsdio.o

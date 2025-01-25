@@ -1,0 +1,97 @@
+7f83803f5 jenkins 2021-04-26
+
+Merge branch 'merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test' into idt-imx-android-11-test
+
+Change-Id: I02b27a29860bb737daf17ac0287da2f4ffde8187
+
+diff --cc camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+index 2eba7ee38,d28b6e872..5bc77ace4
+--- a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
++++ b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.cpp
+@@@ -283,7 -288,7 +288,11 @@@ void ExternalCameraProviderImpl_2_4::de
+      }
+  }
+  
+++<<<<<<< HEAD
+ +bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName) {
+++=======
++ bool ExternalCameraProviderImpl_2_4::isExternalDevice(const char* devName, const char* sysClassName) {
+++>>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+      int32_t ret = -1;
+      struct v4l2_capability vidCap;
+  
+@@@ -309,6 -314,19 +318,22 @@@
+              return true;
+          }
+          ALOGE("Although %s driver name has uvc, but it's a uvc meta device", devName);
+++<<<<<<< HEAD
+++=======
++     } else if(strstr((const char*)vidCap.driver, "cap")) {
++         //HDMI RX for mek_8qm
++         std::string buffer;
++         std::string propName = "mxc_isi.2.capture"; // TODO: Here is hardcoded for hdmi rx
++         if (!ReadFileToString(std::string(sysClassName), &buffer)) {
++             ALOGE("can't read video device name");
++             return false;
++         }
++ 
++         // string read from ReadFileToString have '
+' in last byte
++         if (propName.compare(0,propName.length(),buffer,0,propName.length()) == 0) {
++             return true;
++         }
+++>>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+      }
+      return false;
+  }
+@@@ -339,9 -357,11 +364,15 @@@ bool ExternalCameraProviderImpl_2_4::Ho
+              if (mInternalDevices.count(deviceId) == 0) {
+                  ALOGV("Non-internal v4l device %s found", de->d_name);
+                  char v4l2DevicePath[kMaxDevicePathLen];
++                 char mCamDevice[kMaxDevicePathLen];
+                  snprintf(v4l2DevicePath, kMaxDevicePathLen,
+                          "%s%s", kDevicePath, de->d_name);
+++<<<<<<< HEAD
+ +                if(mParent->isExternalDevice(v4l2DevicePath))
+++=======
++                 sprintf(mCamDevice, "/sys/class/video4linux/%s/name", de->d_name);
++                 if(mParent->isExternalDevice(v4l2DevicePath, mCamDevice))
+++>>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+                      mParent->deviceAdded(v4l2DevicePath);
+              }
+          }
+@@@ -376,10 -396,14 +407,18 @@@
+                          std::string deviceId(event->name + kPrefixLen);
+                          if (mInternalDevices.count(deviceId) == 0) {
+                              char v4l2DevicePath[kMaxDevicePathLen];
++                             char mCamDevice[kMaxDevicePathLen];
+                              snprintf(v4l2DevicePath, kMaxDevicePathLen,
+                                      "%s%s", kDevicePath, event->name);
++                             sprintf(mCamDevice, "/sys/class/video4linux/%s/name", de->d_name);
+                              if (event->mask & IN_CREATE) {
+++<<<<<<< HEAD
+ +                                if(mParent->isExternalDevice(v4l2DevicePath))
+++=======
++                                 // usb camera is not ready until 100ms.
++                                 usleep(100000);
++                                 if(mParent->isExternalDevice(v4l2DevicePath, mCamDevice))
+++>>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+                                      mParent->deviceAdded(v4l2DevicePath);
+                              }
+                              if (event->mask & IN_DELETE) {
+diff --cc camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
+index 3fddc41a3,6113142bd..c9417b57e
+--- a/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
++++ b/camera/provider/2.4/default/ExternalCameraProviderImpl_2_4.h
+@@@ -83,7 -83,7 +83,11 @@@ private
+  
+      void deviceRemoved(const char* devName);
+  
+++<<<<<<< HEAD
+ +    bool isExternalDevice(const char* devName);
+++=======
++     bool isExternalDevice(const char* devName, const char* sysClassName);
+++>>>>>>> merge_android-11.0.0-2.0.0_to_idt-imx-android-11-test
+  
+      class HotplugThread : public android::Thread {
+      public:

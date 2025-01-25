@@ -1,0 +1,116 @@
+9c559759 Jay 2021-06-21
+
+AOS-663: Add test script for SD card electrical test
+
+Add script to read/write SD card first partition for
+HW electrical testing.
+
+Change-Id: Ifb303b37e90b14e240320ef2d56a6b10725760a6
+
+diff --git a/common/tools/sdcard_test.sh b/common/tools/sdcard_test.sh
+new file mode 100755
+index 00000000..1a36d19a
+--- /dev/null
++++ b/common/tools/sdcard_test.sh
+@@ -0,0 +1,85 @@
++#!/bin/bash
++
++scan_path=/sys/block
++mmc_path=/sys/block/mmcblk
++device_typ_file=/device/type
++erase_size_file=/device/erase_size
++sd_type=SD
++found=false
++erase_size=0
++blk_cnt=0
++block_name=mmcblk
++opt_flag=write
++
++helpFunction()
++{
++	echo ""
++	echo "Usage: adb shell source sdcard_test.sh read"
++	echo -e "	write: write data into sdcard first partition"
++	echo -e "	read: read data from sdcard first partition"
++	echo -e "	?: show help"
++	exit 1
++}
++
++if [ $# != 1 ]; then
++	helpFunction
++	exit 1
++fi
++
++opt_flag=$1
++
++if [ $opt_flag != "write" ] && [ $opt_flag != "read" ]; then
++	helpFunction
++	exit 1
++fi
++
++echo "Press Ctrl + c to stop SD card testing
+"
++
++for entry in "$scan_path"/*
++do
++	# Find out mmc device in block directory
++	if [[ "$entry" == "$mmc_path"? ]]; then
++		while IFS= read -r type
++		do
++			# Find SDCard type mmc device
++			if [ "$type" == "$sd_type" ]; then
++				found=true
++				echo "Found SD Card in $entry"
++				echo "Start testing"
++
++				block_name=$(echo $entry | cut -d'/' -f 4)
++
++				# Read erase block size
++				while IFS= read -r size
++				do
++					erase_size=$size
++				done < "$entry$erase_size_file"
++
++				# Read block count
++				while IFS= read -r size
++				do
++					blk_cnt=$size
++				done < "$entry"/"$block_name"p1/size
++
++				echo "opt : $opt_flag"
++				while :
++				do
++					# Write random data into SDCard first parition
++					if [ $opt_flag == "write" ]; then
++						echo "Write random data into SD Card"
++						dd bs=$erase_size count=$blk_cnt if=/dev/urandom of=/dev/block/"$block_name"p1
++					else
++						echo "Read data from SD Card"
++						dd if=/dev/block/"$block_name"p1 of=/dev/null
++					fi
++
++					echo "Press Ctrl + c to stop SD card testing
+"
++				done
++			fi
++		done < "$entry$device_typ_file"
++	fi
++done
++
++if [ "$found" == "false" ]; then
++	echo "Cannot found SD Card"
++fi
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 5df01aec..46a5362e 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -132,7 +132,8 @@ PRODUCT_PACKAGES += \
+     SystemUpdaterSample
+ 
+ PRODUCT_COPY_FILES += \
+-    $(CONFIG_REPO_PATH)/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml
++    $(CONFIG_REPO_PATH)/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
++    $(CONFIG_REPO_PATH)/common/tools/sdcard_test.sh:sdcard_test.sh
+ 
+ 
+ # A/B OTA

@@ -1,0 +1,37 @@
+963b00af owen.wen 2021-02-18
+
+AOS-435: update_engine fail to read OTA package since scoped storage
+
+according to below AOSP ota updater README
+https://android.googlesource.com/platform/bootable/recovery/+/master/updater_sample/README.md
+
+OTA pacakge can be installed with the privileged system permissions:
+  install in /product/priv-app/ (LOCAL_MODULE_PATH := $(TARGET_OUT_PRODUCT_APPS_PRIVILEGED)
+  add privapp-permissions android.permission.ACCESS_CACHE_FILESYSTEM in privapp-permissions-platform.xml
+  read/write access right to /data/ota_package/ is granted only to system apps
+
+auditd  : type=1400 audit(0.0:45): avc: denied { relabelto } for comm="tech.otaupdater" name="android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=425154 scontext=u:r:system_app:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=0
+auditd  : type=1400 audit(0.0:112): avc: denied { relabelfrom } for comm="tech.otaupdater" name="android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=122642 scontext=u:r:system_app:s0 tcontext=u:object_r:ota_package_file:s0 tclass=file permissive=1
+auditd  : type=1400 audit(0.0:111): avc: denied { setattr } for comm="tech.otaupdater" name="android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=122642 scontext=u:r:system_app:s0 tcontext=u:object_r:ota_package_file:s0 tclass=file permissive=1
+auditd  : type=1400 audit(0.0:110): avc: denied { write open } for comm="tech.otaupdater" path="/data/ota_package/android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=122642 scontext=u:r:system_app:s0 tcontext=u:object_r:ota_package_file:s0 tclass=file permissive=1
+auditd  : type=1400 audit(0.0:80): avc: denied { search } for comm="tech.otaupdater" name="ota_package" dev="dm-9" ino=122641 scontext=u:r:system_app:s0 tcontext=u:object_r:ota_package_file:s0 tclass=dir permissive=0
+auditd  : type=1400 audit(0.0:43): avc: denied { write } for comm="tech.otaupdater" name="com.idtech.otaupdater-pp1FK2Hc3c_7STDsR6gvDg==" dev="dm-9" ino=596850 scontext=u:r:system_app:s0 tcontext=u:object_r:apk_data_file:s0 tclass=dir permissive=0
+auditd  : type=1400 audit(0.0:46): avc: denied { getattr } for comm="tech.otaupdater" path="/data/ota_package/android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=425154 scontext=u:r:system_app:s0 tcontext=u:object_r:ota_package_file:s0 tclass=file permissive=0
+auditd  : type=1400 audit(0.0:45): avc: denied { relabelto } for comm="tech.otaupdater" name="android_11_idt_dev_210121-bigcypress_8mq-userdebug-fullota_lpddr4-dual-signed.zip" dev="dm-9" ino=425154 scontext=u:r:system_app:s0 tcontext=u:object_r:media_rw_data_file:s0 tclass=file permissive=0
+
+Change-Id: I825c1c64e9d592916541d3df418c98f4cdc5bd94
+
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index aa5a018c..1644ec56 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -12,6 +12,9 @@ allow system_app ctl_default_prop:property_service  { set };
+ allow system_app dhcp_prop:property_service  { set };
+ allow system_app update_engine:binder { call transfer };
+ allow system_app fs_bpf:dir { search };
++allow system_app ota_package_file:dir rw_dir_perms;
++allow system_app ota_package_file:file { create_file_perms relabelfrom };
++allow system_app media_rw_data_file:file relabelto;
+ 
+ get_prop(system_app, vendor_default_prop)
+ set_prop(system_app, vendor_idtech_prop)

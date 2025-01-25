@@ -1,0 +1,53 @@
+703328eb4874 jay deng 2020-09-08
+
+AOS-312: Enable thermal sensor function
+
+Setup device tree for thermal sensor. Connect with I2C directly
+or connect via I2C bridge CP2112, both working.
+The board of mlx90614 does not support wake up pin, so it would
+not enter sleep mode.
+
+Change-Id: Ie1eb045469ee9b9b8e419fb99dcc6bfcaf439809
+
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+index 04632138027b..ff4b46a4a53c 100755
+--- a/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
++++ b/arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+@@ -250,6 +250,13 @@ sound-ak4497 {
+ 		audio-codec = <&ak4497>;
+ 		status = "disabled";
+ 	};
++
++	i2c@cp2112 {
++		mlx90xxx: mlx90614@5a {
++			compatible = "melexis,mlx90614";
++			reg = <0x5a>;
++		};
++	};
+ };
+ 
+ &A53_0 {
+@@ -670,6 +677,11 @@ ov5640_mipi1_ep: endpoint {
+ 			};
+ 		};
+ 	};
++
++	mlx90614: mlx90614@5a {
++		compatible = "melexis,mlx90614";
++		reg = <0x5a>;
++	};
+ };
+ 
+ &pcie0 {
+diff --git a/drivers/hid/hid-cp2112.c b/drivers/hid/hid-cp2112.c
+index db1b55df0d13..3f14d8ede07e 100644
+--- a/drivers/hid/hid-cp2112.c
++++ b/drivers/hid/hid-cp2112.c
+@@ -1311,6 +1311,7 @@ static int cp2112_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ 	dev->adap.algo		= &smbus_algorithm;
+ 	dev->adap.algo_data	= dev;
+ 	dev->adap.dev.parent	= &hdev->dev;
++	dev->adap.dev.of_node   = of_find_node_by_path("/i2c@cp2112");
+ 	snprintf(dev->adap.name, sizeof(dev->adap.name),
+ 		 "CP2112 SMBus Bridge on hidraw%d",
+ 		 ((struct hidraw *)hdev->hidraw)->minor);

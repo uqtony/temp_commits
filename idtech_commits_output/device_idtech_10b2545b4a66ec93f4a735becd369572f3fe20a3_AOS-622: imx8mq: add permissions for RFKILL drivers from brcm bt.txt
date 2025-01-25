@@ -1,0 +1,44 @@
+10b2545b George.Huang 2021-05-28
+
+AOS-622: imx8mq: add permissions for RFKILL drivers from brcm bt
+
+Error Log:
+  D android.hardware.bluetooth@1.0-impl: Open vendor library loaded
+  E bt_upio : set_bluetooth_power : open(/sys/class/rfkill/rfkill0/state) for write failed: Permission denied (13)
+  W bt_vendor: NOTE: BT_VND_PWR_ON now forces power-off first
+  E bt_upio : set_bluetooth_power : open(/sys/class/rfkill/rfkill0/state) for write failed: Permission denied (13)
+
+Change-Id: Ib79292351e2e32e95aa52d26d10d2e203c1dd463
+
+diff --git a/imx8m/bigcypress_8mq/init.rc b/imx8m/bigcypress_8mq/init.rc
+index eb6f470b..c817f240 100644
+--- a/imx8m/bigcypress_8mq/init.rc
++++ b/imx8m/bigcypress_8mq/init.rc
+@@ -116,6 +116,11 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     # Prepare for wifi
+     setprop wifi.interface wlan0
+ 
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
++
+     # Disable surfaceflinger back pressure propagate
+     setprop debug.sf.disable_backpressure 1
+ 
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index f6b092a6..18c4590d 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -116,6 +116,11 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     # Prepare for wifi
+     setprop wifi.interface wlan0
+ 
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
++
+     # Disable surfaceflinger back pressure propagate
+     setprop debug.sf.disable_backpressure 1
+ 

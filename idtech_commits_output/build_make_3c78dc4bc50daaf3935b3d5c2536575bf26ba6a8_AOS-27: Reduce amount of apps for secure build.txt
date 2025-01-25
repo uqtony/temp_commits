@@ -1,0 +1,137 @@
+3c78dc4bc owen.wen 2020-04-17
+
+AOS-27: Reduce amount of apps for secure build
+
+Change-Id: I01bc561ac1670544c595fa7f12a30e6eb699e2aa
+
+diff --git a/target/product/base_system.mk b/target/product/base_system.mk
+index e4592f8ff..e7d7110ff 100644
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@ -17,7 +17,9 @@
+ # install adbd if string TARGET_PRODUCT contains no secure
+ ifneq (secure,$(findstring secure, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+-    adbd
++    adbd \
++    monkey \
++    WallpaperBackup
+ endif
+ 
+ # Base modules and settings for the system partition.
+@@ -210,7 +212,6 @@ PRODUCT_PACKAGES += \
+     MediaProvider \
+     mediaserver \
+     mke2fs \
+-    monkey \
+     mtpd \
+     ndc \
+     netd \
+@@ -266,7 +267,6 @@ PRODUCT_PACKAGES += \
+     viewcompiler \
+     voip-common \
+     vold \
+-    WallpaperBackup \
+     watchdogd \
+     wificond \
+     wifi-service \
+diff --git a/target/product/handheld_product.mk b/target/product/handheld_product.mk
+index 0d100b267..66f75fc3c 100644
+--- a/target/product/handheld_product.mk
++++ b/target/product/handheld_product.mk
+@@ -20,27 +20,31 @@
+ # does, use base_vendor.mk).
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/media_product.mk)
+ 
+-# /product packages
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
++    frameworks-base-overlays \
++    OneTimeInitializer \
++    DeskClock \
+     Browser2 \
++    Email \
++    Music \
++    Gallery2 \
+     Calendar \
+     Camera2 \
+     Contacts \
+-    DeskClock \
+-    Email \
+-    Gallery2 \
++    WallpaperCropper
++endif
++
++# /product packages
++PRODUCT_PACKAGES += \
+     LatinIME \
+     Launcher3QuickStep \
+-    Music \
+-    OneTimeInitializer \
+     Provision \
+     QuickSearchBox \
+     Settings \
+     SettingsIntelligence \
+     StorageManager \
+-    SystemUI \
+-    WallpaperCropper \
+-    frameworks-base-overlays
++    SystemUI
+ 
+ PRODUCT_PACKAGES_DEBUG += \
+     frameworks-base-overlays-debug
+diff --git a/target/product/handheld_system.mk b/target/product/handheld_system.mk
+index 6463a541b..f9868b177 100644
+--- a/target/product/handheld_system.mk
++++ b/target/product/handheld_system.mk
+@@ -31,8 +31,14 @@ $(call inherit-product-if-exists, external/hyphenation-patterns/patterns.mk)
+ $(call inherit-product-if-exists, frameworks/base/data/keyboards/keyboards.mk)
+ $(call inherit-product-if-exists, frameworks/webview/chromium/chromium.mk)
+ 
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+     BasicDreams \
++    screenrecord \
++    EasterEgg
++endif
++
++PRODUCT_PACKAGES += \
+     BlockedNumberProvider \
+     Bluetooth \
+     BluetoothMidiService \
+@@ -46,7 +52,6 @@ PRODUCT_PACKAGES += \
+     clatd.conf \
+     DocumentsUI \
+     DownloadProviderUi \
+-    EasterEgg \
+     ExternalStorageProvider \
+     FusedLocation \
+     InputDevices \
+@@ -62,7 +67,6 @@ PRODUCT_PACKAGES += \
+     PrintRecommendationService \
+     PrintSpooler \
+     ProxyHandler \
+-    screenrecord \
+     SecureElement \
+     SharedStorageBackup \
+     SimAppDialog \
+diff --git a/target/product/telephony_product.mk b/target/product/telephony_product.mk
+index a4c7e31f5..15c726ec8 100644
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@ -17,8 +17,12 @@
+ # This is the list of modules that are specific to products that have telephony
+ # hardware, and install to the product partition.
+ 
+-# /product packages
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ PRODUCT_PACKAGES += \
+-    CarrierConfig \
+-    Dialer \
+     EmergencyInfo \
++    Dialer
++endif
++
++# /product packages
++PRODUCT_PACKAGES += \
++    CarrierConfig

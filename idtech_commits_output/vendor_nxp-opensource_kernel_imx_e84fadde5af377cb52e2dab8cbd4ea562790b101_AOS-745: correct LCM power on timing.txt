@@ -1,0 +1,245 @@
+e84fadde5af3 AndrewS 2021-10-01
+
+AOS-745: correct LCM power on timing
+
+Change-Id: I75be68c67b0cc929c371a0e97bde14085b364146
+
+diff --git a/drivers/gpu/drm/bridge/chipone-icn6211.c b/drivers/gpu/drm/bridge/chipone-icn6211.c
+index a6151db95586..1e5043795c1a 100644
+--- a/drivers/gpu/drm/bridge/chipone-icn6211.c
++++ b/drivers/gpu/drm/bridge/chipone-icn6211.c
+@@ -35,6 +35,8 @@ struct chipone {
+ 	struct regulator *vdd1;
+ 	struct regulator *vdd2;
+ 	struct regulator *vdd3;
++	bool		pre_enabled;
++	bool		enabled;
+ };
+ 
+ static inline struct chipone *bridge_to_chipone(struct drm_bridge *bridge)
+@@ -66,6 +68,9 @@ static void chipone_enable(struct drm_bridge *bridge)
+ 	struct chipone *icn = bridge_to_chipone(bridge);
+ 	struct drm_display_mode *mode = bridge_to_mode(bridge);
+ 
++	if (icn->enabled)
++		return;
++
+ 	ICN6211_DSI(icn, 0x7a, 0xc1);
+ 
+ 	ICN6211_DSI(icn, HACTIVE_LI, mode->hdisplay & 0xff);
+@@ -112,6 +117,8 @@ static void chipone_enable(struct drm_bridge *bridge)
+ 	ICN6211_DSI(icn, 0x09, 0x10);
+ 
+ 	usleep_range(10000, 11000);
++
++	icn->enabled = true;
+ }
+ 
+ static void chipone_pre_enable(struct drm_bridge *bridge)
+@@ -119,6 +126,9 @@ static void chipone_pre_enable(struct drm_bridge *bridge)
+ 	struct chipone *icn = bridge_to_chipone(bridge);
+ 	int ret;
+ 
++	if (icn->pre_enabled)
++		return;
++
+ 	if (icn->vdd1) {
+ 		ret = regulator_enable(icn->vdd1);
+ 		if (ret)
+@@ -143,6 +153,8 @@ static void chipone_pre_enable(struct drm_bridge *bridge)
+ 	gpiod_set_value(icn->enable_gpio, 1);
+ 
+ 	usleep_range(10000, 11000);
++
++	icn->pre_enabled = true;
+ }
+ 
+ static void chipone_post_disable(struct drm_bridge *bridge)
+@@ -159,6 +171,7 @@ static void chipone_post_disable(struct drm_bridge *bridge)
+ 		regulator_disable(icn->vdd3);
+ 
+ 	gpiod_set_value(icn->enable_gpio, 0);
++	icn->enabled = false;
+ }
+ 
+ static int chipone_attach(struct drm_bridge *bridge, enum drm_bridge_attach_flags flags)
+@@ -228,8 +241,10 @@ static int chipone_parse_dt(struct chipone *icn)
+ static int chipone_probe(struct mipi_dsi_device *dsi)
+ {
+ 	struct device *dev = &dsi->dev;
++	struct device_node *np = dev->of_node;
+ 	struct chipone *icn;
+ 	int ret;
++	int video_mode;
+ 
+ 	icn = devm_kzalloc(dev, sizeof(struct chipone), GFP_KERNEL);
+ 	if (!icn)
+@@ -238,6 +253,9 @@ static int chipone_probe(struct mipi_dsi_device *dsi)
+ 	mipi_dsi_set_drvdata(dsi, icn);
+ 	icn->dev = dev;
+ 
++	icn->pre_enabled = false;
++	icn->enabled = false;
++
+ 	ret = chipone_parse_dt(icn);
+ 	if (ret)
+ 		return ret;
+@@ -252,6 +270,27 @@ static int chipone_probe(struct mipi_dsi_device *dsi)
+ 	dsi->format = MIPI_DSI_FMT_RGB888;
+ 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
+ 
++	ret = of_property_read_u32(np, "video-mode", &video_mode);
++	if (!ret) {
++		switch (video_mode) {
++		case 0:
++			/* burst mode */
++			dsi->mode_flags |= MIPI_DSI_MODE_VIDEO_BURST;
++			break;
++		case 1:
++			/* non-burst mode with sync event */
++			break;
++		case 2:
++			/* non-burst mode with sync pulse */
++			dsi->mode_flags |= MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
++			break;
++		default:
++			dev_warn(dev, "invalid video mode %d
+", video_mode);
++			break;
++
++		}
++	}
++
+ 	ret = mipi_dsi_attach(dsi);
+ 	if (ret < 0) {
+ 		drm_bridge_remove(&icn->bridge);
+diff --git a/drivers/gpu/drm/panel/panel-sitronix-st7262.c b/drivers/gpu/drm/panel/panel-sitronix-st7262.c
+index 4a57ba2a4bf9..455344c68106 100644
+--- a/drivers/gpu/drm/panel/panel-sitronix-st7262.c
++++ b/drivers/gpu/drm/panel/panel-sitronix-st7262.c
+@@ -45,6 +45,9 @@ struct st7262 {
+ 	struct videomode vm;
+ 	u32 width_mm;
+ 	u32 height_mm;
++
++	bool enabled;
++	bool prepared;
+ };
+ 
+  static const struct display_timing st7262_default_timing = {
+@@ -70,11 +73,23 @@ static inline struct st7262 *panel_to_st7262(struct drm_panel *panel)
+ 
+ static int st7262_enable(struct drm_panel *panel)
+ {
++	struct st7262 *ctx = panel_to_st7262(panel);
++
++	if (ctx->enabled)
++		return 0;
++
++	//switch DISP from 0 to 1
++	gpiod_set_value_cansleep(ctx->enable, 1);
++
++	ctx->enabled = true;
++
+ 	return backlight_enable(panel->backlight);
+ }
+ 
+ static int st7262_disable(struct drm_panel *panel)
+ {
++	struct st7262 *ctx = panel_to_st7262(panel);
++	ctx->enabled = false;
+ 	return backlight_disable(panel->backlight);
+ }
+ 
+@@ -99,6 +114,7 @@ static int st7262_get_modes(struct drm_panel *panel,
+ 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+ 	drm_mode_probed_add(connector, mode);
+ 
++	ctx->enabled = false;
+ 	return 1;
+ }
+ 
+@@ -107,6 +123,9 @@ static int st7262_prepare(struct drm_panel *panel)
+ 	struct st7262 *ctx = panel_to_st7262(panel);
+ 	int ret;
+ 
++	if (ctx->prepared)
++		return 0;
++
+ 	ret = regulator_enable(ctx->power);
+ 	if (ret) {
+ 		dev_err(panel->dev, "Fail to enable regualtor : %d
+", ret);
+@@ -116,19 +135,12 @@ static int st7262_prepare(struct drm_panel *panel)
+ 	//Waiting for ICN6211 and power stable
+ 	msleep(10);
+ 
+-	//switch GRB reset from 0 to 1
+-	gpiod_set_value_cansleep(ctx->reset, 1);
+-
+-	//According datasheet interval of GRB Reset and DISP should be 10ms
+-	msleep(10);
+-
+-	//switch DISP from 0 to 1
+-	gpiod_set_value_cansleep(ctx->enable, 1);
+-
+ 	// setting other display parameter via spi
+ 	// if we use default setting then we do not
+ 	// need to do anything.
+ 
++	ctx->prepared = true;
++
+ 	return 0;
+ }
+ 
+@@ -140,15 +152,14 @@ static int st7262_unprepare(struct drm_panel *panel)
+ 	//switch DISP from 1 to 0
+ 	gpiod_set_value_cansleep(ctx->enable, 0);
+ 
+-	//switch GRB reset from 1 to 0
+-	gpiod_set_value_cansleep(ctx->reset, 0);
+-
+ 	ret = regulator_disable(ctx->power);
+ 	if (ret) {
+ 		dev_err(panel->dev, "Fail to disable regualtor : %d
+", ret);
+ 		return ret;
+ 	}
+ 
++	ctx->prepared = false;
++
+ 	return 0;
+ }
+ 
+@@ -172,6 +183,9 @@ static int st7262_probe(struct spi_device *spi)
+ 	if (!ctx)
+ 		return -ENOMEM;
+ 
++	ctx->prepared = false;
++	ctx->enabled = false;
++
+ 	spi_set_drvdata(spi, ctx);
+ 	ctx->spi = spi;
+ 
+@@ -182,12 +196,6 @@ static int st7262_probe(struct spi_device *spi)
+ 	if (IS_ERR(ctx->power))
+ 		return PTR_ERR(ctx->power);
+ 
+-	ctx->reset = devm_gpiod_get(&spi->dev, "reset", GPIOD_OUT_LOW);
+-	if (IS_ERR(ctx->reset)) {
+-		dev_err(&spi->dev, "Couldn't get our reset line
+");
+-		return PTR_ERR(ctx->reset);
+-	}
+-
+ 	ctx->enable = devm_gpiod_get(&spi->dev, "enable", GPIOD_OUT_LOW);
+ 	if (IS_ERR(ctx->enable)) {
+ 		dev_err(&spi->dev, "Couldn't get our enable line
+");
+@@ -243,4 +251,4 @@ module_spi_driver(st7262_driver);
+ 
+ MODULE_AUTHOR("Jay Deng <jay.deng@idtechproducts.com>");
+ MODULE_DESCRIPTION("Sitronix st7262 LCD Driver");
+-MODULE_LICENSE("GPL v2");
+\ No newline at end of file
++MODULE_LICENSE("GPL v2");

@@ -1,0 +1,958 @@
+08d2ed4d George.Huang 2020-06-04
+
+Switch symlinks to regular files for modifying
+
+Change-Id: If58d6bf2befd5845fdbacc7df422b6d94c8512a8
+
+diff --git a/imx8m/evk_a100/UbootKernelBoardConfig.mk b/imx8m/evk_a100/UbootKernelBoardConfig.mk
+deleted file mode 120000
+index b50a818f..00000000
+--- a/imx8m/evk_a100/UbootKernelBoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/UbootKernelBoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/UbootKernelBoardConfig.mk b/imx8m/evk_a100/UbootKernelBoardConfig.mk
+new file mode 100644
+index 00000000..e17ad36f
+--- /dev/null
++++ b/imx8m/evk_a100/UbootKernelBoardConfig.mk
+@@ -0,0 +1,26 @@
++# from BoardConfig.mk
++TARGET_BOOTLOADER_POSTFIX := bin
++UBOOT_POST_PROCESS := true
++
++# u-boot target for stand config and Trusty OS config
++TARGET_BOOTLOADER_CONFIG := imx8mn:imx8mn_ddr4_evk_android_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mn-dual:imx8mn_ddr4_evk_android_dual_defconfig
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++  TARGET_BOOTLOADER_CONFIG += imx8mn-trusty:imx8mn_ddr4_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mn-trusty-secure-unlock:imx8mn_ddr4_evk_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mn-trusty-dual:imx8mn_ddr4_evk_android_trusty_dual_defconfig
++endif
++# u-boot target used by uuu for imx8mn_evk
++TARGET_BOOTLOADER_CONFIG += imx8mn-evk-uuu:imx8mn_ddr4_evk_android_uuu_defconfig
++
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
++
++TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
++
++
++# absolute path is used, not the same as relative path used in AOSP make
++TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
++
++# define bootloader rollback index
++BOOTLOADER_RBINDEX ?= 0
++
+diff --git a/imx8m/evk_a100/android_addition_defconfig b/imx8m/evk_a100/android_addition_defconfig
+deleted file mode 120000
+index 70a346dd..00000000
+--- a/imx8m/evk_a100/android_addition_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/android_addition_defconfig
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/android_addition_defconfig b/imx8m/evk_a100/android_addition_defconfig
+new file mode 100644
+index 00000000..18be38d6
+--- /dev/null
++++ b/imx8m/evk_a100/android_addition_defconfig
+@@ -0,0 +1 @@
++CONFIG_CLD_HL_SDIO_CORE=y
+diff --git a/imx8m/evk_a100/android_secure_defconfig b/imx8m/evk_a100/android_secure_defconfig
+new file mode 100644
+index 00000000..07c19dbb
+--- /dev/null
++++ b/imx8m/evk_a100/android_secure_defconfig
+@@ -0,0 +1 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
+diff --git a/imx8m/evk_a100/audio_policy_configuration.xml b/imx8m/evk_a100/audio_policy_configuration.xml
+deleted file mode 120000
+index f9db6386..00000000
+--- a/imx8m/evk_a100/audio_policy_configuration.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/audio_policy_configuration.xml
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/audio_policy_configuration.xml b/imx8m/evk_a100/audio_policy_configuration.xml
+new file mode 100644
+index 00000000..50f2a380
+--- /dev/null
++++ b/imx8m/evk_a100/audio_policy_configuration.xml
+@@ -0,0 +1,91 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<!-- Copyright (C) 2017 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
++    <globalConfiguration speaker_drc_enabled="true"/>
++
++    <modules>
++        <module name="primary" halVersion="2.0">
++            <attachedDevices>
++                <item>Speaker</item>
++                <item>Built-In Mic</item>
++            </attachedDevices>
++            <defaultOutputDevice>Speaker</defaultOutputDevice>
++            <mixPorts>
++                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="esai output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000,96000,192000,384000,768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_QUAD,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
++                    <profile name="" format="AUDIO_FORMAT_PCM_FLOAT"
++                             samplingRates="48000,96000,192000,384000,768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_QUAD,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
++                </mixPort>
++                <mixPort name="dsd output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD">
++                    <profile name="" format="AUDIO_FORMAT_DSD"
++                             samplingRates="2822400,5644800,11289600,22579200" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="primary input" role="sink">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
++                             channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++                </mixPort>
++            </mixPorts>
++            <devicePorts>
++                <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink" >
++                </devicePort>
++                <devicePort tagName="Wired Headphones" type="AUDIO_DEVICE_OUT_WIRED_HEADPHONE" role="sink">
++                </devicePort>
++                <devicePort tagName="Line-Out" type="AUDIO_DEVICE_OUT_LINE" role="sink">
++                </devicePort>
++
++                <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
++                </devicePort>
++                <devicePort tagName="Spdif-In" type="AUDIO_DEVICE_IN_AUX_DIGITAL" role="source">
++                </devicePort>
++            </devicePorts>
++            <routes>
++                <route type="mix" sink="Speaker"
++                       sources="primary output"/>
++                <route type="mix" sink="Wired Headphones"
++                       sources="dsd output,esai output,primary output"/>
++                <route type="mix" sink="Line-Out"
++                       sources="dsd output,esai output,primary output"/>
++
++                <route type="mix" sink="primary input"
++                       sources="Built-In Mic,Spdif-In"/>
++            </routes>
++        </module>
++
++        <!-- A2dp Audio HAL -->
++        <xi:include href="a2dp_audio_policy_configuration.xml"/>
++
++        <!-- Usb Audio HAL -->
++        <xi:include href="usb_audio_policy_configuration.xml"/>
++
++        <!-- Remote Submix Audio HAL -->
++        <xi:include href="r_submix_audio_policy_configuration.xml"/>
++
++    </modules>
++
++    <!-- Volume section -->
++    <xi:include href="audio_policy_volumes.xml"/>
++    <xi:include href="default_volume_tables.xml"/>
++
++</audioPolicyConfiguration>
+diff --git a/imx8m/evk_a100/fstab.freescale b/imx8m/evk_a100/fstab.freescale
+deleted file mode 120000
+index 3b1f1d6e..00000000
+--- a/imx8m/evk_a100/fstab.freescale
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/fstab.freescale
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/fstab.freescale b/imx8m/evk_a100/fstab.freescale
+new file mode 100644
+index 00000000..2b4c32d5
+--- /dev/null
++++ b/imx8m/evk_a100/fstab.freescale
+@@ -0,0 +1,11 @@
++# Android fstab file.
++#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
++# The filesystem that contains the filesystem checker binary (typically /system) cannot
++# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
++
++/devices/platform/soc@0/32c00000.bus/32e40000.usb/ci_hdrc.0/* auto auto defaults voldmanaged=usb:auto
++/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
++/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
++/dev/block/zram0 none swap defaults zramsize=629145600
++/tmp /sdcard none defaults,bind recoveryonly
++
+diff --git a/imx8m/evk_a100/manifest.xml b/imx8m/evk_a100/manifest.xml
+deleted file mode 120000
+index bb0844f4..00000000
+--- a/imx8m/evk_a100/manifest.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/manifest.xml
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/manifest.xml b/imx8m/evk_a100/manifest.xml
+new file mode 100644
+index 00000000..4bba8783
+--- /dev/null
++++ b/imx8m/evk_a100/manifest.xml
+@@ -0,0 +1,256 @@
++<manifest version="1.0" type="device" target-level="4">
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.3</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.keymaster</name>
++        <transport>hwbinder</transport>
++        <version>3.0</version>
++        <interface>
++            <name>IKeymasterDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.drm</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ICryptoFactory</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IDrmFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>2.1</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.configstore</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>ISurfaceFlingerConfigs</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi</name>
++       <transport>hwbinder</transport>
++       <version>1.3</version>
++       <interface>
++           <name>IWifi</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi.supplicant</name>
++       <transport>hwbinder</transport>
++       <version>1.2</version>
++       <interface>
++           <name>ISupplicant</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.wifi.hostapd</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IHostapd</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.camera.provider</name>
++	<transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.4</version>
++	<interface>
++	    <name>ICameraProvider</name>
++	    <instance>legacy/0</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.light</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>ILight</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>5.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++		<version>5.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IUsb</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb.gadget</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IUsbGadget</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.boot</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBootControl</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.oemlock</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOemLock</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.health</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>IHealth</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.neuralnetworks</name>
++        <transport>hwbinder</transport>
++        <version>1.2</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>vsi-npu</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/evk_a100/ueventd.freescale.rc b/imx8m/evk_a100/ueventd.freescale.rc
+deleted file mode 120000
+index 5205b1b6..00000000
+--- a/imx8m/evk_a100/ueventd.freescale.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/ueventd.freescale.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/ueventd.freescale.rc b/imx8m/evk_a100/ueventd.freescale.rc
+new file mode 100644
+index 00000000..9645107b
+--- /dev/null
++++ b/imx8m/evk_a100/ueventd.freescale.rc
+@@ -0,0 +1,20 @@
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/presistdata 0600   system     system
++/dev/ttymxc0              0660   bluetooth  bluetooth
++/dev/snd/*                0660   system     audio
++/dev/video*               0660   system     camera
++/dev/mxc_hantro           0660   media      drmrpc
++/dev/mxc_hantro_h1        0660   media      drmrpc
++/dev/uinput               0660   system     bluetooth
++/dev/ion                  0666   media      drmrpc
++/dev/galcore	          0666 	 system     graphics
++/dev/graphics/fb0         0660   system     graphics
++/dev/watchdog             0660   system     root
++/dev/mmcblk2rpmb    0600   system     system
++/dev/trusty-ipc-dev0      0660   system     drmrpc
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_temp 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_temp 0660 system system
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
+diff --git a/imx8m/vp6820_8mn/android_addition_defconfig b/imx8m/vp6820_8mn/android_addition_defconfig
+deleted file mode 120000
+index 70a346dd..00000000
+--- a/imx8m/vp6820_8mn/android_addition_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/android_addition_defconfig
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/android_addition_defconfig b/imx8m/vp6820_8mn/android_addition_defconfig
+new file mode 100644
+index 00000000..18be38d6
+--- /dev/null
++++ b/imx8m/vp6820_8mn/android_addition_defconfig
+@@ -0,0 +1 @@
++CONFIG_CLD_HL_SDIO_CORE=y
+diff --git a/imx8m/vp6820_8mn/android_secure_defconfig b/imx8m/vp6820_8mn/android_secure_defconfig
+new file mode 100644
+index 00000000..07c19dbb
+--- /dev/null
++++ b/imx8m/vp6820_8mn/android_secure_defconfig
+@@ -0,0 +1 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
+diff --git a/imx8m/vp6820_8mn/audio_policy_configuration.xml b/imx8m/vp6820_8mn/audio_policy_configuration.xml
+deleted file mode 120000
+index f9db6386..00000000
+--- a/imx8m/vp6820_8mn/audio_policy_configuration.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/audio_policy_configuration.xml
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/audio_policy_configuration.xml b/imx8m/vp6820_8mn/audio_policy_configuration.xml
+new file mode 100644
+index 00000000..50f2a380
+--- /dev/null
++++ b/imx8m/vp6820_8mn/audio_policy_configuration.xml
+@@ -0,0 +1,91 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<!-- Copyright (C) 2017 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<audioPolicyConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
++    <globalConfiguration speaker_drc_enabled="true"/>
++
++    <modules>
++        <module name="primary" halVersion="2.0">
++            <attachedDevices>
++                <item>Speaker</item>
++                <item>Built-In Mic</item>
++            </attachedDevices>
++            <defaultOutputDevice>Speaker</defaultOutputDevice>
++            <mixPorts>
++                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="esai output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000,96000,192000,384000,768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_QUAD,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
++                    <profile name="" format="AUDIO_FORMAT_PCM_FLOAT"
++                             samplingRates="48000,96000,192000,384000,768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_QUAD,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
++                </mixPort>
++                <mixPort name="dsd output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT|AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD">
++                    <profile name="" format="AUDIO_FORMAT_DSD"
++                             samplingRates="2822400,5644800,11289600,22579200" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="primary input" role="sink">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="8000,11025,16000,22050,24000,32000,44100,48000"
++                             channelMasks="AUDIO_CHANNEL_IN_MONO,AUDIO_CHANNEL_IN_STEREO"/>
++                </mixPort>
++            </mixPorts>
++            <devicePorts>
++                <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink" >
++                </devicePort>
++                <devicePort tagName="Wired Headphones" type="AUDIO_DEVICE_OUT_WIRED_HEADPHONE" role="sink">
++                </devicePort>
++                <devicePort tagName="Line-Out" type="AUDIO_DEVICE_OUT_LINE" role="sink">
++                </devicePort>
++
++                <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
++                </devicePort>
++                <devicePort tagName="Spdif-In" type="AUDIO_DEVICE_IN_AUX_DIGITAL" role="source">
++                </devicePort>
++            </devicePorts>
++            <routes>
++                <route type="mix" sink="Speaker"
++                       sources="primary output"/>
++                <route type="mix" sink="Wired Headphones"
++                       sources="dsd output,esai output,primary output"/>
++                <route type="mix" sink="Line-Out"
++                       sources="dsd output,esai output,primary output"/>
++
++                <route type="mix" sink="primary input"
++                       sources="Built-In Mic,Spdif-In"/>
++            </routes>
++        </module>
++
++        <!-- A2dp Audio HAL -->
++        <xi:include href="a2dp_audio_policy_configuration.xml"/>
++
++        <!-- Usb Audio HAL -->
++        <xi:include href="usb_audio_policy_configuration.xml"/>
++
++        <!-- Remote Submix Audio HAL -->
++        <xi:include href="r_submix_audio_policy_configuration.xml"/>
++
++    </modules>
++
++    <!-- Volume section -->
++    <xi:include href="audio_policy_volumes.xml"/>
++    <xi:include href="default_volume_tables.xml"/>
++
++</audioPolicyConfiguration>
+diff --git a/imx8m/vp6820_8mn/fstab.freescale b/imx8m/vp6820_8mn/fstab.freescale
+deleted file mode 120000
+index 3b1f1d6e..00000000
+--- a/imx8m/vp6820_8mn/fstab.freescale
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/fstab.freescale
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/fstab.freescale b/imx8m/vp6820_8mn/fstab.freescale
+new file mode 100644
+index 00000000..2b4c32d5
+--- /dev/null
++++ b/imx8m/vp6820_8mn/fstab.freescale
+@@ -0,0 +1,11 @@
++# Android fstab file.
++#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
++# The filesystem that contains the filesystem checker binary (typically /system) cannot
++# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
++
++/devices/platform/soc@0/32c00000.bus/32e40000.usb/ci_hdrc.0/* auto auto defaults voldmanaged=usb:auto
++/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,nomblk_io_submit,noauto_da_alloc,errors=panic    wait,formattable,quota,fileencryption=software,reservedsize=128M
++/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
++/dev/block/zram0 none swap defaults zramsize=629145600
++/tmp /sdcard none defaults,bind recoveryonly
++
+diff --git a/imx8m/vp6820_8mn/manifest.xml b/imx8m/vp6820_8mn/manifest.xml
+deleted file mode 120000
+index bb0844f4..00000000
+--- a/imx8m/vp6820_8mn/manifest.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/manifest.xml
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/manifest.xml b/imx8m/vp6820_8mn/manifest.xml
+new file mode 100644
+index 00000000..4bba8783
+--- /dev/null
++++ b/imx8m/vp6820_8mn/manifest.xml
+@@ -0,0 +1,256 @@
++<manifest version="1.0" type="device" target-level="4">
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.3</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.keymaster</name>
++        <transport>hwbinder</transport>
++        <version>3.0</version>
++        <interface>
++            <name>IKeymasterDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.drm</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>ICryptoFactory</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IDrmFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>2.1</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.configstore</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>ISurfaceFlingerConfigs</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi</name>
++       <transport>hwbinder</transport>
++       <version>1.3</version>
++       <interface>
++           <name>IWifi</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.wifi.supplicant</name>
++       <transport>hwbinder</transport>
++       <version>1.2</version>
++       <interface>
++           <name>ISupplicant</name>
++           <instance>default</instance>
++       </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.wifi.hostapd</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IHostapd</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.camera.provider</name>
++	<transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>2.4</version>
++	<interface>
++	    <name>ICameraProvider</name>
++	    <instance>legacy/0</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.light</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>ILight</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>5.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++		<version>5.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IUsb</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.usb.gadget</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IUsbGadget</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.boot</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBootControl</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.oemlock</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOemLock</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.health</name>
++        <transport>hwbinder</transport>
++        <version>2.0</version>
++        <interface>
++            <name>IHealth</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.neuralnetworks</name>
++        <transport>hwbinder</transport>
++        <version>1.2</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>vsi-npu</instance>
++        </interface>
++    </hal>
++</manifest>
+diff --git a/imx8m/vp6820_8mn/ueventd.freescale.rc b/imx8m/vp6820_8mn/ueventd.freescale.rc
+deleted file mode 120000
+index 5205b1b6..00000000
+--- a/imx8m/vp6820_8mn/ueventd.freescale.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/ueventd.freescale.rc
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/ueventd.freescale.rc b/imx8m/vp6820_8mn/ueventd.freescale.rc
+new file mode 100644
+index 00000000..9645107b
+--- /dev/null
++++ b/imx8m/vp6820_8mn/ueventd.freescale.rc
+@@ -0,0 +1,20 @@
++/dev/block/platform/soc@0/30800000.bus/30b50000\.mmc/by-name/presistdata 0600   system     system
++/dev/block/platform/soc@0/30800000.bus/30b60000\.mmc/by-name/presistdata 0600   system     system
++/dev/ttymxc0              0660   bluetooth  bluetooth
++/dev/snd/*                0660   system     audio
++/dev/video*               0660   system     camera
++/dev/mxc_hantro           0660   media      drmrpc
++/dev/mxc_hantro_h1        0660   media      drmrpc
++/dev/uinput               0660   system     bluetooth
++/dev/ion                  0666   media      drmrpc
++/dev/galcore	          0666 	 system     graphics
++/dev/graphics/fb0         0660   system     graphics
++/dev/watchdog             0660   system     root
++/dev/mmcblk2rpmb    0600   system     system
++/dev/trusty-ipc-dev0      0660   system     drmrpc
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_temp 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_temp 0660 system system
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system

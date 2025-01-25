@@ -1,0 +1,271 @@
+ca241508e max.yang 2021-05-27
+
+AOS-626: Improve post signing script's performance by multi-processing
+
+  1. Multi-processing apk signing, modify function as thread-safe with lock
+  2. Parallel execution of apex handle with apk handle
+  3. Main process will concurrently do IO jobs while above process is busying
+
+Change-Id: I532971f835581212b7edf851f8abe44e49df62b1
+
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 8dee9d4c2..da0a1c30c 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -21,9 +21,10 @@ import idt_sign_ota_package
+ from xml.etree import ElementTree
+ from distutils.spawn import find_executable
+ from hashlib import sha256
++from multiprocessing import Process, Manager
+ 
+ # VERSION: Android Ver.Major.Minor
+-OTATOOL_VERSION = "11.01.007"
++OTATOOL_VERSION = "11.01.008"
+ 
+ WS = None
+ idt_key_map = {}
+@@ -31,6 +32,81 @@ idt_key_map = {}
+ idt_cert_dir = None
+ idt_apex_payload_key = "device/idtech/common/security/testkey_rsa4096.pem"
+ 
++# Define for multi-processing
++manager = Manager()
++work_list = manager.list()
++work_list_lock = manager.Lock()
++signed_list = manager.list()
++signed_list_lock = manager.Lock()
++CA_lock = manager.Lock()
++codename_to_api_level_map = None
++
++def handle_apks_CA_sign_multi(name, data, key):
++  # dump to_sign file
++  tmp_d = tempfile.mkdtemp(prefix=str(os.getpid())) + "/"
++  apk_path = tmp_d + name
++  with open(apk_path, "wb") as unsigned:
++    unsigned.write(data)
++    unsigned.flush()
++
++  shutil.copy(idt_cert_dir + key + ".x509.der", tmp_d + "cert.der")
++  shutil.copy(idt_cert_dir + "fake.keystore", tmp_d + "fake.keystore")
++  args = ["apksigner", "sign", "--dump-sign-data", "true", "--v1-signing-enabled", "false",\
++          "--ks", "./fake.keystore", "--ks-pass", "pass:testtest", apk_path]
++  p = subprocess.Popen(args, cwd=tmp_d)
++  retcode = p.wait()
++  if retcode != 0:
++    raise ValueError('Error generating apk to sign file, abort script')
++
++  # CA signs to_sign file, output signature data
++  with open(tmp_d + "./v2.to-sign.hex", "r") as f_v2, open(tmp_d + "./v3.to-sign.hex", "r") as f_v3:
++    v2_sig = sign_by_ca(f_v2.read(), key)
++    v3_sig = sign_by_ca(f_v3.read(), key)
++  with open(tmp_d + "v2.sig.bin", "wb") as f_sigv2, open(tmp_d + "v3.sig.bin", "wb") as f_sigv3:
++    f_sigv2.write(v2_sig)
++    f_sigv3.write(v3_sig)
++
++  # combine signature to original app
++  args = ["apksigner", "sign", "--combine-signature-data", "true", "--v1-signing-enabled", "false",\
++          "--ks", "./fake.keystore", "--ks-pass", "pass:testtest", apk_path]
++  p = subprocess.Popen(args, cwd=tmp_d)
++  retcode = p.wait()
++  if retcode != 0:
++      raise ValueError('Error combining apk signature file, abort script')
++
++  with open(apk_path, "rb") as f_apk:
++    signed = f_apk.read()
++
++  shutil.rmtree(tmp_d)
++  return signed
++
++def new_workers():
++  pid = os.getpid()
++  count = 0
++  print('sub process: {}, list size: {}'.format(pid, len(work_list)))
++
++  work_list_lock.acquire()
++  while(work_list):
++    info, data, key = work_list.pop()
++    work_list_lock.release()
++
++    if info.filename.startswith("SYSTEM/apex") and info.filename.endswith(".apex"):
++      apex_file = idt_process_apex_file(info.filename, data, key, codename_to_api_level_map)
++      apex_file = handle_apex_payload_sign(apex_file, idt_apex_payload_key)
++      signed_data = handle_apex_container_sign(apex_file, "SYS_Platform")
++    else:
++      name = os.path.basename(info.filename)
++      print('process {} signing {} by {}'.format(pid, name, key))
++      signed_data = handle_apks_CA_sign_multi(name, data, key)
++
++    signed_list_lock.acquire()
++    signed_list.append((info, signed_data))
++    signed_list_lock.release()
++    count += 1
++    work_list_lock.acquire()
++  work_list_lock.release()
++  print('sub process {} finish, hanlded {} jobs'.format(pid, count))
++
+ def usage():
+   print('Usage:')
+   print('    python releasetools/idt_sign_target_files_ca.py [DEMO|PROD] [TARGET_FILE_PACKAGE]')
+@@ -103,59 +179,14 @@ def idt_write_ota_certs(output_zip):
+   common.ZipWriteStr(output_zip, "SYSTEM/etc/security/otacerts.zip", temp_file.getvalue())
+ 
+ def sign_by_ca(data, key, is_hash = 0):
++  CA_lock.acquire()
+   sig_hex = WS.doSign(key, data, is_hash)
++  CA_lock.release()
+   sig = bytearray.fromhex(sig_hex)
+   assert len(sig) == 256
+ 
+   return sig
+ 
+-def handle_apks_CA_sign(data, key):
+-  # dump to_sign file
+-  tmp_d = tempfile.mkdtemp()
+-  apk_path = tmp_d + "/file.apk"
+-  with open(apk_path, "wb") as unsigned:
+-    unsigned.write(data)
+-    unsigned.flush()
+-
+-  shutil.copy(idt_cert_dir + key + ".x509.der", "./cert.der")
+-  args = ["./bin/apksigner", "sign", "--dump-sign-data", "true", "--v1-signing-enabled", "false",\
+-          "--ks", idt_cert_dir + "fake.keystore", "--ks-pass", "pass:testtest", apk_path]
+-  p = subprocess.Popen(args)
+-  retcode = p.wait()
+-  if retcode != 0:
+-    raise ValueError('Error generating apk to sign file, abort script')
+-
+-  shutil.move("./v2.to-sign.hex", apk_path + ".v2.hex")
+-  shutil.move("./v3.to-sign.hex", apk_path + ".v3.hex")
+-
+-  # CA signs to_sign file, output signature data
+-  with open(apk_path + ".v2.hex", "r") as f_v2, open(apk_path + ".v3.hex", "r") as f_v3:
+-    v2_sig = sign_by_ca(f_v2.read(), key)
+-    v3_sig = sign_by_ca(f_v3.read(), key)
+-  with open(apk_path + "v2.sig.bin", "wb") as f_sigv2, open(apk_path + "v3.sig.bin", "wb") as f_sigv3:
+-    f_sigv2.write(v2_sig)
+-    f_sigv3.write(v3_sig)
+-
+-  # combine signature to original app
+-  shutil.move(apk_path + "v2.sig.bin", "v2.sig.bin")
+-  shutil.move(apk_path + "v3.sig.bin", "v3.sig.bin")
+-  args = ["./bin/apksigner", "sign", "--combine-signature-data", "true", "--v1-signing-enabled", "false",\
+-          "--ks", idt_cert_dir + "fake.keystore", "--ks-pass", "pass:testtest", apk_path]
+-  p = subprocess.Popen(args)
+-  retcode = p.wait()
+-  if retcode != 0:
+-      raise ValueError('Error combining apk signature file, abort script')
+-
+-  with open(apk_path, "rb") as f_apk:
+-    signed = f_apk.read()
+-
+-  os.unlink("./cert.der")
+-  os.unlink("v2.sig.bin")
+-  os.unlink("v3.sig.bin")
+-  shutil.rmtree(tmp_d)
+-
+-  return signed
+-
+ def handle_apex_container_sign(apex_file, key):
+   aligned_apex = common.MakeTempFile(prefix='apex-container-', suffix='.apex')
+   common.RunAndCheckOutput(['zipalign', '-f', '4096', apex_file, aligned_apex])
+@@ -177,7 +208,7 @@ def handle_apex_container_sign(apex_file, key):
+   with open(signed_apex, 'rb') as f:
+     data = f.read()
+ 
+-  signed_data = handle_apks_CA_sign(data, key)
++  signed_data = handle_apks_CA_sign_multi(os.path.basename(signed_apex), data, key)
+   return signed_data
+ 
+ def handle_apex_payload_sign(apex_file, payload_key):
+@@ -248,7 +279,7 @@ def idt_process_apex_file(filename, data, apk_keys, codename_to_api_level_map):
+     os.rename(apk_path, unsigned_apk)
+     with open(unsigned_apk, 'rb') as uapk_f:
+       unsigned_data = uapk_f.read()
+-    signed_data = handle_apks_CA_sign(unsigned_data, idt_key_map[key_name])
++    signed_data = handle_apks_CA_sign_multi(os.path.basename(apk_path), unsigned_data, idt_key_map[key_name])
+     with open(apk_path, 'wb+') as sapk_f:
+       sapk_f.write(signed_data)
+     has_signed_apk = True
+@@ -259,6 +290,8 @@ def idt_process_apex_file(filename, data, apk_keys, codename_to_api_level_map):
+   return apk_signer.RepackApexPayload(payload_dir, idt_apex_payload_key, None)
+ 
+ def handle_all_files_verbatim(input_zip, output_zip):
++  pure_write_list = []
++  pure_write_threshold = 1024*1024
+   misc_info = common.LoadInfoDict(input_zip)
+   IDTBuildKeyMap(misc_info)
+ 
+@@ -268,6 +301,7 @@ def handle_all_files_verbatim(input_zip, output_zip):
+   apex_keys_info = sign_target_files_apks.ReadApexKeysInfo(input_zip)
+   apex_keys = sign_target_files_apks.GetApexKeys(apex_keys_info, apk_keys)
+ 
++  global codename_to_api_level_map
+   codename_to_api_level_map = sign_target_files_apks.GetCodenameToApiLevelMap(input_zip)
+ 
+   for info in input_zip.infolist():
+@@ -298,9 +332,7 @@ def handle_all_files_verbatim(input_zip, output_zip):
+         print("SKIP signing apk (special cert): {}".format(filename))
+         common.ZipWriteStr(output_zip, out_info, data)
+       else:
+-        print("Signing apk: {} by key: {}".format(name, idt_key_map[apk_keys[name]]))
+-        signed_data = handle_apks_CA_sign(data, idt_key_map[apk_keys[name]])
+-        common.ZipWriteStr(output_zip, out_info, signed_data)
++        work_list.append((out_info, data, idt_key_map[apk_keys[name]]))
+     # Apex module signing
+     elif filename.startswith("SYSTEM/apex") and filename.endswith(".apex"):
+       name = os.path.basename(filename)
+@@ -310,10 +342,7 @@ def handle_all_files_verbatim(input_zip, output_zip):
+         print("SKIP signing apex (special cert): {}".format(filename))
+         common.ZipWriteStr(output_zip, out_info, data)
+       else:
+-        apex_file = idt_process_apex_file(filename, data, apk_keys, codename_to_api_level_map)
+-        apex_file = handle_apex_payload_sign(apex_file, idt_apex_payload_key)
+-        signed_data = handle_apex_container_sign(apex_file, "SYS_Platform")
+-        common.ZipWriteStr(output_zip, out_info, signed_data)
++        work_list.append((out_info, data, apk_keys))
+     elif filename in ("SYSTEM/build.prop",
+                       "VENDOR/build.prop",
+                       "SYSTEM/vendor/build.prop",
+@@ -355,10 +384,34 @@ def handle_all_files_verbatim(input_zip, output_zip):
+     elif filename == "META/misc_info.txt":
+       pass
+ 
++    elif (out_info.compress_size > pure_write_threshold):
++      pure_write_list.append((out_info, data))
++
+     # Copy for all files no need to deal with
+     else:
+       common.ZipWriteStr(output_zip, out_info, data)
+ 
++  print('main process: work_list size: {}, pure_write_list size: {}'.format(len(work_list), len(pure_write_list)))
++  job_list = []
++  for i in range(4):
++    job = Process(target=new_workers)
++    job.start()
++    job_list.append(job)
++
++  # Main thread hanle writing operation
++  while (pure_write_list):
++    out_info, data = pure_write_list.pop()
++    common.ZipWriteStr(output_zip, out_info, data)
++
++  for i in range(4):
++    job = job_list.pop()
++    job.join()
++
++  print('main process: work_list size: {}, signed_list size: {}'.format(len(work_list), len(signed_list)))
++  while(signed_list):
++    out_info, signed_data = signed_list.pop()
++    common.ZipWriteStr(output_zip, out_info, signed_data)
++
+   sign_target_files_apks.ReplaceAvbSigningKeys(misc_info)
+ 
+   idt_write_ota_certs(output_zip)
+@@ -532,7 +585,6 @@ def main(argv):
+   print("Signing target-file finished, creating full ota package")
+ 
+   create_fullota_package(argv[0], input_file, output_file, idt_cert_dir)
+-
+   print("*************************************")
+   print("All process successfully finished")
+ 

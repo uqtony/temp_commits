@@ -1,0 +1,48 @@
+5053a5d1c953 George.Huang 2022-04-22
+
+AOS-948: redwood_8mq: Unable to connect to ethernet phy
+
+Symptom Unable to connect to ethernet phy on android-12
+
+Root Cause: previous delay setting in android-11 dtsi are deprecated
+  phy-reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+  phy-reset-duration = <10>;
+  phy-reset-post-delay = <50>;
+
+Solution: use new reset-post-delay under mdio
+  reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+  reset-delay-us = <10000>;
+  reset-post-delay-us = <50000>;
+
+Reference:
+  commit 530fe9d433b9 ("Merge branch 'Improve-MDIO-Ethernet-PHY-reset'")
+  commit e4d5efdd0bc4 ("net: mdio device: use flexible sleeping in reset function")
+  commit bb3831294cd5 ("net: mdiobus: add reset-post-delay-us handling")
+  commit 6259e0f5478d ("net: mdiobus: use flexible sleeping for reset-delay-us")
+  commit c44a1b91753e ("dt-bindings: net: mdio: add reset-post-delay-us property")
+
+Change-Id: Ib760273ee0c79aad4168b4d859369c0cd2f622f0
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index c066a7da87f0..5518e09f74b1 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -424,15 +424,15 @@ &fec1 {
+ 	phy-mode = "rmii";
+ 	phy-handle = <&ethphy0>;
+ 	phy-supply = <&reg_phy_vdd>;
+-	phy-reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
+-	phy-reset-duration = <10>;
+-	phy-reset-post-delay = <50>;
+ 	fsl,magic-packet;
+ 	status = "okay";
+ 
+ 	mdio {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
++		reset-delay-us = <10000>;
++		reset-post-delay-us = <50000>;
+ 
+ 		ethphy0: ethernet-phy@2 {
+ 			compatible = "ethernet-phy-ieee802.3-c22";

@@ -1,0 +1,73 @@
+da10a2c0 George.Huang 2022-04-06
+
+AOS-930: sepolicy: refine sepolicy
+
+- media.log.level: rename to vendor.media.log.level
+- ro.rfkilldisabled: follow default security flag for BT
+- ro.support_one_handed_mode: follow default security flag
+
+- vendor.rild.: follow default security flag for rild
+- rild.: follow default security flag for rild
+- net.eth0.: not used for current rild
+- net_radio_prop / default_prop / system_prop:
+  now it's not necessary for rild to set these properties
+
+- net.ppp0. need Quectel to help rename to vendor.net.ppp0.
+  before removing BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE := true
+
+Change-Id: I1cdd5c96df38241f6a41947754b6ee75ff3c065f
+
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 76b72a14..d7124c5f 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -180,7 +180,7 @@ vendor.media.fsl_codec.flag         u:object_r:vendor_public_default_prop:s0
+ vendor.gki.enable                   u:object_r:vendor_public_default_prop:s0
+ vendor.hwc.debug.dump_refresh_rate  u:object_r:vendor_public_default_prop:s0
+ vendor.hwc.drm.fbTileSupport        u:object_r:vendor_public_default_prop:s0
+-media.log.level                     u:object_r:vendor_public_default_prop:s0
++vendor.media.log.level              u:object_r:vendor_public_default_prop:s0
+ vendor.display.state                u:object_r:vendor_public_default_prop:s0
+ 
+ ro.boot.gui_resolution              u:object_r:vendor_public_default_prop:s0
+@@ -205,8 +205,6 @@ vendor.rw.VIDEO_RENDER_NAME         u:object_r:vendor_public_default_prop:s0
+ vendor.sys.SECOND_DISPLAY_ENABLED   u:object_r:vendor_public_default_prop:s0
+ vendor.AQROOT                       u:object_r:vendor_public_default_prop:s0
+ vendor.CL_NOPREPROCESS              u:object_r:vendor_public_default_prop:s0
+-ro.rfkilldisabled                   u:object_r:vendor_public_default_prop:s0
+-ro.support_one_handed_mode          u:object_r:vendor_public_default_prop:s0
+ 
+ # idtech property
+ ro.boot.idt.                        u:object_r:vendor_public_default_prop:s0
+@@ -214,9 +212,6 @@ ro.vendor.idt.                      u:object_r:vendor_public_default_prop:s0
+ persist.vendor.idt.                 u:object_r:vendor_idtech_prop:s0
+ 
+ ro.radio.noril                      u:object_r:telephony_status_prop:s0 exact string
+-vendor.rild.                        u:object_r:radio_prop:s0
+-rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:radio_prop:s0
+ net.ppp0.dns1                       u:object_r:radio_prop:s0
+ net.ppp0.dns2                       u:object_r:radio_prop:s0
+ net.ppp0.local-ip                   u:object_r:radio_prop:s0
+diff --git a/imx8m/sepolicy/rild.te b/imx8m/sepolicy/rild.te
+index b9acf183..aa7d3b8e 100644
+--- a/imx8m/sepolicy/rild.te
++++ b/imx8m/sepolicy/rild.te
+@@ -59,17 +59,6 @@ allow rild usb_serial_device:chr_file { rw_file_perms };
+ # support pppd dialing
+ domain_auto_trans(rild, ppp_exec, ppp);
+ 
+-# property service
+-# The property permissions that Quectel requested, but too over
+-#set_prop(rild, net_radio_prop)
+-#set_prop(rild, default_prop)
+-#set_prop(rild, system_prop)
+-# TODO: remove auditallow once if rild related functions are fully tested.
+-userdebug_or_eng(
+-  auditallow rild net_radio_prop:property_service set;
+-  auditallow rild default_prop:property_service set;
+-  auditallow rild system_prop:property_service set;
+-)
+ # The property permissions that hardware/ril exactly used
+ set_prop(rild, radio_prop)
+ get_prop(rild, exported_default_prop)

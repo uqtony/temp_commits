@@ -1,0 +1,50 @@
+de7eed35 owen.wen 2022-04-07
+
+AOS-936: GKI: set CONFIG_SND_SOC_IMX_TLV320AIC31XX as m
+
+01-01 00:20:51.630 I/audio_hw_primary(  405): card0: imx-audio-hdmi
+01-01 00:20:51.632 I/audio_hw_primary(  405): Total 0 cards match
+01-01 00:20:51.632 E/audio_hw_primary(  405): no supported sound card found, aborting.
+...
+04-07 06:54:27.727 W/AudioManager(  611): updateAudioPortCache: listAudioPorts failed
+04-07 06:54:27.828 E/AudioSystem-JNI(  611): AudioSystem::listAudioPorts error -19
+04-07 06:54:27.828 W/AudioManager(  611): updateAudioPortCache: listAudioPorts failed
+04-07 06:54:27.929 E/AudioSystem-JNI(  611): AudioSystem::listAudioPorts error -19
+
+CONFIG_SND_SOC_IMX_TLV320AIC31XX depends on CONFIG_SND_IMX_SOC
+and CONFIG_SND_IMX_SOC set as m in below config
+arch/arm64/configs/imx8mq_gki.fragment
+
+Change-Id: I8a01b975191b876848caae294ebd20b016086162
+
+diff --git a/imx8m/redwood_8mq/SharedBoardConfig.mk b/imx8m/redwood_8mq/SharedBoardConfig.mk
+index c632f1d3..52cebcbf 100644
+--- a/imx8m/redwood_8mq/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mq/SharedBoardConfig.mk
+@@ -72,6 +72,13 @@ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/drivers/input/touchscreen/synaptics_dsx/synaptics_dsx_i2c.ko
+ endif
+ 
++# kernel modules add by IDTECH
++# CONFIG_SND_SOC_IMX_TLV320AIC31XX: snd-soc-imx-tlv320aic31xx.ko, audio codec
++ifeq ($(IMX8MQ_USES_GKI),true)
++BOARD_VENDOR_KERNEL_MODULES += \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-tlv320aic31xx.ko
++endif
++
+ # CONFIG_ZRAM: zram.ko, lzo.ko, lzo-rle.ko compressed ram using LZ coding.
+ # CONFIG_ZSMALLOC: zsmalloc.ko
+ # CONFIG_CLK_IMX8MP: clk-imx8mq.ko
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index b60b1803..97ee9a34 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -4,7 +4,7 @@ CONFIG_SINGLE_LOGO=y
+ CONFIG_SPLASH_SCREEN_CENTERED=y
+ CONFIG_USB_SERIAL=y
+ CONFIG_USB_SERIAL_OPTION=y
+-CONFIG_SND_SOC_IMX_TLV320AIC31XX=y
++CONFIG_SND_SOC_IMX_TLV320AIC31XX=m
+ CONFIG_SND_SOC_TLV320AIC31XX=y
+ CONFIG_KEYBOARD_MATRIX=y
+ CONFIG_MXC_DUAL_MIPI_CAMERA=y

@@ -1,0 +1,662 @@
+ec3271b1 George.Huang 2022-02-10
+
+AOS-864: redood: bringup_test: add new function tests
+
+- add functions:
+  check_func_rs232
+  check_func_eth 0 2             # eth index / delay sec
+  check_func_wlan 0 2            # wlan index / delay sec
+  check_sdcard 100000 2          # write size KB / delay sec
+  check_led_front_cam_flash 255  # brightness code
+  check_led_front_cam_status 255 # brightness code
+  check_led_status 255           # brightness code
+  check_func_camera 0            # display_id
+  check_func_local_video 1       # display_id
+  check_func_youtube_video 1     # display_id
+  check_func_occupy_cpu 3        # cpu thread num
+  check_func_provision
+
+Change-Id: I7f153add816ad61504d8d6eee84b21c206e5c727
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index da7df434..0ec84887 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -5,9 +5,11 @@ set_log_path() {
+   [ ! -z $1 ] && test_idx=$1
+   LOG_TAG="bringup_test"
+   RST_TAG="bringup_result"
++  URT_TAG="bringup_rs232"
+   SN=`getprop ro.serialno`
+   LOG_PATH="/data/local/tmp/${SN}_${LOG_TAG}_${test_idx}.txt"
+   RST_PATH="/data/local/tmp/${SN}_${RST_TAG}_${test_idx}.txt"
++  URT_PATH="/data/local/tmp/${SN}_${URT_TAG}_${test_idx}.txt"
+ }
+ 
+ logi() {
+@@ -34,10 +36,13 @@ unset_test_array() {
+   unset test_array
+   unset test_key
+   unset test_num
++  unset test_cnt
+   unset test_path
+   unset test_size
+   unset test_rst
+   unset test_idx
++  unset test_act
++  unset test_sec
+ }
+ 
+ check_dev_info() {
+@@ -76,10 +81,10 @@ check_dev_size() {
+   [ -n "$val" ] && val="$((val / 1024 / 1024 + 1)) GB"
+   log_rst "$key" "${val}"
+ 
+-  key="sdcard_size:"
+-  val=`df /mnt/media_rw/* |grep public |head -n1 |cut -F2` 2> /dev/null
+-  [ -n "$val" ] && val="$((val / 1024 / 1024 + 1)) GB"
+-  log_rst "$key" "${val}"
++#  key="sdcard_size:"
++#  val=`df /mnt/media_rw/* |grep public |head -n1 |cut -F2` 2> /dev/null
++#  [ -n "$val" ] && val="$((val / 1024 / 1024 + 1)) GB"
++#  log_rst "$key" "${val}"
+ 
+   logi ""
+ }
+@@ -125,7 +130,7 @@ check_uart() {
+ # uart1: /dev/ttymxc0, /sys/class/tty/ttymxc0 for rs232
+ # uart3: /dev/ttymxc2, /sys/class/tty/ttymxc2 for rs232 reserved
+ # uart2: /dev/ttymxc1, /sys/class/tty/ttymxc1 for BT
+-  logi "== check_uart: ${uart_node}[0-1]"
++  logi "== check_uart: /dev/ttymxc[0-2]"
+   unset_test_array
+ 
+   uart_node="/dev/ttymxc"
+@@ -178,16 +183,85 @@ check_pcie() {
+   logi ""
+ }
+ 
+-check_eth() {
++check_func_rs232() {
++  logi "== check_func_rs232"
++  unset_test_array
++
++  echo "" > ${URT_PATH}
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    test_key=("func_rs232")
++    test_num=${#test_key[@]}
++  fi
++  if [ -z $test_num ]; then
++    test_key=("func_rs232")
++    test_num=${#test_key[@]}
++  fi
++  for i in $(seq 0 $((test_num - 1))); do
++    test_path="/dev/ttymxc${i}"
++    test_cnt=5
++    logi "`ps -ef |grep $(basename ${test_path})`"
++    for j in $(seq 0 $test_cnt); do
++      # reset the buffer first by restarting console
++      # shell         21247      1 5 09:59:59 ttymxc0 00:01:02 sh
++      stop console
++      start console
++      sleep 1
++
++      # do not echo prefix
++      stty -F ${test_path} -echo 2> /dev/null &
++      cat ${test_path} 2>&1 |grep ${test_key[i]} > ${URT_PATH} &
++      sleep 1
++      echo "${test_key[i]}" > ${test_path} &
++      echo "${test_key[i]}" > ${test_path} &
++      echo "${test_key[i]}" > ${test_path} &
++      echo "${test_key[i]}" > ${test_path} &
++      echo "${test_key[i]}" > ${test_path} &
++      sleep 1
++      test_rst=`grep ${test_key[i]} ${URT_PATH}`
++      logi "test_rst ${j}: ${test_rst}"
++      logi "`ps -ef |grep $(basename ${test_path})`"
++      [ ! -z "${test_rst}" ] && break
++    done
++    stop console
++    start console
++
++    if [ ! -z "${test_rst}" ]; then
++      log_rst "${test_key[i]}:" "OK"
++    else
++      log_rst "${test_key[i]}:" "FAIL"
++    fi
++
++  done
++
++  logi ""
++}
++
++check_func_eth() {
+ # ifconfig
+-  logi "== check_eth: ifconfig"
++  logi "== check_func_eth: ifconfig"
+   unset_test_array
+ 
+-  test_num=`ifconfig -S eth0 |wc -l`
+-  if [ $test_num -ge 1 ]; then
+-    log_rst "eth0:" "OK"
++  test_cnt=10
++  test_idx="0"
++  [ ! -z $1 ] && test_idx=$1
++  test_sec=1
++  [ ! -z "$2" ] && test_sec="$2"
++  test_key="func_eth${test_idx}"
++  ifconfig -S ${test_key#*_} up 2> /dev/null
++  for i in $(seq 0 $test_cnt); do
++    sleep ${test_sec}
++    test_rst=`ifconfig -S ${test_key#*_} |cut -F2` 2> /dev/null
++    if [ -z "${test_rst}" -o "${test_rst}" == "0.0.0.0/0" ]; then
++      logi "wait ${test_key}: $i ${test_rst}"
++      continue
++    else
++      break
++    fi
++  done
++  if [ -z "${test_rst}" -o "${test_rst}" == "0.0.0.0/0" ]; then
++    log_rst "${test_key}:" "FAIL_${test_rst}"
+   else
+-    log_rst "eth0:" "FAIL"
++    log_rst "${test_key}:" "OK_${test_rst}"
+   fi
+ 
+   logi "`ifconfig -S`"
+@@ -291,14 +365,17 @@ check_usb() {
+   logi ""
+ }
+ 
+-check_led() {
+-  logi "== check_led:"
++check_led_front_cam_flash() {
++  logi "== check_ledfront_cam_flash:"
+   unset_test_array
+ 
++  test_idx="0"
++  [ ! -z $1 ] && test_idx=$1
++
+   test_path=/sys/class/leds/front-cam:flash/brightness
+-  test_key="led_front_cam_flash"
+-  logi "echo 255 > ${test_path}"
+-  echo 255 > ${test_path}
++  test_key="led_front_cam_flash_${test_idx}"
++  logi "echo ${test_idx} > ${test_path}"
++  echo ${test_idx} > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+     log_rst "${test_key}:" "OK"
+@@ -306,12 +383,21 @@ check_led() {
+     log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > ${test_path}
++
++  logi ""
++}
++
++check_led_front_cam_status() {
++  logi "== check_led_front_cam_status:"
++  unset_test_array
++
++  test_idx="0"
++  [ ! -z $1 ] && test_idx=$1
+ 
+   test_path=/sys/class/leds/front-cam:status/brightness
+-  test_key="led_front_cam_status"
+-  logi "echo 255 > ${test_path}"
+-  echo 255 > ${test_path}
++  test_key="led_front_cam_status_${test_idx}"
++  logi "echo ${test_idx} > ${test_path}"
++  echo ${test_idx} > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+     log_rst "${test_key}:" "OK"
+@@ -319,12 +405,21 @@ check_led() {
+     log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > ${test_path}
++
++  logi ""
++}
++
++check_led_status() {
++  logi "== check_led_status:"
++  unset_test_array
++
++  test_idx="0"
++  [ ! -z $1 ] && test_idx=$1
+ 
+   test_path=/sys/class/leds/device:status/brightness
+-  test_key="led_device_status"
+-  logi "echo 255 > ${test_path}"
+-  echo 255 > ${test_path}
++  test_key="led_device_status_${test_idx}"
++  logi "echo ${test_idx} > ${test_path}"
++  echo ${test_idx} > ${test_path}
+   ret=$?
+   if [ "$ret" = 0 ]; then
+     log_rst "${test_key}:" "OK"
+@@ -332,7 +427,6 @@ check_led() {
+     log_rst "${test_key}:" "FAIL"
+   fi
+   sleep 1
+-  echo 0 > ${test_path}
+ 
+   logi ""
+ }
+@@ -375,34 +469,278 @@ check_light_sensor() {
+   logi ""
+ }
+ 
+-check_bringup_stage1() {
+-  log_rst "==== STAGE1 ==================" "======"
++get_app_button_axis() {
++  #only works on display_id=0
++  ff=`uiautomator dump | grep -oE '[^ ]+.xml'`
++  sss=$(cat ${ff} |sed "s|>|
+|g" |grep "$1" | grep -o -E '[0-9]+' |tail -n4)
++  echo $sss |awk -F' ' '{print int(($1+$3)/2)" "int(($2+$4)/2)}'
++}
++
++check_func_camera_provision() {
++  # camera preview on 2nd display
++  logi "== check_func_camera_provision"
++  unset_test_array
++
++  test_idx="Front camera"
++  [ ! -z $1 ] && test_idx="$1"
++  test_act="com.android.camera2/com.android.camera.CameraLauncher"
++
++  # skip the first page on display_id=0
++  logi "$(am start -W --display 0 -n ${test_act} 2>&1)"
++  sleep 1
++  test_num=`get_app_button_axis "NEXT"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  # select option
++  test_num=`get_app_button_axis "mode_options_toggle"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  # switch to Front/Back camera
++  test_num=`get_app_button_axis "${test_idx}"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  # leave the camera
++  input -d 0 keyevent 4
++  sleep 1
++}
++
++check_func_camera() {
++  # camera preview on 2nd display
++  logi "== check_func_camera"
++  unset_test_array
++
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  test_key="func_camera_${test_idx}"
++  test_act="com.android.camera2/com.android.camera.CameraLauncher"
++
++  logi "$(am start -W --display ${test_idx} -n ${test_act} 2>&1)"
++  sleep 1
++  input -d ${test_idx} keyevent 80 # camera focus
++  sleep 1
++  input -d ${test_idx} keyevent 27 # camera capture
++  sleep 2
++
++  ret=`dumpsys window windows |grep -E ${test_act} |wc -l`
++  logi "ret: ${ret}"
++  if [ -n "$ret" -a "$ret" -ge 1 ]; then
++    log_rst "${test_key}:" "OK"
++  else
++    log_rst "${test_key}:" "FAIL"
++  fi
++}
++
++check_func_local_video_provision() {
++  # play video on another display
++  logi "== check_func_local_video_provision"
++  unset_test_array
++
++  test_act="com.freescale.cactusplayer/com.freescale.cactusplayer.VideoPlayer"
++
++  # enable loop play on display_id=0
++  logi "$(am start -W --display 0 -a android.intent.action.VIEW -n ${test_act} 2>&1)"
++  sleep 1
++  test_num=`get_app_button_axis "More options"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  sleep 1
++  test_num=`get_app_button_axis "Loop"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  input -d 0 keyevent 4
++}
++
++check_func_local_video() {
++  # play video on another display
++  logi "== check_func_local_video"
++  unset_test_array
++
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  test_key="func_local_video_${test_idx}"
++  test_act="com.freescale.cactusplayer/com.freescale.cactusplayer.VideoPlayer"
++  test_path=`ls /storage/*/Download/bbb_sunflower_1080p_60fps_normal.mp4`
++  #test_path=`ls /storage/*/Download/bbb_sunflower_2160p_60fps_normal.mp4`
++
++  logi "$(am start -W --display ${test_idx} -a android.intent.action.VIEW \
++    -n ${test_act} -t video/mp4 -d file://${test_path} 2>&1)"
++  sleep 5
++
++  ret=`dumpsys window windows |grep -E ${test_act} |wc -l`
++  logi "ret: ${ret}"
++  if [ -n "$ret" -a "$ret" -ge 1 ]; then
++    log_rst "${test_key}:" "OK"
++  else
++    log_rst "${test_key}:" "FAIL"
++  fi
++}
++
++check_func_youtube_video() {
++  # play youtube on another display
++  logi "== check_func_youtube_video"
++  unset_test_array
++
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  test_key="func_youtube_video_${test_idx}"
++  test_act="org.chromium.webview_shell/org.chromium.webview_shell.WebViewBrowserActivity"
++
++  logi "$(am start -W --display ${test_idx} -a android.intent.action.VIEW \
++    -n ${test_act} -d "https://www.youtube.com/embed/coYw-eVU0Ks?autoplay=1&mute=0&hd=1" 2>&1)"
++  sleep 5
++  # start playing
++  test_num=`wm size -d ${test_idx} |cut -F3 |awk -F'x' '{print $1/2" "$2/2}'`
++  input -d ${test_idx} tap ${test_num}
++  logi "tap ${test_num}"
++
++  ret=`dumpsys window windows |grep -E ${test_act} |wc -l`
++  logi "ret: ${ret}"
++  if [ -n "$ret" -a "$ret" -ge 1 ]; then
++    log_rst "${test_key}:" "OK"
++  else
++    log_rst "${test_key}:" "FAIL"
++  fi
++}
++
++check_func_wlan() {
++  logi "== check_func_wlan"
++  unset_test_array
++
++  test_cnt=10
++  test_idx="0"
++  [ ! -z $1 ] && test_idx=$1
++  test_sec=1
++  [ ! -z "$2" ] && test_sec="$2"
++  test_key="func_wlan${test_idx}"
++
++  ifconfig -S ${test_key#*_} up 2> /dev/null
++  for i in $(seq 0 $test_cnt); do
++    # turn off eth0 first
++    ifconfig eth0 down
++    sleep ${test_sec}
++    logi "$(cmd wifi set-wifi-enabled disabled 2> /dev/null)"
++    sleep ${test_sec}
++    logi "$(cmd wifi set-wifi-enabled enabled 2> /dev/null)"
++    sleep ${test_sec}
++#    logi "$(cmd wifi start-scan 2> /dev/null)"
++#    sleep ${test_sec}
++#   logi "$(cmd wifi list-scan-results 2> /dev/null)"
++    logi "$(cmd wifi connect-network android wpa2 owendosomething 2> /dev/null)"
++    sleep ${test_sec}
++#   logi "$(cmd wifi list-networks 2> /dev/null)"
++    sleep ${test_sec}
++
++    test_rst=`ifconfig -S ${test_key#*_} |cut -F2` 2> /dev/null
++    if [ -z "${test_rst}" -o "${test_rst}" == "0.0.0.0/0" ]; then
++      logi "wait ${test_key}: $i ${test_rst}"
++      continue
++    else
++      break
++    fi
++  done
++  if [ -z "${test_rst}" -o "${test_rst}" == "0.0.0.0/0" ]; then
++    log_rst "${test_key}:" "FAIL_${test_rst}"
++  else
++    log_rst "${test_key}:" "OK_${test_rst}"
++  fi
++
++  logi "`ifconfig -S`"
++  logi ""
++}
++
++check_func_occupy_cpu() {
++  # this func may cause the service running
++  logi "== check_func_occupy_cpu"
++  unset_test_array
++
++  test_idx=0
++  [ ! -z $1 ] && test_idx=$1
++  test_key="func_func_occupy_cpu_${test_idx}"
++  test_num=`ps -ef |grep yes |grep -v grep |wc -l`
++  test_num=$((test_idx - test_num))
++  for i in $(seq 0 $((test_num - 1))); do
++    yes > /dev/null &
++  done
++
++  sleep 1
++  ret=`ps -ef |grep yes |grep -v grep |wc -l`
++  logi "ret: ${ret}"
++  if [ "$ret" -eq "$test_idx" ]; then
++    log_rst "${test_key}:" "OK"
++  else
++    log_rst "${test_key}:" "FAIL"
++  fi
++}
++
++check_func_provision() {
++  logi "== check_func_provision:"
++  unset_test_array
++
++  test_key=func_provision
++  # skip idtech walcome app
++  test_num=`get_app_button_axis "skipButtonForDebug"`
++  input -d 0 tap ${test_num}
++  logi "tap ${test_num}"
++  # unlock screen
++  input -d 0 keyevent 82
++  # adjust audio volume to max
++  sleep 1
++  logi "$(service call audio 10 i32 3 i32 25 i32 1 2>&1)"
++  # adjust brightness to max
++  sleep 1
++  echo "82" > /sys/class/backlight/backlight/brightness
++  # back key
++  input -d 0 keyevent 4
++  sleep 1
++  input -d 0 keyevent 4
++  sleep 1
++  input -d 1 keyevent 4
++  sleep 1
++
++  log_rst "${test_key}:" "OK"
++}
++
++check_bringup_stage1_if() {
++  log_rst "==== STAGE1_IF ===============" "======"
+   check_dev_info
+   check_dev_size
+   check_usb
+   check_i2c 1
+-# check_dp_display
+-  check_light_sensor "input"
+-# check_audio
+   check_modem
+-# check_sim
+   check_pcie
+-# check_wifi
+   check_uart
+-# check_bt
+-  check_eth
++}
++
++check_bringup_stage1_func() {
++  log_rst "==== STAGE1_FUNC =============" "======"
++  check_light_sensor "input"
+   check_idg_version
++# check_func_lte
++# check_func_bt
++# check_audio
++# check_func_rs232
++  check_func_eth 0 2          # eth0 / delay 2sec
++  check_func_wlan 0 2         # wlan0 / delay 2sec
++  check_sdcard 100000 2       # write 100MB / delay 2sec
+   log_rst "==============================" "======"
+ }
+ 
+-check_bringup_stage2() {
+-  log_rst "==== STAGE2 ==================" "======"
++check_bringup_stage2_if() {
++  log_rst "==== STAGE2_IF ===============" "======"
+   check_dev_info
+   check_usb
+   check_i2c 2
+-# check display/backlight/tp
+-# check camera
+-  check_led
++}
++
++check_bringup_stage2_func() {
++  log_rst "==== STAGE2_FUNC =============" "======"
++  check_led_front_cam_status 255
++  check_led_front_cam_flash 255
++  check_led_status 255
++  sleep 3
++  check_led_front_cam_status 0
++  check_led_front_cam_flash 0
++  check_led_status 0
+   check_light_sensor "input"
+   check_light_sensor "raw"
+   check_prox_sensor
+@@ -415,38 +753,52 @@ check_bringup() {
+   [ ! -z $1 ] && test_idx=$1
+ 
+   if [ $test_idx -eq 1 ]; then
+-    check_bringup_stage1
++    check_bringup_stage1_if
++    check_bringup_stage1_func
+   elif [ $test_idx -eq 2 ]; then
+-    check_bringup_stage2
++    check_bringup_stage2_if
++    check_bringup_stage2_func
+   else
+-    check_bringup_stage1
+-    check_bringup_stage2
++    check_bringup_stage1_if
++    check_bringup_stage1_func
++    check_bringup_stage2_if
++    check_bringup_stage2_func
+   fi
++  echo -e "
+
+
+
+
+
+
+
+
+
+" >> $RST_PATH
+ }
+ 
+ check_sdcard() {
+   # default test 3GB
+   unset_test_array
+ 
++  test_cnt=10
+   test_size=3000000
+   [ ! -z "$1" ] && test_size="$1"
+-  sleep_sec=10
+-  [ ! -z "$2" ] && sleep_sec="$2"
++  test_sec=10
++  [ ! -z "$2" ] && test_sec="$2"
++  test_key="func_sdcard_${test_size}"
+   logi "== check_sdcard $test_size KB"
+ 
+-  sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6) 2> /dev/null
++  for j in $(seq 0 $test_cnt); do
++    sleep $test_sec
++    sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6) 2> /dev/null
++    if [ -z "$sdcard_path" ]; then
++      # sleep 10 seconds and try again if sdcard not exist
++      logi "sdcard not found ${j} (df /mnt/media_rw/* | grep vold/public | cut -F6)"
++    else
++      break
++    fi
++  done
+   if [ -z "$sdcard_path" ]; then
+-    # sleep 10 seconds and try again if sdcard not exist
+-    logi "sdcard not found(df /mnt/media_rw/* | grep vold/public | cut -F6)"
+-    sleep $sleep_sec
++    log_rst "${test_key}:" "FAIL"
+   else
+     logi "sdcard writing..."
+-    dd if=/dev/urandom of=$sdcard_path/urandom.img bs=1024 count=$test_size
++    dd if=/dev/urandom of=$sdcard_path/urandom.img bs=1024 count=$test_size 2> /dev/null
+     ret=$?
+-    if [ "$ret" = "0" ]; then
+-      logi "sdcard writing... finish"
++    if [ "$ret" = 0 ]; then
++      log_rst "${test_key}:" "OK"
+     else
+-      logi "sdcard writing... abort"
++      log_rst "${test_key}:" "FAIL"
+     fi
+   fi
+ 
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+index 2732dd59..326cc271 100755
+--- a/imx8m/bringup_test_stageall.sh
++++ b/imx8m/bringup_test_stageall.sh
+@@ -2,20 +2,27 @@
+ 
+ # test_idx: 0: all / 1: stage1 / 2: stage2
+ test_idx=0
+-#test_script="/data/local/tmp/bringup_test.sh"
+ test_script="/product/bin/bringup_test.sh"
+ 
+ adb wait-for-device
+ sleep 1
+-adb root
+-adb shell setenforce 0
+ SN=`adb shell getprop ro.serialno`
++[ ! -z ] && adb_opt="-s ${SN}"
++adb ${adb_opt} root
++adb ${adb_opt} shell setenforce 0
+ 
+-#adb shell rm -f /data/local/tmp/*
+-#adb push bringup_test.sh ${test_script}
+-#adb shell chmod +x ${test_script}
++if [ -f "./bringup_test.sh" ]; then
++  test_script="/data/local/tmp/bringup_test.sh"
++#  adb ${adb_opt} shell rm -f /data/local/tmp/*
++  adb ${adb_opt} push ./bringup_test.sh ${test_script} 2>&1 > /dev/null
++  adb ${adb_opt} shell chmod +x ${test_script}
++fi
+ 
+-adb shell ${test_script} check_bringup ${test_idx}
+-adb pull /data/local/tmp/${SN}_bringup_test_${test_idx}.txt
+-adb pull /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
+-adb shell tail -n54 /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
++adb ${adb_opt} shell touch /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
++adb ${adb_opt} shell tail -f /data/local/tmp/${SN}_bringup_result_${test_idx}.txt &
++adb ${adb_opt} shell ${test_script} check_bringup ${test_idx}
++adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_test_${test_idx}.txt 2>&1 > /dev/null
++adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_result_${test_idx}.txt 2>&1 > /dev/null
++adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_rs232_${test_idx}.txt 2>&1 > /dev/null
++adb ${adb_opt} reconnect
++adb ${adb_opt} wait-for-device

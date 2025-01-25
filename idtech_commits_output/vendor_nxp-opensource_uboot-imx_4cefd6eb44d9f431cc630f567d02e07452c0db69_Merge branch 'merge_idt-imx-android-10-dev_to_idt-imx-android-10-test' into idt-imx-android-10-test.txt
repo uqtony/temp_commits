@@ -1,0 +1,339 @@
+4cefd6eb44 jenkins 2020-11-05
+
+Merge branch 'merge_idt-imx-android-10-dev_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: I4d1c9691586af09a269af435b523f6d6a17567b4
+
+diff --cc arch/arm/dts/Makefile
+index 81ac2569c6,44bbbd84c7..b879ad50c6
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@@ -792,8 -792,8 +792,9 @@@ dtb-$(CONFIG_ARCH_IMX8M) += 
+  	imx8mq-ddr3l-val.dtb \
+  	imx8mq-ddr4-val.dtb \
+  	imx8mq-evk.dtb \
++ 	idt_a300_evt-0_devboard_evt-1.dtb \
+  	imx8mp-evk.dtb \
+ +	imx8mm-ddr4-ab2.dtb \
+  	imx8mm-ab2.dtb \
+  	imx8mn-ddr4-ab2.dtb \
+  	imx8mn-ab2.dtb
+diff --cc configs/vp6820_8mn_evk_android_defconfig
+index d05ebfbda5,b043a26521..352e6f6a08
+--- a/configs/vp6820_8mn_evk_android_defconfig
++++ b/configs/vp6820_8mn_evk_android_defconfig
+@@@ -157,4 -157,5 +157,9 @@@ CONFIG_AVB_WARNING_LOGO_ROWS=0x1A
+  CONFIG_SPLASH_SOURCE=y
+  CONFIG_IDT_SPLASH_SUPPORT=y
+  CONFIG_IDT_MULTIPLE_DDR=y
+++<<<<<<< HEAD
+ +CONFIG_VIRTUAL_AB_SUPPORT=y
+++=======
++ CONFIG_IDT_BOARD_INFO_PARSER=y
++ CONFIG_IDT_LINUX_DTB=y
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+diff --cc configs/vp6820_8mq_evk_android_defconfig
+index bb270b37d6,c45cd8d581..067c4603de
+--- a/configs/vp6820_8mq_evk_android_defconfig
++++ b/configs/vp6820_8mq_evk_android_defconfig
+@@@ -149,4 -152,5 +152,9 @@@ CONFIG_AVB_WARNING_LOGO_ROWS=0x6
+  
+  CONFIG_NR_DRAM_BANKS=2
+  CONFIG_IDT_MULTIPLE_DDR=y
+++<<<<<<< HEAD
+ +CONFIG_VIRTUAL_AB_SUPPORT=y
+++=======
++ CONFIG_IDT_BOARD_INFO_PARSER=y
++ CONFIG_IDT_LINUX_DTB=y
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+diff --cc configs/vp6820_8mq_evk_android_dual_defconfig
+index 6ad00ad2ef,dd60efcdbe..65420964cf
+--- a/configs/vp6820_8mq_evk_android_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_dual_defconfig
+@@@ -153,4 -156,5 +156,9 @@@ CONFIG_IDT_DUAL_SPL=
+  CONFIG_IDT_BACKUP_SPL=y
+  CONFIG_NR_DRAM_BANKS=2
+  CONFIG_IDT_MULTIPLE_DDR=y
+++<<<<<<< HEAD
+ +CONFIG_VIRTUAL_AB_SUPPORT=y
+++=======
++ CONFIG_IDT_BOARD_INFO_PARSER=y
++ CONFIG_IDT_LINUX_DTB=y
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+diff --cc configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+index b8d10934f3,9e19212d1b..f1991247a6
+--- a/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
++++ b/configs/vp6820_8mq_evk_android_trusty_dual_defconfig
+@@@ -152,4 -155,5 +155,9 @@@ CONFIG_AVB_WARNING_LOGO_ROWS=0x6
+  
+  CONFIG_IDT_DUAL_SPL=y
+  CONFIG_IDT_BACKUP_SPL=y
+++<<<<<<< HEAD
+ +CONFIG_VIRTUAL_AB_SUPPORT=y
+++=======
++ CONFIG_IDT_BOARD_INFO_PARSER=y
++ CONFIG_IDT_LINUX_DTB=y
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+diff --cc drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index c4263feab5,d65358d6da..741b4ef853
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@@ -673,7 -654,9 +673,13 @@@ int do_boota(cmd_tbl_t *cmdtp, int flag
+  	AvbABFlowResult avb_result;
+  	AvbSlotVerifyData *avb_out_data = NULL;
+  	AvbPartitionData *avb_loadpart = NULL;
+++<<<<<<< HEAD
+ +	AvbPartitionData *avb_vendorboot = NULL;
+++=======
++ #ifdef CONFIG_IDT_LINUX_DTB
++ 	char *env_value;
++ #endif /* CONFIG_IDT_LINUX_DTB */
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  
+  	if (!is_bdinfo_som_set()) {
+  		goto fail;
+@@@ -926,70 -919,71 +932,120 @@@
+  			goto fail;
+  		}
+  
+ -		struct dt_table_entry *dt_entry;
+ +		dt_img = (struct dt_table_header *)((void *)(ulong)hdr +
+ +					hdr->page_size +
+ +					ALIGN(hdr->kernel_size, hdr->page_size) +
+ +					ALIGN(hdr->ramdisk_size, hdr->page_size) +
+ +					ALIGN(hdr->second_size, hdr->page_size));
+ +	} else if (find_partition_data_by_name("dtbo",
+ +					avb_out_data, &avb_loadpart)) {
+ +		goto fail;
+ +	} else
+ +		dt_img = (struct dt_table_header *)avb_loadpart->data;
+ +#endif
+  
+++<<<<<<< HEAD
+ +	if (fdt32_to_cpu(dt_img->magic) != DT_TABLE_MAGIC) {
+ +		printf("boota: bad dt table magic %08x
+",
+ +				fdt32_to_cpu(dt_img->magic));
+ +		retry_boot = true;
+ +		goto fail;
+ +	} else if (!fdt32_to_cpu(dt_img->dt_entry_count)) {
+ +		printf("boota: no dt entries
+");
+ +		retry_boot = true;
+ +		goto fail;
+++=======
++ 		printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
++ 							    dt_entry_count));
++ #ifdef CONFIG_IDT_LINUX_DTB
++ 		env_value = env_get("idt,prod-id");
++ 		if (env_value == NULL) {
++ 			puts("boota: no IDTECH product ID in board_info
+");
++ #ifdef CONFIG_IMX_HAB
++ 			retry_boot = true;
++ 			goto fail;
++ #endif /* CONFIG_IMX_HAB */
++ 		}
++ 		env_value = env_get("entry_idx");
++ 		if (env_value != NULL) {
++ 			entry_idx = (int)simple_strtol(env_value, NULL, 10);
++ 		} else {
++ 			entry_idx = find_dtb_in_dtbo(dt_img);
++ 			if (entry_idx < 1) {
++ 				puts("boota: no avaliable dtb
+");
++ 				retry_boot = true;
++ 				goto fail;
++ 			}
++ 		}
++ #else /* !CONFIG_IDT_LINUX_DTB */
++ 		entry_idx = find_dtb_in_dtbo(dt_img);
++ 		if (entry_idx < 1) {
++ 			puts("boota: no avaliable dtb
+");
++ 			retry_boot = true;
++ 			goto fail;
++ 		}
++ #endif /* CONFIG_IDT_LINUX_DTB */
++ 		dt_entry = (struct dt_table_entry *)
++ 			   ((ulong)dt_img +
++ 			    fdt32_to_cpu(dt_img->dt_entries_offset) *
++ 			    entry_idx);
++ 		fdt_size = fdt32_to_cpu(dt_entry->dt_size);
++ 		memcpy((void *)fdt_addr, (void *)((ulong)dt_img +
++ 				fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
++ 	} else {
++ 		fdt_addr = (ulong)(hdr->second_addr);
++ 		fdt_size = (ulong)(hdr->second_size);
++ 		if (fdt_size && fdt_addr) {
++ 			memcpy((void *)(ulong)fdt_addr,
++ 				(void *)(ulong)hdr + hdr->page_size
++ 				+ ALIGN(hdr->kernel_size, hdr->page_size)
++ 				+ ALIGN(hdr->ramdisk_size, hdr->page_size),
++ 				fdt_size);
++ 		}
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  	}
+ -#endif /*CONFIG_OF_LIBFDT*/
+  
+ -	if (check_image_arm64) {
+ -		android_image_get_kernel(hdr, 0, NULL, NULL);
+ -		addr = hdr->kernel_addr;
+ +	struct dt_table_entry *dt_entry;
+ +
+ +	printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
+ +						    dt_entry_count));
+ +	entry_idx = find_dtb_in_dtbo(dt_img);
+ +	if (entry_idx < 1) {
+ +		puts("boota: no avaliable dtb
+");
+ +		retry_boot = true;
+ +		goto fail;
+ +	}
+ +	dt_entry = (struct dt_table_entry *)
+ +		   ((ulong)dt_img +
+ +		    fdt32_to_cpu(dt_img->dt_entries_offset) *
+ +		    entry_idx);
+ +	fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+ +	memcpy((void *)(ulong)fdt_addr, (void *)((ulong)dt_img +
+ +			fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
+ +
+ +	/* Combine cmdline and Print image info  */
+ +	if (gki_is_supported) {
+ +		check_image_arm64  = image_arm64((void *)(ulong)vendor_boot_hdr->kernel_addr);
+ +		android_image_get_kernel_v3(hdr_v3, vendor_boot_hdr);
+ +		addr = vendor_boot_hdr->kernel_addr;
+ +		printf("kernel   @ %08x (%d)
+", vendor_boot_hdr->kernel_addr, hdr_v3->kernel_size);
+ +		printf("ramdisk  @ %08x (%d)
+", vendor_boot_hdr->ramdisk_addr,
+ +						vendor_boot_hdr->vendor_ramdisk_size + hdr_v3->ramdisk_size);
+  	} else {
+ -		addr = (ulong)(hdr->kernel_addr - hdr->page_size);
+ +		check_image_arm64  = image_arm64((void *)(ulong)hdr->kernel_addr);
+ +		if (check_image_arm64) {
+ +			android_image_get_kernel(hdr, 0, NULL, NULL);
+ +			addr = hdr->kernel_addr;
+ +		} else {
+ +			addr = (ulong)(hdr->kernel_addr - hdr->page_size);
+ +		}
+ +		printf("kernel   @ %08x (%d)
+", hdr->kernel_addr, hdr->kernel_size);
+ +		printf("ramdisk  @ %08x (%d)
+", hdr->ramdisk_addr, hdr->ramdisk_size);
+  	}
+ -	printf("kernel   @ %08x (%d)
+", hdr->kernel_addr, hdr->kernel_size);
+ -	printf("ramdisk  @ %08x (%d)
+", hdr->ramdisk_addr, hdr->ramdisk_size);
+ -#ifdef CONFIG_OF_LIBFDT
+  	if (fdt_size)
+  		printf("fdt      @ %08x (%d)
+", fdt_addr, fdt_size);
+ -#endif /*CONFIG_OF_LIBFDT*/
+  
+ +	/* Set boot parameters */
+  	char boot_addr_start[12];
+  	char ramdisk_addr[25];
+  	char fdt_addr_start[12];
+diff --cc drivers/video/imx/mipi_dsi_northwest.c
+index 6b576dae65,763d30b4ac..bccd11a83a
+--- a/drivers/video/imx/mipi_dsi_northwest.c
++++ b/drivers/video/imx/mipi_dsi_northwest.c
+@@@ -24,7 -24,21 +24,25 @@@
+  #include <dm/device-internal.h>
+  #include <regmap.h>
+  #include <syscon.h>
+++<<<<<<< HEAD
+ +#include <asm/arch/clock.h>
+++=======
++ 
++ #define CN_BUF	0xcb7a89c0
++ #define CO_BUF	0x63
++ #define CM(x)	( \
++ 		((x) <  32)?0xe0|((x)-16) : \
++ 		((x) <  64)?0xc0|((x)-32) : \
++ 		((x) < 128)?0x80|((x)-64) : \
++ 		((x) - 128))
++ #define CN(x)	(((x) == 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
++ #define CO(x)	((CO_BUF)>>(8-(x))&0x3)
++ 
++ #define NWL_DSI_TX_PKT_DONE_MASK	BIT(1)
++ #define NWL_DSI_TX_FIFO_OVFLW_MASK	BIT(3)
++ #define NWL_DSI_RX_PKT_HDR_RCVD_MASK	BIT(7)
++ #define NWL_DSI_HS_TX_TIMEOUT_MASK	BIT(31)
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  
+  #define MIPI_LCD_SLEEP_MODE_DELAY	(120)
+  #define MIPI_FIFO_TIMEOUT		250000 /* 250ms */
+@@@ -719,9 -735,9 +739,14 @@@ static void mipi_dsi_shutdown(struct mi
+  	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_PLL);
+  	writel(0x1, mipi_dsi->mmio_base + DPHY_PD_DPHY);
+  
+++<<<<<<< HEAD
+ +	enable_mipi_dsi_clk(false);
+ +
+++=======
++ #ifndef CONFIG_IMX8MQ
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  	reset_dsi_domains(mipi_dsi, true);
++ #endif /* !CONFIG_IMX8MQ */
+  }
+  
+  static inline struct mipi_dsi_northwest_info *host_to_dsi(struct mipi_dsi_host *host)
+@@@ -735,12 -1068,16 +1077,19 @@@ static int mipi_dsi_northwest_host_atta
+  	struct mipi_dsi_northwest_info *mipi_dsi = host_to_dsi(host);
+  	int ret;
+  
++ #ifdef CONFIG_IMX8MQ
++ 	ret = imx8mq_mipi_dsi_northwest_host_attach(host, device);
++ 	return ret;
++ #endif /* CONFIG_IMX8MQ */
++ 
++ #ifndef CONFIG_IMX8MQ
+  	/* Assert resets */
+  	reset_dsi_domains(mipi_dsi, true);
++ #endif /* !CONFIG_IMX8MQ */
+  
+ +	/* Enable mipi relevant clocks */
+ +	enable_mipi_dsi_clk(true);
+ +
+  	ret = mipi_dsi_dphy_init(mipi_dsi);
+  	if (ret < 0)
+  		return ret;
+diff --cc drivers/video/imx/nw_dsi_imx.c
+index 6a8e9463c8,240977d6ce..2a293b7b70
+--- a/drivers/video/imx/nw_dsi_imx.c
++++ b/drivers/video/imx/nw_dsi_imx.c
+@@@ -106,6 -107,12 +106,15 @@@ static int nw_dsi_imx_probe(struct udev
+  		return -EINVAL;
+  	}
+  
+++<<<<<<< HEAD
+++=======
++ #ifdef CONFIG_IMX8MQ
++ 	init_mipi_clk();
++ #else /* !CONFIG_IMX8MQ */
++ 	enable_mipi_dsi_clk(true);
++ #endif /* CONFIG_IMX8MQ */
++ 
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  	return ret;
+  }
+  
+@@@ -123,6 -130,10 +132,13 @@@ static int nw_dsi_imx_remove(struct ude
+  		return ret;
+  	}
+  
+++<<<<<<< HEAD
+++=======
++ #ifndef CONFIG_IMX8MQ
++ 	enable_mipi_dsi_clk(false);
++ #endif /* !CONFIG_IMX8MQ */
++ 
+++>>>>>>> merge_idt-imx-android-10-dev_to_idt-imx-android-10-test
+  	return 0;
+  }
+  

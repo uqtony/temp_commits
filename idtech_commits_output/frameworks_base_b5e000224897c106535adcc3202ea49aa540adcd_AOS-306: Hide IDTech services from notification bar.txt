@@ -1,0 +1,47 @@
+b5e000224897 owen.wen 2020-08-25
+
+AOS-306: Hide IDTech services from notification bar
+
+allow idtech app using foreground service and not show the notification
+in status bar
+rules as below
+1. package name starts with com.idtech
+2. signed with idtech key
+
+Change-Id: I679389cd8411b4f0fafce716887878a7e8cf8d06
+
+diff --git a/services/core/java/com/android/server/notification/NotificationManagerService.java b/services/core/java/com/android/server/notification/NotificationManagerService.java
+index 47ed7f54e1b0..fb9134a732e3 100644
+--- a/services/core/java/com/android/server/notification/NotificationManagerService.java
++++ b/services/core/java/com/android/server/notification/NotificationManagerService.java
+@@ -139,6 +139,7 @@ import android.content.IntentFilter;
+ import android.content.pm.ActivityInfo;
+ import android.content.pm.ApplicationInfo;
+ import android.content.pm.IPackageManager;
++import android.content.pm.PackageInfo;
+ import android.content.pm.PackageManager;
+ import android.content.pm.PackageManager.NameNotFoundException;
+ import android.content.pm.PackageManagerInternal;
+@@ -5282,6 +5283,22 @@ public class NotificationManagerService extends SystemService {
+             usageStats.registerBlocked(r);
+             return true;
+         }
++        // if package name starting with com.idtech
++        // and is foreground notification then return true
++        // and is signed with platform key
++        PackageManager pm = getContext().getPackageManager();
++        try {
++            PackageInfo info = pm.getPackageInfo(r.sbn.getPackageName(), 0);
++            if (info.applicationInfo != null &&
++                    r.sbn.getPackageName().startsWith("com.idtech") &&
++                    (r.getNotification().flags & FLAG_FOREGROUND_SERVICE) !=0 &&
++                    (info.applicationInfo.privateFlags & ApplicationInfo.PRIVATE_FLAG_SIGNED_WITH_PLATFORM_KEY) != 0) {
++                Slog.d(TAG, "Suppress the notification of package: " + r.sbn.getPackageName());
++                return true;
++            }
++        } catch (Exception e) {
++            Slog.e(TAG, "Exception in getPackageInfo " + e);
++        }
+         return false;
+     }
+ 

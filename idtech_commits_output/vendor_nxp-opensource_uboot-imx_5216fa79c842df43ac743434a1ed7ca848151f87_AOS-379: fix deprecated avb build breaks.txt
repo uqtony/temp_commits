@@ -1,0 +1,99 @@
+5216fa79c8 George.Huang 2020-10-29
+
+AOS-379: fix deprecated avb build breaks
+
+Since livavb is refactored to bootloader_control
+- lib/avb/libavb_ab/* are removed
+- lib/avb/fsl/fsl_avb_ab_flow.c >> lib/avb/fsl/fsl_bootctrl.c  is refactored
+- lib/avb/libavb_ab/avb_ab_flow.h >> include/android_bootloader_message.h
+- AvbABData >> bootloader_control
+- AvbABSlotData >> slot_metadata
+
+Change-Id: I651f7da88bc4caa8f94f1c4ae081a9cbfcff0826
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 4cea262502..c4263feab5 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -324,7 +324,7 @@ static int vbh_bootloader(uint8_t *image_hash)
+ {
+ 	char* slot_suffixes[2] = {"_a", "_b"};
+ 	char partition_name[20];
+-	AvbABData ab_data;
++	struct bootloader_control ab_data;
+ 	uint8_t *image_buf = NULL;
+ 	uint32_t image_size;
+ 	size_t image_num_read;
+diff --git a/drivers/idt/multiddr/idt_ddr_select.c b/drivers/idt/multiddr/idt_ddr_select.c
+index ed401dcf49..26fed098d1 100644
+--- a/drivers/idt/multiddr/idt_ddr_select.c
++++ b/drivers/idt/multiddr/idt_ddr_select.c
+@@ -78,13 +78,13 @@ void idt_read_block(struct blk_desc *dev_desc, unsigned int start_off, struct id
+ /* read misc partition for AB data and return according mem_info offset */
+ unsigned int get_misc_ab_info(struct blk_desc *dev_desc)
+ {
+-	AvbABData *p_abdata = NULL;
++	struct bootloader_control *p_abdata = NULL;
+ 	char misc_ab_info[IDT_BLOCK_SIZE] = "";
+ 	blk_dread(dev_desc, MISC_ABINFO_BASE, 1, (void *) misc_ab_info);
+-	p_abdata = (struct AvbABData *) misc_ab_info;
++	p_abdata = (struct bootloader_control *) misc_ab_info;
+ 
+-	if (memcmp(p_abdata->magic, AVB_AB_MAGIC, AVB_AB_MAGIC_LEN) == 0 &&
+-			p_abdata->slots[1].priority > p_abdata->slots[0].priority) {
++	if (p_abdata->magic == BOOT_CTRL_MAGIC &&
++			p_abdata->slot_info[1].priority > p_abdata->slot_info[0].priority) {
+ 		printf("using slot b
+");
+ 		return MEM_INFO_B_BASE;
+ 	} else {
+diff --git a/include/fsl_avb.h b/include/fsl_avb.h
+index 5ba62d1e45..d15313fd1d 100644
+--- a/include/fsl_avb.h
++++ b/include/fsl_avb.h
+@@ -209,17 +209,4 @@ bool hab_is_enabled(void);
+ /* Return if device is in spl recovery mode. */
+ bool is_spl_recovery(void);
+ 
+-/* Ensure all unbootable and/or illegal states are marked as the
+- * canonical 'unbootable' state, e.g. priority=0, tries_remaining=0,
+- * and successful_boot=0. This is a copy of slot_normalize from
+- * external/avb/libavb_ab/avb_ab_flow.c.
+- */
+-void fsl_slot_normalize(AvbABSlotData* slot);
+-
+-/* Load metadate from misc partition.
+- */
+-int fsl_load_metadata_dual_uboot(struct blk_desc *dev_desc,
+-				AvbABData* ab_data,
+-				AvbABData* ab_data_orig);
+-
+ #endif /* __FSL_AVB_H__ */
+diff --git a/lib/avb/fsl/fsl_bootctrl.c b/lib/avb/fsl/fsl_bootctrl.c
+index f7c37e803e..0b2eafe790 100755
+--- a/lib/avb/fsl/fsl_bootctrl.c
++++ b/lib/avb/fsl/fsl_bootctrl.c
+@@ -1426,17 +1426,17 @@ out:
+ 
+ #ifdef CONFIG_ANDROID_AB_SUPPORT
+ extern AvbIOResult fsl_save_metadata_if_changed(AvbABOps* ab_ops,
+-						AvbABData* ab_data,
+-						AvbABData* ab_data_orig);
++						struct bootloader_control* ab_data,
++						struct bootloader_control* ab_data_orig);
+ 
+ extern AvbIOResult fsl_load_metadata(AvbABOps* ab_ops,
+-						AvbABData* ab_data,
+-						AvbABData* ab_data_orig);
++						struct bootloader_control* ab_data,
++						struct bootloader_control* ab_data_orig);
+ 
+-extern void fsl_slot_set_unbootable(AvbABSlotData* slot);
++extern void fsl_slot_set_unbootable(struct slot_metadata* slot);
+ 
+ int avb_ab_handle_retry_count(AvbABOps* ab_ops, bool need_to_decrease) {
+-	AvbABData ab_data, ab_data_orig;
++	struct bootloader_control ab_data, ab_data_orig;
+ 	AvbIOResult io_ret;
+ 	size_t slot_index_to_boot;
+ 

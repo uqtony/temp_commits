@@ -1,0 +1,237 @@
+cd4e4aa5 George.Huang 2020-10-27
+
+Merge tag 'android-10.0.0_2.5.0_history' into HEAD
+
+android-10.0.0_2.5.0_history
+
+Change-Id: I997d0e636f7302614303d121a330e9f5204b435d
+
+diff --cc common/tools/fastboot_imx_flashall.bat
+index b769dfde,f892a552..38ab35ea
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@@ -240,9 -203,8 +240,14 @@@ if %erase% == 1 
+          %fastboot_tool% erase cache
+      )
+      %fastboot_tool% erase misc
+++<<<<<<< .merge_file_jO2Nsy
+ +    if EXIST %image_directory%%userdata_file% call :flash_partition %userdata_partition%
+ +    if NOT [%ERRORLEVEL%] == [0] %fastboot_tool% format userdata
+ +    if NOT [%ERRORLEVEL%] == [0] %fastboot_tool% erase userdata
+++=======
++     %fastboot_tool% erase metadata
++     %fastboot_tool% erase userdata
+++>>>>>>> .merge_file_I3aJyz
+  )
+  if %lock% == 1 %fastboot_tool% oem lock
+  
+diff --cc common/tools/fastboot_imx_flashall.sh
+index 4e29c86e,76b09e97..03d140db
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@@ -657,8 -465,7 +657,12 @@@ if [ ${erase} -eq 1 ]; the
+          ${fastboot_tool} erase cache
+      fi
+      ${fastboot_tool} erase misc
+++<<<<<<< .merge_file_PpsVrx
+ +    [ -f "${image_directory}${userdata_file}" ] && flash_partition userdata ||
+ +    ${fastboot_tool} format userdata ||
+++=======
++     ${fastboot_tool} erase metadata
+++>>>>>>> .merge_file_96fAnx
+      ${fastboot_tool} erase userdata
+  fi
+  
+diff --cc common/tools/imx-make.sh
+index 629b6b1d,45fa7139..d35f8086
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@@ -108,7 -112,12 +112,16 @@@ if [ ${build_bootloader_kernel_flag} -e
+      build_android_flag=1
+  fi
+  
+++<<<<<<< .merge_file_tdkgcB
+ +product_makefile=`pwd`/`find device/idtech -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++=======
++ # vvcam.ko need build with kernel each time to make sure "insmod vvcam.ko" works
++ if [ -n "${build_kernel}" ] && [ ${TARGET_PRODUCT} = "evk_8mp" ]; then
++     build_vvcam="vvcam";
++ fi
++ 
++ product_makefile=`pwd`/`find device/fsl -maxdepth 4 -name "${TARGET_PRODUCT}.mk"`;
+++>>>>>>> .merge_file_rrxT8A
+  product_path=${product_makefile%/*}
+  soc_path=${product_path%/*}
+  fsl_git_path=${soc_path%/*}
+diff --cc imx8m/ProductConfigCommon.mk
+index da81d062,2c7eb448..17b7602f
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@@ -12,11 -12,18 +12,19 @@@ $(call inherit-product, $(SRC_TARGET_DI
+  PRODUCT_BRAND := Android
+  PRODUCT_MANUFACTURER := freescale
+  
+ -# Android infrastructures
+ +ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+  PRODUCT_PACKAGES += \
+ -    CactusPlayer \
+ -    ExtractorPkg \
+      SystemUpdaterSample \
+ -    charger_res_images \
+      ethernet \
+++<<<<<<< .merge_file_03JG6x
+ +    CubeLiveWallpapers
+++=======
++     libedid \
++     libion \
++     slideshow \
++     verity_warning_images
++ 
+++>>>>>>> .merge_file_5WZ2Zx
+  ifneq ($(PRODUCT_IMX_CAR),true)
+  PRODUCT_PACKAGES += \
+      Camera \
+@@@ -108,9 -87,7 +110,13 @@@ PRODUCT_PACKAGES += 
+  # sensor
+  PRODUCT_PACKAGES += \
+      fsl_sensor_fusion \
+++<<<<<<< .merge_file_03JG6x
+ +    libbt-vendor \
+ +    sensors.imx \
+ +    magd
+++=======
++     libbt-vendor
+++>>>>>>> .merge_file_5WZ2Zx
+  
+  # memtrack
+  PRODUCT_PACKAGES += \
+@@@ -266,31 -216,25 +245,40 @@@ PRODUCT_COPY_FILES += 
+      $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_c2_telephony.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_c2_telephony.xml \
+      $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_codecs_google_c2_tv.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_google_c2_tv.xml \
+      $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media_profiles_720p.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_profiles_720p.xml \
+++<<<<<<< .merge_file_03JG6x
+ +    device/idtech/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
+ +    device/idtech/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
+ +    device/idtech/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
+ +    device/idtech/common/input/matrix-keypad.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/matrix-keypad.kl: \
+ +    device/idtech/imx8m/init.recovery.freescale.rc:root/init.recovery.freescale.rc \
+ +    device/idtech/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+ +    device/idtech/common/input/touchscreen/FW_TDDI_TRUNK_FB.ili:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/FW_TDDI_TRUNK_FB.ili \
+ +    device/idtech/common/input/touchscreen/TM050JYHS11_TM_500_20190614.hex:$(TARGET_COPY_OUT_VENDOR)/usr/tp/ili/TM050JYHS11_TM_500_20190614 \
+++=======
++     device/fsl/common/input/Dell_Dell_USB_Entry_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Entry_Keyboard.idc \
++     device/fsl/common/input/Dell_Dell_USB_Keyboard.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Dell_Dell_USB_Keyboard.idc \
++     device/fsl/common/input/Dell_Dell_USB_Keyboard.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Dell_Dell_USB_Keyboard.kl \
++     device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/HannStar_P1003_Touchscreen.idc \
++     device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/Novatek_NT11003_Touch_Screen.idc \
++     device/fsl/common/input/eGalax_Touch_Screen.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/eGalax_Touch_Screen.idc \
++     device/fsl/imx8m/com.example.android.systemupdatersample.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/com.example.android.systemupdatersample.xml \
+++>>>>>>> .merge_file_5WZ2Zx
+      frameworks/av/services/audiopolicy/config/a2dp_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/a2dp_audio_policy_configuration.xml \
+      frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+      frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+      frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+      frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
+  
+ -PRODUCT_PROPERTY_OVERRIDES += \
+ -    pm.dexopt.boot=quicken
+ +# Copy soc related config and binary to board
+ +PRODUCT_COPY_FILES += \
+ +    device/idtech/imx8m/init.idt.common.rc:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/init.idt.common.rc \
+ +    device/idtech/imx8m/check_modem.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/check_modem.sh \
+  
+ -# wifionly device
+  PRODUCT_PROPERTY_OVERRIDES += \
+-     pm.dexopt.boot=quicken \
+-     ro.hardware.bootctrl=avb \
+ -    ro.radio.noril=yes
+++    pm.dexopt.boot=quicken
+  
+  PRODUCT_PROPERTY_OVERRIDES += \
+      ro.mediacomponents.package=com.nxp.extractorpkg
+diff --cc imx8m/sepolicy/file_contexts
+index 68c12072,ba10c727..36471cc7
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@@ -90,22 -87,4 +88,26 @@@
+  /vendor/bin/hw/android\.hardware\.dumpstate@1\.0-service\.imx      u:object_r:hal_dumpstate_impl_exec:s0
+  /dev/cpu_dma_latency u:object_r:latency_device:s0
+  /vendor/bin/hw/android\.hardware\.oemlock@1\.0-service\.imx      u:object_r:hal_oemlock_impl_exec:s0
+++<<<<<<< .merge_file_SdXE8o
+ +
+ +# lsusb command
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ +/sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ +
+ +#quectel port
+ +/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+ +/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+ +/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+ +#/system/socket/rild              u:object_r:rild_socket:s0
+ +#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+ +/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+ +/system/bin/chat                 u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up            u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-down          u:object_r:ppp_exec:s0
+ +/system/etc/ppp/ip-up-vpn        u:object_r:ppp_exec:s0
+ +/dev/usb/lp0                     u:object_r:ptr_device:s0
+++=======
++ /vendor/bin/hw/android\.hardware\.boot@1\.0-service\.imx      u:object_r:hal_bootctl_default_exec:s0
+++>>>>>>> .merge_file_R974Bn
+diff --cc imx8m/sepolicy/property.te
+index 3af622a9,ca0b40ec..cb3a22b4
+--- a/imx8m/sepolicy/property.te
++++ b/imx8m/sepolicy/property.te
+@@@ -4,4 -4,4 +4,8 @@@ type vendor_usb_config_prop, property_t
+  type power_hal_prop, property_type;
+  type vendor_bluetooth_prop, property_type;
+  type public_vendor_default_prop, property_type;
+++<<<<<<< .merge_file_fKz43t
+ +type idtech_prop, property_type;
+++=======
++ type vendor_wifi_version, property_type;
+++>>>>>>> .merge_file_jLXozs
+diff --cc imx8m/sepolicy/property_contexts
+index c28f23f6,ba6589ad..cfffe4c4
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@@ -255,15 -256,6 +258,21 @@@ ro.bluetooth.wipower                u:o
+  unified_bt_logging                  u:object_r:vendor_bluetooth_prop:s0
+  persist.BT3_2.version               u:object_r:vendor_bluetooth_prop:s0
+  
+++<<<<<<< .merge_file_mGqP1y
+ +ro.radio.noril                      u:object_r:radio_prop:s0 exact string
+ +vendor.rild.                        u:object_r:radio_prop:s0
+ +rild.                               u:object_r:radio_prop:s0
+ +net.eth0.                           u:object_r:net_dns_prop:s0
+ +net.ppp0.dns1                       u:object_r:radio_prop:s0
+ +net.ppp0.dns2                       u:object_r:radio_prop:s0
+ +net.ppp0.local-ip                   u:object_r:radio_prop:s0
+ +net.ppp0.remote-ip                  u:object_r:radio_prop:s0
+ +net.ppp0.gw                         u:object_r:radio_prop:s0
+ +
+ +# create new property header for IDTECH products
+ +persist.idt.                        u:object_r:idtech_prop:s0
+++=======
++ # vendor_wifi_version
++ vendor.wlan.driver.version    u:object_r:vendor_wifi_version:s0
++ vendor.wlan.firmware.version  u:object_r:vendor_wifi_version:s0
+++>>>>>>> .merge_file_v5MoHy
+diff --cc imx8m/sepolicy/vendor_init.te
+index 2ebdfb2a,11158938..3ecec949
+--- a/imx8m/sepolicy/vendor_init.te
++++ b/imx8m/sepolicy/vendor_init.te
+@@@ -13,4 -13,4 +13,8 @@@ set_prop(vendor_init, vendor_bluetooth_
+  set_prop(vendor_init, public_vendor_default_prop)
+  set_prop(vendor_init, vendor_default_prop)
+  get_prop(vendor_init, default_prop)
+++<<<<<<< .merge_file_DuYp6D
+ +set_prop(vendor_init, idtech_prop)
+++=======
++ set_prop(vendor_init, system_prop)
+++>>>>>>> .merge_file_K7wjVD

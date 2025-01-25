@@ -1,0 +1,5094 @@
+3bcff6c jenkins 2020-05-26
+
+Download imx-android-10.0.0_2.0.0.tar.gz from nxp.com
+
+Change-Id: I572e34286e40e57aa9dae59ac00c2562f628b05c
+
+diff --git a/Android.bp b/Android.bp
+new file mode 100644
+index 0000000..0c22bd5
+--- /dev/null
++++ b/Android.bp
+@@ -0,0 +1,35 @@
++// Copyright 2020 NXP
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++//libhantro_vc8000e_defaults {
++//    name: "libhantro_vc8000e_default",
++//}
++
++cc_prebuilt_library_shared {
++    name: "libhantro_vc8000e",
++    vendor: true,
++    //defaults: ["libhantro_vc8000e_default"],
++    compile_multilib: "both",
++
++    multilib: {
++        lib64: {
++            srcs: ["lib64/libhantro_vc8000e.so"],
++        },
++        lib32: {
++            srcs: ["lib/libhantro_vc8000e.so"],
++        },
++
++    }
++}
++
+diff --git a/Android.mk b/Android.mk
+new file mode 100644
+index 0000000..095f789
+--- /dev/null
++++ b/Android.mk
+@@ -0,0 +1,236 @@
++LOCAL_PATH := $(call my-dir)
++
++include $(CLEAR_VARS)
++
++include $(BUILD_MULTI_PREBUILT)
++
++MAJOR_VERSION := $(shell echo $(PLATFORM_VERSION) | cut -d "." -f1)
++ANDROID_VERSION_GE_O := $(shell if [ $(MAJOR_VERSION) -ge 8 ];then echo "true";fi)
++ANDROID_VERSION_EQ_P := $(shell if [ $(MAJOR_VERSION) -eq 9 ];then echo "true";fi)
++
++ifeq ($(ANDROID_VERSION_GE_O), true)
++    FSL_CODEC_OUT_PATH := $(TARGET_OUT_VENDOR)
++else
++    FSL_CODEC_OUT_PATH := $(TARGET_OUT)
++endif
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_nb_amr_dec_v2_arm9_elinux
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++ifeq ($(ANDROID_VERSION_GE_O), true)
++LOCAL_VENDOR_MODULE := true
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(FSL_CODEC_OUT_PATH)/lib64/
++LOCAL_SRC_FILES_64 := ./lib64/lib_nb_amr_dec_arm_android.so
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := ./lib/lib_nb_amr_dec_v2_arm9_elinux.so
++else
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/lib_nb_amr_dec_v2_arm9_elinux.so
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          if [ -d lib ]; then \
++                              ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib/lib_nb_amr_dec.so; \
++                              ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib/lib_aac_dec.so; \
++                              ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib/lib_mp3_dec.so; \
++                          fi; \
++                          if [ -d lib64 ]; then \
++                              ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib64/lib_nb_amr_dec.so; \
++                              ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib64/lib_aac_dec.so; \
++                              ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib64/lib_mp3_dec.so; \
++                          fi;
++else
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          ln -sf ./lib_nb_amr_dec_v2_arm9_elinux.so lib/lib_nb_amr_dec.so; \
++                          ln -sf ./lib_aac_dec_v2_arm12_elinux.so lib/lib_aac_dec.so; \
++                          ln -sf ./lib_mp3_dec_v2_arm12_elinux.so lib/lib_mp3_dec.so;
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_wb_amr_dec_arm9_elinux
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++ifeq ($(ANDROID_VERSION_GE_O), true)
++LOCAL_VENDOR_MODULE := true
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(FSL_CODEC_OUT_PATH)/lib64/
++LOCAL_SRC_FILES_64 := lib64/lib_wb_amr_dec_arm_android.so
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := lib/lib_wb_amr_dec_arm9_elinux.so
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          if [ -d lib ]; then \
++                              ln -sf ./lib_wb_amr_dec_arm9_elinux.so lib/lib_wb_amr_dec.so; \
++                          fi; \
++                          if [ -d lib64 ]; then \
++                              ln -sf ./lib_wb_amr_dec_arm9_elinux.so lib64/lib_wb_amr_dec.so; \
++                          fi;
++else
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          ln -sf ./lib_wb_amr_dec_arm9_elinux.so lib/lib_wb_amr_dec.so;
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/lib_wb_amr_dec_arm9_elinux.so
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_flac_dec_v2_arm11_elinux
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++ifeq ($(ANDROID_VERSION_GE_O), true)
++LOCAL_VENDOR_MODULE := true
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(FSL_CODEC_OUT_PATH)/lib64/
++LOCAL_SRC_FILES_64 := lib64/lib_flac_dec_arm_android.so
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := lib/lib_flac_dec_v2_arm11_elinux.so
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          if [ -d lib ]; then \
++                              ln -sf ./lib_flac_dec_v2_arm11_elinux.so lib/lib_flac_dec.so; \
++                          fi; \
++                          if [ -d lib64 ]; then \
++                              ln -sf ./lib_flac_dec_v2_arm11_elinux.so lib64/lib_flac_dec.so; \
++                          fi;
++else
++LOCAL_POST_INSTALL_CMD := cd $(FSL_CODEC_OUT_PATH); \
++                          ln -sf ./lib_flac_dec_v2_arm11_elinux.so lib/lib_flac_dec.so;
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/lib_flac_dec_v2_arm11_elinux.so
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_H263_dec_v2_arm11_elinux
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++ifeq ($(ANDROID_VERSION_GE_O), true)
++LOCAL_VENDOR_MODULE := true
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := 32
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := lib/lib_H263_dec_v2_arm11_elinux.so
++else
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/lib_H263_dec_v2_arm11_elinux.so
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_peq_v2_arm11_elinux
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++ifeq ($(ANDROID_VERSION_GE_O), true)
++LOCAL_VENDOR_MODULE := true
++endif
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := 32
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := lib/lib_peq_v2_arm11_elinux.so
++else
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/lib_peq_v2_arm11_elinux.so
++endif
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := libvpu-malone
++LOCAL_MODULE_SUFFIX := .so
++LOCAL_MODULE_TAGS := optional
++LOCAL_MODULE_CLASS := SHARED_LIBRARIES
++LOCAL_VENDOR_MODULE := true
++ifeq ($(TARGET_ARCH),arm64)
++LOCAL_MULTILIB := both
++LOCAL_MODULE_PATH_64 := $(FSL_CODEC_OUT_PATH)/lib64/
++LOCAL_SRC_FILES_64 := lib64/libvpu-malone.so
++LOCAL_MODULE_PATH_32 := $(FSL_CODEC_OUT_PATH)/lib/
++LOCAL_SRC_FILES_32 := lib/libvpu-malone.so
++else
++LOCAL_MODULE_PATH := $(FSL_CODEC_OUT_PATH)/lib
++LOCAL_SRC_FILES := lib/libvpu-malone.so
++endif
++include $(BUILD_PREBUILT)
++
++# When version is pi9, install parsers by Android.mk because ExtractorPkg needs it when compiling.
++ifeq ($(ANDROID_VERSION_EQ_P), true)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_avi_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_flv_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_mkv_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_mp4_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_mpg2_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_ogg_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_amr_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_aac_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_mp3_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_wav_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_flac_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_ape_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++include $(CLEAR_VARS)
++LOCAL_MODULE := lib_dsf_parser_arm11_elinux.3.0
++include $(LOCAL_PATH)/library_common.mk
++include $(BUILD_PREBUILT)
++
++endif # EQ_P
++
+diff --git a/asrc-dspc/include/asrcapi.h b/asrc-dspc/include/asrcapi.h
+new file mode 100644
+index 0000000..147259b
+--- /dev/null
++++ b/asrc-dspc/include/asrcapi.h
+@@ -0,0 +1,137 @@
++/*
++ * Copyright 2018-2019 NXP.
++ *
++ * SPDX-License-Identifier: BSD-3
++ */
++
++#ifndef _ASRCAPI_H_
++#define _ASRCAPI_H_
++
++#define ASRC_OK		(0)
++#define ASRC_OVF	(-1)
++#define ASRC_UNF	(-2)
++#define ASRC_NOK	(-3)
++
++#include <stdint.h>
++#include <stdbool.h>
++
++typedef short fract16;
++typedef int fract32;
++typedef long long fract64;
++
++/*
++ * tASRC
++ *
++ * Structure that defines an instance of the ASRC. The Setup parameters should
++ * be initialized before calling asrcCreate. Internal parameters are used
++ * by the ASRC library and should not be modified
++ */
++
++typedef struct sASRC
++{
++    /* Setup parameters */
++    uint32_t fsIn;              /* asrcCreate searches for a filter matching
++                                   the fsIn and fsOut parameters                */
++    uint32_t fsOut;
++    uint32_t quality;           /* 0 or 1, optional quality selection           */
++    uint32_t channels;          /* 1 or 2                                       */
++    uint32_t inBlockSize;       /* Input block size, typically 128 samples. Note
++                                   that the output block size is limited by the
++                                   conversion ratio acting on 2 input buffers.  */
++    uint32_t outBlockSize;      /* Output block size                            */
++    bool internalRatioControl;  /* internal Ratio Control flag                  */
++
++    /* Internal parameters      */
++    uint64_t conversionRatio;
++    void *internalState;
++} tASRC;
++
++/*
++ * asrcCreate()
++ *
++ * Initialize a ASRC instance. Searches for a filter matching the sample rate,
++ * and quality requirements.
++ *
++ * Note that these parameters are used to select a filter but the actual 
++ * ratio used by the ASRC is set by the conversionRatio parameter. This is set
++ * initially by this function based on idealized fsIn:fsOut and updated by
++ * the client application as necessary. 
++ *
++ * ASRC_OK  - successful completion
++ * ASRC_NOK - execution error, no matching filter found
++ */ 
++int asrcCreate( tASRC *context );
++
++/*
++ * asrcDelete()
++ *
++ * Final call to clean up an ASRC context, after this the tASRC storage can 
++ * be released.
++
++ * ASRC_OK  - successful completion
++ * ASRC_NOK - execution error, invalid tASRC instance
++ */ 
++int asrcDelete( tASRC *context );
++
++/*
++ * asrcFlush()
++ *
++ * Clears the current state of the SSRC. Use after error, skip, repeat etc
++ *
++ * ASRC_OK  - successful completion
++ * ASRC_NOK - execution error, invalid tASRC instance
++ */ 
++int asrcFlush( tASRC *context );
++
++/*
++ * asrcInput()
++ *
++ * Read inBlockSize input samples from the specified buffer pointer. Client 
++ * application is responsible for buffer alignment, this function does not
++ * handle wrapping. Due to alignment requirements for efficient internal
++ * computation, the data is copied during the API call and the buffer may
++ * be reused immediately.
++ *
++ * At the end of a track, the client should pad the input buffer with zero
++ * data sufficient to support the filter length
++ *
++ * ASRC_OK  - successful completion
++ * ASRC_NOK - execution error, invalid tASRC instance, insufficient space
++ * ASRC_OVF - input overflow, insufficient space to write data
++ */
++int asrcInput( tASRC *context, fract32 *pIn );
++
++/*
++ * asrcSetConversionRatio()
++ *
++ * Update the value of the conversion ratio for subsequenct ASRC operations.
++ * The format is 25.39 fixed point
++ */
++int asrcConversionRatio( tASRC *context, uint64_t ratio );
++
++/* asrcGainControl()
++ *
++ * Control the gain/attenuation setting for the ASRC:
++ *
++ * 0 -  0dB attenuation
++ * 1 -  6dB attenuation
++ * 2 - 12dB attenuation
++ * 3 - 18dB attenuation
++ */
++int asrcGainControl( tASRC *context, uint32_t attenuation );
++
++/*
++ * asrcOutput()
++ *
++ * Write outBlockSize samples to the specified buffer pointer. Client
++ * application is responsible for buffer alignment, this function does not
++ * handle wrapping
++ *
++ * ASRC_OK  - successful completion
++ * ASRC_NOK - execution error, invalid tASRC instance, insufficient input
++ *            samples available
++ * ASRC_UNF - underflow, insufficient input samples available for output
++ */
++int asrcOutput( tASRC *context, fract32 *pOut );
++
++#endif        /* !defined _ASRCAPI_H_ */
+diff --git a/asrc-dspc/release/exe/asrc-test_android b/asrc-dspc/release/exe/asrc-test_android
+new file mode 100644
+index 0000000..c1dd2b3
+Binary files /dev/null and b/asrc-dspc/release/exe/asrc-test_android differ
+diff --git a/asrc-dspc/release/lib/lib_dspc_asrc_android.so b/asrc-dspc/release/lib/lib_dspc_asrc_android.so
+new file mode 100644
+index 0000000..a803ebc
+Binary files /dev/null and b/asrc-dspc/release/lib/lib_dspc_asrc_android.so differ
+diff --git a/asrc-dspc/release/lib/lib_dspc_asrc_coef_android.so b/asrc-dspc/release/lib/lib_dspc_asrc_coef_android.so
+new file mode 100644
+index 0000000..6a562ea
+Binary files /dev/null and b/asrc-dspc/release/lib/lib_dspc_asrc_coef_android.so differ
+diff --git a/asrc-dspc/test/Makefile b/asrc-dspc/test/Makefile
+new file mode 100644
+index 0000000..2ff154c
+--- /dev/null
++++ b/asrc-dspc/test/Makefile
+@@ -0,0 +1,49 @@
++# Copyright 2019 NXP
++#
++
++CFLAGS += -DLINUX -fPIC
++
++ifeq ($(ANDROID_BUILD), 1)
++CFLAGS += -pie -fPIE
++endif
++
++INCLUDES = -I../include
++
++LIB_DIR = ../release/lib
++RELEASE_DIR = ../release
++
++TEST_OBJS = ./src/test.o \
++		./src/wave_func.o
++
++ifeq ($(ANDROID_BUILD), 1)
++LIBRARY = $(RELEASE_DIR)/lib/lib_dspc_asrc_android.so
++TARGET=asrc-test_android
++else
++LIBRARY = $(RELEASE_DIR)/lib/lib_dspc_asrc.so
++TARGET=asrc-test
++endif
++
++all: ASRC_TEST
++	echo "--- Build DSPC ASRC TEST ---"
++
++ASRC_TEST: $(TEST_OBJS)
++ifneq ($(ARCH), arm64)
++	@echo "--only support ARM64 build---"
++	@exit 1;
++endif
++	echo "--- Build unit test ---"
++	cp $(LIBRARY) ./
++	$(CC) $(CFLAGS) $(TEST_OBJS) $(subst $(LIB_DIR)/,,$(LIBRARY)) -lm -o $(TARGET)
++	cp $(TARGET) $(RELEASE_DIR)/exe/
++
++%.o: %.c
++	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $<
++
++clean:
++	rm -f ./src/*.o
++	rm -f asrc-test
++
++help:
++	@echo "targets are:"
++	@echo "	ASRC_TEST	- build asrc unit test"
++	@echo "	all		- build the above"
+diff --git a/asrc-dspc/test/src/test.c b/asrc-dspc/test/src/test.c
+new file mode 100644
+index 0000000..120ef56
+--- /dev/null
++++ b/asrc-dspc/test/src/test.c
+@@ -0,0 +1,308 @@
++/*
++ * Copyright 2018-2019 NXP.
++ *
++ * ASRC File based sample test using 32-bit Q31 filters and 128 Interpolation
++ *
++ * SPDX-License-Identifier: BSD-3
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <getopt.h>
++#include <string.h>
++#include <math.h>
++#include <endian.h>
++#include "asrcapi.h"
++#include "wave_func.h"
++
++#define CHANNEL_COUNT 2
++#define INPUT_BLOCK_SIZE 128
++#define OUTPUT_BLOCK_SIZE 16
++#define ASRC_FS_IN_48000 48000
++#define ASRC_FS_OUT_48000 48000
++#define INTERP_FACTOR_M 128.0
++
++char* infile = NULL;
++char* outfile = NULL;
++uint32_t gainValue = 0;
++uint32_t inputClockOffset = 0;
++void print_help(const char *argv[]);
++int parse_arguments(int argc, const char *argv[], tASRC *asrc);
++int  update_wav_hdr (FILE* outfile,  int32_t samplerate, int32_t channels,  int32_t nsamples);
++
++int main(int argc, const char *argv[])
++{
++	tASRC asrc;
++	uint8_t bEOF = 0;
++	uint8_t wavOutFile = 0;
++
++	FILE *fpIn = NULL;
++	FILE *fpOut = NULL;
++	int status = ASRC_OK;
++	int inSampleCount = 0;
++	int outSampleCount  = 0;
++	fract32* inputBuffer = NULL;
++	fract32* inputBuffer_s = NULL;
++	fract32* outputBuffer = NULL;
++	uint64_t totalOutSamples = 0;
++	struct waveheader in_waveheader;
++	struct waveheader out_waveheader;
++
++	if (parse_arguments(argc, argv, &asrc) != 0)
++		return -1;
++
++	fpIn = fopen(infile, "rb");
++	if (!fpIn) {
++		perror("Failed to open input file");
++		return -1;
++	}
++
++	fpOut = fopen (outfile, "wb");
++	if (!fpOut) {
++		perror("Failed to open output file");
++		goto err_open_out_file;
++	}
++
++	if (header_parser(fpIn,  &in_waveheader) < 0)
++		goto err_header_parse;
++
++	if (in_waveheader.bitspersample != 16 &&
++		in_waveheader.bitspersample != 32) {
++		printf("unsupported sample bits %d
+",
++			in_waveheader.bitspersample);
++		goto err_header_parse;
++	}
++
++	asrc.channels = in_waveheader.numchannels;
++	asrc.fsIn = in_waveheader.samplerate;
++
++	if (asrcCreate(&asrc) != ASRC_OK) {
++		printf("
+ asrcCreate Failed 
+");
++		goto err_header_parse;
++	}
++
++	if(asrcGainControl(&asrc, gainValue) != ASRC_OK) {
++		printf("
+ asrcGainControl Failed 
+");
++		goto err_gain_control;
++	}
++
++	memcpy(&out_waveheader, &in_waveheader, sizeof(struct waveheader));
++
++	out_waveheader.samplerate = asrc.fsOut;
++	out_waveheader.bitspersample = 32;
++
++	header_write(fpOut, &out_waveheader);
++
++	if(asrc.quality > 1)
++		asrc.quality = 1;
++
++	if(inputClockOffset != 0) {
++		fract64 fStep;
++		double phaseBits;
++		float relativeInputFS;
++		relativeInputFS = asrc.fsIn + (float)inputClockOffset;
++		phaseBits = 32.0 + (log(INTERP_FACTOR_M)/log(2));
++		fStep = (fract64) (((relativeInputFS)/asrc.fsOut) * pow(2.0, phaseBits));
++		printf("
+ Adjusting fStep=%lld for inputClockOffset=%d  
+", fStep, inputClockOffset);
++		asrcConversionRatio(&asrc, fStep);
++	}
++
++	inputBuffer = (fract32 *)malloc(asrc.inBlockSize * asrc.channels * in_waveheader.bitspersample / 8);
++	outputBuffer = (fract32 *)malloc(asrc.outBlockSize * asrc.channels * sizeof(fract32));
++	inputBuffer_s = (fract32 *)malloc(asrc.inBlockSize * asrc.channels * sizeof(fract32));
++
++	if ((inputBuffer == NULL) || (outputBuffer == NULL) || (inputBuffer_s == NULL)) {
++		if(inputBuffer != NULL)
++			free(inputBuffer);
++
++		if(inputBuffer_s != NULL)
++			free(inputBuffer_s);
++
++		if(outputBuffer != NULL)
++			free(outputBuffer);
++
++		printf("
+ malloc error 
+");
++		goto err_gain_control;
++	}
++
++	//Get first block of data
++	inSampleCount = (int) fread (&inputBuffer[0], in_waveheader.bitspersample / 8,
++				     asrc.channels * asrc.inBlockSize, fpIn);
++
++	while(1)
++	{
++		while(status == ASRC_OK )
++		{
++			if (inSampleCount != asrc.channels * asrc.inBlockSize) {
++				printf("
+ End of file reached 
+");
++				status = ASRC_NOK;
++				break;
++			}
++			if (in_waveheader.bitspersample == 16) {
++				int i;
++				short data;
++				short *buf = (short *) inputBuffer;
++				for (i = 0; i < inSampleCount; i++) {
++					data = buf[i];
++					inputBuffer_s[i] = (int)data << 16;
++				}
++			} else {
++				memcpy(inputBuffer_s, inputBuffer, inSampleCount * 4);
++			}
++
++			status = asrcInput(&asrc, inputBuffer_s);
++			//printf("
+ input asrcInput returned status=%d 
+", status);
++			if( status == ASRC_OVF)
++			{
++				status = ASRC_OK;
++				break;
++			}
++			if( status == ASRC_NOK)
++			{
++				printf("
+ asrc retunred NOK for for asrcInput 
+");
++				goto err_asrc_input;
++			}
++			inSampleCount = (int) fread (&inputBuffer[0],
++				in_waveheader.bitspersample / 8, asrc.channels * asrc.inBlockSize, fpIn);
++		}
++
++		while(status == ASRC_OK)
++		{
++			status = asrcOutput(&asrc, outputBuffer);
++			//printf("
+ output asrcOutput returned status=%d 
+", status);
++			if (status == ASRC_UNF) {
++				status = ASRC_OK;
++				break;
++			}
++
++			if (status == ASRC_NOK) {
++				printf("
+ asrc retunred NOK for asrcOutput 
+");
++				goto err_asrc_output;
++			}
++			/* Write the data*/
++			outSampleCount = (int) fwrite (&outputBuffer[0],
++				sizeof(fract32), asrc.channels * asrc.outBlockSize, fpOut);
++
++			if (outSampleCount != asrc.channels * asrc.outBlockSize) {
++				printf("
+ File write failed!
+");
++				goto err_write_file;
++			}
++
++			totalOutSamples += asrc.outBlockSize;
++		}
++		if(status == ASRC_NOK)
++			break;
++	}
++
++	out_waveheader.datachunksize = totalOutSamples *
++					out_waveheader.numchannels *
++					out_waveheader.bitspersample/8;
++	header_update(fpOut, &out_waveheader);
++
++	asrcDelete(&asrc);
++
++	free(inputBuffer);
++	free(inputBuffer_s);
++	free(outputBuffer);
++	fclose(fpOut);
++	fclose(fpIn);
++
++	return 0;
++
++err_write_file:
++err_asrc_output:
++err_asrc_input:
++	free(inputBuffer);
++	free(inputBuffer_s);
++	free(outputBuffer);
++err_gain_control:
++	asrcDelete(&asrc);
++err_header_parse:
++	fclose(fpOut);
++err_open_out_file:
++	fclose(fpIn);
++	return -1;
++}
++
++int parse_arguments(int argc, const char *argv[], tASRC *asrc)
++{
++	asrc->inBlockSize = INPUT_BLOCK_SIZE;
++	asrc->outBlockSize = OUTPUT_BLOCK_SIZE;
++	asrc->fsIn = ASRC_FS_IN_48000;
++	asrc->fsOut = ASRC_FS_OUT_48000;
++	asrc->channels = CHANNEL_COUNT;
++	asrc->quality = 1;
++	asrc->internalRatioControl = false;
++
++	/* Usage checking  */
++	if( argc < 3 )
++	{
++		print_help(argv);
++		exit(1);
++	}
++
++	int c, option_index;
++	static const char short_options[] = "ho:x:z:b:k:q:g:r:";
++	static const struct option long_options[] = {
++		{"help", 0, 0, 'h'},
++		{"outFreq", 1, 0, 'o'},
++		{"inputFile", 1, 0, 'x'},
++		{"outputFile", 1, 0, 'z'},
++		{"blocksize", 1, 0, 'b'},
++		{"quality", 1, 0, 'q'},
++		{"gain", 1, 0, 'g'},
++		{"inputClockOffset", 1, 0, 'k'},
++		{0, 0, 0, 0}
++	};
++
++	while ((c = getopt_long(argc, (char * const*)argv, short_options, long_options, &option_index)) != -1) {
++		switch (c) {
++		case 'o':
++			asrc->fsOut = strtol(optarg,NULL,0);
++			break;
++		case 'x':
++			infile = optarg;
++			break;
++		case 'z':
++			outfile = optarg;
++			break;
++		case 'q':
++			asrc->quality = strtol(optarg,NULL,0);
++			break;
++		case 'b':
++			asrc->inBlockSize =  strtol(optarg,NULL,0);
++			asrc->outBlockSize = 16; //inputBlockSize;
++			break;
++		case 'k':
++			inputClockOffset = strtol(optarg,NULL,0);
++			break;
++		case 'g':
++			gainValue = strtol(optarg,NULL,0);
++			break;
++		case 'h':
++			print_help(argv);
++			exit(1);
++	default:
++			printf("Unknown Command  -%c 
+", c);
++			exit(1);
++		}
++	}
++
++	printf("
+ fsOut=%d, inBlockSize=%d, outBlockSize=%d, quality=%d gain=%d inFile=%s, outFile=%s 
+",
++		asrc->fsOut, asrc->inBlockSize, asrc->outBlockSize, asrc->quality, gainValue, infile, outfile);
++	return 0;
++}
++
++void print_help(const char *argv[])
++{
++	printf("Usage: %s 
+"
++			"	--- help (h): this screen 
+"
++			"	--- inputFile(x): raw audio data to process
+"
++			"	--- outputFile(z): output file for converted audio
+"
++			"	--- outFreq (o): output Frequency 
+"
++			"	--- quality (q): quality to be either 0 or 1 
+"
++			"	--- gain (h): gain to be applied 0..3 
+"
++			"	--- inputClockOffset(k): optional input clock offset in Hz, to add to processing to simulate asynchronous clocks 
+"
++			"	--- blocksize (b): (optional) block size to be used 
+" , argv[0]);
++	return;
++}
+diff --git a/asrc-dspc/test/src/wave_func.c b/asrc-dspc/test/src/wave_func.c
+new file mode 100644
+index 0000000..40b7eeb
+--- /dev/null
++++ b/asrc-dspc/test/src/wave_func.c
+@@ -0,0 +1,161 @@
++/*
++ * Copyright 2019 NXP.
++ *
++ * SPDX-License-Identifier: BSD-3
++ */
++
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include "wave_func.h"
++
++
++int header_parser(FILE *src, struct waveheader *waveheader)
++{
++
++	int format_size;
++	char chunk_id[4];
++	int chunk_size;
++	char *header = &waveheader->header[0];
++
++	/* check the "RIFF" chunk */
++	fseek(src, 0, SEEK_SET);
++	fread(chunk_id, 4, 1, src);
++	while (strncmp(chunk_id, "RIFF", 4) != 0){
++		fread(&chunk_size, 4, 1, src);
++		fseek(src, chunk_size, SEEK_CUR);
++		if(fread(chunk_id, 4, 1, src) == 0) {
++			printf("Wrong wave file format 
+");
++			return -1;
++		}
++	}
++	fseek(src, -4, SEEK_CUR);
++	fread(&header[0], 1, 12, src);
++
++	/* check the "fmt " chunk */
++	fread(chunk_id, 4, 1, src);
++	while (strncmp(chunk_id, "fmt ", 4) != 0){
++		fread(&chunk_size, 4, 1, src);
++		fseek(src, chunk_size, SEEK_CUR);
++		if(fread(chunk_id, 4, 1, src) == 0) {
++			printf("Wrong wave file format 
+");
++			return -1;
++		}
++	}
++	/* fmt chunk size */
++	fread(&format_size, 4, 1, src);
++
++	fseek(src, -8, SEEK_CUR);
++	fread(&header[12], 1, format_size + 8, src);
++
++	/* AudioFormat(2) */
++
++	/* NumChannel(2) */
++	waveheader->numchannels = *(short *)&header[12 + 8 + 2];
++
++	/* SampleRate(4) */
++	waveheader->samplerate = *(int *)&header[12 + 8 + 2 + 2];
++
++	/* ByteRate(4) */
++
++	/* BlockAlign(2) */
++	waveheader->blockalign = *(short *)&header[12 + 8 + 2 + 2 + 4 + 4];
++
++	/* BitsPerSample(2) */
++	waveheader->bitspersample = *(short *)&header[12 + 8 + 2 + 2 + 4 + 4 + 2];
++
++
++	/* check the "data" chunk */
++	fread(chunk_id, 4, 1, src);
++	while (strncmp(chunk_id, "data", 4) != 0) {
++		fread(&chunk_size, 4, 1, src);
++		/* seek to next chunk if it is not "data" chunk */
++		fseek(src, chunk_size, SEEK_CUR);
++		if(fread(chunk_id, 4, 1, src) == 0) {
++		    printf("No data chunk found 
+Wrong wave file format 
+");
++		    return -1;
++		}
++	}
++	/* wave data length */
++	fread(&waveheader->datachunksize, 4, 1, src);
++	fseek(src, -8, SEEK_CUR);
++	fread(&header[format_size + 20], 1, 8, src);
++
++	return 0;
++}
++
++void header_update(FILE *dst, struct waveheader *waveheader)
++{
++	int format_size;
++	char *header = &waveheader->header[0];
++
++	format_size = *(int *)&header[16];
++
++	*(int *)&header[4] = waveheader->datachunksize + 20 + format_size;
++	*(int *)&header[24 + format_size] = waveheader->datachunksize;
++	*(int *)&header[24] = waveheader->samplerate;
++	*(int *)&header[28] =
++		waveheader->samplerate * (waveheader->bitspersample / 8)
++					* waveheader->numchannels;
++	*(unsigned short *)&header[32] = waveheader->blockalign;
++	*(unsigned short *)&header[34] = waveheader->bitspersample;
++
++	fseek(dst, 4,  SEEK_SET);
++	fwrite(&header[4], 4, 1, dst);
++
++	fseek(dst, 24,  SEEK_SET);
++	fwrite(&header[24], 12, 1, dst);
++
++	fseek(dst, 24 + format_size,  SEEK_SET);
++	fwrite(&header[24 + format_size], 4, 1, dst);
++
++	fseek(dst, 0, SEEK_END);
++}
++
++void header_write(FILE *dst, struct waveheader *waveheader)
++{
++	int format_size;
++	char *header = &waveheader->header[0];
++	int i = 0;
++
++	format_size = *(int *)&header[16];
++
++	while (i < (format_size + 28)) {
++		fwrite(&header[i], 1, 1, dst);
++		i++;
++	}
++}
++
++int header_update_datachunksize(struct waveheader *waveheader)
++{
++	int format_size;
++	char *header = &waveheader->header[0];
++
++	*(int *)&header[24 + format_size] = waveheader->datachunksize;
++	*(int *)&header[4] = waveheader->datachunksize + 20 + format_size;
++
++	return 0;
++}
++
++int header_update_blockalign(struct waveheader *waveheader)
++{
++	int format_size;
++	char *header = &waveheader->header[0];
++
++	*(unsigned short *)&header[32] = waveheader->blockalign;
++
++	return 0;
++}
++
++int header_update_bitspersample(struct waveheader *waveheader)
++{
++	char *header = &waveheader->header[0];
++
++	*(unsigned short *)&header[34] = waveheader->bitspersample;
++	*(int *)&header[28] =
++		waveheader->samplerate * (waveheader->bitspersample / 8)
++					* waveheader->numchannels;
++	return 0;
++}
++
++
+diff --git a/asrc-dspc/test/src/wave_func.h b/asrc-dspc/test/src/wave_func.h
+new file mode 100644
+index 0000000..273e2bf
+--- /dev/null
++++ b/asrc-dspc/test/src/wave_func.h
+@@ -0,0 +1,36 @@
++/*
++ * Copyright 2019 NXP.
++ *
++ * SPDX-License-Identifier: BSD-3
++ */
++
++#ifndef WAVE_FUNC_H
++#define WAVE_FUNC_H
++
++#include <stdio.h>
++#include <stdlib.h>
++
++#define WAVE_HEAD_SIZE 44 + 14 + 16
++
++struct waveheader {
++	int   riffchunkoffset;
++	int   riffchunksize;
++	int   fmtchunkoffset;
++	int   fmtchunksize;
++	short numchannels;
++	int   samplerate;
++	int   byterate;
++	short blockalign;
++	short bitspersample;
++	int   datachunkoffset;
++	int   datachunksize;
++
++	char header[WAVE_HEAD_SIZE];
++};
++
++
++int header_parser(FILE *src, struct waveheader *waveheader);
++void header_update(FILE *dst, struct waveheader *waveheader);
++void header_write(FILE *dst, struct waveheader *waveheader);
++
++#endif
+diff --git a/doc/g.711/g711_codec_api.pdf b/doc/g.711/g711_codec_api.pdf
+new file mode 100755
+index 0000000..7b12ff0
+Binary files /dev/null and b/doc/g.711/g711_codec_api.pdf differ
+diff --git a/doc/g.723.1/g723_codec_api.pdf b/doc/g.723.1/g723_codec_api.pdf
+new file mode 100755
+index 0000000..7b5204f
+Binary files /dev/null and b/doc/g.723.1/g723_codec_api.pdf differ
+diff --git a/doc/g.726/g726_codec_api.pdf b/doc/g.726/g726_codec_api.pdf
+new file mode 100755
+index 0000000..e2e4231
+Binary files /dev/null and b/doc/g.726/g726_codec_api.pdf differ
+diff --git a/doc/g.729ab/g729_codec_api.pdf b/doc/g.729ab/g729_codec_api.pdf
+new file mode 100755
+index 0000000..63632c1
+Binary files /dev/null and b/doc/g.729ab/g729_codec_api.pdf differ
+diff --git a/fsl-codec.mk b/fsl-codec.mk
+new file mode 100755
+index 0000000..3778fdf
+--- /dev/null
++++ b/fsl-codec.mk
+@@ -0,0 +1,87 @@
++MAJOR_VERSION := $(shell echo $(PLATFORM_VERSION) | cut -d "." -f1)
++ANDROID_VERSION_GE_O := $(shell if [ $(MAJOR_VERSION) -ge 8 ];then echo "true";fi)
++ANDROID_VERSION_EQ_P := $(shell if [ $(MAJOR_VERSION) -eq 9 ];then echo "true";fi)
++ANDROID_VERSION_GE_Q := $(shell if [ $(MAJOR_VERSION) -ge 10 ];then echo "true";fi)
++
++ifeq ($(ANDROID_VERSION_GE_O), true)
++    FSL_CODEC_OUT_PATH := vendor/lib
++else
++    FSL_CODEC_OUT_PATH := system/lib
++endif
++
++ifeq ($(FSL_CODEC_PATH),)
++    FSL_CODEC_PATH := device
++endif
++
++FSL_PARSER_OUT_PATH := $(FSL_CODEC_OUT_PATH)
++FSL_PARSER_OUT_PATH64 := $(FSL_CODEC_OUT_PATH)64
++FSL_CODEC_OUT_PATH64 := $(FSL_CODEC_OUT_PATH)64
++
++ifeq ($(ANDROID_VERSION_GE_Q), true)
++    FSL_PARSER_OUT_PATH := system/lib/extractors
++    FSL_PARSER_OUT_PATH64 := system/lib64/extractors
++    ifeq ($(INSTALL_64BIT_LIBRARY), true)
++        TARGET_ARCH := arm64
++    endif
++endif
++
++PRODUCT_COPY_FILES += \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aac_dec_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_aac_dec_v2_arm12_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aacd_wrap_arm12_elinux_android.so:$(FSL_CODEC_OUT_PATH)/lib_aacd_wrap_arm12_elinux_android.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_dec_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp3_dec_v2_arm12_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3d_wrap_arm12_elinux_android.so:$(FSL_CODEC_OUT_PATH)/lib_mp3d_wrap_arm12_elinux_android.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_nb_amr_enc_v2_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_nb_amr_enc_v2_arm11_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wb_amr_enc_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_wb_amr_enc_arm11_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp4_muxer_arm11_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp4_muxer_arm11_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_enc_v2_arm12_elinux.so:$(FSL_CODEC_OUT_PATH)/lib_mp3_enc_v2_arm12_elinux.so
++
++# for pi9, parsers are handled by Android.mk
++ifneq ($(ANDROID_VERSION_EQ_P), true)
++PRODUCT_COPY_FILES += \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_avi_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_avi_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_flv_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_flv_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mkv_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_mkv_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp4_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_mp4_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mpg2_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_mpg2_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_ogg_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_ogg_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_amr_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_amr_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_aac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_aac_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_mp3_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_mp3_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_wav_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_wav_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_flac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_flac_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_ape_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_ape_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib/lib_dsf_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH)/lib_dsf_parser_arm11_elinux.3.0.so
++endif
++
++ifeq ($(TARGET_ARCH),arm64)
++PRODUCT_COPY_FILES += \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aac_dec_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_aac_dec_v2_arm12_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aacd_wrap_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_aacd_wrap_arm12_elinux_android.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3_dec_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_mp3_dec_v2_arm12_elinux.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3d_wrap_arm_android.so:$(FSL_CODEC_OUT_PATH64)/lib_mp3d_wrap_arm12_elinux_android.so
++
++# copy dspc asrc binaries
++PRODUCT_COPY_FILES += \
++    $(FSL_CODEC_PATH)/fsl-codec/asrc-dspc/release/lib/lib_dspc_asrc_coef_android.so:$(FSL_CODEC_OUT_PATH64)/lib_dspc_asrc_coef_android.so \
++    $(FSL_CODEC_PATH)/fsl-codec/asrc-dspc/release/lib/lib_dspc_asrc_android.so:$(FSL_CODEC_OUT_PATH64)/lib_dspc_asrc_android.so \
++    $(FSL_CODEC_PATH)/fsl-codec/asrc-dspc/release/exe/asrc-test_android:vendor/bin/asrc-test_android
++
++# when version is pi9, parsers are not copied here, but handled by Android.mk
++ifneq ($(ANDROID_VERSION_EQ_P), true)
++PRODUCT_COPY_FILES += \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_avi_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_avi_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_flv_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_flv_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mkv_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_mkv_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp4_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_mp4_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mpg2_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_mpg2_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_ogg_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_ogg_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_amr_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_amr_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_aac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_aac_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_mp3_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_mp3_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_wav_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_wav_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_dsf_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_dsf_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_flac_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_flac_parser_arm11_elinux.3.0.so \
++    $(FSL_CODEC_PATH)/fsl-codec/lib64/lib_ape_parser_arm11_elinux.3.0.so:$(FSL_PARSER_OUT_PATH64)/lib_ape_parser_arm11_elinux.3.0.so
++endif
++
++endif
+diff --git a/ghdr/aac_parser/AacCoreParser.h b/ghdr/aac_parser/AacCoreParser.h
+new file mode 100755
+index 0000000..c3c9116
+--- /dev/null
++++ b/ghdr/aac_parser/AacCoreParser.h
+@@ -0,0 +1,274 @@
++/**
++ *  Copyright (c) 2010-2012, Freescale Semiconductors, Inc.
++ *  All Rights Reserved.
++ *
++ *  The following programs are the sole property of Freescale Semiconductors Inc.,
++ *  and contain its proprietary and confidential information.
++ *
++ */
++
++/**
++ *  @file AacCoreParser.h
++ *  @brief AAC core parser.
++ *  @ingroup AacCoreParser
++ */
++
++
++#ifndef AacCoreParser_h
++#define AacCoreParser_h
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++#include "AudioCoreParser.h"
++//#include "aacd_dec_interface.h"
++
++typedef enum {
++    FILETYPEADTS,
++    FILETYPEADIF,
++    FILETYPERAW
++}AAC_FILETYPE;
++
++typedef enum {
++    AAC_PARSERRETURNSUCESS,
++    AAC_PARSERRETURNFAIL
++}AAC_PARSERRETURNTYPE;
++
++enum {
++  FLAG_SUCCESS,
++  FLAG_NEEDMORE_DATA
++};
++
++enum
++{
++    LN = 2048,
++    LN2 = LN / 2,
++
++    LEN_ELE_IS_CPE = 1,
++    LEN_PROFILE = 2,
++    LEN_SAMP_IDX = 4,
++    LEN_NUM_ELE = 4,
++    LEN_NUM_LFE = 2,
++    LEN_NUM_DAT = 3,
++    LEN_NUM_CCE = 4,
++
++    LEN_MIX_PRES = 1,
++    LEN_MMIX_IDX = 2,
++    LEN_PSUR_ENAB = 1,
++    LEN_COMMENT_BYTES = 8,
++
++    /*
++    * audio data transport stream frame format header
++    */
++    /* fixed header */
++    LEN_SYNCWORD        = 12,
++    LEN_ID      = 1,
++    LEN_LAYER   = 2,
++    LEN_PROTECT_ABS = 1,
++    LEN_PRIVTE_BIT  = 1,
++    LEN_CHANNEL_CONF    = 3,
++
++    /* variable header */
++    LEN_COPYRT_START            = 1,
++    LEN_FRAME_LEN               = 13,
++    LEN_ADTS_BUF_FULLNESS   = 11,
++    LEN_NUM_OF_RDB          =2,
++
++    /* CRC */
++    LEN_CRC = 16,
++
++    /* Some encoders (PsyTEL) put an addtional field 'Emphasis'
++       in MPEG-4 ADTS streams, though it a violation of the
++       standard.
++       But defining OLD_FORMAT_ADTS_HEADER will correctly decode
++       such streams.
++       */
++#ifdef OLD_FORMAT_ADTS_HEADER
++    LEN_EMPHASIS   =  2,
++#endif
++
++    /* audio data interchange format header */
++    LEN_ADIF_ID = (32 / 8),
++    LEN_COPYRT_ID = (72 / 8),
++    LEN_COPYRT_ID_ADTS  = 1,
++
++    LEN_COPYRT_PRES = 1,
++    LEN_ORIG = 1,
++    LEN_HOME = 1,
++    LEN_BS_TYPE = 1,
++    LEN_BIT_RATE = 23,
++    LEN_NUM_PCE = 4,
++    LEN_ADIF_BF = 20,
++
++
++    LEN_TAG = 4,
++    LEN_BYTE = 8
++};
++
++enum
++{
++    /*
++     * channels for 5.1 main profile configuration
++     * (modify for any desired decoder configuration)
++     */
++    FCHANS      = 3,    /* front channels: left, center, right */
++    FCenter     = 1,    /* 1 if decoder has front center channel */
++    SCHANS      = 0,    /* side channels: */
++    BCHANS      = 2,    /* back channels: left surround, right surround */
++    BCenter     = 0,    /* 1 if decoder has back center channel */
++    LCHANS      = 1,    /* LFE channels */
++    XCHANS      = 0,    /* scratch space for parsing unused channels */
++
++    CHANS       = FCHANS + SCHANS + BCHANS + LCHANS + XCHANS
++};
++
++#ifndef AACD_UINT32
++typedef unsigned int AACD_UINT32;
++#endif
++#ifndef AACD_INT32
++typedef int AACD_INT32;
++#endif
++#ifndef AACD_UINT16
++typedef unsigned short AACD_UINT16;
++#endif
++#ifndef AACD_INT16
++typedef short AACD_INT16;
++#endif
++#ifndef AACD_UCHAR
++typedef unsigned char AACD_UCHAR;
++#endif
++#ifndef AACD_UINT8
++typedef unsigned char AACD_UINT8;
++#endif
++#ifndef AACD_INT8
++typedef char AACD_INT8;
++#endif
++
++#define AAC_FRAME_SIZE 		1024
++#define AACD_LEN_TAG            4
++
++#define BIT_COUNTER_INIT        (24)
++#define MIN_REQD_BITS           (24)
++#define ADTS_FRAME_MAX_SIZE     (8192)
++#define ADTS_FRAME_HEADER_SIZE  (7)
++
++/* #define is required in order to use these args in #if () directive */
++#define ICCHANS 		0       /* independently switched coupling channels */
++#define DCCHANS 		0       /* dependently switched coupling channels */
++#define XCCHANS 		0       /* scratch space index for parsing unused coupling
++                 * channels */
++#define CCHANS  (ICCHANS + DCCHANS + XCCHANS)
++
++typedef struct
++{
++    char            adif_id[LEN_ADIF_ID + 1];
++    int             copy_id_present;
++    char            copy_id[LEN_COPYRT_ID + 1];
++    int             original_copy;
++    int             home;
++    int             bitstream_type;
++    int            bitrate;
++    int             num_pce;
++    int             prog_tags[(1 << LEN_TAG)];
++}  ADIF_Header;
++
++typedef struct
++{
++    int             syncword;
++    int             id;
++    int             layer;
++    int             protection_abs;
++    int             profile;
++    int             sampling_freq_idx;
++    int             private_bit;
++    int             channel_config;
++    int             original_copy;
++    int             home;
++    int             copyright_id_bit;
++    int             copyright_id_start;
++    int             frame_length;
++    int             adts_buffer_fullness;
++    int             num_of_rdb;
++    int             crc_check;
++}  ADTS_Header;
++
++typedef struct
++{
++    AACD_INT32             num_ele;
++    AACD_INT32             ele_is_cpe[(1 << AACD_LEN_TAG)];
++    AACD_INT32             ele_tag[(1 << AACD_LEN_TAG)];
++}   AACD_EleList;
++
++typedef struct
++{
++    AACD_INT32             present;
++    AACD_INT32             ele_tag;
++    AACD_INT32             pseudo_enab;
++}   AACD_MIXdown;
++
++typedef struct
++{
++    AACD_INT32           profile;
++    AACD_INT32           sampling_rate_idx;
++    AACD_EleList         front;
++    AACD_EleList         side;
++    AACD_EleList         back;
++    AACD_EleList         lfe;
++    AACD_EleList         data;
++    AACD_EleList         coupling;
++    AACD_MIXdown         mono_mix;
++    AACD_MIXdown         stereo_mix;
++    AACD_MIXdown         matrix_mix;
++    /* Ignore the comment field to minimize memory usage */
++    AACD_INT8            comments[1];
++    AACD_INT32           buffer_fullness;    /* put this transport level info here */
++
++  /* Added the following the 'tag' field, to process ProgConfigElements outside
++     of the header-parsing routines */
++
++    AACD_INT32             tag;
++}   AACD_ProgConfig;
++
++typedef struct
++{
++    AACD_INT32        num_pce;
++    AACD_ProgConfig *pce;
++
++    AACD_INT32 ChannelConfig;
++    AACD_INT32 SamplingFreqIndex;
++    AACD_INT32 BitstreamType;
++    AACD_INT32 BitRate;
++    AACD_INT32 BufferFullness; /*No. of bits in encoder buffer after encoding first raw_data_block */
++    AACD_INT32 ProtectionAbsent;
++    AACD_INT32 CrcCheck;
++    AACD_INT32 frame_length;
++
++    AACD_INT32 scalOutObjectType;
++    AACD_INT32 scalOutNumChannels;
++    AACD_INT32 sampleRate;
++    AACD_INT32 framelengthflag;
++    AACD_INT32 iMulti_Channel_Support;
++    AACD_INT32 bsacDecLayer;
++
++    /* Please see FileHeader at the top for explanation */
++#ifdef OLD_FORMAT_ADTS_HEADER
++    AACD_INT32        Flush_LEN_EMPHASIS_Bits;
++#endif
++} AACD_Block_Params;
++
++AAC_FILETYPE Aac_FindFileType(uint8 *pBuffer, int32 nBufferLen);
++FRAME_INFO ParserADTS(AACD_Block_Params *params, uint8 *pBuffer, uint32 nBufferLen, FRAME_INFO *in_info);
++FRAME_INFO ParserADIF(AACD_Block_Params *params, uint8 *pBuffer, int32 nBufferLen);
++AAC_PARSERRETURNTYPE AacDec_InitRaw(AACD_Block_Params *params, int32 nChannels, int32 nSamplingFreq);
++
++AUDIO_PARSERRETURNTYPE AacParserFileHeader(AUDIO_FILE_INFO *pFileInfo, uint8 *pBuffer, \
++ 										uint32 nBufferLen);
++AUDIO_PARSERRETURNTYPE AacParserFrame(AUDIO_FRAME_INFO *pFrameInfo, uint8 *pBuffer, \
++										uint32 nBufferLen);
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif
++/* File EOF */
+diff --git a/ghdr/aacd_dec_interface.h b/ghdr/aacd_dec_interface.h
+new file mode 100755
+index 0000000..a1291a8
+--- /dev/null
++++ b/ghdr/aacd_dec_interface.h
+@@ -0,0 +1,562 @@
++/*******************************************************************************
++
++ * (C) 2004 MOTOROLA INDIA ELECTRONICS LTD.
++  ************************************************************************
++  * Copyright (C) 2005-2010, 2014 Freescale Semiconductor, Inc.
++  * All modifications are confidential and proprietary information
++  * of Freescale Semiconductor, Inc.
++  ************************************************************************
++
++ *   CHANGE HISTORY
++ *   dd/mm/yy   Code Ver     Description                        Author
++ *   --------   -------      -----------                        ------
++ *   08/04/2003 01           Created                            B.Venkatarao
++ *   19/02/2004 02           Added global structure for         Vishala
++ *                           relocatability
++ *   12/07/2004 03           Added prototypes for swap
++ *                           buffer function and removed
++ *                           global structure and moved it
++ *                           to other file                      Vishala
++ *
++ *   19/08/2004 04           Defined struct AACD_Block_Params,  S.Nachiappan
++ *                           which is to be passed to the
++ *                           decoder, along with the block to
++ *                           be decoded. This struct has
++ *                           parameters similar to ADIF/ADTS
++ *                           header data.
++ *
++ *                           aacd_decode_frame() additionally
++ *                           receives:
++ *                           (1) a pointer to the buffer
++ *                               containing the block to be
++ *                               decoded
++ *                           (2) Length of the buffer
++ *                           (3) Pointer to AACD_Block_Params
++ *
++ *                           For MPEG-4 vectors, some encoders, put
++ *                           in an 'emphasis' field in the ADTS Header
++ *                           and don't perform a byte-alignment
++ *                           after the header ends. So header is 58-bits
++ *                           long instead of 56-bits. To handle
++ *                           this situation, the decoder has to
++ *                           flush LEN_EMPHASIS no.of bits from the
++ *                           first-byte of the input-buffer.
++ *                           to start off correctly.
++ *
++ *   23/08/2004 04           Moved BitCreditType to here        S.Nachiappan
++ *                           from aac_common.h
++ *
++ *
++ *   23/07/2004 04           Modified the prototype for
++ *                           aacd_decode_frame for 24 bit
++ *                           output                             Pradeep V
++ *
++ *   03/09/2004 06           Removed BitCreditType typedef      S.Nachiappan
++ *   09/09/2004 07           App will write pointer to          S.Nachiappan
++ *                           AACD_Block_Params data into
++ *                           AACD_Decoder_config
++ *
++ *                           Moved structs ProgConfig, EleList
++ *                           and MIXdown from aac_fix_types.h to
++ *                           here
++ *   09/09/2004 08           Added enum for pcm length and
++ *                           memory type                        Pradeep V
++ *
++ *   15/09/2004 09           Modified proto-type of             S.Nachiappan
++ *                           (*app_swap_buf)()
++ *
++ *   16/09/2004 10           Added new error code               S.Nachiappan
++ *                           AACD_ERROR_PNS
++ *
++ *   16/09/2004 11           Added more error codes             S.Nachiappan
++ *   25/04/2008 12       Add error concealment feature          Bing Song
++ *   13/02/2009 13          support aacplus envoke aac lib      Lyon Wang
++ *
++ ******************************************************************************/
++#ifndef _AACD_DEC_INTERFACE_H
++#define _AACD_DEC_INTERFACE_H
++#ifdef UNDER_CE
++ #ifndef EXPORT_C
++#define EXPORT_C __declspec(dllexport)
++ #endif
++ #ifndef IMPORT_C
++#define IMPORT_C __declspec(dllimport)
++ #endif
++#else
++ #ifndef EXPORT_C
++#define EXPORT_C
++ #endif
++ #ifndef IMPORT_C
++#define IMPORT_C
++ #endif
++#endif
++#define AACD_TRUE               1
++#define AACD_FALSE              0
++#define AAC_FRAME_SIZE 1024
++#define AACD_GLOBAL_STRUCT_SIZE 100000
++#define AACD_FAST_MEMORY        0
++#define AACD_SLOW_MEMORY        1
++#define AACD_MAX_NUM_MEM_REQS   5+1+1+1 //5 note this should modified in case aac lib was used for aac+
++#define AACD_DATA_SIZE          0
++#define AACD_DATA_ALIGN_IN_BYTES 16
++#define AACD_DATA_BEGIN         0       /* some known symbol */
++#define AACD_MEM_TYPE           AACD_FAST_MEMORY /* can be changed */
++#define AACD_INPUT_BUFFER_SIZE  AACD_6CH_FRAME_MAXLEN     /*6*768 */  /*size of input buffer*/
++#define AACD_FRAME_SIZE          2*1024 /* size in bytes for one channel */
++
++#define AACD_PATH_LEN           128
++#define AACD_LEN_TAG            4
++
++#define INTERNAL_BS_BUFSIZE 2048         //DSPhl28187
++#define AACD_6CH_FRAME_MAXLEN  (6*768)
++
++#ifndef AACD_UINT32
++typedef unsigned int AACD_UINT32;
++#endif
++#ifndef AACD_INT32
++typedef int AACD_INT32;
++#endif
++#ifndef AACD_UINT16
++typedef unsigned short AACD_UINT16;
++#endif
++#ifndef AACD_INT16
++typedef short AACD_INT16;
++#endif
++#ifndef AACD_UCHAR
++typedef unsigned char AACD_UCHAR;
++#endif
++#ifndef AACD_UINT8
++typedef unsigned char AACD_UINT8;
++#endif
++#ifndef AACD_INT8
++typedef char AACD_INT8;
++#endif
++#ifndef AACD_CHAR
++typedef char AACD_CHAR;
++#endif
++#ifndef AACD_Void
++typedef void           AACD_Void;
++#endif
++
++typedef signed int AACD_OutputFmtType;
++
++#define AACPD_WARNING_BASE       11
++#define AACPD_RECOVERROR_BASE    31
++#define AACPD_FATALERROR_BASE    51
++
++/* enum with error return */
++typedef enum
++{
++    AACD_ERROR_NO_ERROR,
++    AACD_ERROR_EOF,
++    /* The output of decoder is produced by error concealment. It can be used as NO ERROR output */
++    AACD_ERROR_START_BLOCK=AACPD_RECOVERROR_BASE,
++    AACD_ERROR_HUFFDECODE,
++    AACD_ERROR_GETCC,
++    AACD_ERROR_DATA_CHN,
++    AACD_ERROR_PROG_CONFIG,
++    AACD_ERROR_MCINFO,
++    AACD_ERROR_END_BLOCK,
++    AACD_ERROR_HEADER_TYPES,
++    AACD_ERROR_NOT_SUPPORTED_PCM_BITS,
++    AACD_ERROR_NOT_SUPPORTED_CHANNEL_CONFIG,
++    AACD_ERROR_NOT_SUPPORTED_CHANNEL_COUNT,
++    AACD_ERROR_SEEKING,
++    AACD_ERROR_PNS,
++    AACD_ERROR_MS_STEREO,
++    AACD_ERROR_IS_STEREO,
++    AACD_ERROR_DEINTERLEAVE,
++    AACD_ERROR_TNS_COEF_RES,
++    AACD_ERROR_BLOCK_TYPE,
++    AACPD_ERROR_SBRD_CONCEAL,
++    AACPD_ERROR_SBRD_NOT_INITIALIZED,
++    /* Fatal error base*/
++    AACD_ERROR_INIT = AACPD_FATALERROR_BASE,
++    AACD_ERROR_INVALID_HEADER,
++    AACPD_ERROR_INVALID_PARAMETERS,
++    AACPD_ERROR_MEMALLOC
++}AACD_RET_TYPE;
++
++typedef enum
++{
++    AACD_MEM_SCRATCH = 0,
++    AACD_MEM_PERSISTENT
++}AACD_MEM_DESC;
++typedef enum
++{
++    AACD_MEM_PRIORITY_HIGH = 0,
++    AACD_MEM_PRIORITY_LOW
++}AACD_MEM_PRIORITY;
++
++typedef enum
++{
++    AACD_16_BIT_OUTPUT = 16,
++    AACD_24_BIT_OUTPUT = 24
++}AACD_PCM_LENGTH;
++
++typedef enum
++{
++    AACD_NO_PACKET_LOSS = 0,
++    AACD_PACKET_LOSS
++}AACD_ERROR_CONCEALMENT;
++
++enum
++{
++    /*
++     * channels for 5.1 main profile configuration
++     * (modify for any desired decoder configuration)
++     */
++    FCHANS      = 3,    /* front channels: left, center, right */
++    FCenter     = 1,    /* 1 if decoder has front center channel */
++    SCHANS      = 0,    /* side channels: */
++    BCHANS      = 2,    /* back channels: left surround, right surround */
++    BCenter     = 0,    /* 1 if decoder has back center channel */
++    LCHANS      = 1,    /* LFE channels */
++    XCHANS      = 0,    /* scratch space for parsing unused channels */
++
++    CHANS       = FCHANS + SCHANS + BCHANS + LCHANS + XCHANS
++};
++
++/* Structure definitions */
++typedef  struct
++{
++    AACD_INT32              aacd_size;        /* Size in bytes */
++    AACD_INT32              aacd_type;        /* Fast or Slow */
++    AACD_MEM_DESC      aacd_mem_desc;    /* Static/Scratch memory*/
++    AACD_MEM_PRIORITY  aacd_priority;    /* In case of fast Memory type, specify the
++                                     * priority */
++
++    void               *app_base_ptr;     /* Pointer to the base memory,
++                           which will be allocated and
++                                           * filled by the application*/
++} AACD_Mem_Alloc_Info_Sub;
++
++
++typedef struct
++{
++    AACD_INT32    aacd_num_reqs;    /*  Number of valid memory requests */
++    AACD_Mem_Alloc_Info_Sub   mem_info_sub[AACD_MAX_NUM_MEM_REQS];
++} AACD_Mem_Alloc_Info;
++
++
++
++typedef struct
++{
++    AACD_UINT32 aacd_sampling_frequency;     /* Sampling frequency of the current frame in Khz */
++    AACD_UINT32     aacd_num_channels;       /* Number of channels decoded in current frame */
++    AACD_UINT32      aacd_bit_rate;
++    AACD_UINT32      aacd_len;
++
++    AACD_UINT32 aacd_frame_size;                /* Number of stereo samples being outputted for this
++                                                                            frame */
++    AACD_INT8    output_path[AACD_PATH_LEN];
++
++    AACD_UINT32   BitsInBlock;
++    AACD_INT8      ch_is_present[CHANS]; /* flag to indicate presence of each channel */
++    AACD_UINT32    AACD_bno;         /* frame number, updated after each call to aacpd_decode_frame*/
++
++    /* More parameters can be added here if required in the future
++       .............................
++       .............................
++     */
++} AACD_Decoder_info;
++
++typedef struct
++{
++    AACD_INT32             num_ele;
++    AACD_INT32             ele_is_cpe[(1 << AACD_LEN_TAG)];
++    AACD_INT32             ele_tag[(1 << AACD_LEN_TAG)];
++}   AACD_EleList;
++
++typedef struct
++{
++    AACD_INT32             present;
++    AACD_INT32             ele_tag;
++    AACD_INT32             pseudo_enab;
++}   AACD_MIXdown;
++
++typedef struct
++{
++    AACD_INT32             profile;
++    AACD_INT32             sampling_rate_idx;
++    AACD_EleList         front;
++    AACD_EleList         side;
++    AACD_EleList         back;
++    AACD_EleList         lfe;
++    AACD_EleList         data;
++    AACD_EleList         coupling;
++    AACD_MIXdown         mono_mix;
++    AACD_MIXdown         stereo_mix;
++    AACD_MIXdown         matrix_mix;
++    /* Ignore the comment field to minimize memory usage */
++    AACD_INT8            comments[1];
++    AACD_INT32            buffer_fullness;    /* put this transport level info here */
++
++  /* Added the following the 'tag' field, to process ProgConfigElements outside
++     of the header-parsing routines */
++
++    AACD_INT32             tag;
++}   AACD_ProgConfig;
++
++
++typedef struct
++{
++    AACD_INT32        num_pce;
++    AACD_ProgConfig *pce;
++
++    AACD_INT32 ChannelConfig;
++    AACD_INT32 SamplingFreqIndex;
++    AACD_INT32 BitstreamType;
++    AACD_INT32 BitRate;
++    AACD_INT32 BufferFullness; /*No. of bits in encoder buffer after encoding first raw_data_block */
++    AACD_INT32 ProtectionAbsent;
++    AACD_INT32 CrcCheck;
++    AACD_INT32 frame_length;
++} AACD_Block_Params_Tmp;
++
++
++typedef struct
++{
++    AACD_INT32        num_pce;
++    AACD_ProgConfig *pce;
++
++    AACD_INT32 ChannelConfig;
++    AACD_INT32 SamplingFreqIndex;
++    AACD_INT32 BitstreamType;
++    AACD_INT32 BitRate;
++    AACD_INT32 BufferFullness; /*No. of bits in encoder buffer after encoding first raw_data_block */
++    AACD_INT32 ProtectionAbsent;
++    AACD_INT32 CrcCheck;
++    AACD_INT32 frame_length;
++
++    AACD_INT32 scalOutObjectType;
++    AACD_INT32 scalOutNumChannels;
++    AACD_INT32 sampleRate;
++    AACD_INT32 framelengthflag;
++    AACD_INT32 iMulti_Channel_Support;
++    AACD_INT32 bsacDecLayer;
++
++    /* Please see FileHeader at the top for explanation */
++#ifdef OLD_FORMAT_ADTS_HEADER
++    AACD_INT32        Flush_LEN_EMPHASIS_Bits;
++#endif
++} AACD_Block_Params;
++
++//DSPhl28187
++typedef struct
++{
++    AACD_INT32    sbrd_down_sample;   /* flag to indicate SBR down sample mode */
++    AACD_INT32    sbrd_stereo_downmix;    /* flag related to stereo down mix */
++}SBRD_Decoder_Config;
++
++#define MAX_FILE_EXTENSION_LEN 6
++
++typedef struct
++{
++    AACD_INT32          *present;/* channel present */
++    char                *fext;
++    AACD_INT32          *file_opened; /* file is already open aacd_or not */
++} AACD_Ch_Info;
++
++typedef struct
++{
++    void *ps_aacd_ptr;      /* pointer to AACD_global_struct */
++    void *psStreamSbr;      /* SBRBITSTREAM * psStreamSbr; */
++    void *poutbuf;          /* int (*poutbuf)[2048]; */
++    void *psStreamSbr_tmp;  /* for error_concealment use */
++    void *psStreamSbr_restore; /* for error_concealment use */
++} SBR_Temp_Info;
++
++typedef struct AACD_decoder_config_struct
++{
++    AACD_Mem_Alloc_Info    aacd_mem_info;
++    void                   *aacd_decode_info_struct_ptr;
++
++    AACD_UINT8   num_pcm_bits;    /*Specifies number of Bits in the PCM.(16 or 24)*/
++
++    int         *AACD_bno;     //DSPhl28187
++    AACD_Block_Params *params;
++
++    AACD_Ch_Info ch_info[CHANS];    //DSPhl28187
++    AACD_INT32 adts_format;    /* Used for error concealment to indicate if the stream is adts format */
++    AACD_INT32 packet_loss;    /* Used for error concealment. If the flag set as AACD_PACKET_LOSS,
++                                          the decoder will output one frame data based on previous frame data */
++    AACD_UINT8      *aacd_initialized_data_start;
++    AACD_Void * sbrd_info_struct_ptr;
++    SBRD_Decoder_Config sbrd_dec_config;
++    void *pContext;
++    SBR_Temp_Info sbr_temp_struct; //for pass information between aac and aac+
++    AACD_INT32 aac_plus_enable;  //indicate codec used in aac+ decoder
++} AACD_Decoder_Config;
++
++//DSPhl28187
++#define BIT_COUNTER_INIT            (24)
++#define MIN_REQD_BITS               (24)
++#define ADTS_FRAME_MAX_SIZE         AACD_6CH_FRAME_MAXLEN        /*(8192)*/
++#define ADTS_FRAME_HEADER_SIZE      (7)
++#define ADTS_FRAME_HEADER_SIZE_CRC  (9)
++
++/* #define is required in order to use these args in #if () directive */
++#define ICCHANS 0       /* independently switched coupling channels */
++#define DCCHANS 0       /* dependently switched coupling channels */
++#define XCCHANS 0       /* scratch space index for parsing unused coupling
++                 * channels */
++#define CCHANS  (ICCHANS + DCCHANS + XCCHANS)
++
++
++enum
++{
++    LN = 2048,
++    LN2 = LN / 2,
++
++    LEN_ELE_IS_CPE = 1,
++    LEN_PROFILE = 2,
++    LEN_SAMP_IDX = 4,
++    LEN_NUM_ELE = 4,
++    LEN_NUM_LFE = 2,
++    LEN_NUM_DAT = 3,
++    LEN_NUM_CCE = 4,
++
++    LEN_MIX_PRES = 1,
++    LEN_MMIX_IDX = 2,
++    LEN_PSUR_ENAB = 1,
++    LEN_COMMENT_BYTES = 8,
++
++    /*
++    * audio data transport stream frame format header
++    */
++    /* fixed header */
++    LEN_SYNCWORD        = 12,
++    LEN_ID      = 1,
++    LEN_LAYER   = 2,
++    LEN_PROTECT_ABS = 1,
++    LEN_PRIVTE_BIT  = 1,
++    LEN_CHANNEL_CONF    = 3,
++
++    /* variable header */
++    LEN_COPYRT_START            = 1,
++    LEN_FRAME_LEN               = 13,
++    LEN_ADTS_BUF_FULLNESS   = 11,
++    LEN_NUM_OF_RDB          =2,
++
++    /* CRC */
++    LEN_CRC = 16,
++
++    /* Some encoders (PsyTEL) put an addtional field 'Emphasis'
++       in MPEG-4 ADTS streams, though it a violation of the
++       standard.
++       But defining OLD_FORMAT_ADTS_HEADER will correctly decode
++       such streams.
++       */
++#ifdef OLD_FORMAT_ADTS_HEADER
++    LEN_EMPHASIS   =  2,
++#endif
++
++    /* audio data interchange format header */
++    LEN_ADIF_ID = (32 / 8),
++    LEN_COPYRT_ID = (72 / 8),
++    LEN_COPYRT_ID_ADTS  = 1,
++
++    LEN_COPYRT_PRES = 1,
++    LEN_ORIG = 1,
++    LEN_HOME = 1,
++    LEN_BS_TYPE = 1,
++    LEN_BIT_RATE = 23,
++    LEN_NUM_PCE = 4,
++    LEN_ADIF_BF = 20,
++
++
++    LEN_TAG = 4,
++    LEN_BYTE = 8
++};
++
++enum
++{
++    AAC_ERROR_EOF = 0,
++    AAC_ERROR_USAGE,
++    AAC_ERROR_ADTS_HEADER,
++    AAC_ERROR_PROG_CONFIG,
++    AAC_ERROR_ENTER_CHN,
++    AAC_ERROR_DEFAULT_POSITION,
++    AAC_ERROR_MCINFO,
++    AAC_ERROR_GETCC,
++    AAC_ERROR_DATA_CHN,
++    AAC_ERROR_START_BLOCK,
++    AAC_ERROR_END_BLOCK,
++    AAC_ERROR_ICS_INFO,
++    AAC_ERROR_GET_MASK,
++    AAC_ERROR_GETICS,
++    AAC_ERROR_INITIO,
++    AAC_ERROR_COUPLING,
++    AAC_ERROR_PREDICT,
++    AAC_ERROR_MEMORY,
++    AAC_ERROR_HUFFDECODE,
++    AAC_ERROR_GAIN_CONTROL,
++    AAC_ERROR_PULSE_NC,
++    AAC_ERROR_FILEIO,
++    AAC_ERROR_DRC,
++    AAC_ERROR_BLOCK_TYPE,
++    AAC_ERROR_HEADER_TYPES,
++    AAC_ERROR_TNS_COEF_RES,
++    AAC_ERROR_FFT_LENGTH
++};
++
++typedef struct
++{
++    char            adif_id[LEN_ADIF_ID + 1];
++    int             copy_id_present;
++    char            copy_id[LEN_COPYRT_ID + 1];
++    int             original_copy;
++    int             home;
++    int             bitstream_type;
++    int            bitrate;
++    int             num_pce;
++    int             prog_tags[(1 << LEN_TAG)];
++}               ADIF_Header;
++
++typedef struct
++{
++    int             syncword;
++    int             id;
++    int             layer;
++    int             protection_abs;
++    int             profile;
++    int             sampling_freq_idx;
++    int             private_bit;
++    int             channel_config;
++    int             original_copy;
++    int             home;
++    int             copyright_id_bit;
++    int             copyright_id_start;
++    int             frame_length;
++    int             adts_buffer_fullness;
++    int             num_of_rdb;
++    int             crc_check;
++}               ADTS_Header;
++
++#ifdef __cplusplus
++#define EXTERN
++#else
++#define EXTERN extern
++#endif
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++
++
++/* Function prototypes */
++ EXTERN const AACD_INT8 * aacd_decode_versionInfo();
++ EXTERN AACD_RET_TYPE aacd_query_dec_mem (AACD_Decoder_Config *dec_config);
++ EXTERN AACD_RET_TYPE aacd_decoder_init (AACD_Decoder_Config *dec_config);
++ EXTERN AACD_RET_TYPE aacd_decode_frame (AACD_Decoder_Config *dec_config,
++                                 AACD_Decoder_info *dec_info,
++                                         AACD_OutputFmtType *out_buf,
++                 AACD_INT8* buf, AACD_INT32 buf_len);
++
++
++#ifdef __cplusplus
++}
++#endif
++#endif
+diff --git a/ghdr/aacplus_dec_interface.h b/ghdr/aacplus_dec_interface.h
+new file mode 100755
+index 0000000..8b8d5e1
+--- /dev/null
++++ b/ghdr/aacplus_dec_interface.h
+@@ -0,0 +1,83 @@
++
++/************************************************************************
++ * Copyright 2005-2010 by Freescale Semiconductor, Inc.
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++ ************************************************************************/
++
++/*****************************************************************************
++ *
++ * File Name: aacpd_dec_interface.h
++ *
++ * Description: aacplus decoder interface.
++ *
++ ****************************** Change History********************************
++ *
++ *   DD/MMM/YYYY     Code Ver     Description                   Author
++ *   -----------     --------     -----------                   ------
++ *   08/Jun/2005     0.1          File created                  Tommy Tang
++ *   08/Jun/2005     0.2          redefine macro                Webber Wang
++ *                                AACPD_MAX_NUM_MEM_REQS
++ *                                add enum type AACPD_MEMALIGN.
++ *                                add element aacd_mem_align in
++ *                                structure AACPD_Mem_Alloc_Info_Sub
++ *  20/Aug/2005      0.3          AACPD_OutputFmtType made as   Ganesh Kumar C
++ *                                short/long depending on flag
++ *                                "OUTPUT_24BITS"
++ *  29/Aug/2005      1.0          Increased MAX_NUM_MEM_REQS by 1   Ashok Kumar
++ *                                to add SBR decoder scratch and
++ *                                added SBR decoder related error
++ *                                return
++ *  29/Dec/2007      1.1          Merged AAC LC optimized code and
++ *                                changed to interleave output      Bing Song
++ *  13/Feb/2009      2.2          support envoke AAC LC lib         Lyon Wang
++ ******************************************************************************/
++
++#ifndef _AACPD_DEC_INTERFACE_H
++#define _AACPD_DEC_INTERFACE_H
++
++#include "aacd_dec_interface.h"
++
++#define AACP_FRAME_SIZE          2048
++#define AACPD_INPUT_BUFFER_SIZE  6*768
++
++typedef struct
++{
++  int bit_counter;
++  unsigned int bit_register;
++  unsigned char *bs_curr;
++  unsigned char *bs_end;
++  unsigned char *bs_curr_ext;
++  unsigned char *bs_end_ext;
++  unsigned int bs_eof;
++  unsigned int bs_seek_needed;
++} BitstreamParam;
++
++
++#ifdef __cplusplus
++extern "C"
++{
++#endif
++typedef enum
++{
++    NO_SBR_FRAME, /* indicate no sbr information */
++    SBR_FRAME     /* indicate sbr information contained */
++}SBR_FRAME_TYPE;
++
++extern const char * AACPDCodecVersionInfo ();
++EXTERN AACD_RET_TYPE aacpd_query_dec_mem ( AACD_Decoder_Config *dec_config);
++EXTERN AACD_RET_TYPE SBRD_decoder_init(AACD_Decoder_Config *dec_config);
++
++EXTERN AACD_RET_TYPE SBRD_decode_frame(
++        AACD_Decoder_Config *dec_config,
++        AACD_Decoder_info *dec_info,
++        AACD_INT32 *out_buf,
++        SBR_FRAME_TYPE * sbr_frame_type);
++
++#ifdef __cplusplus
++}
++#endif
++#endif
++
++/**************************<END OF THE FILE>***********************************/
++
+diff --git a/ghdr/aacplus_log_api.h b/ghdr/aacplus_log_api.h
+new file mode 100755
+index 0000000..767b9f2
+--- /dev/null
++++ b/ghdr/aacplus_log_api.h
+@@ -0,0 +1,40 @@
++
++ /************************************************************************
++  * Copyright 2005-2010 by Freescale Semiconductor, Inc.
++  * All modifications are confidential and proprietary information
++  * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++  ************************************************************************/
++
++#ifndef LOG_API_H
++#define LOG_API_H
++#include <stdarg.h>
++
++///////////////////////////////////////////////////////////////////////////
++//
++//
++//
++//  File Description:   Logging API's defined
++//
++//  Author(s):          (1) Vijay PY (vijaypy@motorola.com)
++//
++//  Version History:    29/Sep/2004 - Vijay PY Created
++//
++//
++///////////////////////////////////////////////////////////////////////////
++
++//APIS for logging.
++// All the codec libraries will use the below function name symbols to
++// implement debug logs. These function symbols will be implemented
++// by the logger library or task.
++
++int DebugLogData(short int msgid,void *ptr,int size);
++int DebugLogText(short int msgid,char *fmt,...);
++
++#ifdef VC_PLUS_PLUS
++
++int DebugLogTextVC(int id1, int id2,char *fmt,...);
++
++#endif
++
++#endif
++
+diff --git a/ghdr/ac3d_dec_interface.h b/ghdr/ac3d_dec_interface.h
+new file mode 100755
+index 0000000..c1a1bc0
+--- /dev/null
++++ b/ghdr/ac3d_dec_interface.h
+@@ -0,0 +1,203 @@
++/*
++ ***************************************************************************
++ * Copyright (C) 2007-2012 Freescale Semiconductor, Inc.
++ * All Rights Reserved.
++ *
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++ ***************************************************************************
++
++****************************************************************************
++* ANSI C source code
++*
++* Project Name : ac-3 Decoder
++*
++* FREESCALE CONFIDENTIAL PROPRIETARY
++***************************************************************************/
++/***************************************************************************
++ *
++ *   (C) 2007 FREESCALE SEMICONDUCTOR.
++ *
++ *   CHANGE HISTORY
++ *    dd/mm/yy        Code Ver     Description         CR            Author
++ *    --------        -------      -----------        ----           ------
++ *   07/08/2007       0.1 	   created file                    Baofeng Tian
++ *   11/22/2007       01.03.00     transfer debug function         Wang Shengjiu
++ *                                 from pointer to decoder
++ *   11/29/2007       01.04.00     add version info                Wang Shengjiu
++ *   12/11/2007       02.01.00     add extern "c"                  Wang Shengjiu
++ *
++ **************************************************************************/
++
++#if !defined(AC3D_DEC_INTERFACE_H)
++#define AC3D_DEC_INTERFACE_H
++
++
++#define         KCAPABLE                1			/* Enables karaoke capable code */
++#define         MAXDBGFILE	64				/* Max # of debug files in table	*/
++
++
++typedef unsigned char     AC3D_UINT8;
++typedef char              AC3D_INT8;
++typedef unsigned short    AC3D_UINT16;
++typedef short             AC3D_INT16;
++typedef unsigned int      AC3D_UINT32;
++typedef int               AC3D_INT32;
++
++
++/* uniform Error types both for decoder and interface */
++typedef enum
++{
++        /* Sucess */
++        AC3D_OK = 0,			   /* no error 	*/
++        AC3D_ERR_WARNING,                  /* warning error type */
++        /* fatal error, cause decoder stop decode */
++        AC3D_ERR_SYNC,	                   /* invalid sync word */
++        AC3D_ERR_SAMPRATE,                 /* invalid sample rate */
++        AC3D_ERR_DATARATE,                 /* invalid data rate */
++        AC3D_ERR_REV,                      /* invalid bitstream revision */
++        /* waning error */
++        AC3D_ERR_BLK,                      /* block size error */
++        AC3D_ERR_RPT,	                   /* user block repeat request */
++        AC3D_ERR_MUTE,	                   /* user mute request */
++        AC3D_ERR_CHANS,                    /* too many channels in data stream */
++        AC3D_ERR_MISC,	                   /* miscellaneous data error */
++        AC3D_ERR_FATAL,                    /* fatal error boundary, below all fatal error */
++        AC3D_ERR_PARAMETERS,               /* input parameters invalid */
++        AC3D_ERR_PHSCORTI,                 /* PHSCOR table index out of range */
++        AC3D_ERR_BND,                      /* expand_delta: delta bit alloc past end of array */
++        AC3D_ERR_XDALL,                    /* xdall subroutine fatal error */
++	/* Warning : End of bitstream */
++        AC3D_END_OF_STREAM,                 /* end of bit stream */
++	AC3D_ERR_INPUTLENGTH		   /* input length less than need*/
++} AC3D_RET_TYPE;
++
++
++/* basic information */
++#define AC3D_TRUE	                      1
++#define AC3D_INPUT_BUF_SIZE               3840              /* byte count */
++#define AC3D_FAST_MEMORY                  1
++#define AC3D_SLOW_MEMORY                  0
++#define AC3D_MAX_NUM_MEM_REQS             1
++#define AC3D_DATA_ALIGN_IN_BYTES          16
++#define AC3D_MEM_TYPE                     AC3D_FAST_MEMORY  /* can be changed */
++#define AC3D_FRAME_SIZE                   1536              /* No of stereo samples outputed per\
++                                                               call to the decode frame */
++#define AC3D_MEMDESC                      0
++#define AC3D_MEMPRIORITY                  0
++
++
++/**********************************************************************************/
++
++
++typedef struct
++{
++        char       *ac3fname ;
++        char       *pcmfname ;
++	char       *debugdir ;
++        AC3D_INT16 pcmoff[6];
++        AC3D_INT16 pcmmod[6];
++
++        void      *pcmptr[6];
++        AC3D_INT32 numchans ;
++        AC3D_INT32 chanptr[6] ;
++        AC3D_INT16 wordsize ;					/* output word size code */
++        AC3D_INT32 dynrngscalelow ;				/* dynamic range scale factor (low) */
++        AC3D_INT32 dynrngscalehi ;				/* dynamic range scale factor (high) */
++        AC3D_INT32 pcmscalefac  ;				/* PCM scale factor */
++        AC3D_INT32 compmode ;					/* compression mode */
++        AC3D_INT32 stereomode ;					/* stereo downmix mode */
++        AC3D_INT32 dualmonomode ;				/* dual mono reproduction mode */
++        AC3D_INT32 outputmode ;					/* output channel configuration */
++        AC3D_INT16 outlfeon ;					/* output subwoofer present flag */
++        AC3D_INT32 outputflg ;					/* enable output file flag */
++        AC3D_INT32 framecount ;					/* frame counter */
++        AC3D_INT32 blockcount ;					/* block counter */
++        AC3D_INT32 framestart ;					/* starting frame */
++        AC3D_INT32 frameend ;					/* ending frame */
++        AC3D_INT32 useverbose ;					/* verbose messages flag */
++        AC3D_INT32 debug_arg ;					/* debug argument */
++
++#ifdef KCAPABLE
++        AC3D_INT32 kcapablemode ;				/* karaoke capable mode */
++#endif
++	AC3D_INT16 ac3d_endianmode;				/* 0 Ledian; 1 Bedian; 2 check by decoder it self; others Ledian */
++	AC3D_INT32 ac3d_sampling_freq;				/* Sampling frequency of the current frame in Khz */
++	AC3D_INT32 ac3d_num_channels;				/* Number of channels decoded in current frame */
++	AC3D_INT32 ac3d_frame_size;				/* Number of stereo samples being outputted for this*/
++	AC3D_INT32 ac3d_acmod;					/* ac3 acmod */
++	AC3D_INT32 ac3d_bitrate;         			/* ac3 bitrate */
++	AC3D_INT16 ac3d_outputmask;         			/* ac3 outputmask */
++        AC3D_INT16 dsurmod;					/* Dolby surround mode */
++        AC3D_INT16 dmixmod;					/* preferred downmix mode */
++        AC3D_INT16 dsurexmod;					/* Surround EX mode flag */
++        AC3D_INT16 dheadphonmod;				/* Dolby Headphone encoded flag */
++        AC3D_INT16 adconvtyp;					/* Advanced converter flag */
++        AC3D_INT16 outstereomode;                               /* 0--represent Lt/Rt mode, 2--Lo/Ro mode, -1 --- invalid mode */
++        AC3D_INT16 ac3d_lfeon;                                  /* lfe flag , if lfe is on, ac3d_lfeon = 1; else ac3d_lfeon = 0.*/
++}AC3D_PARAM;
++
++
++
++
++/* requery memeory data structure */
++typedef enum
++{
++    AC3D_STATIC_MEM,                                        	/* 0 for static memory */
++    AC3D_SCRATCH_MEM                                        	/* 1 for scratch memory */
++} AC3D_MEM_DESC;
++
++typedef struct {
++	AC3D_INT32		 s32AC3DSize;                   /* Size in bytes */
++	AC3D_INT32 	         s32AC3DType;                   /* Memory type Fast or Slow */
++	AC3D_MEM_DESC		 s32AC3DMemDesc;                /* to indicate if it is scratch memory */
++	AC3D_INT32               s32AC3DPriority;               /* In case of fast memory, specify the priority */
++	void 	                 *app_base_ptr;                 /* PoDSPinter to the base memory , which will be allocated and                                                             * filled by the  application */
++} AC3DMemAllocInfoSub;
++
++
++typedef struct {
++	AC3D_INT32 		 s32NumReqs;                    /*  Number of valid memory requests */
++	AC3DMemAllocInfoSub	 sMemInfoSub[AC3D_MAX_NUM_MEM_REQS];
++} AC3DMemAllocInfo;
++
++/* end memory data structrue */
++
++typedef struct AC3DDecoderConfig
++{
++	AC3DMemAllocInfo	sAC3DMemInfo;
++	void			*psAC3DecodeInfoStructPtr;        /* Global_struct, poDSPint to bs info, like sample rate?*/
++	                                                          /* perserved first for application parser use.*/
++
++
++	AC3D_PARAM         	*pAC3param;
++	void                	*pContext;
++
++
++#ifdef DEBUG_AC3
++	void (*filetw_func)(char *filename, char *text);
++	void (*filefw_func)(char *filename, AC3D_INT32 *buf, AC3D_INT32 start, AC3D_INT32 count);
++	void (*filesw_func)(char *filename, AC3D_INT16 *buf, AC3D_INT32 start, AC3D_INT32 count);
++	void (*fileinit_func)(char *filename,int useverbose,int * filecnt, char files[][128]);
++	int  (*sprintf_ext)( char * str, const char * format, ... );
++#endif
++
++} AC3DDecoderConfig;
++
++/* api part */
++
++#ifdef __cplusplus
++#define EXTERN extern "C"
++#else
++#define EXTERN
++#endif
++
++EXTERN AC3D_RET_TYPE AC3D_QueryMem(AC3DDecoderConfig *ac3decconfig);
++
++EXTERN AC3D_RET_TYPE AC3D_dec_init(AC3DDecoderConfig *ac3decconfig,AC3D_UINT8 *input_buf_ptr,AC3D_INT32 input_buf_length);
++
++EXTERN AC3D_RET_TYPE AC3D_dec_Frame(AC3DDecoderConfig *ac3deccfg,AC3D_INT32 *output_pcm_buf,AC3D_INT16 *input_buf_ptr,AC3D_INT32 ILength);
++
++EXTERN const char *AC3D_get_version_info(void);
++
++#endif
+diff --git a/ghdr/common/AudioCoreParser.h b/ghdr/common/AudioCoreParser.h
+new file mode 100755
+index 0000000..49ed91c
+--- /dev/null
++++ b/ghdr/common/AudioCoreParser.h
+@@ -0,0 +1,116 @@
++/**
++ *  Copyright (c) 2009-2013, Freescale Semiconductor, Inc.
++ *  All Rights Reserved.
++ *
++ *  The following programs are the sole property of Freescale Semiconductors Inc.,
++ *  and contain its proprietary and confidential information.
++ *
++ */
++
++/**
++ *  @file AudioCoreParser.h
++ *  @brief Audio core parser.
++ *  @ingroup AudioCoreParser
++ */
++
++
++#ifndef AudioCoreParser_h
++#define AudioCoreParser_h
++
++#ifdef __cplusplus
++extern "C" {
++#endif /* __cplusplus */
++
++#include "fsl_types.h"
++
++/** Audio parser return value */
++typedef enum AUDIO_PARSERRETURNTYPE {
++    AUDIO_PARSERRETURNSUCESS = 0,
++    AUDIO_PARSERRETURNFAIL
++} AUDIO_PARSERRETURNTYPE;
++ 
++typedef enum PCM_MODE {
++    PCM_MODE_LINEAR = 0,
++    PCM_MODE_ALAW,
++	PCM_MODE_MULAW,
++	PCM_MODE_UNKNOW
++} PCM_MODE;
++
++/** Audio file information */
++typedef struct AUDIO_FILE_INFO {
++	bool bIsCBR;
++	bool bSeekable;
++	bool bGotDuration;
++	uint32 nFrameHeaderSize;    /*< For overlay search */
++	int64 nDuration;
++	uint64 nBeginPointOffset;
++	uint64 nBitStreamLen;
++	uint64 nTotalSample;
++	uint32 nChannels;
++	uint32 nSamplingRate;
++	uint32 nBitRate;
++	uint32 nBitPerSample;
++	uint32 nBlockSize;
++	uint32 nMinBlockSize;
++	PCM_MODE ePCMMode;
++} AUDIO_FILE_INFO;
++
++typedef struct FRAME_INFO
++{
++	uint32 frm_size;
++	uint32 index;
++	uint32 b_rate;
++	uint32 flags;
++	uint32 total_frame_num;
++	uint32 total_bytes;
++	uint32 sampling_rate;
++	uint32 sample_per_fr;
++	uint32 samples;
++	uint32 layer;
++	uint32 version;
++	uint32 xing_exist;
++	uint32 vbri_exist;
++    uint32 channels;
++	uint8  TOC[100];
++#ifdef PARSER_MP3_LAME_ENC_TAG
++    uint32 lame_exist;
++    uint32 enc_delay;
++    uint32 enc_padding;
++#endif
++}FRAME_INFO;
++
++/** Audio frame information */
++typedef struct AUDIO_FRAME_INFO {
++	bool bGotOneFrame;
++	bool bIsCBR;
++	uint32 nFrameCount;
++	uint32 nFrameHeaderConsumed;
++	uint32 nFrameSize;
++	uint32 nBitRate;
++	uint32 nSamplesPerFrame;
++	uint32 nSamplingRate;
++    uint32 nChannels;
++	FRAME_INFO FrameInfo;
++#ifdef PARSER_MP3_LAME_ENC_TAG
++    uint32 lame_exist;
++    uint32 enc_delay;
++    uint32 enc_padding;
++#endif
++} AUDIO_FRAME_INFO;
++
++
++/** Audio core parser need implement below two function */
++/*
++ * AUDIO_PARSERRETURNTYPE ParserFileHeader(AUDIO_FILE_INFO *pFileInfo, fsl_osal_u8 *pBuffer, \
++ *										uint32 nBufferLen);
++ * AUDIO_PARSERRETURNTYPE ParserFrame(AUDIO_FRAME_INFO *pFrameInfo, fsl_osal_u8 *pBuffer, \
++ *										uint32 nBufferLen);
++ *
++ */
++
++#ifdef __cplusplus
++}
++#endif /* __cplusplus */
++
++#endif
++/* File EOF */
+diff --git a/ghdr/common/file_stream.h b/ghdr/common/file_stream.h
+new file mode 100755
+index 0000000..39cbd7e
+--- /dev/null
++++ b/ghdr/common/file_stream.h
+@@ -0,0 +1,36 @@
++/*
++***********************************************************************
++* Copyright 2009-2010 by Freescale Semiconductor, Inc.
++* All modifications are confidential and proprietary information
++* of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++***********************************************************************
++*
++*  History :
++*  Date             Author              Version    Description
++*
++*  Aug,2009         B18987              0.1        Initial Version
++*
++*/
++#ifndef FSL_MEDIA_STREAM_H
++#define FSL_MEDIA_STREAM_H
++
++/* Deprecated API, to be replaced by the new one. */
++typedef void* file_handle_t;
++
++typedef struct file_stream_s
++{
++    file_handle_t 	file_handle;
++     uint8 * 	file_path; 
++    
++    int32	(*pf_fopen)( struct file_stream_s *stream, const uint8 * mode, void * context); 
++    uint32  (*pf_fread)( struct file_stream_s *stream, void * buffer, uint32 nb, void * context);
++    int64  	(*pf_fseek)( struct file_stream_s *stream, int64 offset, int32 whence, void * context); /* whence: SEEK_SET, SEEK_CUR, or SEEK_END */
++    int64  	(*pf_ftell)( struct file_stream_s *stream, void * context); /* get current pointer postion of the stream */
++    int64 	(*pf_fsize)( struct file_stream_s *stream, void * context); /* get size of the entire file size */
++    int32 	(*pf_fclose)( struct file_stream_s *stream, void * context);
++   
++} file_stream_t;
++
++
++#endif
++  
+diff --git a/ghdr/common/fsl_media_types.h b/ghdr/common/fsl_media_types.h
+new file mode 100644
+index 0000000..99b9cdc
+--- /dev/null
++++ b/ghdr/common/fsl_media_types.h
+@@ -0,0 +1,276 @@
++/*
++***********************************************************************
++* Copyright (C) 2009-2013,2014,2016 Freescale Semiconductor, Inc.
++* All modifications are confidential and proprietary information
++* of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++*
++* Copyright 2017-2020 NXP
++***********************************************************************
++*
++*  History :
++*  Date             Author              Version    Description
++*
++*  Oct,2009         Amanda              1.0        Initial Version
++*
++*/
++
++#ifndef _FSL_MMLAYER_MEDIA_TYPES_H
++#define _FSL_MMLAYER_MEDIA_TYPES_H
++
++
++/*
++ * Media types of a track. 
++ */
++typedef enum
++{    
++    MEDIA_TYPE_UNKNOWN = 0,
++    MEDIA_VIDEO,
++    MEDIA_AUDIO,
++    MEDIA_TEXT, /* subtitle text or stand-alone application, string-based or bitmap-based */
++    MEDIA_MIDI    
++}MediaType;
++
++
++#define UNKNOWN_CODEC_TYPE 0
++#define UNKNOWN_CODEC_SUBTYPE 0 /*  Value 0 is reserved for unknown subtypes or no subtypes. */
++
++/*
++ * Video codec types. 
++ */
++typedef enum
++{    
++    VIDEO_TYPE_UNKNOWN = 0,
++    VIDEO_UNCOMPRESSED, /* uncompressed video, every frame is a key frame */
++    VIDEO_MPEG2, /* MPEG-2 video, ISO/IEC 13818-2 */
++    VIDEO_MPEG4, /* MPEG-4 video, ISO/IEC 14496-2 */
++    VIDEO_MS_MPEG4, /* Microsoft MPEG-4 video*/   
++    VIDEO_H263, /* ITU-T H.263 */
++    VIDEO_H264, /* H.264, ISO/IEC 14496-10 */
++    VIDEO_MJPG, /* Motion-JPEG (M-JPEG) is a variant of the ISO JPEG specification 
++                for use with digital video streams.
++                Instead of compressing an entire image into a single bitstream, 
++                Motion-JPEG compresses each video field separately, returning 
++                the resulting JPEG bitstreams consecutively in a single frame.*/
++    VIDEO_DIVX, /* DivX video types*/
++    VIDEO_XVID,
++    VIDEO_WMV,    
++    VIDEO_SORENSON_H263, /* Sorenson Spark. Deprecated value. 
++                            Please use type "VIDEO_SORENSON" and subtype "VIDEO_SORENSON_SPARK.*/
++    VIDEO_FLV_SCREEN, /* Screen videos, by Adobe */    
++    VIDEO_ON2_VP, /* True Motion video types by On2 */
++    VIDEO_REAL, /* Real video types */
++    VIDEO_JPEG, /* ISO JPEG still image */
++    VIDEO_SORENSON, /* Sorenson video types, including Sorenson Spark, SVQ1, SVQ3 etc */
++    VIDEO_HEVC,
++    VIDEO_AVS,
++    VIDEO_AV1,
++}VideoCodecType;
++
++
++/*
++ * Audio codec types. 
++ */
++typedef enum
++{    
++    AUDIO_TYPE_UNKNOWN = 0,
++    AUDIO_PCM, /* Linear PCM, little-endian or big-endian */
++    AUDIO_PCM_ALAW,
++    AUDIO_PCM_MULAW,
++    AUDIO_ADPCM,
++    AUDIO_MP3,  /* MPEG-1/2 Layer 1,2,3 */  
++    AUDIO_AAC,   /* MPEG-4 AAC, 14496-3 */
++    AUDIO_MPEG2_AAC, /* MPEG-2 AAC, 13818-7 */
++    AUDIO_AC3,
++    AUDIO_WMA,    
++    AUDIO_AMR,  /* Adaptive Multi-Rate audio */  
++    AUDIO_DTS,
++    AUDIO_VORBIS,
++    AUDIO_FLAC,
++    AUDIO_NELLYMOSER,
++    AUIDO_SPEEX,
++    AUDIO_REAL, /* Real audio types */
++    AUDIO_EC3,
++    AUDIO_OPUS,
++    AUDIO_APE,   /*Monkey's audio*/
++    AUDIO_WMS,  /* Windows Media Voice */
++    AUDIO_DSD,
++    AUDIO_AC4,
++}AudioCodecType;
++
++
++/*
++ * text types. 
++ */
++typedef enum
++{    
++    TXT_TYPE_UNKNOWN = 0,
++    TXT_3GP_STREAMING_TEXT, /* 3GP streaming text, timed code, string-based */
++    TXT_DIVX_FEATURE_SUBTITLE, /* DivX feature subtitle, bitmap-based */
++    TXT_DIVX_MENU_SUBTITLE, /* DivX menu subtitle, bitmap-based */
++    
++    //TXT_QT_TIMECODE,      /* Quicktime timed code */
++    TXT_QT_TEXT,            /* Quicktime text */
++    TXT_SUBTITLE_SSA,       /* SubStation Alpha */
++    TXT_SUBTITLE_ASS,       /* Advanced SubStation Alpha */
++    TXT_SUBTITLE_TEXT,
++
++    TXT_METADATA, /* for mett atom */
++}TextType;
++
++
++/*******************************************************************************
++ *  Video Subtypes.
++ *******************************************************************************/
++typedef enum
++{
++    VIDEO_DIVX3 = 1,    /* version 3*/
++    VIDEO_DIVX4,    /* version 4*/
++    VIDEO_DIVX5_6 /* version 5 & 6*/
++    
++}DivXVideoTypes; /* DivX video types */
++
++typedef enum
++{
++    VIDEO_MS_MPEG4_V2 = 1, /* Microsoft MPEG-4 video version 2, fourcc 'mp42'*/
++    VIDEO_MS_MPEG4_V3 /* Microsoft MPEG-4 video version 3, fourcc 'mp43' */
++    
++}MsMPEG4VideoTypes; /* Microsoft MPEG-4 video types */
++
++
++typedef enum
++{
++    MPEG4_VIDEO_AS_PROFILE  = 1 /* Fourcc 'RMP4', MPEG-4 AS profile */
++    
++}MPEG4VideoTypes; /* Microsoft MPEG-4 video types */
++
++
++typedef enum
++{
++    VIDEO_WMV7 = 1,
++    VIDEO_WMV8,
++    VIDEO_WMV9,
++    VIDEO_WMV9A,    /* Windows Media Video 9 Advanced Profile. The codec originally submitted for consideration as SMPTE VC1. 
++                    This is not VC1 compliant and is no longer supported by Microsoft */
++                    
++    VIDEO_WVC1      /* Microsoft's implementation of the SMPTE VC1 codec */
++    
++}WMVVideoTypes; /* WMV video types */
++
++
++typedef enum
++{
++    FLV_SCREEN_VIDEO = 1, /* Screen video version 1*/
++    FLV_SCREEN_VIDEO_2  /* Screen video version 2 */
++    
++}ScreenVideoTypes;  /* Screen video types by Adobe*/
++
++
++typedef enum
++{
++    VIDEO_VP6 = 1,
++    VIDEO_VP6A,
++    VIDEO_VP7,
++    VIDEO_VP8,
++    VIDEO_VP9
++}On2VideoTypes; /* On2 video types */
++
++
++typedef enum
++{
++    REAL_VIDEO_RV10 = 1,
++    REAL_VIDEO_RV20,   
++    REAL_VIDEO_RV30,
++    REAL_VIDEO_RV40
++}RealVideoTypes;
++
++/*
++There are two flavors of Motion-JPEG currently in use. These two formats differ 
++based on their use of markers.
++Motion-JPEG format A supportsmarkers;Motion-JPEG format B does not.
++Each field of Motion-JPEG format A fully complies with the ISO JPEG specification, 
++and therefore supports application markers.*/
++typedef enum
++{
++    VIDEO_MJPEG_FORMAT_A = 1, /* Motion-JPEG(format A), support markers */
++    VIDEO_MJPEG_FORMAT_B,      /* Motion-JPEG(format B), not support markers */
++    VIDEO_MJPEG_2000
++
++}MotionJPEGVideoTypes;
++
++
++
++typedef enum
++{
++    VIDEO_SORENSON_SPARK = 1, /* Sorenson H.263, almost H.263 but not standard */
++    VIDEO_SVQ1, /* Sorenson Video 1, a custom beast */
++    VIDEO_SVQ3  /* Sorenson Video 3, SVQ3 is quite similar to H.264, not H.263 */
++    
++}SorensonVideoTypes;
++
++
++/*******************************************************************************
++ *  Audio Subtypes
++ *******************************************************************************/
++
++typedef enum
++{
++    REAL_AUDIO_SIPR = 1,
++    REAL_AUDIO_COOK,    
++    REAL_AUDIO_ATRC,
++    REAL_AUDIO_RAAC,
++}RealAudioTypes;
++
++typedef enum
++{
++    AUDIO_WMA1 = 1,
++    AUDIO_WMA2,
++    AUDIO_WMA3,
++    AUDIO_WMALL
++    
++}WMAAudioTypes; 
++
++typedef enum
++{
++    AUDIO_AMR_NB = 1, /* Adaptive Multi-Rate - narrow band */
++    AUDIO_AMR_WB, /* Adaptive Multi-Rate - Wideband */
++    AUDIO_AMR_WB_PLUS   /* Extended Adaptive Multi-Rate - Wideband */
++    
++}AmrAudioTypes;
++
++
++typedef enum
++{  
++    AUDIO_PCM_U8 = 1,   /* PCM, unsigned, 8 pits per sample */
++    AUDIO_PCM_S16LE,    /* PCM, signed little-endian, 16 bits per sample */
++    AUDIO_PCM_S24LE,    /* PCM, signed little-endian, 24 bits per sample */
++    AUDIO_PCM_S32LE,    /* PCM, signed little-endian, 32 bits per sample */
++
++    AUDIO_PCM_S16BE,    /* PCM, signed big-endian, 16 bits per sample */
++    AUDIO_PCM_S24BE,    /* PCM, signed big-endian, 24 bits per sample */
++    AUDIO_PCM_S32BE,     /* PCM, signed big-endian, 32 bits per sample */
++
++    AUDIO_PCM_DVD,    /* PCM, dvd, 24 bits per sample */
++    AUDIO_PCM_S8
++}PCMAudioTypes;
++
++
++typedef enum
++{
++    AUDIO_IMA_ADPCM = 1,  /* IMA 4:1 */
++    AUDIO_ADPCM_MS = 2,  /* Microsoft ADPCM audio */
++    AUDIO_ADPCM_QT
++
++}ADPCMAudioTypes;
++
++typedef enum
++{
++    AUDIO_ER_BSAC = 1, /* In fact we only care about whether it's BSAC or not */
++    AUDIO_AAC_RAW = 2, /* ADTS without sync word, such as in mp4 container */
++    AUDIO_AAC_ADTS = 3,
++    AUDIO_AAC_ADIF = 4
++}AACAudioTypes;
++
++
++
++#endif /* _FSL_MMLAYER_MEDIA_TYPES_H */
++
+diff --git a/ghdr/common/fsl_muxer.h b/ghdr/common/fsl_muxer.h
+new file mode 100755
+index 0000000..7677a3d
+--- /dev/null
++++ b/ghdr/common/fsl_muxer.h
+@@ -0,0 +1,486 @@
++
++/***********************************************************************
++* Copyright (c) 2011-2015, Freescale Semiconductor, Inc.
++* All modifications are confidential and proprietary information
++* of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++***********************************************************************/
++ 
++/*
++ *
++ *  History :
++ *  Date             Author              Version    Description
++ *
++ *  Apr, 2011        Lou Zhan            1.0        Initial Version
++ *  Sep, 2011        Fang Hui            1.0.1      Fix ENGR157476. Support long duration.
++ *  Oct, 2011        Fang Hui            1.0.2      Add FslMuxerGetTrailerSize, Fix ENGR160218 
++ *	May, 2012        Fang Hui            1.0.3      Support geographic location meta data	 
++ */
++
++#ifndef _FSL_MUXER_H
++#define _FSL_MUXER_H
++
++
++#ifdef __cplusplus
++#define EXTERN extern "C"
++#else
++#define EXTERN 
++#endif
++
++#include "fsl_types.h"
++
++#define MUXER_API_VERSION_STR "MUXER_API_01.00.04"
++
++
++/* Warning:
++ * It's not recommended to use any enum types as API arguments or return value!
++ * Please use data types that can explicitly tell the data length and asign 
++ * them the listed enum values. It's because different compilers can treat enum 
++ * as different types such as integer or unsinged char. If the muxer library 
++ * and plug-in(filter) are built by different compliers, the data length 
++ * mismatch will cause error.
++ */
++
++
++typedef void * FslMuxerHandle;
++
++#define MUXER_UNKNOWN_DURATION 0    /* Unknown sample duration */
++                                       
++#define MUXER_UNKNOWN_TIME_STAMP (-1) /* Unknown time stamp */ 
++                                       
++#define MUXER_UNKNOWN_TRACK_ID (0xFFFFFFFF) /* Unknown track id */ 
++ 
++
++/*
++ * Common error codes of muxers, 
++ * within the range [-100 , +100].
++ * Different muxers can extend the format specific errors OUTSIDE this range, 
++ * in their own API header files. 
++ */
++
++enum
++{
++    MUXER_SUCCESS  = 0,
++   
++    /* errors */
++    MUXER_ERR_UNKNOWN = -1, /* Unknow error, not captured by muxer logic */
++
++    MUXER_ERR_INVALID_API = -2, /* Some common API is not implemented properly */
++    
++    MUXER_NOT_IMPLEMENTED = -3, /* No support for some feature. */
++    MUXER_ERR_INVALID_PARAMETER = -4, /* parameters are invalid */
++    MUXER_ERR_INVALID_STATE_OPT = -5, /* api operation in wrong muxer state*/
++
++    MUXER_INSUFFICIENT_MEMORY = -6, /* memory not enough, causing general memory allocation failure */
++    MUXER_INSUFFICIENT_DATA = -7, /* data not enough, muxer need more data to go ahead */
++    
++    MUXER_FILE_OPEN_ERROR = -8, /* Can not open the movie file. */
++    MUXER_WRITE_ERROR = -9, /* Error on file writing. */
++    MUXER_SEEK_ERROR = -10, /* file system seeking error */
++
++    MUXER_ERR_INVALID_MEDIA = -11, /* invalid or unsupported media format */
++    MUXER_ERR_INVALID_CODEC = -12, /* invalid or unsupported codec format */
++
++    MUXER_WRITE_HEADER_FAILURE = -13, /* can not write movie header. */
++    MUXER_WRITE_INDEX_FAILURE = -14, /* can not write index table */
++
++    MUXER_ERR_TRACK_EXISTS = -15, /* track ID has already existed */
++    MUXER_ERR_INVALID_TRACK_ID = -16, /* invalid track ID or inexistent track  */
++    
++};
++
++
++
++
++/********************************************************************* 
++ * sample flags : 
++ * 32-bit long, properties of a sample read.
++ * The low 16 bits is reserved for common flag.
++ * Muxers can use high 16 bits to define their own flags.
++ ********************************************************************/
++#define FLAG_SYNC_SAMPLE         0x00000001  /* This is a sync sample */
++#define FLAG_SAMPLE_NOT_FINISHED 0X00000008  /* only partial sample in the input buffer */
++
++
++
++/********************************************************************* 
++ * Property Type
++*********************************************************************/
++typedef enum FSL_MUXER_PROPERTY_TYPE
++{
++    /* common */
++    PROPERTY_MODE = 0,              /* muxer mode. */
++    PROPERTY_TIMESCALE,             /* time-scale of track or movie. this is 
++                                     * the number of time units that pass in 
++                                     * one second. For example, a time 
++                                     * coordinate system that measures time in 
++                                     * sixtieths of a second has a time scale 
++                                     * of 60. Default is 1,000,000 */
++    PROPERTY_DURATION,              /* movie or track duration in time-scale */
++    PROPERTY_AVERAGE_BIT_RATE,      /* average bit rate of movie or track */
++    PROPERTY_CODEC_SPECIFIC_INFO,   /* codec specific information */
++    
++    /* video/text */
++    PROPERTY_FRAME_WIDTH = 64,      /* width of video frame or text window */
++    PROPERTY_FRAME_HEIGHT,          /* height of video frame or text window */
++    PROPERTY_FRAME_RATE,
++    PROPERTY_FRAME_ROTATE_DEGREE,   /* rotate degree of video frame */
++    
++    /* audio */
++    PROPERTY_CHANNEL_NUMBER = 128,  /* audio channel number */
++    PROPERTY_SAMPLE_RATE,           /* audio sample rate */
++    PROPERTY_BIT_DEPTH,             /* audio sample bit depth */
++    PROPERTY_BLOCK_ALIGNMENT,       /* audio block alignment */
++    PROPERTY_BITS_PER_FRAME,        /* bits per audio frame */
++    PROPERTY_CHANNEL_MASK           /* audio channel mask */
++} PropertyID;
++
++
++/********************************************************************* 
++ * Metadata Type
++*********************************************************************/
++typedef enum FSL_MUXER_METADATA_TYPE
++{
++    METADATA_TITLE = 0,        /* title of the content */
++    METADATA_LANGUAGE,         /* language of movie or track, ISO 639-2/T code (DATA_FORMAT_UTF8) */
++    METADATA_GENRE,            /* genre of the content, mainly music */   
++    METADATA_ARTIST,           /* main artist and performer */
++    METADATA_COPYRIGHT,        /* copyright statement */
++    METADATA_COMMENTS,         /* comments of the content */
++    METADATA_CREATION_DATE,    /* date the movie content was created */
++    METADATA_RATING,           /* rating */
++    METADATA_ALBUM,            /* album name of music content */
++    METADATA_VCODECNAME,       /* video codec name */
++    METADATA_ACODECNAME = 10,  /* audio codec name */
++    METADATA_ARTWORK,          /* artwork of movie or music */
++    METADATA_COMPOSER,         /* name of composer */
++    METADATA_DIRECTOR,         /* name of movie's director */
++    METADATA_INFORMATION,      /* information about the movie */
++    METADATA_CREATOR,          /* name of the file creator or maker */
++    METADATA_PRODUCER,         /* name of producer */
++    METADATA_PERFORMER,        /* name of performer */
++    METADATA_REQUIREMENTS,     /* special hardware and software requirements */
++    METADATA_SONGWRITER,       /* name of songwriter */
++    METADATA_MOVIEWRITER = 20, /* name of movie's writer */
++    METADATA_TOOL,             /* writing application */
++    METADATA_DESCRIPTION,      /* movie description */
++    METADATA_LOCATION,         /* Geographic point location by coordinates as defined in ISO 6709:2008.*/
++    METADATA_ANDROIDVERSION,
++    METADATA_CAPTUREFPS,
++    METADATA_MAX
++} MetadataID;
++
++/********************************************************************* 
++ * User data format
++*********************************************************************/
++typedef enum FSL_DATA_FORMAT
++{
++    DATA_FORMAT_UTF8 = 0,       /* all strings in stream should be 
++                                 * convert to UTF-8 and output */
++
++    DATA_FORMAT_INT8,           /* signed 8-bit integer */
++    DATA_FORMAT_INT16,          /* signed 16-bit integer */
++    DATA_FORMAT_INT32,          /* signed 32-bit integer */
++    DATA_FORMAT_INT64,          /* signed 64-bit integer */
++    DATA_FORMAT_UINT8,          /* unsigned 8-bit integer */
++    DATA_FORMAT_UINT16,         /* unsigned 16-bit integer */
++    DATA_FORMAT_UINT32,         /* unsigned 32-bit integer */
++    DATA_FORMAT_UINT64,         /* unsigned 64-bit integer */
++    DATA_FORMAT_FLOAT32,        /* floating 32-bit point */
++    DATA_FORMAT_FLOAT64,        /* floating 64-bit point */
++    DATA_FORMAT_FRACTION,       /* fraction. shall be istance of FractionData */
++
++    DATA_FORMAT_JPEG,           /* JPEG picture */
++    DATA_FORMAT_PNG,            /* PNG picture */
++    DATA_FORMAT_BMP,            /* BMP picture */
++    DATA_FORMAT_GIF,            /* GIF picture */
++
++    DATA_FORMAT_GENERAL_BINARY, /* general binary */
++    
++    DATA_FORMAT_MAX
++} DataFormat;
++
++
++/********************************************************************* 
++ * Fraction structure
++*********************************************************************/
++typedef struct _FSL_FRACTION_DATA
++{
++    int32 numerator;
++    int32 denominator;
++} FractionData;
++
++
++/********************************************************************* 
++ * file I/O interface on a file or live source. 
++
++open
++    Open a local file or URL.
++    Arguments:
++        fileName [in] File name or url to open. 
++                      To open the movie source file, just set file name to NULL.
++                      To open another external file for some track (eg. MP4), set the url. 
++                      
++        mode [in] Open mode, same as libc. Such as "rb".
++        
++    Return value:
++        Handle of the opened file. NULL for failure.
++
++read
++    Read data from the file.
++    Arguments:
++        handle [in] Handle of the file.
++        buffer [in] Pointer to a block of memory, to receive the data.
++        size[in] Data size to read, in bytes.
++
++    Return value:
++        The total number of bytes successfully read.
++        If this number differs from the size parameter, either an error occured or the EOF was reached.
++
++
++seek    
++    Seek the stream.
++    Arguments:
++        handle [in] Handle of the file.
++        offset [in] The offset.
++                    To move to a position before the end-of-file, you need to pass a negative value in offset and set whence to SEEK_END. 
++
++        whence in]  The new position, measured in bytes from the beginning of the file, 
++                    is obtained by adding offset to the position specified by whence. 
++                    SEEK_SET - Set position equal to offset bytes. 
++                    SEEK_CUR - Set position to current location plus offset . 
++                    SEEK_END - Set position to end-of-file plus offset.
++    Return value:
++        Upon success, returns 0; otherwise, returns -1. 
++
++tell
++    Tell the position of the file pointer 
++    Arguments:
++        handle [in] Handle of the file.
++
++    Return value:
++        Returns the position of the file pointer in bytes; i.e., its offset into the file stream.
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.        
++
++size
++    Tell the size of the entire file.
++    Arguments:
++        handle [in] Handle of the file.
++    Return value:
++        Returns the file size in bytes.
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.
++
++check_available_bytes
++    Tell the availble bytes of the file. Especially useful for a live source file (streaming).
++    The muxer can decide not to read if cached data is not enough and so avoid reading failure in unexpected context.
++    For a local file, any bytes request from the muxer can be met as long as it's within the file range.
++    
++    Arguments:
++        handle [in] Handle of the file.
++        bytes_requested [in]    Bytes requested for further parsing. This information can help the application 
++                                to cache enough data before calling muxer API next time.
++                                If the muxer can not know the exact data size needed, set it to 0.
++        
++    Return value:
++        If the file source can always meet the data reading request unless EOF (eg. a local file or a pull-mode live source),
++        returns the data size from the current file pointer to the file end.
++
++        Otherwise (eg. a push-mode live source), returns the cached data size.        
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.
++
++close
++    Close the file.
++    Arguments:
++        handle [in] Handle of the file.        
++        
++    Return value:
++        Upon success, returns 0; otherwise, returns -1. 
++*/
++
++typedef void * FslFileHandle;
++
++/* Seek origin, position from where offset is added, same as libc */
++#ifndef FSL_SEEK_SET
++#define FSL_SEEK_SET 0 /* SEEK_SET, Beginning of file */
++#endif
++#ifndef FSL_SEEK_CUR
++#define FSL_SEEK_CUR 1  /* SEEK_CUR, Current position of file pointer */
++#endif
++#ifndef FSL_SEEK_END
++#define FSL_SEEK_END 2  /* SEEK_END, End of file */
++#endif
++
++typedef struct _FslFileStream
++{
++    FslFileHandle (*Open)(const uint8 * fileName, 
++                          const uint8 * mode, 
++                          void * context); /* Open a file or URL */
++    int32 	(*Close)(FslFileHandle handle, 
++                     void * context); /* Close the stream */   
++    uint32  (*Write)(FslFileHandle handle, 
++                     void * buffer, 
++                     uint32 size, 
++                     void * context); /* Write data to stream */
++    int32 	(*Seek)(FslFileHandle handle, 
++                    int64 offset, 
++                    int32 whence, 
++                    void * context);  /* Seek the stream */
++    int64  	(*Tell)(FslFileHandle handle, 
++                    void * context); /* Tell the current position from start of the stream */
++    
++    void * reserved[2];
++} FslFileStream;
++
++
++/********************************************************************* 
++ * Core muxer memory callback funtion pointer table.
++ *********************************************************************/
++typedef struct 
++{  
++    void* (*Calloc) (uint32 numElements, uint32 size);
++    void* (*Malloc) (uint32 size);
++    void  (*Free) (void * ptr);     
++    void* (*ReAlloc)(void * ptr, uint32 size);
++    
++    void * reserved[2];
++
++} MuxerMemoryOps; /* callback operation callback table */
++
++
++
++/*********************************************************************************************************
++ *                  API Funtion Prototypes List
++ *
++ * There are mandotory and optional APIs.
++ * A core muxer must implent the mandory APIs while need not implement the optional one. 
++ * And in its DLL entry point "FslMuxerInit", it shall set the not-implemented function pointers to NULL. 
++ *
++ *********************************************************************************************************/
++
++/***************************************************************************************
++ *
++ *                Creation & Deletion
++ *
++ ***************************************************************************************/
++/* all mandatory */
++typedef const char * (*FslMuxerApiVersionInfo)(uint32 *mainVersion, 
++                                                 uint32 *minorVersion);
++
++typedef const char * (*FslMuxerVersionInfo)();
++
++typedef int32 (*FslCreateMuxer)(bool isLive, 
++                                FslFileStream *streamOps, 
++                                MuxerMemoryOps *memOps, 
++                                void *context, 
++                                FslMuxerHandle *muxerHandle);
++
++typedef int32 (*FslDeleteMuxer)(FslMuxerHandle muxerHandle); 
++
++
++/************************************************************************************************************
++ *
++ *               Movie Level
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslMuxerSetMovieProperty)(FslMuxerHandle muxerHandle, 
++                                          PropertyID propertyId, 
++                                          DataFormat propertyFormat, 
++                                          void *propertyData, 
++                                          uint32 propertyDataLength);
++
++/* optional */
++typedef int32 (*FslMuxerSetMovieMetadata)(FslMuxerHandle muxerHandle, 
++                                          MetadataID metadataId, 
++                                          DataFormat metadataFormat, 
++                                          void *metadata, 
++                                          uint32 metadataLength);
++
++/* mandatory */
++typedef int32 (*FslMuxerWriteHeader)(FslMuxerHandle muxerHandle);
++
++/* mandatory */
++typedef int32 (*FslMuxerWriteTrailer)(FslMuxerHandle muxerHandle);
++
++/* mandatory */
++typedef int32 (*FslMuxerAddTrack)(FslMuxerHandle muxerHandle, 
++                                  uint32 mediaType, 
++                                  uint32 codecType, 
++                                  uint32 codecSubType, 
++                                  uint32 *trackId);
++
++/* optional */
++typedef int32 (*FslMuxerGetTrailerSize)(FslMuxerHandle muxerHandle, uint32 *tailerSize);
++
++
++/************************************************************************************************************
++ *
++ *              Track Level
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslMuxerSetTrackProperty)(FslMuxerHandle muxerHandle, 
++                                          uint32 trackId, 
++                                          PropertyID propertyId, 
++                                          DataFormat propertyFormat, 
++                                          void *propertyData, 
++                                          uint32 propertyDataLength);
++
++/* optional */
++typedef int32 (*FslMuxerSetTrackMetadata)(FslMuxerHandle muxerHandle, 
++                                          uint32 trackId, 
++                                          MetadataID metadataId, 
++                                          DataFormat metadataFormat, 
++                                          void *metadata, 
++                                          uint32 metadataLength);
++
++/* mandatory */
++typedef int32 (*FslMuxerAddSample)(FslMuxerHandle muxerHandle, 
++                                   uint32 trackId, 
++                                   uint8 *sampleBuffer, 
++                                   uint32 sampleSize, 
++                                   uint64 pts, 
++                                   uint64 dts, 
++                                   uint64 duration, 
++                                   uint32 flags);
++
++
++/************************************************************************************************************
++ *
++ *               DLL entry point (mandatory) - to query muxer interface
++ *
++ ************************************************************************************************************/
++enum /* API function ID */
++{
++    MUXER_API_VERSION = 0, 
++
++    /* creation & deletion */
++    MUXER_API_GET_VERSION_INFO     = 1,
++    MUXER_API_CREATE_MUXER         = 2,
++    MUXER_API_DELETE_MUXER         = 3,
++    
++    /* movie */
++    MUXER_API_SET_MOVIE_PROPERTY   = 20,
++    MUXER_API_SET_MOVIE_METADATA   = 21,
++    MUXER_API_WRITE_MOVIE_HEADER   = 22,
++    MUXER_API_WRITE_MOVIE_TRAILER  = 23,
++    MUXER_API_GET_MOVIE_TAILER_SIZE = 24,
++    
++    /* track */
++    MUXER_API_ADD_TRACK            = 30,
++    MUXER_API_SET_TRACK_PROPERTY   = 31,
++    MUXER_API_SET_TRACK_METADATA   = 32,
++    MUXER_API_ADD_SAMPLE           = 33,
++}; 
++
++/* prototype of entry point */
++typedef int32 (*tFslMuxerQueryInterface)(uint32 id, void ** func);
++
++/* 
++Every core muxer shall implement this function and tell a specific API function pointer.
++If the queried API is not implemented, the muxer shall set funtion pointer to NULL and return MUXER_SUCCESS. */
++
++EXTERN int32 FslMuxerQueryInterface(uint32 id, void ** func);
++
++
++#endif /* _FSL_MUXER_COMMON_H */
++
+diff --git a/ghdr/common/fsl_parser.h b/ghdr/common/fsl_parser.h
+new file mode 100644
+index 0000000..67d4a18
+--- /dev/null
++++ b/ghdr/common/fsl_parser.h
+@@ -0,0 +1,993 @@
++
++/***********************************************************************
++ * Copyright 2009-2016 Freescale Semiconductor, Inc.
++ * Copyright 2017-2020 NXP
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. 
++ ***********************************************************************/
++
++/*
++ *
++ *  History :
++ *  Date             Author              Version    Description
++ *
++ *  Oct, 2009        Amanda              1.0        Initial Version
++ *  Jan, 2010        Amanda              1.1        Extend user data ID.
++ *  Apr, 2010        Amanda              2.0        Further unify API, add entry point "FslParserInit" for DLL loading.
++ *  Mar, 2010        Larry               2.1        Add API for getting Meta data
++ *  Sep, 2011        Fanghui             2.2        Add USER_DATA_TRACKNUMBER, USER_DATA_TOTALTRACKNUMBER
++ *  May, 2012        Fanghui             2.3		Change FslParserGetProgramTracks definition
++ *  May, 2012        Fanghui             2.4		Add USER_DATA_LOCATION
++ *  Jun, 2012        Fanghui             2.5		Add USER_DATA_PROGRAMINFO
++ *  Sep, 2012        Fanghui             2.6		Add USER_DATA_PMT
++ */
++
++#ifndef _FSL_PARSER_COMMON_H
++#define _FSL_PARSER_COMMON_H
++
++#include "fsl_media_types.h"
++#include "fsl_types.h"
++
++#ifdef __cplusplus
++#define EXTERN extern "C"
++#else
++#define EXTERN
++#endif
++
++
++/* Warning:
++ * It's not recommended to use any enum types as API arguments or return value!
++ * Please use data types that can explicitly tell the data length and asign them the listed enum values.
++ * It's because different compilers can treat enum as different types such as integer or unsinged char.
++ * If the parser library and plug-in(filter) are built by different compliers, the data length mismatch
++ * will cause error.
++ */
++
++
++#ifdef __WINCE
++	#define DEBUGMSG
++    //#define PARSERMSG(cond, fmt, ...) DEBUGMSG(cond, _T(fmt), __VA_ARGS__))
++    //#define PARSERMSG(fmt, ...) DEBUGMSG(1, (_T(fmt),  __VA_ARGS__))
++    #define PARSERMSG(fmt, ...)
++#elif WIN32
++	#define DEBUGMSG(cond, fmt) printf fmt
++	#define PARSERMSG(fmt, ...) printf(fmt, __VA_ARGS__)
++#else /* linux platform */
++    #ifdef DEBUG
++        #define PARSERMSG printf
++    #else
++        #define PARSERMSG(fmt...)
++    #endif
++#endif
++
++
++typedef void * FslParserHandle;
++
++#define PARSER_INVALID_TRACK_NUMBER   (-1)
++
++#define PARSER_UNKNOWN_DURATION 0    /* Unknown movie, track or sample duration.
++                                       In some broadcasting sources (eg. MMS of broadcasting)
++                                       or recording clips, the movie or track's duration is set to 0.
++                                       It means the duration is unknown, not an empty clip or track.
++                                       The plug-in and the core parser shall just try to read as many sample as possible until EOF.*/
++
++#define PARSER_UNKNOWN_TIME_STAMP (-1) /* The time stamp is unknown. Usually used when the exact audio samples
++                                        are not known until after decoding. And so only audio decoder can give
++                                        a valid time stamp for each decoded audio frame.
++                                        However, for the 1st sample after seeking,
++                                        the parser MUST NOT use this value but shall give a valid time stamp.*/
++
++#define PARSER_UNKNOWN_BITRATE  0    /* unknown bitrate */
++
++
++/*
++ * Common error codes of parsers,
++ * within the range [-100 , +100].
++ * Different parsers can extend the format specific errors OUTSIDE this range,
++ * in their own API header files.
++ */
++
++enum
++{
++    PARSER_SUCCESS  = 0,
++    PARSER_EOS = 1,    /* reach the end of the track/movie */
++    PARSER_BOS = 2,    /* reach the beginning of the track/movie */
++    PARSER_NEED_MORE_DATA = 3,  /* No longer used. Shall use "PARSER_INSUFFICIENT_DATA" */
++    PARSER_NOT_READY = 4,  /* did not have subtitle sample when get next sample */
++
++    /* errors */
++    PARSER_ERR_UNKNOWN = -1, /* Unknown error, not captured by parser logic */
++
++    PARSER_ERR_INVALID_API = -2, /* Some common API is not implemented properly */
++
++    PARSER_NOT_IMPLEMENTED = -5, /* No support for some feature. */
++    PARSER_ERR_INVALID_PARAMETER = -6, /* parameters are invalid */
++
++    PARSER_INSUFFICIENT_MEMORY = -7, /* memory not enough, causing general memory allocation failure */
++    PARSER_INSUFFICIENT_DATA = -8, /* data not enough, parser need more data to go ahead */
++
++    PARSER_ERR_NO_OUTPUT_BUFFER = -9, /* can not get sample buffer for output */
++
++    PARSER_FILE_OPEN_ERROR = -10,
++    PARSER_READ_ERROR = -11, /* file read error, no need for further error concealment */
++    PARSER_WRITE_ERROR = -12,
++    PARSER_SEEK_ERROR = -13, /* file system seeking error */
++    PARSER_ILLEAGAL_FILE_SIZE = -14, /* file size is wrong or exceeds parser's capacity.
++                                       (some parser can not handle file larger than 2GB)*/
++    PARSER_ILLEAGAL_OPERATION =-15, /* the parser is being used improperly */
++
++    PARSER_ERR_INVALID_MEDIA = -20, /* invalid or unsupported media format */
++
++    PARSER_ERR_NOT_SEEKABLE = -21, /* This file is not seekable and does not support trick mode */
++
++    /* error concealment */
++    PARSER_ERR_CONCEAL_FAIL = -22, /* Error in bitstream and no sample can be found by error concealment.
++                                If the file is seekable, it's better to perform a seeking than further
++                                searching the bit stream for the next sample. */
++
++    PARSER_ERR_MEMORY_ACCESS_VIOLATION = -25, /* internal memory access error */
++
++    PARSER_ERR_TRACK_DISABLED = -30, /* The track is disabled and no media samples can be read from it. Only enabled track can output samples.*/
++    PARSER_ERR_INVALID_READ_MODE = -32, /* The reading mode is invalid, or some operation is illegal under current reading mode */
++
++
++};
++
++
++/*********************************************************************
++ * Reading mode. There are two options:
++ * a. File-based sample reading.
++ *      The reading order is same as that of track interleaving in the file.
++ *      Mainly for streaming application.
++ *
++ * b. Track-based sample reading.
++ *      Each track can be read independently from each other.
++ *
++ * Note:
++ * A parser may support only one reading mode. Setting it to a not-supported mode will fail.
++ * And it usually has a default reading mode.
++ ********************************************************************/
++enum
++{
++    PARSER_READ_MODE_FILE_BASED = 0, /* File-based sample reading.*/
++    PARSER_READ_MODE_TRACK_BASED /* Track-based sample reading.*/
++};
++
++
++
++
++/*********************************************************************
++ * sample flags :
++ * 32-bit long, properties of a sample read.
++ * The low 16 bits is reserved for common flag.
++ * Parsers can use high 16 bits to define their own flags.
++ ********************************************************************/
++#define FLAG_SYNC_SAMPLE 0X01  /* This is a sync sample */
++
++#define FLAG_SAMPLE_ERR_CONCEALED 0X02 /* This sample is got by error concealment, such as searching the bitstream.*/
++
++#define FLAG_SAMPLE_SUGGEST_SEEK 0X04   /* A seeking is suggested. Although sample is got by error concealment,
++                                        A/V sync may be impacted.
++                                        If the file is seekable, a seeking on all tracks can save the A/V sync.*/
++#define FLAG_SAMPLE_NOT_FINISHED 0X08   /* Sample is NOT finished at this call, large samples can be output in several calls. */
++
++#define FLAG_UNCOMPRESSED_SAMPLE 0X10 /* This is a uncompressed sample.
++                                        Warning:
++                                        A track may have both compressed & uncompressed samples.
++                                        But some AVI clips seem to abuse this flag, sync samples are mark as uncompressed,
++                                        although they are actually compressed ones.
++                                        Now suggest not care this flag.*/
++
++#define FLAG_SAMPLE_NEWSEG       0x20 /* A new segment of new sample */
++
++#define FLAG_SAMPLE_CODEC_DATA   0x40 /* This is a sample of codec data */
++
++#define FLAG_SAMPLE_PCR_INFO     0x80 /* This is a sample of PCR data, the data is stored in struct PCRInfo type */
++
++#define FLAG_SAMPLE_H264_SEI_POS_DATA 0x100 /* This is a sample of h264 sei position data, the position data gives the offset and
++                                             * size of the sei nalu in the h264 frame it belongs to */
++
++#define FLAG_SAMPLE_COMPRESSED_SAMPLE 0x200 //drm sample flag, need to call drm api to get drm info
++
++#define FLAG_SAMPLE_AUDIO_PRESENTATION_CHANGED 0x400 //audio presentation is changed , need to call getMetaData to update
++
++/*********************************************************************
++ * seeking flags :
++ when to seek, must set one of the following flags
++ ********************************************************************/
++#define SEEK_FLAG_NEAREST 0X01  /* Default flag. The actual seeked time shall be nearest one to the given time (can be later or earlier)*/
++#define SEEK_FLAG_NO_LATER  0X02    /* The actual seeked time shall be no later than the given time */
++#define SEEK_FLAG_NO_EARLIER 0X03    /* The actual seeked time shall be no earlier than the given time */
++#define SEEK_FLAG_FUZZ 0X04 /* Reserved. No accurate request on time but request quick response.
++                               Parsers shall optimize performances with other flags.*/
++#define SEEK_FLAG_CLOSEST 0X05 /* this flag is only used for android when read options is ReadOptions::SEEK_CLOSEST in mp4 parser. */
++#define SEEK_FLAG_FRAME_INDEX 0X06 /* android cts requires this feature for mp4 parser */
++
++/*********************************************************************
++ * direction for trick mode/sync sample reading
++ ********************************************************************/
++#define FLAG_BACKWARD   0X00
++#define FLAG_FORWARD    0x01
++
++/*********************************************************************
++ * file flags:
++ * return flags of GetFlag() in FslFileStream
++ * Return value for some cases:
++ *   0 local playback.(default)
++ *   1 illegal
++ *   2 http streaming, which source is seekable, but seek may affect the fluency of playback.
++ *   3 live streaming such as rtp or udp streaming.
++ ********************************************************************/
++#define FILE_FLAG_NON_SEEKABLE   0X01
++//file source should be read in sequence. You should not read from random position even if the file is seekable
++#define FILE_FLAG_READ_IN_SEQUENCE   0X02
++
++/*********************************************************************
++ * flags for create parse2
++ ********************************************************************/
++//if set the flag, stream format was avc if codec data is presented, and format is bytestream if codec data is not found.
++#define FLAG_H264_NO_CONVERT 0x04
++//output pts if it exists
++#define FLAG_OUTPUT_PTS 0x08
++//if set the flag, do not convert id3 data to utf8 in parser, other components will do it. 
++#define FLAG_ID3_FORMAT_NON_UTF8  0x10
++//if set the flag, send out PCR data
++#define FLAG_OUTPUT_PCR  0x20
++//if set the flag, output sei position data in a sample buffer
++#define FLAG_OUTPUT_H264_SEI_POS_DATA 0x40
++
++/*********************************************************************
++ * User data ID
++ * Some File level metadata
++*********************************************************************/
++typedef enum FSL_PARSER_USER_DATA_TYPE
++{
++    USER_DATA_TITLE = 0,      /* title of the content */
++    USER_DATA_LANGUAGE,       /* user data may tell the language of the movie as a string */
++    USER_DATA_GENRE,          /* genre of the content, mainly music */
++    USER_DATA_ARTIST,         /* main artist and performer */
++    USER_DATA_COPYRIGHT,      /* copyright statement */
++    USER_DATA_COMMENTS,       /* comments of the content */
++    USER_DATA_CREATION_DATE,  /* date the movie content was created */
++    USER_DATA_RATING,         /* ? */
++    USER_DATA_ALBUM,          /* album name of music content */
++    USER_DATA_VCODECNAME,     /* video codec name */
++    USER_DATA_ACODECNAME,     /* audio codec name */
++    USER_DATA_ARTWORK,        /* artwork of movie or music */
++    USER_DATA_COMPOSER,       /* name of composer */
++    USER_DATA_DIRECTOR,       /* name of movie's director */
++    USER_DATA_INFORMATION,    /* information about the movie */
++    USER_DATA_CREATOR,        /* name of the file creator or maker */
++    USER_DATA_PRODUCER,       /* name of producer */
++    USER_DATA_PERFORMER,      /* name of performer */
++    USER_DATA_REQUIREMENTS,   /* special hardware and software requirements */
++    USER_DATA_SONGWRITER,     /* name of songwriter */
++    USER_DATA_MOVIEWRITER,    /* name of movie's writer */
++    USER_DATA_TOOL,           /* writing application */
++    USER_DATA_DESCRIPTION,    /* movie description */
++    USER_DATA_TRACKNUMBER,    /* track number */
++    USER_DATA_TOTALTRACKNUMBER,    /* total track number */
++    USER_DATA_LOCATION,       /* geographic location */  
++
++    /* add more? */
++    USER_DATA_CHAPTER_MENU,     /* Chapter Menu information */
++    USER_DATA_FORMATVERSION,   /* container format version */
++    USER_DATA_PROFILENAME,     /* Profile Name (DivX)*/
++
++    USER_DATA_PROGRAMINFO,     /* program info for ts */
++    USER_DATA_PMT,             /* program map table */
++
++    USER_DATA_AUD_ENC_DELAY,   /* audio encoding delay */
++    USER_DATA_AUD_ENC_PADDING, /* audio encoding padding */
++    USER_DATA_DISCNUMBER,      /* disc number */
++
++    USER_DATA_AUTHOR,         /* author */
++    USER_DATA_COLLECTION,     /* collection user */
++    USER_DATA_PUBLISHER,      /* publisher */
++    USER_DATA_SOFTWARE,       /* software */
++    USER_DATA_YEAR,           /* year */
++    USER_DATA_KEYWORDS,       /* keywords */
++    USER_DATA_ALBUMARTIST,
++    USER_DATA_COMPILATION,
++    USER_DATA_ANDROID_VERSION,
++    USER_DATA_CAPTURE_FPS,
++    USER_DATA_PSSH,
++    USER_DATA_MP4_CREATION_TIME, //in seconds since midnite, Jan,1, 1904, in UTC time
++    USER_DATA_MAX
++} UserDataID;
++
++/*********************************************************************
++ * User data format
++*********************************************************************/
++typedef enum FSL_PARSER_USER_DATA_FORMAT
++{
++    USER_DATA_FORMAT_UTF8,         /* all strings in stream should be convert to UTF-8 and output */
++
++    USER_DATA_FORMAT_INT_BE,
++    USER_DATA_FORMAT_UINT_BE,
++    USER_DATA_FORMAT_FLOAT32_BE,
++    USER_DATA_FORMAT_FLOAT64_BE,
++
++    USER_DATA_FORMAT_JPEG,
++    USER_DATA_FORMAT_PNG,
++    USER_DATA_FORMAT_BMP,
++    USER_DATA_FORMAT_GIF,
++
++    USER_DATA_FORMAT_CHAPTER_MENU,
++    /* add more? */
++
++    USER_DATA_FORMAT_PROGRAM_INFO,
++    USER_DATA_FORMAT_PMT_INFO,
++
++    USER_DATA_FORMAT_INT_LE,
++    USER_DATA_FORMAT_UINT_LE,
++
++    USER_DATA_FORMAT_MAX
++} UserDataFormat;
++
++
++/*********************************************************************
++ * file I/O interface on a file or live source.
++
++open
++    Open a local file or URL.
++    Arguments:
++        fileName [in] File name or url to open.
++                      To open the movie source file, just set file name to NULL.
++                      To open another external file for some track (eg. MP4), set the url.
++
++        mode [in] Open mode, same as libc. Such as "rb".
++
++    Return value:
++        Handle of the opened file. NULL for failure.
++
++read
++    Read data from the file.
++    Arguments:
++        handle [in] Handle of the file.
++        buffer [in] Pointer to a block of memory, to receive the data.
++        size[in] Data size to read, in bytes.
++
++    Return value:
++        The total number of bytes successfully read.
++        If this number differs from the size parameter, either an error occurred or the EOF was reached.
++
++
++seek
++    Seek the stream.
++    Arguments:
++        handle [in] Handle of the file.
++        offset [in] The offset.
++                    To move to a position before the end-of-file, you need to pass a negative value in offset and set whence to SEEK_END.
++
++        whence in]  The new position, measured in bytes from the beginning of the file,
++                    is obtained by adding offset to the position specified by whence.
++                    SEEK_SET - Set position equal to offset bytes.
++                    SEEK_CUR - Set position to current location plus offset .
++                    SEEK_END - Set position to end-of-file plus offset.
++    Return value:
++        Upon success, returns 0; otherwise, returns -1.
++
++tell
++    Tell the position of the file pointer
++    Arguments:
++        handle [in] Handle of the file.
++
++    Return value:
++        Returns the position of the file pointer in bytes; i.e., its offset into the file stream.
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.
++
++size
++    Tell the size of the entire file.
++    Arguments:
++        handle [in] Handle of the file.
++    Return value:
++        Returns the file size in bytes.
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.
++
++check_available_bytes
++    Tell the availble bytes of the file. Especially useful for a live source file (streaming).
++    The parser can decide not to read if cached data is not enough and so avoid reading failure in unexpected context.
++    For a local file, any bytes request from the parser can be met as long as it's within the file range.
++
++    Arguments:
++        handle [in] Handle of the file.
++        bytes_requested [in]    Bytes requested for further parsing. This information can help the application
++                                to cache enough data before calling parser API next time.
++                                If the parser can not know the exact data size needed, set it to 0.
++
++    Return value:
++        If the file source can always meet the data reading request unless EOF (eg. a local file or a pull-mode live source),
++        returns the data size from the current file pointer to the file end.
++
++        Otherwise (eg. a push-mode live source), returns the cached data size.
++        If error occurs or this feature can not be supported (eg. broadcast application), returns -1.
++
++close
++    Close the file.
++    Arguments:
++        handle [in] Handle of the file.
++
++    Return value:
++        Upon success, returns 0; otherwise, returns -1.
++*/
++
++typedef void * FslFileHandle;
++
++/* Seek origin, position from where offset is added, same as libc */
++#ifndef FSL_SEEK_SET
++#define FSL_SEEK_SET 0 /* SEEK_SET, Beginning of file */
++#endif
++#ifndef FSL_SEEK_CUR
++#define FSL_SEEK_CUR 1  /* SEEK_CUR, Current position of file pointer */
++#endif
++#ifndef FSL_SEEK_END
++#define FSL_SEEK_END 2  /* SEEK_END, End of file */
++#endif
++
++typedef struct _FslFileStream
++{
++    FslFileHandle (*Open)(const uint8 * fileName, const uint8 * mode, void * context); /* Open a file or URL */
++    int32 	(*Close)(FslFileHandle handle, void * context); /* Close the stream */
++    uint32  (*Read)(FslFileHandle handle, void * buffer, uint32 size, void * context); /* Read data from the stream */
++    int32 	(*Seek)(FslFileHandle handle, int64 offset, int32 whence, void * context);  /* Seek the stream */
++    int64  	(*Tell)(FslFileHandle handle, void * context); /* Tell the current position from start of the stream */
++    int64 	(*Size)(FslFileHandle handle, void * context); /* Get the size of the entire stream */
++    int64   (*CheckAvailableBytes)(FslFileHandle handle, int64 bytesRequested, void * context); /* How many bytes cached but not read yet */
++    uint32  (*GetFlag)(FslFileHandle handle, void * context);
++    void * reserved[1];
++
++} FslFileStream;
++
++
++/*********************************************************************
++ * Core parser memory callback function pointer table.
++ *********************************************************************/
++typedef struct
++{
++    void* (*Calloc) (uint32 numElements, uint32 size);
++    void* (*Malloc) (uint32 size);
++    void  (*Free) (void * ptr);
++    void* (*ReAlloc)(void * ptr, uint32 size); /* necessary for index scanning!*/
++
++}ParserMemoryOps; /* callback operation callback table */
++
++
++/********************************************************************************************************
++Callback functions to request/release an output buffer.
++Usually, the core parser requests an output buffer, fill the media data and return it to the application
++on GetNextSample(). But, on flushing (eg. on seek or deletion), the core parser need explicitly release
++all buffers not returned yet.
++
++RequestBuffer
++    Request an output buffer.
++
++    Arguments:
++        streamNum [in] Track number, 0-based.
++
++        size [in,out] The requested buffer size as input, and the size actually got as output, both in bytes.
++                      The actually got size can be larger than the requested size, and the parser can
++                      make full use of the buffer.
++
++        bufContext [out] A buffer context from the application. The parser shall not modify it.
++
++        parserContext [in] The parser context from the application, got on parser creation.
++
++    Return value:
++        Buffer pointer. NULL for failure.
++
++
++ReleaseBuffer
++    Release an output buffer explicitly.
++
++    Arguments:
++        streamNum [in] Track number, 0-based.
++        pBuffer [in] Buffer to release.
++        bufContext [in] The buffer context from the application, got on requestBuffer().
++        parserContext [in] The parser context from the application, got on parser creation.
++
++    Return value: none.
++
++********************************************************************************************************/
++
++typedef struct
++{
++    uint8* (*RequestBuffer) (uint32 streamNum, uint32 *size, void ** bufContext, void * parserContext);
++    void (*ReleaseBuffer) (uint32 streamNum, uint8 * pBuffer, void * bufContext, void * parserContext);
++
++}ParserOutputBufferOps;
++
++typedef struct _ChapterInfo
++{
++    uint32 ChapterUID;      /* UID for chapter */
++    uint32 dwStartTime;     /* Chapter's Start time in ms unit */
++    uint32 dwStopTime;      /* Chapter's Stop time in ms unit */
++    uint32 dwTitleSize;     /* Chapter Title size in byte */
++    char * Title;           /* The string for Title */
++}ChapterInfo;
++
++typedef struct _strChapterMenu
++{
++    uint32 EditionUID;      /* UID for Movie/Edition */
++    uint32 EdtionFlags;     /* Flags for Movie/Edition */
++    uint32 dwChapterNum;    /* Total number of chapters in this Edition */
++    ChapterInfo * pChapterList; /* the pointer to Chapter information list */
++}ChapterMenu;
++
++typedef struct _ProgramInfo
++{
++    uint32 m_dwChannel; //program_number in spec, for a broadcast channel.
++    uint32 m_dwPID; //program PID(packet ID)
++}ProgramInfo;
++
++typedef struct _ProgramInfoMenu
++{
++    uint32 m_dwProgramNum;
++    ProgramInfo m_atProgramInfo[0];
++}ProgramInfoMenu;
++
++
++#define INVALID_PID         (uint32)(-1)
++#define INVALID_CHANNEL     (uint32)(-1)
++
++
++typedef struct _TrackInfo
++{
++    uint32 m_dwTrackNo; //global track No
++    uint32 m_dwPID;     //PID(packet ID)
++    uint8 m_byLan[3];   //language
++    uint32 m_dwReserved[16];    
++}TrackInfo;
++
++//single program map table
++typedef struct _PMTInfo
++{
++    uint32 m_dwChannel; //program_number in spec, for a broadcast channel.
++    uint32 m_dwPID;     //PID(packet ID)
++    uint32 m_dwReserved[8];
++    uint32 m_dwTrackNum;    
++    TrackInfo *m_ptTrackInfo;
++}PMTInfo;
++
++//total program map table
++typedef struct _PMTInfoList
++{
++    uint32 m_dwProgramNum;
++    PMTInfo *m_ptPMTInfo;
++}PMTInfoList;
++
++//struct for FslParserGetTrackExtTag
++typedef struct _TrackExtTagItem
++{
++    uint32 index;
++    uint32 type;
++    uint32 size;
++    uint8* data;
++    struct _TrackExtTagItem * nextItemPtr;
++}TrackExtTagItem;
++
++typedef struct TrackExtTagList
++{
++    int32 num;
++    TrackExtTagItem * m_ptr;
++}TrackExtTagList;
++
++enum{
++    FSL_PARSER_TRACKEXTTAG_CRPYTOKEY = 0,
++    FSL_PARSER_TRACKEXTTAG_TX3G,
++    FSL_PARSER_TRACKEXTTAG_CRPYTOMODE,
++    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE
++}TrackExtTagIndex;
++
++typedef struct _SeiPosition
++{
++    uint32 offset;
++    uint32 size;
++}SeiPosition;
++
++typedef struct
++{
++    uint32 maxCLL;
++    uint32 maxFALL;
++    bool hasMasteringMetadata;
++    float PrimaryRChromaticityX;
++    float PrimaryRChromaticityY;
++    float PrimaryGChromaticityX;
++    float PrimaryGChromaticityY;
++    float PrimaryBChromaticityX;
++    float PrimaryBChromaticityY;
++    float WhitePointChromaticityX;
++    float WhitePointChromaticityY;
++    float LuminanceMax;
++    float LuminanceMin;
++}VideoHDRColorInfo;
++
++/*********************************************************************************************************
++ *                  API Function Prototypes List
++ *
++ * There are mandatory and optional APIs.
++ * A core parser must implement the mandatory APIs while need not implement the optional one.
++ * And in its DLL entry point "FslParserInit", it shall set the not-implemented function pointers to NULL.
++ *
++ *********************************************************************************************************/
++
++/***************************************************************************************
++ *
++ *                Creation & Deletion
++ *
++ ***************************************************************************************/
++/* mandatory */
++typedef const char * (*FslParserVersionInfo)();
++
++typedef int32  (*FslCreateParser)(  bool isLive,
++                                    FslFileStream * streamOps,
++                                    ParserMemoryOps * memOps,
++                                    ParserOutputBufferOps * outputBufferOps,
++                                    void * context,
++                                    FslParserHandle * parserHandle);
++
++typedef int32 (*FslDeleteParser)(FslParserHandle parserHandle);
++
++/* optional */
++typedef int32  (*FslCreateParser2)( uint32 flags,
++                                    FslFileStream * streamOps,
++                                    ParserMemoryOps * memOps,
++                                    ParserOutputBufferOps * outputBufferOps,
++                                    void * context,
++                                    FslParserHandle * parserHandle);
++
++/***************************************************************************************
++ *
++ *                 Index Table Loading, Export & Import
++ *
++ ***************************************************************************************/
++/* optional */
++typedef int32 (*FslParserInitializeIndex)(FslParserHandle parserHandle); /*Loading index from the movie file */
++
++typedef int32 (*FslParserImportIndex)(  FslParserHandle parserHandle, /* Import index from outside */
++                                        uint8 * buffer,
++                                        uint32 size);
++
++typedef int32 (*FslParserExportIndex)(  FslParserHandle parserHandle,
++                                        uint8 * buffer,
++                                        uint32 *size);
++
++
++/************************************************************************************************************
++ *
++ *               Movie Properties
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslParserIsSeekable)(FslParserHandle parserHandle, bool * seekable);
++
++typedef int32 (*FslParserGetMovieDuration)(FslParserHandle parserHandle,  uint64 * usDuration);
++
++typedef int32 (*FslParserGetUserData)(  FslParserHandle parserHandle,
++                                        uint32 userDataId,
++                                        uint16 ** unicodeString,
++                                        uint32 * stringLength);
++
++typedef int32 (*FslParserGetMetaData)(  FslParserHandle parserHandle,
++                                        UserDataID userDataId,
++                                        UserDataFormat * userDataFormat,
++                                        uint8 ** userData,
++                                        uint32 * userDataLength);
++
++typedef int32 (*FslParserGetNumTracks)(FslParserHandle parserHandle, uint32 * numTracks); /* single program interface */
++
++typedef int32 (*FslParserGetNumPrograms)(FslParserHandle parserHandle, uint32 * numPrograms); /* multiple program interface */
++typedef int32 (*FslParserGetProgramTracks)( FslParserHandle parserHandle,
++                                            uint32 programNum,
++                                            uint32 * numTracks,
++                                            uint32 ** ppTrackNumList);
++
++typedef int32 (*FslParserGetPCR)( FslParserHandle parserHandle,
++                                            uint32 programNum,
++                                            uint64* usPCR);
++
++/************************************************************************************************************
++ *
++ *              General Track Properties
++ *
++ ************************************************************************************************************/
++typedef int32 (*FslParserGetTrackType)( FslParserHandle parserHandle,
++                                        uint32 trackNum,
++                                        uint32 * mediaType,
++                                        uint32 * decoderType,
++                                        uint32 * decoderSubtype);
++
++typedef int32 (*FslParserGetTrackDuration)( FslParserHandle parserHandle,
++                                            uint32 trackNum,
++                                            uint64 * usDuration); /* Duration 0 means an empty track */
++
++typedef int32 (*FslParserGetLanguage)(  FslParserHandle parserHandle,
++                                        uint32 trackNum,
++                                        uint8 * threeCharCode);
++
++/* optional */
++typedef int32 (*FslParserGetBitRate)(   FslParserHandle parserHandle,
++                                        uint32 trackNum,
++                                        uint32 * bitrate);
++
++typedef int32 (*FslParserGetDecSpecificInfo)(   FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint8 ** data,
++                                                uint32 * size);
++
++typedef int32 (*FslParserGetTrackExtTag)(   FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                TrackExtTagList **pList);
++
++/************************************************************************************************************
++ *
++ *               Video Properties, only for video media
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef    int32 (*FslParserGetVideoFrameWidth)(FslParserHandle parserHandle, uint32 trackNum, uint32 *width);
++
++typedef    int32 (*FslParserGetVideoFrameHeight)(FslParserHandle parserHandle, uint32 trackNum, uint32 *height);
++
++/* optional */
++typedef    int32 (*FslParserGetVideoFrameRate)( FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * rate,
++                                                uint32 * scale);
++
++typedef    int32 (*FslParserGetVideoFrameRotation)(FslParserHandle parserHandle, uint32 trackNum, uint32 *rotation);
++
++/* optional */
++typedef    int32 (*FslParserGetVideoColorInfo)(FslParserHandle parserHandle, uint32 trackNum
++                                                , int32* primaries,int32 * transfer, int32* coeff, int32* fullRange);
++
++
++typedef    int32 (*FslParserGetVideoHDRColorInfo)(FslParserHandle parserHandle, uint32 trackNum, VideoHDRColorInfo *pInfo);
++
++typedef    int32 (*FslParserGetVideoDisplayWidth)(FslParserHandle parserHandle, uint32 trackNum, uint32 *width);
++
++typedef    int32 (*FslParserGetVideoDisplayHeight)(FslParserHandle parserHandle, uint32 trackNum, uint32 *height);
++
++typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
++
++
++/************************************************************************************************************
++ *
++ *               Audio Properties
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslParserGetAudioNumChannels)(  FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * numchannels);
++
++typedef int32 (*FslParserGetAudioSampleRate)(   FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * sampleRate);
++
++typedef int32 (*FslParserGetAudioBitsPerSample)(FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * bitsPerSample); /* bit depth */
++
++/* optional */
++typedef int32 (*FslParserGetAudioBlockAlign)(FslParserHandle parserHandle,
++                                             uint32 trackNum,
++                                             uint32 * blockAlign);
++
++typedef int32 (*FslParserGetAudioBitsPerFrame)( FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 *bits_per_frame); /* for Real audio */
++
++typedef int32 (*FslParserGetAudioChannelMask)(  FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * channelMask); /* for WMA audio */
++
++
++/************************************************************************************************************
++ *
++ *               Text/Subtitle Properties
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslParserGetTextTrackWidth)(FslParserHandle parserHandle,
++                                            uint32 trackNum,
++                                            uint32 * width);
++
++typedef int32 (*FslParserGetTextTrackHeight)(   FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint32 * height);
++
++typedef int32 (*FslParserGetTextTrackMime)(   FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                uint8 ** sampleBuffer,uint32 * dataSize);
++/************************************************************************************************************
++ *
++ *               Sample Reading, Seek & Trick Mode
++ *
++ * NOTE: if the core parser can not give a valid sample duration,
++ *       setting the sample duration to ZERO is a good choice.
++ *
++ ************************************************************************************************************/
++/* mandatory */
++typedef int32 (*FslParserGetReadMode)(FslParserHandle parserHandle, uint32 * readMode);
++typedef int32 (*FslParserSetReadMode)(FslParserHandle parserHandle, uint32 readMode);
++
++typedef int32 (*FslParserEnableTrack)(  FslParserHandle parserHandle,
++                                        uint32 trackNum,
++                                        bool enable);
++
++typedef int32 (*FslParserGetNextSample)(FslParserHandle parserHandle,
++                                        uint32 trackNum,
++                                        uint8 ** sampleBuffer,
++                                        void  ** bufferContext,
++                                        uint32 * dataSize,
++                                        uint64 * usStartTime,
++                                        uint64 * usDuration,
++                                        uint32 * sampleFlags); /* Only for track-based sample reading. The application tell which track to read.*/
++
++
++/* optional */
++typedef int32 (*FslParserGetNextSyncSample)(FslParserHandle parserHandle,
++                                            uint32 direction,
++                                            uint32 trackNum,
++                                            uint8 ** sampleBuffer,
++                                            void  ** bufferContext,
++                                            uint32 * dataSize,
++                                            uint64 * usStartTime,
++                                            uint64 * usDuration,
++                                            uint32 * flags); /* only for trick mode on video track */
++
++
++typedef int32 (*FslParserGetFileNextSample)(FslParserHandle parserHandle,
++                                            uint32 * trackNum,
++                                            uint8 ** sampleBuffer,
++                                            void  ** bufferContext,
++                                            uint32 * dataSize,
++                                            uint64 * usStartTime,
++                                            uint64 * usDuration,
++                                            uint32 * sampleFlags); /* Only for file-based sample reading. The parser tell which track is being read.*/
++
++
++/* optional */
++typedef int32 (*FslParserGetFileNextSyncSample)(FslParserHandle parserHandle,
++                                            uint32 direction,
++                                            uint32 * trackNum,
++                                            uint8 ** sampleBuffer,
++                                            void  ** bufferContext,
++                                            uint32 * dataSize,
++                                            uint64 * usStartTime,
++                                            uint64 * usDuration,
++                                            uint32 * flags); /* only for trick mode on video track */
++
++//crypto info for android widevine
++typedef int32 (*FslParserGetSampleCryptoInfo)(FslParserHandle parserHandle,
++                                            uint32 trackNum,
++                                            uint8** iv,
++                                            uint32 * ivSize,
++                                            uint8 ** clearBuffer,
++                                            uint32 * clearSize,
++                                            uint8 ** encryptedBuffer,
++                                            uint32 * encryptedSize);
++
++/* mandatory */
++typedef int32 (*FslParserSeek)( FslParserHandle parserHandle,
++                                uint32 trackNum,
++                                uint64 * usTime,
++                                uint32 flag);
++
++/* optional */
++typedef int32 (*FslParserGetAudioPresentationNum)(FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                int32 * presentationNum);
++
++/* optional */
++typedef int32 (*FslParserGetAudioPresentationInfo)(FslParserHandle parserHandle,
++                                                uint32 trackNum,
++                                                int32  presentationNum,
++                                                int32* presentationId,
++                                                char ** language,
++                                                uint32 * masteringIndication,
++                                                uint32 * audioDescriptionAvailable,
++                                                uint32 * spokenSubtitlesAvailable,
++                                                uint32 * dialogueEnhancementAvailable);
++
++
++/************************************************************************************************************
++ *
++ *               DLL entry point (mandatory) - to query parser interface
++ *
++ ************************************************************************************************************/
++enum /* API function ID */
++{
++    /* creation & deletion */
++    PARSER_API_GET_VERSION_INFO  = 0,
++    PARSER_API_CREATE_PARSER     = 1,
++    PARSER_API_DELETE_PARSER     = 2,
++    PARSER_API_CREATE_PARSER2     = 5,
++
++    /* index export/import */
++    PARSER_API_INITIALIZE_INDEX  = 10,
++    PARSER_API_IMPORT_INDEX      = 11,
++    PARSER_API_EXPORT_INDEX      = 12,
++
++
++    /* movie properties */
++    PARSER_API_IS_MOVIE_SEEKABLE    = 20,
++    PARSER_API_GET_MOVIE_DURATION   = 21,
++    PARSER_API_GET_USER_DATA       = 22,
++    PARSER_API_GET_META_DATA       = 23,
++
++    PARSER_API_GET_NUM_TRACKS       = 25,
++
++    PARSER_API_GET_NUM_PROGRAMS     = 26,
++    PARSER_API_GET_PROGRAM_TRACKS   = 27,
++    PARSER_API_GET_PCR              = 28,
++
++
++    /* generic track properties */
++    PARSER_API_GET_TRACK_TYPE                   = 30,
++    PARSER_API_GET_TRACK_DURATION               = 31,
++    PARSER_API_GET_LANGUAGE                     = 32,
++    PARSER_API_GET_BITRATE                      = 36,
++    PARSER_API_GET_DECODER_SPECIFIC_INFO        = 37,
++    PARSER_API_GET_TRACK_EXT_TAG                = 38,
++
++    /* video properties */
++    PARSER_API_GET_VIDEO_FRAME_WIDTH        = 50,
++    PARSER_API_GET_VIDEO_FRAME_HEIGHT       = 51,
++    PARSER_API_GET_VIDEO_FRAME_RATE         = 52,
++    PARSER_API_GET_VIDEO_FRAME_ROTATION     = 53,
++    PARSER_API_GET_VIDEO_COLOR_INFO         = 54,
++    PARSER_API_GET_VIDEO_HDR_COLOR_INFO     = 55,
++    PARSER_API_GET_VIDEO_DISPLAY_WIDTH      = 56,
++    PARSER_API_GET_VIDEO_DISPLAY_HEIGHT     = 57,
++    PARSER_API_GET_VIDEO_FRAME_COUNT        = 58,
++
++    /* audio properties */
++    PARSER_API_GET_AUDIO_NUM_CHANNELS       = 60,
++    PARSER_API_GET_AUDIO_SAMPLE_RATE        = 61,
++    PARSER_API_GET_AUDIO_BITS_PER_SAMPLE    = 62,
++
++    PARSER_API_GET_AUDIO_BLOCK_ALIGN        = 65,
++    PARSER_API_GET_AUDIO_CHANNEL_MASK       = 66,
++    PARSER_API_GET_AUDIO_BITS_PER_FRAME     = 67,
++    PARSER_API_GET_AUDIO_PRESENTATION_NUM   = 68,
++    PARSER_API_GET_AUDIO_PRESENTATION_INFO  = 69,
++
++    /* text/subtitle properties */
++    PARSER_API_GET_TEXT_TRACK_WIDTH = 80,
++    PARSER_API_GET_TEXT_TRACK_HEIGHT= 81,
++    PARSER_API_GET_TEXT_TRACK_MIME = 82,
++
++    /* sample reading, seek & trick mode */
++    PARSER_API_GET_READ_MODE = 100,
++    PARSER_API_SET_READ_MODE = 101,
++
++    PARSER_API_ENABLE_TRACK = 105,
++
++    PARSER_API_GET_NEXT_SAMPLE = 110,
++    PARSER_API_GET_NEXT_SYNC_SAMPLE = 111,
++
++
++    PARSER_API_GET_FILE_NEXT_SAMPLE = 115,
++    PARSER_API_GET_FILE_NEXT_SYNC_SAMPLE = 116,
++
++    PARSER_API_GET_SAMPLE_CRYPTO_INFO = 117,
++
++    PARSER_API_SEEK  = 120
++
++
++};
++
++/* prototype of entry point */
++typedef int32 (*tFslParserQueryInterface)(uint32 id, void ** func);
++
++/*
++Every core parser shall implement this function and tell a specific API function pointer.
++If the queried API is not implemented, the parser shall set funtion pointer to NULL and return PARSER_SUCCESS. */
++
++EXTERN int32 FslParserQueryInterface(uint32 id, void ** func);
++
++
++#endif /* _FSL_PARSER_COMMON_H */
++
+diff --git a/ghdr/common/fsl_types.h b/ghdr/common/fsl_types.h
+new file mode 100755
+index 0000000..2fb5039
+--- /dev/null
++++ b/ghdr/common/fsl_types.h
+@@ -0,0 +1,59 @@
++/*
++***********************************************************************
++* Copyright 2009-2010 by Freescale Semiconductor, Inc.
++* All modifications are confidential and proprietary information
++* of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++***********************************************************************
++*
++*  History :
++*  Date             Author              Version    Description
++*
++*  Aug,2009         B06543              0.1        Initial Version
++*
++*/
++
++#ifndef _FSL_MMLAYER_TYPES_H
++#define _FSL_MMLAYER_TYPES_H
++
++#include <stdio.h>
++
++#ifndef uint64
++#ifdef WIN32
++	typedef  unsigned __int64 uint64;	
++#else
++	typedef  unsigned long long uint64;	
++#endif
++#endif /*uint64*/
++
++
++#ifndef int64
++#ifdef WIN32	
++	typedef  __int64 int64;
++#else	
++	typedef  long long int64;
++#endif
++#endif /*int64*/
++
++//typedef unsigned long uint32;
++typedef unsigned int uint32;
++typedef unsigned short uint16;
++typedef unsigned char uint8;
++//typedef long int32;
++typedef int int32;
++typedef short int16;
++typedef char int8;
++
++#ifndef bool
++    #define bool int
++#endif
++
++#ifndef TRUE
++    #define TRUE 1    
++#endif
++
++#ifndef FALSE
++    #define FALSE 0    
++#endif
++
++#endif /* _FSL_MMLAYER_TYPES_H */
++
+diff --git a/ghdr/common/fsl_unia.h b/ghdr/common/fsl_unia.h
+new file mode 100755
+index 0000000..4202bb0
+--- /dev/null
++++ b/ghdr/common/fsl_unia.h
+@@ -0,0 +1,419 @@
++
++/***********************************************************************
++ * Copyright (c) 2011-2014, Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++ ***********************************************************************/
++
++/*
++ *
++ *  History :
++ *  Date             Author              Version    Description
++ *
++ *  Sep, 2011        Lyon               1.0        Initial Version
++ *
++ */
++
++#ifndef _Uni_ADEC_WRAPPER_H_
++#define _Uni_ADEC_WRAPPER_H_
++
++#include "fsl_types.h"
++
++
++#ifdef __cplusplus
++#define EXTERN extern "C"
++#else
++#define EXTERN
++#endif
++
++
++/* Warning:
++ * It's not recommended to use any enum types as API arguments or return value!
++ * Please use data types that can explicitly tell the data length and asign them the listed enum values.
++ * It's because different compilers can treat enum as different types such as integer or unsinged char.
++ * If the ACodec library and plug-in(filter) are built by different compliers, the data length mismatch
++ * will cause error.
++ */
++ typedef void * UniACodec_Handle;
++//typedef void * UniACodec_Config;
++//typedef void * UniACodec_Info;
++
++/*
++ * Common error codes of ACodec,
++ * within the range [-100 , +100].
++ * Different ACodecs can extend the format specific errors OUTSIDE this range,
++ * in their own API header files.
++ */
++typedef enum
++{
++    ACODEC_SUCCESS = 0,
++      
++    ACODEC_ERROR_STREAM,
++    ACODEC_PARA_ERROR,
++    ACODEC_INSUFFICIENT_MEM,
++    ACODEC_ERR_UNKNOWN,
++    ACODEC_PROFILE_NOT_SUPPORT,
++    ACODEC_INIT_ERR,
++    ACODEC_NO_OUTPUT,
++    
++    ACODEC_NOT_ENOUGH_DATA = 0x100,
++    ACODEC_CAPIBILITY_CHANGE = 0x200, /* output format changes, caller should reget format from getparameter API */
++    ACODEC_END_OF_STREAM = 0x300, /* no output */
++} UA_ERROR_TYPE;
++
++
++/* Parameter type to Set /Get */
++typedef enum
++{
++/* Set parmameters */
++/* common  */
++    UNIA_SAMPLERATE= 0,
++    UNIA_CHANNEL,
++    UNIA_FRAMED,        /* one whole frame input */
++    UNIA_DEPTH,
++    UNIA_CODEC_DATA,
++    UNIA_BITRATE,
++    UNIA_DOWNMIX_STEREO,
++    UNIA_STREAM_TYPE,
++    UNIA_CHAN_MAP_TABLE,
++    //UNIA_CHANNEL_MASK,
++    UNIA_TO_STEREO,
++
++/* dedicate for wma */
++    UNIA_WMA_BlOCKALIGN= 0x100,
++    UNIA_WMA_VERSION,
++
++/*dedicate for RealAudio */
++    UNIA_RA_FLAVOR_INDEX = 0x110,
++    UNIA_RA_FRAME_BITS,
++
++/* dedicate for mp3 dec */
++    UNIA_MP3_DEC_CRC_CHECK = 0x120,
++    UNIA_MP3_DEC_MCH_ENABLE,
++
++/* dedicate for bsac dec */
++    UNIA_BSAC_DEC_DECODELAYERS = 0x130,
++
++/* dedicate for aacplus dec */
++    UNIA_AACPLUS_DEC_BDOWNSAMPLE = 0x140,
++    UNIA_AACPLUS_DEC_BBITSTREAMDOWNMIX,
++    UNIA_AACPLUS_DEC_CHANROUTING,
++
++/* dedicate for dabplus dec */
++    UNIA_DABPLUS_DEC_BDOWNSAMPLE = 0x150,
++    UNIA_DABPLUS_DEC_BBITSTREAMDOWNMIX,
++    UNIA_DABPLUS_DEC_CHANROUTING,
++
++/* dedicate for sbc enc */
++    UNIA_SBC_ENC_SUBBANDS = 0x160,
++    UNIA_SBC_ENC_BLOCKS,
++    UNIA_SBC_ENC_SNR,
++    UNIA_SBC_ENC_BITPOOL,
++    UNIA_SBC_ENC_CHMODE,
++
++/* Get parmameters */
++    UNIA_CODEC_DESCRIPTION= 0x200, 
++    UNIA_OUTPUT_PCM_FORMAT,
++    UNIA_CONSUMED_LENGTH,
++    UNIA_OUTBUF_ALLOC_SIZE,  /* used for allocate output buffer outside */
++    
++    UA_TYPE_MAX
++} UA_ParaType;
++
++
++
++typedef enum
++{
++  UA_CHANNEL_FRONT_MONO,
++  UA_CHANNEL_FRONT_LEFT,
++  UA_CHANNEL_FRONT_RIGHT,
++  
++  UA_CHANNEL_REAR_CENTER,
++  UA_CHANNEL_REAR_LEFT,
++  UA_CHANNEL_REAR_RIGHT,
++
++  UA_CHANNEL_LFE,
++
++  UA_CHANNEL_FRONT_CENTER,
++  UA_CHANNEL_FRONT_LEFT_CENTER,
++  UA_CHANNEL_FRONT_RIGHT_CENTER,
++
++  UA_CHANNEL_SIDE_LEFT,
++  UA_CHANNEL_SIDE_RIGHT,
++
++  UA_CHANNEL_MAX
++  
++}UA_CHANNEL_LAYOUT;
++
++#define STREAM_NBAMR_BASE  0x10
++#define STREAM_WBAMR_BASE  0x20
++#define STREAM_DABPLUS_BASE  0x30
++typedef enum
++{
++    /* AAC/AACPLUS file format */
++    STREAM_UNKNOW = 0,
++    STREAM_ADTS,
++    STREAM_ADIF,
++    STREAM_RAW,
++
++    STREAM_LATM,
++    STREAM_LATM_OUTOFBAND_CONFIG,
++    STREAM_LOAS,
++
++    /* NB-AMR file format */
++    STREAM_NBAMR_ETSI = STREAM_NBAMR_BASE,
++    STREAM_NBAMR_MMSIO,
++    STREAM_NBAMR_IF1IO,
++    STREAM_NBAMR_IF2IO,
++
++    /* WB-AMR file format */
++    STREAM_WBAMR_DEFT = STREAM_WBAMR_BASE,
++    STREAM_WBAMR_ITU,
++    STREAM_WBAMR_MIME,
++    STREAM_WBAMR_IF2,
++    STREAM_WBAMR_IF1,
++
++    /* DABPLUS file format */
++    STREAM_DABPLUS_RAW_SIDEINFO = STREAM_DABPLUS_BASE,
++    STREAM_DABPLUS,
++
++    /* BSAC file raw format */
++    STREAM_BSAC_RAW
++
++} STREAM_TYPE;
++
++/* sbc_enc-specific channel modes */
++enum sbc_enc_chmode {
++    CHMODE_MONO =   0,
++    CHMODE_DUAL =   1,
++    CHMODE_STEREO = 2,
++    CHMODE_JOINT =  3
++};
++
++/*
++ * Audio codec types.
++ */
++typedef enum
++{
++    AAC = 0,
++    AAC_PLUS,
++    MP3,
++    WMA,
++    AC3,
++    OGG,
++    DD_PLUS,
++    RA,
++    FLAC,
++    NBAMR,
++    WBAMR,
++    BSAC,
++    DRM,
++    SBCENC,
++    SBCDEC,
++    DAB_PLUS,
++    MP2,
++
++    FORMAT_UNKNOW = 0x200
++}AUDIOFORMAT;
++
++/*********************************************************************
++ * Uni Audio memory callback funtion pointer table.
++ *********************************************************************/
++typedef struct
++{
++    void* (*Calloc) (uint32 numElements, uint32 size);
++    void* (*Malloc) (uint32 size);
++    void  (*Free) (void * ptr);
++    void* (*ReAlloc)(void * ptr, uint32 size);
++}UniACodecMemoryOps; /* callback operation callback table */
++
++typedef struct
++{
++  uint32 samplerate;
++  uint32 width;
++  uint32 depth;
++  uint32 channels;
++  uint32 endian;
++  bool interleave;
++  uint32 layout[UA_CHANNEL_MAX];
++  bool chan_pos_set;  // indicate if channel position is set outside or use codec default
++}UniAcodecOutputPCMFormat;
++
++
++typedef struct 
++{
++     uint32 size;		/* The size in bytes of the data in this buffer */
++     char * buf;		/* Buffer pointer */
++}UniACodecParameterBuffer;
++
++typedef struct
++{   uint32 size;
++    uint32* channel_table[10]; //assume the max channel is less than 10
++}CHAN_TABLE;
++
++typedef struct
++{
++    union {
++        uint32 samplerate;
++        uint32 channels;
++        uint32 bitrate;
++        uint32 depth;
++        uint32 blockalign;
++        uint32 version;
++        bool downmix;
++        bool framed;
++        UniACodecParameterBuffer codecData;
++        STREAM_TYPE stream_type;
++        CHAN_TABLE chan_map_tab;
++
++        /* for real audio decoder */
++        uint32 frame_bits;
++        uint32 flavor_index;
++		
++        char ** codecDesc;
++        UniAcodecOutputPCMFormat outputFormat;
++        uint32 consumed_length;
++        uint32 outbuf_alloc_size;
++
++/* defined for dsp */
++        uint32 chanmap;
++        uint32 mono_to_stereo;
++        uint32 layers;
++
++        /* dedicate for mp3 and mp2 dec */
++        uint32 crc_check;
++        uint32 mch_enable;
++
++        /* dedicate for bsac, aacplus and dabplus dec */
++        uint32 bdownsample;
++        uint32 bbitstreamdownmix;
++        uint32 chanrouting;
++
++        /*dedicate for sbc enc */
++        uint32 enc_subbands;
++        uint32 enc_blocks;
++        uint32 enc_snr;
++        uint32 enc_bitpool;
++        uint32 enc_chmode;
++/* end */
++    };
++}UniACodecParameter;
++
++
++/* typedef struct
++{
++    uint32 (*wma10dec_callback) (void *state, uint64 offset, uint32 * num_bytes, uint8 **ppData, void* pAppContext, uint32 *compress_payload);
++
++}UniACodecCallbackOps;
++*/
++/*********************************************************************************************************
++ *                  API Funtion Prototypes List
++ *
++ * There are mandotory and optional APIs.
++ * A core wrapper must implent the mandory APIs while need not implement the optional one.
++ * And in its DLL entry point "UniACodecInit", it shall set the not-implemented function pointers to NULL.
++ *
++ *********************************************************************************************************/
++/************************************************************************************************************
++ *
++ *               DLL entry point (mandatory) - to query ACodec interface
++ *
++ ************************************************************************************************************/
++/* prototype of entry point */
++typedef int32 (*tUniACodecQueryInterface)(uint32 id, void ** func);
++
++/*
++Every core ACodec shall implement this function and tell a specific API function pointer.
++If the queried API is not implemented, the ACodec shall set funtion pointer to NULL and return ACODEC_SUCCESS. */
++
++EXTERN int32 UniACodecQueryInterface(uint32 id, void ** func);
++
++
++/*******************************************************************
++ * Codec Version Info
++*******************************************************************/
++typedef const char * (*UniACodecVersionInfo)();
++
++/*******************************************************************
++ * Codec  Create & Delete
++*******************************************************************/
++typedef UniACodec_Handle (*UniACodecCreate)(  UniACodecMemoryOps * memOps);
++typedef UniACodec_Handle (*UniACodecCreatePlus)(  UniACodecMemoryOps * memOps, AUDIOFORMAT type);
++
++typedef int32 (*UniACodecDelete) (UniACodec_Handle pua_handle);
++
++typedef int32 (*UniACodecReset) (UniACodec_Handle pua_handle);
++
++/*******************************************************************
++ * Codec  Initializaation
++*******************************************************************/
++/*typedef int32  (*UniACodecInit) (UniACodec_Handle pua_handle,
++                                    uint8 * InputBuffer,
++                                    uint32 inputLength,
++                                    uint8 * codec_data);
++*/
++/*******************************************************************
++ * Codec Query Memory
++*******************************************************************/
++//typedef int32  (*UniACodecQueryMem) (UniACodec_Config pADec_config);
++
++/*******************************************************************
++ * Codec set  & get parameter
++*******************************************************************/
++typedef int32 (*UniACodecSetParameter) (UniACodec_Handle pua_handle, UA_ParaType ParaType, UniACodecParameter * parameter);
++
++typedef int32 (*UniACodecGetParameter) (UniACodec_Handle pua_handle, UA_ParaType ParaType, UniACodecParameter * parameter);
++
++/*******************************************************************
++ * Codec decode & encode frame
++*******************************************************************/
++typedef int32 (*UniACodec_decode_frame) (UniACodec_Handle pua_handle,
++                                         uint8 * InputBuf,
++                                         uint32 InputSize,
++                                         uint32 * offset,
++                                         uint8 ** OutputBuf,
++                                         uint32 *OutputSize);
++
++/*
++typedef int32 (*UniACodec_encode_frame) (UniACodec_Handle pua_handle,
++                                         uint8 * InputBuf,
++                                         uint32 InputLength,
++                                         uint32 * out_buf
++                                         uint32 end_flag
++                                         UA_ERROR_TYPE error_ret);
++*/
++
++typedef char * (*UniACodec_get_last_error) (UniACodec_Handle pua_handle);
++
++/*******************************************************************
++ *
++API function ID
++*******************************************************************/
++
++enum /* API function ID */
++{
++    ACODEC_API_GET_VERSION_INFO  = 0x0,
++    /* creation & deletion */
++    ACODEC_API_CREATE_CODEC     = 0x1,
++    ACODEC_API_CREATE_CODEC_PLUS  = 0x04,
++    ACODEC_API_DELETE_CODEC     = 0x2,
++    /* reset */
++    ACODEC_API_RESET_CODEC = 0x3,
++
++    /* set parameter */
++    ACODEC_API_SET_PARAMETER  = 0x10,
++    ACODEC_API_GET_PARAMETER  = 0x11,
++
++    /* process frame */
++    ACODEC_API_DEC_FRAME    = 0x20,
++    ACODEC_API_ENC_FRAME    = 0x21,
++
++    ACODEC_API_GET_LAST_ERROR = 0x1000,
++
++};
++
++
++
++#endif /* _Uni_ADEC_WRAPPER_H_ */
++
+diff --git a/ghdr/csc_api.h b/ghdr/csc_api.h
+new file mode 100755
+index 0000000..7ba29ec
+--- /dev/null
++++ b/ghdr/csc_api.h
+@@ -0,0 +1,128 @@
++/*
++ ***********************************************************************
++ * Copyright 2007-2008 by Freescale Semiconductor, Inc.
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++ ***********************************************************************
++ */
++ 
++/*
++****************************************************************************  
++ * Freescale ShangHai Video Codec Team Change History
++
++  Version    Date                   Author		     CRs                       Comments
++  01.01.00   03/Jan/2008            Bo Zhao                                  The draft version
++  01.02.00   02/Jul/2008            Bo Zhao                                  Add get viersion information API        
++****************************************************************************  
++*/
++
++/*
++*Define the API for color space conversion.
++*At this moment, only yuv4:2:0 to rgb565 supported compatible with ITU 601-5 standard.
++*/
++
++#ifndef __CSC_API_H
++#define __CSC_API_H
++
++#ifdef __cplusplus
++extern "C"{
++#endif
++
++typedef enum
++{
++	E_CSC_OK = 0,  
++	E_CSC_NOT_SUPPORTED,   		  	
++	E_CSC_UNKNOWN_ERROR         
++} eCSCRetType;
++
++typedef enum
++{
++	E_CSC_CF_420 = 0,  
++	E_CSC_CF_422, 
++	E_CSC_CF_444, 
++	E_CSC_CF_400, 		  	
++	E_CSC_CF_LAST         
++} eCSCChromFmt;
++
++typedef enum
++{
++	E_CSC_RANGE_240 = 0,  
++	E_CSC_RANGE_235, 
++	E_CSC_RANGE_255, 	  	
++	E_CSC_RANGE_LAST         
++} eCSCRange;
++
++
++typedef enum
++{
++	E_CSC_STANDARD_601 = 0,  
++	E_CSC_STANDARD_709_NTSC, 
++	E_CSC_STANDARD_709_PAL, 
++	E_CSC_STANDARD_YUV, 		  	
++	E_CSC_STANDARD_LAST         
++} eCSCStandard;
++
++typedef enum
++{
++	E_CSC_RGB565 = 0,  
++	E_CSC_RGB555, 
++	E_CSC_RGB888, 	  	
++	E_CSC_RGB_LAST         
++} eCSCRGBFmt;
++
++typedef struct tagCSCYUV
++{
++	unsigned char *pY;   /* pointer to luminance */
++	unsigned char *pU;   /* pointer to chrominance cb */
++	unsigned char *pV;   /* pointer to chrominance cr */
++	int width;       /* the image horizontal size in pixels */
++	int height;      /* the image vertical size in pixels */
++	int stride_y;    /* yuv buffer horizontal stride for luminance */
++	int stride_uv;   /* yuv buffer horizontal stride for chrominance */
++	eCSCChromFmt chrom_fmt;   /* chrominance format.*/
++	                          /* 0:                 4:2:0;     */
++	                          /* 1:                 4:2:2;     */
++	                          /* 2:                 4:4:4;     */
++	                          /* 3:                 4:0:0;     */
++	                          /* others:            reserved.  */ 
++	                  
++	eCSCRange range;          /* range of pixel value.*/
++	                          /* 0:          16-240;           */
++	                          /* 1:          16-235;           */
++	                          /* 2:          0-255;            */
++	                          /* others:     reserved.         */
++	 
++	eCSCStandard standard;    /* the international standard the sampling process compatible with */
++	                          /* 0:          ITU 601;          */
++	                          /* 1:          ITU 709 NTSC;     */
++	                          /* 2:          ITU 709 PAL;      */
++	                          /* 3:          YUV standard;     */
++	                          /* others:     reserved.         */
++               
++}CSCYUV;
++
++
++typedef struct tagCSCRGB
++{
++	void *pRGB;       /* base address of video display buffer */
++	int stride;       /* horizontal stride of the video display buffer in pixels */	
++	eCSCRGBFmt RGBfmt;       /* format of RGB */
++	                         /* 0:          RGB565;   */
++	                         /* 1:          RGB555;   */
++	                         /* 2:          RGB888;   */
++	                         /* others:     reserved. */	                  
++}CSCRGB;
++
++
++
++/* API for color space conversion */
++eCSCRetType csc_yuv2rgb( CSCYUV *pCSCYUV, CSCRGB *pCSCRGB );
++const unsigned char * csc_version_info(void);
++
++#ifdef __cplusplus
++}
++#endif
++
++
++#endif  /*__CSC_API_H*/
++
+diff --git a/ghdr/flac_dec_interface.h b/ghdr/flac_dec_interface.h
+new file mode 100755
+index 0000000..5eb576b
+--- /dev/null
++++ b/ghdr/flac_dec_interface.h
+@@ -0,0 +1,269 @@
++/*
++Copyright (C) 2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010 Josh Coalson
++
++Redistribution and use in source and binary forms, with or without
++modification, are permitted provided that the following conditions
++are met:
++
++- Redistributions of source code must retain the above copyright
++notice, this list of conditions and the following disclaimer.
++
++- Redistributions in binary form must reproduce the above copyright
++notice, this list of conditions and the following disclaimer in the
++documentation and/or other materials provided with the distribution.
++
++- Neither the name of the Xiph.org Foundation nor the names of its
++contributors may be used to endorse or promote products derived from
++this software without specific prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR
++CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
++LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
++NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++*/
++/*
++ ***********************************************************************
++ * Copyright (C) 2005-2010, 2013-2014 Freescale Semiconductor, Inc.
++ * All modifications are confidential and proprietary information
++ * of Freescale Semiconductor, Inc. ALL RIGHTS RESERVED.
++ ***********************************************************************
++ */
++ /***************************************************************************
++ *   CHANGE HISTORY
++ *   dd/mm/yy        Code Ver     Description             Author
++ *   --------        -------      -----------             ------
++ *   07/07/08         0.1 	      created file            Guo Yue
++ **************************************************************************/
++#ifndef __FLACD_DEC_INTERFACE_H_
++#define __FLACD_DEC_INTERFACE_H_
++
++#ifdef __cplusplus
++#define EXTERN extern "C"
++#else
++#define EXTERN
++#endif
++
++//#include <stdio.h>
++//#include "ordinals.h"
++//#include "../src/flac/hdr/private/global_structure.h"
++//#include "global_structure.h"
++//#include "../../../src/flac_dec/hdr/global_structure.h"
++//#include "flac/stream_decoder.h"
++
++//#define FLACD_TRUE                  1
++//#define FLACD_FALSE                 0
++//***********************************************************************
++//   Data type
++//***********************************************************************
++
++//#if !(defined(_MSC_VER) || defined(__BORLANDC__) || defined(__EMX__))
++//#include <inttypes.h>
++//#endif
++
++typedef signed char FLAC__int8;
++typedef unsigned char FLAC__uint8;
++typedef short FLAC__int16;
++typedef unsigned short FLAC__uint16;
++typedef int FLAC__int32;
++typedef unsigned int FLAC__uint32;
++#if _WIN32
++typedef __int64                 FLAC__int64;
++typedef unsigned __int64        FLAC__uint64;
++#else
++typedef long long               FLAC__int64;
++typedef unsigned long long      FLAC__uint64;
++#endif
++
++#if 0
++#if defined(_MSC_VER) || defined(__BORLANDC__)
++typedef __int16 FLAC__int16;
++typedef __int32 FLAC__int32;
++typedef __int64 FLAC__int64;
++typedef unsigned __int16 FLAC__uint16;
++typedef unsigned __int32 FLAC__uint32;
++typedef unsigned __int64 FLAC__uint64;
++#elif defined(__EMX__)
++typedef short FLAC__int16;
++typedef long FLAC__int32;
++typedef long long FLAC__int64;
++typedef unsigned short FLAC__uint16;
++typedef unsigned long FLAC__uint32;
++typedef unsigned long long FLAC__uint64;
++#else
++typedef int16_t FLAC__int16;
++typedef int32_t FLAC__int32;
++typedef int64_t FLAC__int64;
++typedef uint16_t FLAC__uint16;
++typedef uint32_t FLAC__uint32;
++typedef uint64_t FLAC__uint64;
++#endif
++#endif
++
++typedef int FLAC__bool;
++typedef FLAC__uint8 FLAC__byte;
++
++#define true 1
++#define false 0
++
++//#define NULL 0
++
++#define FLAC_MAX_NUM_MEM_REQS             1 /* presently we need seperate chunk of memory for scratch_lf */
++#define FLAC_FAST_MEMORY                  1
++#define FLAC_SLOW_MEMORY                  2
++
++/** The maximum number of channels permitted by the format. */
++#define FLAC__MAX_CHANNELS (8u)
++
++#define FLAC_INPUT_PULL_BUFFER_SIZE       (2048*sizeof(FLAC__uint32) * 8)
++#define FLAC_OUTPUT_RESIDUAL              32
++
++#define MAX_BLOCK_SIZE                    32768   // refer to format document of FLAC decoder.
++#define BS_PROTECT                        8
++#define SIZE_THRESHOLD                   (MAX_BLOCK_SIZE+BS_PROTECT)
++
++#define FLAC_INPUT_BUF_PUSH_SIZE         (MAX_BLOCK_SIZE*FLAC__MAX_CHANNELS*sizeof(FLAC__uint32))
++
++#define MAX_VORBIS_COMMENTS_SIZE     (1024)
++
++//***********************************************************************
++//  struct definition
++//***********************************************************************
++typedef enum
++{
++    FLAC_STATIC_MEM,        /* 0 for static memory */
++    FLAC_SCRATCH_MEM        /* 1 for scratch memory */
++} FLAC_MEM_DESC;
++
++typedef struct {
++	FLAC__int32		flacd_size;     /* Size in bytes */
++	FLAC__int32 	    flacd_type;	   /* Memory type Fast or Slow */
++	FLAC_MEM_DESC   flacd_mem_desc; /* to indicate if it is scratch memory */
++	FLAC__int32      flacd_priority; /* In case of fast memory, specify the priority */
++	void 	        *app_base_ptr; /* Pointer to the base memory , which will be allocated and filled by the  application */
++} FLAC_Mem_Alloc_Info_Sub;
++
++typedef struct {
++	FLAC__int32             flacd_num_reqs;
++	FLAC_Mem_Alloc_Info_Sub	mem_info_sub[FLAC_MAX_NUM_MEM_REQS];
++} FLAC_Mem_Alloc_Info;
++#if 0
++typedef enum {
++
++	FLAC__STREAM_DECODER_READ_STATUS_CONTINUE,
++	/**< The read was OK and decoding can continue. */
++
++	FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM,
++	/**< The read was attempted while at the end of the stream.  Note that
++	 * the client must only return this value when the read callback was
++	 * called when already at the end of the stream.  Otherwise, if the read
++	 * itself moves to the end of the stream, the client should still return
++	 * the data and 

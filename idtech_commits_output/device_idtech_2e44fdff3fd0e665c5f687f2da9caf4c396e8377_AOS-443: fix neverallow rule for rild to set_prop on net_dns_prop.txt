@@ -1,0 +1,31 @@
+2e44fdff George.Huang 2020-12-28
+
+AOS-443: fix neverallow rule for rild to set_prop on net_dns_prop
+
+Change-Id: Ie8518c21a30717e9a8f74bb3b6c9e029e73205ea
+
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index f236669c..1d523478 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -209,7 +209,7 @@ ro.idt.serialno                     u:object_r:vendor_default_prop:s0
+ ro.radio.noril                      u:object_r:radio_prop:s0 exact string
+ vendor.rild.                        u:object_r:radio_prop:s0
+ rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:net_dns_prop:s0
++net.eth0.                           u:object_r:radio_prop:s0
+ net.ppp0.dns1                       u:object_r:radio_prop:s0
+ net.ppp0.dns2                       u:object_r:radio_prop:s0
+ net.ppp0.local-ip                   u:object_r:radio_prop:s0
+diff --git a/imx8m/sepolicy/rild.te b/imx8m/sepolicy/rild.te
+index 0339e76e..16db1f0a 100644
+--- a/imx8m/sepolicy/rild.te
++++ b/imx8m/sepolicy/rild.te
+@@ -71,7 +71,6 @@ userdebug_or_eng(
+ )
+ # The property permissions that hardware/ril exactly used
+ set_prop(rild, radio_prop)
+-set_prop(rild, net_dns_prop)
+ get_prop(rild, exported_default_prop)
+ 
+ allow rild tty_device:chr_file rw_file_perms;

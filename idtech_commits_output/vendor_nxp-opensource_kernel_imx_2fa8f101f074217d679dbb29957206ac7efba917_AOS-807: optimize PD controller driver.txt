@@ -1,0 +1,112 @@
+2fa8f101f074 AndrewS 2022-03-18
+
+AOS-807: optimize PD controller driver
+
+clear dead battery flag to resolve dead battery limitations as
+TI FAE recommended.
+
+reset connector if DP connection detected, to makes signal
+more stable, and this will need power from another port,
+otherwise we will see device reboot, because during resetting
+connector, the power of the connector will be cut off.
+
+Change-Id: Ia1cb28b76e80f68e2ed79e1c14c859b147c3f381
+
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index bda772909840..40e163383bf2 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -35,18 +35,21 @@
+ #define TPS_REG_INT_CLEAR2		0x19
+ #define TPS_REG_STATUS			0x1a
+ #define TPS_REG_DISCOVERED_SVIDS	0x21
++#define TPS_REG_POWER_PATH_STATUS	0x26
+ #define TPS_REG_SYSTEM_CONF		0x28
+ #define TPS_REG_CTRL_CONF		0x29
+ #define TPS_REG_BOOT_STATUS		0x2d
+ #define TPS_REG_BUILD_DESC		0x2e
+ #define TPS_REG_DEVICE_INFO		0x2f
+ #define TPS_REG_POWER_STATUS		0x3f
++#define TPS_REG_PD_STATUS		0x40
+ #define TPS_REG_PD3_STATUS		0x41
+ #define TPS_REG_RX_IDENTITY_SOP 	0x48
+ #define TPS_REG_USER_VID_CONF		0x4a
+ #define TPS_REG_DATA_CONTROL		0x50
+ #define TPS_REG_DP_SID_STATUS		0x58
+ #define TPS_REG_GPIO_CONFIG		0x5c
++#define TPS_REG_DATA_STATUS		0x5f
+ #define TPS_REG_I2CMASTER_CONF		0x64
+ #define TPS_REG_EVENT_CONFIG		0x6c
+ #define TPS_REG_TX_BCDB 		0x7d
+@@ -439,6 +442,59 @@ static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
+ 	return 0;
+ }
+ 
++static int tps65994_reset_connector(struct tps65994 *tps)
++{
++	const char *cmd_dbfg = "DBfg";
++	const char *cmd_ucsi = "UCSI";
++	struct i2c_client *client = tps->i2c_client;
++	char out_data[64] = {};
++	char in_data[8] = {};
++	int ret = 0;
++	char boot_status[5] = { };
++	char data_status[5] = { };
++
++	mutex_lock(&tps->lock);
++
++	ret = tps65994_i2c_read(client, TPS_REG_BOOT_STATUS, boot_status, NULL);
++	if (ret)
++		goto out_unlock;
++
++	/* clear dead battery flag */
++	if (boot_status[0] & 0x04) {
++		ret = tps65994_exec_cmd(tps, cmd_dbfg, 0, NULL, 0, NULL);
++		if (ret)
++			goto out_unlock;
++
++		usleep_range(10000, 11000);
++	}
++
++	/* UCSI reset connector */
++	/* if DP connection detect, reset connector to makes signal more stable */
++	/* this will need power on another port, because the power from the connector */
++	/* will be cut off during reset */
++	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_DATA_STATUS,
++				data_status, NULL);
++	if (ret)
++		return ret;
++
++	if ((data_status[0] & 0x1) && (data_status[1] & 0x1)) {
++		memset(in_data, 0, sizeof(in_data));
++		in_data[0] = 0x3;
++		in_data[1] = 0x0;
++		in_data[2] = (tps->main_port) ? 0x1 : 0x2;
++		ret = tps65994_exec_cmd(tps, cmd_ucsi, 8, in_data, 1, out_data);
++		if (ret || (out_data[0] != 0)) {
++			pr_info("failed to send cmd_ucsi, ret=%d, out_data[0]=%d
+",
++					ret, out_data[0]);
++			goto out_unlock;
++		}
++	}
++
++out_unlock:
++	mutex_unlock(&tps->lock);
++	return ret;
++}
++
+ static int tps65994_dr_set(struct typec_port *port, enum typec_data_role role)
+ {
+ 	const char *cmd = (role == TYPEC_DEVICE) ? "SWUF" : "SWDF";
+@@ -1304,6 +1360,10 @@ static int tps65994_probe(struct i2c_client *client)
+ 		tps65994_check_version(tps);
+ 	}
+ 
++	ret = tps65994_reset_connector(tps);
++	if (ret)
++		return ret;
++
+ 	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS,
+ 				status, NULL);
+ 	if (ret)

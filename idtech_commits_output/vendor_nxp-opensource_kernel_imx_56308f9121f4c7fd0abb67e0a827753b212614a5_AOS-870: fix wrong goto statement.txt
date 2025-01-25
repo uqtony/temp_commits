@@ -1,0 +1,108 @@
+56308f9121f4 owen.wen 2022-02-15
+
+AOS-870: fix wrong goto statement
+
+it mix fail case of kzalloc and spi_sync
+memcpy to data will crash when kzalloc data fail
+
+Change-Id: I53870535b8037782214d012bd84be3305d6a47ef
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 2cac6a7b149e..add2945d0146 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -678,52 +678,35 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	spi_message_init(&m);
+ 	spi_message_init(&m_s);
+ 	x_init = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+-	if (x_init == NULL) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (x_init == NULL)
++		goto out;
+ 	x_init->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+-	if (!x_init->ptp_sts) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!x_init->ptp_sts)
++		goto out;
+ 	x = x_init;
+ 	x_s_init = kzalloc(sizeof(struct spi_transfer), GFP_KERNEL);
+-	if (x_s_init == NULL) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (x_s_init == NULL)
++		goto out;
+ 	x_s_init->ptp_sts = kzalloc(sizeof(struct ptp_system_timestamp), GFP_KERNEL);
+-	if (!x_s_init->ptp_sts) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!x_s_init->ptp_sts)
++		goto out;
+ 	x_s = x_s_init;
+ 	idg_tx = kzalloc(BASE_READ_SIZE, GFP_KERNEL);
+-	if (!idg_tx) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!idg_tx)
++		goto out;
+ 	idg_rx = kzalloc(BASE_READ_SIZE, GFP_KERNEL);
+-	if (!idg_rx) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!idg_rx)
++		goto out;
+ 	idg_tx_s = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+-	if (!idg_tx_s) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!idg_tx_s)
++		goto out;
+ 	idg_rx_s = kzalloc(MAX_BUFFER_SIZE, GFP_KERNEL);
+-	if (!idg_rx_s) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!idg_rx_s)
++		goto out;
+ 	data = kzalloc(BASE_READ_SIZE + MAX_BUFFER_SIZE, GFP_KERNEL);
+-	if (!data) {
+-		status = -ENOMEM;
+-		goto spi_report_out;
+-	}
++	if (!data)
++		goto out;
++
+ 	spin_lock_irq(&idg_dev->spi_lock);
+ 	spi = spi_dev_get(idg_dev->spi_dev);
+ 	spin_unlock_irq(&idg_dev->spi_lock);
+@@ -744,7 +727,6 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 	status = spi_sync(spi, &m);
+ 	mutex_unlock(&idg_dev->lock);
+ 	dev_dbg(&spi->dev, "first read (16 bytes)
+");
+-spi_report_out:
+ 	if (!status) {
+ 		memcpy(data, idg_rx, BASE_READ_SIZE);
+ 		idg_size = data[IDG_SIZE_MSB] << 8;
+@@ -958,8 +940,11 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 			fifo_add_msg(idg_dev->v2_fifo, data);
+ 		}
+ 	}
+-	kfree(x_init->ptp_sts);
+-	kfree(x_init);
++out:
++	if (x_init->ptp_sts != NULL)
++		kfree(x_init->ptp_sts);
++	if (x_init != NULL)
++		kfree(x_init);
+ 	if (x_s_init != NULL) {
+ 		kfree(x_s_init->ptp_sts);
+ 		kfree(x_s_init);

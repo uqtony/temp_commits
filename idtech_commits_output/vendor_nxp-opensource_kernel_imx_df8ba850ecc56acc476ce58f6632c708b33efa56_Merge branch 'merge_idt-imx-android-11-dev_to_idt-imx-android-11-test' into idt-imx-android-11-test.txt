@@ -1,0 +1,78 @@
+df8ba850ecc5 jenkins 2021-05-17
+
+Merge branch 'merge_idt-imx-android-11-dev_to_idt-imx-android-11-test' into idt-imx-android-11-test
+
+Change-Id: I9426b4c7fdb8ed18da0262245d75cd05d0322a51
+
+diff --cc arch/arm64/boot/dts/freescale/Makefile
+index 609b5869b1d6,6b6dca6ba4ab..1f6bf0ab60ff
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@@ -215,4 -192,10 +215,14 @@@ dtb-$(CONFIG_ARCH_MXC) += idt_imx8mq_ev
+  			 idt_a300_evt-0_devboard_evt-1_ktc4g.dtb \
+  			 idt_imx8mp_evt-0_evk_evk-0_mic6g.dtb \
+  			 idt_imx8mp_evt-0_evk_ov5640-0_mic6g.dtb \
+++<<<<<<< HEAD
+ +			 idt_imx8mq_evt-0_ibr210_evt-0_mic3g.dtb
+++=======
++ 			 idt_imx8mq_evt-0_ibr210_evt-0_mic3g.dtb \
++ 			 idt_imx8mq_evt-0_ibr210_hdmi-0_mic3g.dtb
++ 
++ 
++ dtb-$(CONFIG_ARCH_S32) += s32v234-evb.dtb \
++ 			  s32v234-sbc.dtb
++ 
+++>>>>>>> merge_idt-imx-android-11-dev_to_idt-imx-android-11-test
+diff --cc drivers/pci/controller/dwc/pci-imx6.c
+index 11f2b1ab7d36,3d7e0eeec5b4..9136a4110bc7
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@@ -1905,8 -1914,24 +1905,29 @@@ static int imx6_pcie_host_init(struct p
+  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pci);
+  
+++<<<<<<< HEAD
+ +	if (gpio_is_valid(imx6_pcie->dis_gpio))
+ +		gpio_set_value_cansleep(imx6_pcie->dis_gpio, 1);
+++=======
++ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++ 		/*
++ 		 * Configure the msi_data to 64Kbytes alignment, since
++ 		 * the 64Kbytes alignment are mandatory required by some
++ 		 * iMX PCIe inbound/outbound regions.
++ 		 */
++ 		pp->msi_data = (u64)(pp->cfg1_base + pp->cfg1_size);
++ 		if (pp->io)
++ 			pp->msi_data += pp->io_size;
++ 		if (pp->msi_data & (SZ_64K - 1))
++ 			pp->msi_data = ALIGN(pp->msi_data, SZ_64K);
++ 		/* Program the msi_data */
++ 		dw_pcie_writel_dbi(pci, PCIE_MSI_ADDR_LO,
++ 				   lower_32_bits(pp->msi_data));
++ 		dw_pcie_writel_dbi(pci, PCIE_MSI_ADDR_HI,
++ 				   upper_32_bits(pp->msi_data));
++ 	}
++ 
+++>>>>>>> merge_idt-imx-android-11-dev_to_idt-imx-android-11-test
+  	dw_pcie_setup_rc(pp);
+  	pci_imx_set_msi_en(pp);
+  	if (imx6_pcie_establish_link(imx6_pcie))
+diff --cc sound/soc/fsl/imx-tlv320aic31xx.c
+index 1c77d35152a0,4409cbac2256..409c2ced3aa5
+--- a/sound/soc/fsl/imx-tlv320aic31xx.c
++++ b/sound/soc/fsl/imx-tlv320aic31xx.c
+@@@ -27,11 -35,11 +35,12 @@@ struct imx_tlv320aic31xx_data 
+  static int imx_tlv320aic31xx_dai_init(struct snd_soc_pcm_runtime *rtd)
+  {
+  	struct imx_tlv320aic31xx_data *data = snd_soc_card_get_drvdata(rtd->card);
++ 	struct snd_soc_component *component = rtd->codec_dai->component;
+  	struct device *dev = rtd->card->dev;
+ +	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+  	int ret;
+  
+ -	ret = snd_soc_dai_set_sysclk(rtd->codec_dai, AIC31XX_PLL_CLKIN_MCLK,
+ +	ret = snd_soc_dai_set_sysclk(codec_dai, AIC31XX_PLL_CLKIN_MCLK,
+  				     data->clk_frequency, SND_SOC_CLOCK_IN);
+  	if (ret) {
+  		dev_err(dev, "could not set codec driver set_sysclk params
+");

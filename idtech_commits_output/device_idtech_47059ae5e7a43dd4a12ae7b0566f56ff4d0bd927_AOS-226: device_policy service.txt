@@ -1,0 +1,67 @@
+47059ae5 owen.wen 2020-06-30
+
+AOS-226: device_policy service
+
+create device_policy service, which will be triggered once boot complete
+and set device admin app as device owner
+
+Change-Id: I8143b39b151e2152361ca5e767fba50d2b665b3a
+
+diff --git a/imx8m/device_policy.sh b/imx8m/device_policy.sh
+new file mode 100644
+index 00000000..887e3efb
+--- /dev/null
++++ b/imx8m/device_policy.sh
+@@ -0,0 +1,6 @@
++#!/system/bin/sh
++
++device_owner=$(getprop ro.device_owner)
++if [ "$device_owner" != "true" ]; then
++    dpm set-device-owner com.idtech.deviceadmin/com.idtech.deviceadmin.AdminReceiver
++fi
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+index e104f9f5..0de5a58a 100644
+--- a/imx8m/init.idt.common.rc
++++ b/imx8m/init.idt.common.rc
+@@ -16,3 +16,13 @@ service check_modem /system/bin/sh /product/etc/init/hw/check_modem.sh "check_mo
+     seclabel u:r:shell:s0
+     writepid /dev/cpuset/system-background/tasks
+ 
++service device_policy /system/bin/sh /product/etc/init/hw/device_policy.sh
++    oneshot
++    disabled
++    user shell
++    group root shell
++    seclabel u:r:shell:s0
++    writepid /dev/cpuset/system-background/tasks
++
++on property:sys.boot_completed=1
++    start device_policy
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index e1e0e364..793ed98b 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -85,7 +85,8 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/device_owner_2.xml \
+     device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
+     device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
+-    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/imx8m/device_policy.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/device_policy.sh
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 67043ade..9bbc1882 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -79,7 +79,8 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
+     device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
+     device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
+-    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img \
++    device/idtech/imx8m/device_policy.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/device_policy.sh
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \

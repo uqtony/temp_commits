@@ -1,0 +1,114 @@
+ee588d24 George.Huang 2022-03-16
+
+AOS-940: fix avc denies from android-12.0.0_1.0.0
+
+There are still 2 remaining problems:
+- one setting for platform_app is removed and need to be recheck
+  -typeattribute platform_app mlstrustedsubject
+  (commit 559ff300 AOS-294: Add policy of SELinux for bootanim and bootmedia app)
+
+- vendor_default_prop is never allowed by system_app/platform_app
+  avc: denied { getattr } for comm="RenderThread" path="/dev/__properties__/u:object_r:vendor_default_prop:s0"
+  dev="tmpfs" ino=290 scontext=u:r:system_app:s0 tcontext=u:object_r:vendor_default_prop:s0 tclass=file
+
+Change-Id: Icbbe8ff728ee30222c80b980e21c5d85d521b0ab
+
+diff --git a/imx8m/redwood_8mq/sepolicy/file_contexts b/imx8m/redwood_8mq/sepolicy/file_contexts
+index a4bd94b8..7ec3c206 100644
+--- a/imx8m/redwood_8mq/sepolicy/file_contexts
++++ b/imx8m/redwood_8mq/sepolicy/file_contexts
+@@ -22,10 +22,11 @@
+ # android.system.suspend@1.0-service
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
+-/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?             u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.[0-1].auto/wakeup/wakeup[0-9]*(/.*)?         u:object_r:sysfs_wakeup:s0
+ /sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
+ /sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                          u:object_r:sysfs_wakeup:s0
+ /sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0024/power_supply/tps65994-source-psy-0-0024/wakeup[0-9]*(/.*)?                     u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0050/power_supply/tcpm-source-psy-0-0050/wakeup[0-9]*(/.*)?                         u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30a20000.i2c/i2c-0/0-0020/power_supply/tps65994-source-psy-0-0020/wakeup[0-9]*(/.*)?                     u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                            u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/sepolicy/hal_camera_default.te b/imx8m/sepolicy/hal_camera_default.te
+index cf395de6..892eef3c 100644
+--- a/imx8m/sepolicy/hal_camera_default.te
++++ b/imx8m/sepolicy/hal_camera_default.te
+@@ -8,6 +8,7 @@ allow hal_camera_default hal_graphics_mapper_hwservice:hwservice_manager find;
+ allow hal_camera_default opencl_cache_file:dir create_dir_perms;
+ allow hal_camera_default opencl_cache_file:file create_file_perms;
+ allow hal_camera_default dmabuf_heap_device:chr_file {ioctl read open };
++allow hal_camera_default system_data_file:dir { search };
+ 
+ set_prop(hal_camera_default, vendor_camera_prop)
+ get_prop(hal_camera_default, vendor_camera_prop)
+diff --git a/imx8m/sepolicy/kernel.te b/imx8m/sepolicy/kernel.te
+index d212fca3..51a612fd 100644
+--- a/imx8m/sepolicy/kernel.te
++++ b/imx8m/sepolicy/kernel.te
+@@ -10,7 +10,8 @@ allow kernel vendor_file:file { read open map };
+ allow kernel rootfs:file { execute };
+ allow kernel vendor_configs_file:file { map };
+ allow kernel vold_data_file:file { write };
+-dontaudit kernel device:blk_file { create };
++allow kernel device:blk_file { getattr };
++dontaudit kernel device:blk_file { create setattr unlink };
+ 
+ allow kernel shell_exec:file { read open execute map getattr };
+ domain_auto_trans(kernel, shell_exec, ueventd)
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index 3d8aa943..a2068f89 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -1,4 +1,3 @@
+-typeattribute platform_app mlstrustedsubject;
+ typeattribute platform_app system_writes_vendor_properties_violators;
+ typeattribute platform_app system_writes_mnt_vendor_violators;
+ 
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 7b9dabf5..53ed1067 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -210,6 +210,9 @@ back_camera_orient                  u:object_r:vendor_public_default_prop:s0
+ front_camera_name                   u:object_r:vendor_public_default_prop:s0
+ front_camera_orient                 u:object_r:vendor_public_default_prop:s0
+ ro.rfkilldisabled                   u:object_r:vendor_public_default_prop:s0
++ro.support_one_handed_mode          u:object_r:vendor_public_default_prop:s0
++ro.boot.idt_orientation             u:object_r:vendor_public_default_prop:s0
++ro.boot.idt_display_id              u:object_r:vendor_public_default_prop:s0
+ 
+ # serial number for mdnsd broadcast
+ ro.idt.serialno                     u:object_r:vendor_public_default_prop:s0
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index 9cb7062e..d3f484c0 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -19,5 +19,7 @@ allow system_app media_rw_data_file:file relabelto;
+ allow system_app idtech_orientation_data_file:file { create_file_perms rw_file_perms };
+ allow system_app idg_device:chr_file { open getattr read write };
+ 
++get_prop(system_app, provisioned_prop)
+ get_prop(system_app, vendor_public_default_prop)
+ set_prop(system_app, vendor_idtech_prop)
++set_prop(system_app, bootanim_system_prop)
+diff --git a/imx8m/sepolicy/system_server.te b/imx8m/sepolicy/system_server.te
+index 2d6cdd00..fa681d10 100644
+--- a/imx8m/sepolicy/system_server.te
++++ b/imx8m/sepolicy/system_server.te
+@@ -28,5 +28,6 @@ allow system_server graphics_device:dir { search };
+ allow system_server graphics_device:chr_file { open read ioctl };
+ allow system_server sysfs_extcon:file { getattr open read };
+ allow system_server hal_graphics_allocator_default_tmpfs:file { getattr read write};
++allow system_server sysfs_batteryinfo:dir { read open };
+ 
+ get_prop(system_server, usb_notify_prop)
+diff --git a/imx8m/sepolicy/vold.te b/imx8m/sepolicy/vold.te
+index bcbe7e43..7efcf485 100644
+--- a/imx8m/sepolicy/vold.te
++++ b/imx8m/sepolicy/vold.te
+@@ -3,3 +3,5 @@ allow vold proc_swaps:file { read open getattr };
+ allow vold sysfs_block_devices:file {write};
+ allow vold idtechdata_block_device:blk_file rw_file_perms;
+ allow vold sysfs_usb_uevent:file write;
++allow vold ram_device:blk_file { getattr };
++allow vold idtech_data_file:dir { r_file_perms };

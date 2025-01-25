@@ -1,0 +1,221 @@
+f45f75562 max.yang 2020-08-26
+
+AOS-218: [post sign] Signing script for post process
+
+  1. gather test signing images in target file TEST_SIGN folder
+     we need signed images that already contain csf binaries that
+     we could extract and replace cert/signature.
+  2. output to TOSIGN folder which need to send to CA server:
+     - vbmeta.img-partial, vemeta.img-to_sign
+     - bootloader/spl/u-boot csf/img tosign files
+
+Change-Id: If7b98ef974b72623a51ea7bf360458060343e95a
+
+diff --git a/core/Makefile b/core/Makefile
+index 61e11e149..e398b1e4e 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4211,6 +4211,9 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl.img
+ 	# backup spl images for ota update
+ 	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl_bak.img
++	# gather signed bootloader images used for post signing process
++	$(hide) mkdir -p $(zip_root)/TEST_SIGN
++	cp $(PRODUCT_OUT)/*signed* $(zip_root)/TEST_SIGN/
+ 
+ 	@# The radio images in BOARD_PACK_RADIOIMAGES will be additionally copied from RADIO/ into
+ 	@# IMAGES/, which then will be added into <product>-img.zip. Such images must be listed in
+diff --git a/tools/releasetools/idt_post_sign_target_file.py b/tools/releasetools/idt_post_sign_target_file.py
+new file mode 100644
+index 000000000..961f7ea33
+--- /dev/null
++++ b/tools/releasetools/idt_post_sign_target_file.py
+@@ -0,0 +1,185 @@
++import base64
++import os
++import sys
++import re
++import common
++import copy
++import stat
++import zipfile
++import subprocess
++import tempfile
++import shutil
++import add_img_to_target_files
++import sign_target_files_apks
++from xml.etree import ElementTree
++
++idt_key_map = {}
++#TODO: replace cert path once we get it
++idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING"
++
++def IDTReplaceCert(data):
++  for old, new in idt_key_map.iteritems():
++    print("    Replacing %s.x509.pem with %s.x509.pem" % (old, new))
++    try:
++      with open(old + ".x509.pem") as old_fp:
++        old_cert16 = base64.b16encode(
++            common.ParseCertificate(old_fp.read())).lower()
++      with open(new + ".x509.pem") as new_fp:
++        new_cert16 = base64.b16encode(
++            common.ParseCertificate(new_fp.read())).lower()
++    except IOError as e:
++        print("    Error accessing %s: %s.
+Skip replacing %s.x509.pem with "
++                "%s.x509.pem." % (e.filename, e.strerror, old, new))
++        continue
++
++    # Only match entire certs.
++    pattern = "\b" + old_cert16 + "\b"
++    (data, num) = re.subn(pattern, new_cert16, data, flags=re.IGNORECASE)
++    print("    Replaced %d occurence(s) of %s.x509.pem with %s.x509.pem" % (num, old, new))
++
++  root = ElementTree.fromstring(data)
++  signatures = [signer.attrib['signature'] for signer in root.findall('signer')]
++  assert len(signatures) == len(set(signatures)), \
++      "Found duplicate entries after cert replacement: {}".format(data)
++
++  return data
++
++def IDTBuildKeyMap(misc_info):
++  devkey = misc_info.get("default_system_dev_certificate",
++                         "build/target/product/security/testkey")
++  devkeydir = os.path.dirname(devkey)
++  idt_key_map.update({
++      devkeydir + "/testkey":  idt_cert_dir + "/releasekey",
++      devkeydir + "/devkey":   idt_cert_dir + "/releasekey",
++      devkeydir + "/media":    idt_cert_dir + "/media",
++      devkeydir + "/shared":   idt_cert_dir + "/shared",
++      devkeydir + "/platform": idt_cert_dir + "/platform",
++      })
++
++def pack_file_tosign(output_zip, file_path, out_info=None):
++  if out_info is None:
++    out_info = "TOSIGN/" + os.path.basename(file_path)
++  else:
++    out_info = "TOSIGN/" + out_info
++  with open(file_path, 'r') as f:
++    data = f.read()
++  common.ZipWriteStr(output_zip, out_info, data)
++
++def main(argv):
++  input_zip = zipfile.ZipFile(argv[0], "r")
++  output_zip = zipfile.ZipFile(argv[1], "w",
++                               compression=zipfile.ZIP_DEFLATED,
++                               allowZip64=True)
++
++  misc_info = common.LoadInfoDict(input_zip)
++  IDTBuildKeyMap(misc_info)
++
++  for info in input_zip.infolist():
++    filename = info.filename
++
++    # remove existing images that needs to replace keys
++    if filename.startswith("IMAGES/system") \
++        or filename.startswith("IMAGES/vendor") \
++        or filename.startswith("IMAGES/product") \
++        or filename.startswith("IMAGES/vbmeta"):
++      print('skipping: {}'.format(filename))
++      continue
++
++    # replace necessary certs under /SYSTEM /VENDOR /PRODUCT
++    data = input_zip.read(filename)
++    out_info = copy.copy(info)
++    if filename in ("SYSTEM/build.prop",
++                    "VENDOR/build.prop",
++                    "SYSTEM/vendor/build.prop",
++                    "ODM/build.prop",  # legacy
++                    "ODM/etc/build.prop",
++                    "VENDOR/odm/build.prop",  # legacy
++                    "VENDOR/odm/etc/build.prop",
++                    "PRODUCT/build.prop",
++                    "SYSTEM/product/build.prop",
++                    "PRODUCT_SERVICES/build.prop",
++                    "SYSTEM/product_services/build.prop",
++                    "SYSTEM/etc/prop.default",
++                    "BOOT/RAMDISK/prop.default",
++                    "BOOT/RAMDISK/default.prop",  # legacy
++                    "ROOT/default.prop",  # legacy
++                    "RECOVERY/RAMDISK/prop.default",
++                    "RECOVERY/RAMDISK/default.prop"):  # legacy
++      print("Rewriting {}".format(filename))
++      if stat.S_ISLNK(info.external_attr >> 16):
++        new_data = data
++      else:
++        new_data = sign_target_files_apks.RewriteProps(data)
++      common.ZipWriteStr(output_zip, out_info, new_data)
++
++    # Replace the certs in *mac_permissions.xml (there could be multiple, such
++    # as {system,vendor}/etc/selinux/{plat,nonplat}_mac_permissions.xml).
++    elif filename.endswith("mac_permissions.xml"):
++      print("Rewriting %s with new keys." % (filename,))
++      new_data = IDTReplaceCert(data)
++      common.ZipWriteStr(output_zip, out_info, new_data)
++
++    #TODO: replace OTA certs
++
++    # Skip the care_map as we will regenerate the system/vendor images.
++    elif filename == "META/care_map.pb" or filename == "META/care_map.txt":
++      pass
++
++    # Copy for all files no need to deal with
++    else:
++      common.ZipWriteStr(output_zip, out_info, data)
++
++  common.ZipClose(output_zip)
++
++  # Create new release images: system/product/vendor release version
++  new_args = ["--is_signing", "--rebuild_recovery", "--add_missing"]
++  new_args.append(argv[1])
++  add_img_to_target_files.main(new_args)
++
++  # create vbmeta to_sign data
++  output_zip = zipfile.ZipFile(argv[1], "a",
++                               compression=zipfile.ZIP_DEFLATED,
++                               allowZip64=True)
++  tmp_dir = tempfile.mkdtemp()
++  output_zip.extract("IMAGES/vbmeta.img", tmp_dir)
++  for info in output_zip.namelist():
++    if info.startswith("TEST_SIGN"):
++      output_zip.extract(info, tmp_dir)
++
++  p = subprocess.Popen(
++      ['python', './build/tools/releasetools/post_sign_vbmeta.py', 'extract_sign_data', '--image', tmp_dir + "/IMAGES/vbmeta.img"])
++  retcode = p.wait()
++  if retcode != 0:
++    raise ValueError('Error generating vbmeta to sign file, abort script')
++  pack_file_tosign(output_zip, tmp_dir + "/IMAGES/vbmeta.img-partial")
++  pack_file_tosign(output_zip, tmp_dir + "/IMAGES/vbmeta.img-to_sign")
++
++  for file in os.listdir(tmp_dir + "/TEST_SIGN"):
++    img_path = os.path.join(tmp_dir, "TEST_SIGN", file)
++
++    # create bootloader to_sign data
++    p = subprocess.Popen(
++        ['python', './post_sign_bootloader.py', 'extract_sign_data', '--image', img_path], cwd="./vendor/idtech/cst/")
++    retcode = p.wait()
++    if retcode != 0:
++      raise ValueError('Error generating bootloader to sign file, abort script')
++
++    if file.startswith("spl") or file.startswith("u-boot"):
++      pack_file_tosign(output_zip, "./vendor/idtech/cst/" + "spl_csf_tosign", file + "-spl_csf_tosign")
++      pack_file_tosign(output_zip, "./vendor/idtech/cst/" + "spl_img_tosign", file + "-spl_img_tosign")
++    if file.startswith("bootloader") or file.startswith("u-boot"):
++      pack_file_tosign(output_zip, "./vendor/idtech/cst/" + "fit_csf_tosign", file + "-fit_csf_tosign")
++      pack_file_tosign(output_zip, "./vendor/idtech/cst/" + "fit_img_tosign", file + "-fit_img_tosign")
++
++  shutil.rmtree(tmp_dir)
++  common.ZipClose(input_zip)
++  common.ZipClose(output_zip)
++
++  print("Done")
++
++if __name__ == '__main__':
++  try:
++    main(sys.argv[1:])
++  except Exception as e:
++    print("
+   ERROR: %s
+" % (e,))
++    sys.exit(1)

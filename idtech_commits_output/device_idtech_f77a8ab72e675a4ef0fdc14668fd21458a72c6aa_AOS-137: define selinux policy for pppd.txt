@@ -1,0 +1,520 @@
+f77a8ab7 owen.wen 2020-07-14
+
+AOS-137: define selinux policy for pppd
+
+avc:  granted  { set } for property=net.ppp0.dns2 pid=2196 uid=0 gid=1001 scontext=u:r:rild:s0 tcontext=u:object_r:net_radio_prop:s0 tclass=property_service
+avc:  granted  { set } for property=net.ppp0.local-ip pid=2197 uid=0 gid=1001 scontext=u:r:rild:s0 tcontext=u:object_r:net_radio_prop:s0 tclass=property_service
+avc:  granted  { set } for property=net.ppp0.remote-ip pid=2198 uid=0 gid=1001 scontext=u:r:rild:s0 tcontext=u:object_r:net_radio_prop:s0 tclass=property_service
+avc:  granted  { set } for property=net.ppp0.gw pid=2199 uid=0 gid=1001 scontext=u:r:rild:s0 tcontext=u:object_r:net_radio_prop:s0 tclass=property_service
+fixed by below 4 rule
+net.ppp0.dns2                       u:object_r:radio_prop:s0
+net.ppp0.local-ip                   u:object_r:radio_prop:s0
+net.ppp0.remote-ip                  u:object_r:radio_prop:s0
+net.ppp0.gw                         u:object_r:radio_prop:s0
+
+avc: denied { getattr } for comm="sh" path="/system/bin/toybox" dev="dm-0" ino=589 scontext=u:r:rild:s0 tcontext=u:object_r:toolbox_exec:s0 tclass=file permissive=1
+fix by below rule
+allow rild toolbox_exec:file getattr;
+
+avc: denied { use } for path="pipe:[16796]" dev="pipefs" ino=16796 scontext=u:r:ppp:s0 tcontext=u:r:rild:s0 tclass=fd permissive=0
+avc: denied { read write } for comm="pppd" path="socket:[16233]" dev="sockfs" ino=16233 scontext=u:r:ppp:s0 tcontext=u:r:rild:s0 tclass=unix_stream_socket permissive=0
+avc: denied { write } for comm="pppd" path="pipe:[16227]" dev="pipefs" ino=16227 scontext=u:r:ppp:s0 tcontext=u:r:rild:s0 tclass=fifo_file permissive=0
+avc: denied { dac_override } for comm="pppd" capability=1 scontext=u:r:rild:s0 tcontext=u:r:rild:s0 tclass=capability permissive=0
+avc: denied { setgid } for comm="pppd" capability=6 scontext=u:r:ppp:s0 tcontext=u:r:ppp:s0 tclass=capability permissive=0
+avc: denied { setuid } for comm="pppd" capability=7 scontext=u:r:ppp:s0 tcontext=u:r:ppp:s0 tclass=capability permissive=0
+avc: denied { getattr } for comm="ip-up" path="/postinstall" dev="dm-0" ino=46 scontext=u:r:ppp:s0 tcontext=u:object_r:postinstall_mnt_dir:s0 tclass=dir permissive=0
+avc: denied { getattr } for path="/system/bin/toybox" dev="mmcblk0p9" ino=589 scontext=u:r:ppp:s0 tcontext=u:object_r:toolbox_exec:s0 tclass=file permissive=0
+avc: denied { execute_no_trans } for path="/system/etc/ppp/ip-up" dev="mmcblk0p9" ino=755 scontext=u:r:ppp:s0 tcontext=u:object_r:ppp_exec:s0 tclass=file permissive=0
+avc: denied { read } for comm="sh" name="/" dev="dm-0" ino=2 scontext=u:r:ppp:s0 tcontext=u:object_r:rootfs:s0 tclass=dir permissive=0
+avc: denied { open } for comm="sh" path="/" dev="dm-0" ino=2 scontext=u:r:ppp:s0 tcontext=u:object_r:rootfs:s0 tclass=dir permissive=0
+avc: denied { read } for comm="ip-up" name="bin" dev="mmcblk0p14" ino=29 scontext=u:r:ppp:s0 tcontext=u:object_r:vendor_file:s0 tclass=dir permissive=0
+avc: denied { getattr } for comm="sh" path="/system/bin/toybox" dev="mmcblk0p9" ino=589 scontext=u:r:ppp:s0 tcontext=u:object_r:toolbox_exec:s0 tclass=file permissive=0
+avc: denied { execute } for comm="sh" name="toybox" dev="mmcblk0p9" ino=589 scontext=u:r:ppp:s0 tcontext=u:object_r:toolbox_exec:s0 tclass=file permissive=0
+avc: denied { read } for comm="ip-up" name="tmp" dev="mmcblk0p18" ino=392450 scontext=u:r:ppp:s0 tcontext=u:object_r:shell_data_file:s0 tclass=dir permissive=0
+avc: denied { execute_no_trans } for comm="sh" path="/system/bin/toybox" dev="mmcblk0p9" ino=589 scontext=u:r:ppp:s0 tcontext=u:object_r:toolbox_exec:s0 tclass=file permissive=0
+avc: denied { write } for comm="setprop" name="property_service" dev="tmpfs" ino=10736 scontext=u:r:ppp:s0 tcontext=u:object_r:property_socket:s0 tclass=sock_file permissive=0
+avc: denied { connectto } for comm="setprop" path="/dev/socket/property_service" scontext=u:r:ppp:s0 tcontext=u:r:init:s0 tclass=unix_stream_socket permissive=0
+fix by below rules
+allow ppp rild:fd use;
+allow ppp rild:unix_stream_socket { read write };
+allow ppp rild:fifo_file { read write };
+allow ppp self:capability { setgid setuid };
+allow ppp postinstall_mnt_dir:dir getattr;
+allow ppp ppp_exec:file execute_no_trans;
+allow ppp rootfs:dir { open read };
+allow ppp shell_exec:file { execute_no_trans getattr map open read execute };
+allow ppp vendor_file:dir read;
+allow ppp toolbox_exec:file { getattr execute open read execute_no_trans map };
+allow ppp init:unix_stream_socket connectto;
+allow ppp property_socket:sock_file write;
+allow ppp radio_prop:property_service set;
+allow ppp shell_data_file:dir { getattr read };
+allow ppp system_data_file:dir read;
+
+avc: denied { dac_read_search } for comm="ip-up" capability=2 scontext=u:r:ppp:s0 tcontext=u:r:ppp:s0 tclass=capability permissive=0
+above error message is not resolved since it is neverallow rule
+allow ppp self:capability { dac_override dac_read_search };
+
+Change-Id: I140575142bba6df600737ec0b437b1f7c9158991
+
+diff --git a/imx8m/evk_a100/sepolicy/device.te b/imx8m/evk_a100/sepolicy/device.te
+deleted file mode 100644
+index 91ac6479..00000000
+--- a/imx8m/evk_a100/sepolicy/device.te
++++ /dev/null
+@@ -1 +0,0 @@
+-type rild_device, dev_type;
+diff --git a/imx8m/evk_a100/sepolicy/file_contexts b/imx8m/evk_a100/sepolicy/file_contexts
+index 2c8110ba..a2ed0b69 100644
+--- a/imx8m/evk_a100/sepolicy/file_contexts
++++ b/imx8m/evk_a100/sepolicy/file_contexts
+@@ -42,10 +42,3 @@
+ #Neural Network HAL service
+ /vendor/bin/hw/android\.hardware\.neuralnetworks@1\.2-service-vsi-npu-server      u:object_r:hal_neuralnetworks_imx_exec:s0
+ 
+-#quectel port
+-/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+-/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+-/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+-#/system/socket/rild              u:object_r:rild_socket:s0
+-#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+-/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/evk_a100/sepolicy/property_contexts b/imx8m/evk_a100/sepolicy/property_contexts
+deleted file mode 100644
+index 2e0ec0f1..00000000
+--- a/imx8m/evk_a100/sepolicy/property_contexts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-vendor.rild.                        u:object_r:radio_prop:s0
+-rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/evk_a100/sepolicy/rild.te b/imx8m/evk_a100/sepolicy/rild.te
+deleted file mode 100644
+index 6efa9e26..00000000
+--- a/imx8m/evk_a100/sepolicy/rild.te
++++ /dev/null
+@@ -1,83 +0,0 @@
+-# rild - radio interface layer daemon
+-#type rild, domain;
+-#hal_server_domain(rild, hal_telephony)
+-#net_domain(rild)
+-
+-# type_transition must be private policy the domain_trans rules could stay
+-# public, but conceptually should go with this
+-#type rild_exec, exec_type, vendor_file_type, file_type;
+-#init_daemon_domain(rild)
+-typeattribute rild vendor_executes_system_violators;
+-
+-allow rild init:dir { search read open };
+-allow rild init:lnk_file read;
+-allow rild init:file read;
+-allow rild kernel:dir search;
+-allow rild kernel:system module_request;
+-allow rild kernel:lnk_file read;
+-allow rild kernel:file read;
+-allow rild rild_device:chr_file { read write ioctl open getattr create };
+-allow rild ppp_device:chr_file { read write ioctl open };
+-allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+-allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+-allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+-allow rild sysfs_wake_lock:file { open read write };
+-allow rild system_file:file { read open getattr execute_no_trans };
+-allow rild sysfs:file write;
+-allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild device:dir { write add_name };
+-allow rild rootfs:dir { read open };
+-allow rild hwservicemanager:dir search;
+-allow rild hwservicemanager:file read;
+-allow rild hwservicemanager:lnk_file read;
+-allow rild logd:dir { search read open };
+-allow rild logd:file read;
+-allow rild logd:lnk_file read;
+-allow rild servicemanager:dir { search read };
+-allow rild servicemanager:file read;
+-allow rild servicemanager:lnk_file read;
+-allow rild ueventd:dir { search read open };
+-allow rild ueventd:file read;
+-allow rild ueventd:lnk_file read;
+-allow rild vendor_init:dir { search read open };
+-allow rild vendor_init:lnk_file read;
+-allow rild vendor_init:file read;
+-allow rild vndservicemanager:dir search;
+-allow rild vndservicemanager:file read;
+-allow rild vndservicemanager:lnk_file read;
+-allow rild watchdogd:dir search;
+-allow rild watchdogd:lnk_file read;
+-allow rild watchdogd:file read;
+-allow rild watchdogd:dir { read open };
+-allow rild hal_bootctl_default:dir search;
+-allow rild hal_bootctl_default:lnk_file read;
+-allow rild hal_keymaster_default:dir search;
+-allow rild vold:dir search;
+-
+-# property service
+-# The property permissions that Quectel requested, but too over
+-#set_prop(rild, net_radio_prop)
+-#set_prop(rild, default_prop)
+-#set_prop(rild, system_prop)
+-# TODO: remove auditallow once if rild related functions are fully tested.
+-userdebug_or_eng(
+-  auditallow rild net_radio_prop:property_service set;
+-  auditallow rild default_prop:property_service set;
+-  auditallow rild system_prop:property_service set;
+-)
+-# The property permissions that hardware/ril exactly used
+-set_prop(rild, radio_prop)
+-set_prop(rild, net_dns_prop)
+-get_prop(rild, exported_default_prop)
+-
+-allow rild tty_device:chr_file rw_file_perms;
+-
+-# Allow rild to create and use netlink sockets.
+-allow rild self:netlink_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_generic_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+-
+-# Access to wake locks
+-wakelock_use(rild)
+-
+-allow rild self:socket create_socket_perms_no_ioctl;
+diff --git a/imx8m/evk_a300/sepolicy/device.te b/imx8m/evk_a300/sepolicy/device.te
+deleted file mode 100644
+index 91ac6479..00000000
+--- a/imx8m/evk_a300/sepolicy/device.te
++++ /dev/null
+@@ -1 +0,0 @@
+-type rild_device, dev_type;
+diff --git a/imx8m/evk_a300/sepolicy/file_contexts b/imx8m/evk_a300/sepolicy/file_contexts
+index de5b0024..4245813d 100644
+--- a/imx8m/evk_a300/sepolicy/file_contexts
++++ b/imx8m/evk_a300/sepolicy/file_contexts
+@@ -42,10 +42,3 @@
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+ 
+-#quectel port
+-/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+-/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+-/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+-#/system/socket/rild              u:object_r:rild_socket:s0
+-#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+-/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/evk_a300/sepolicy/property_contexts b/imx8m/evk_a300/sepolicy/property_contexts
+deleted file mode 100644
+index 2e0ec0f1..00000000
+--- a/imx8m/evk_a300/sepolicy/property_contexts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-vendor.rild.                        u:object_r:radio_prop:s0
+-rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/sepolicy/device.te b/imx8m/sepolicy/device.te
+index fb355d4c..5c27764b 100644
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@ -10,3 +10,4 @@ type mmc_rpmb_char_device, dev_type;
+ type latency_device, dev_type;
+ type bootloader_block_device, dev_type;
+ type spl_block_device, dev_type;
++type rild_device, dev_type;
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index 2fafc08b..8e1db34a 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -95,3 +95,15 @@
+ /sys/devices/platform/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/uevent          u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/soc@0/38200000\.usb/xhci-hcd\.0\.auto/usb[0-9]/[0-9].*/uevent  u:object_r:sysfs_usb_uevent:s0
++
++#quectel port
++/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
++/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
++/vendor/bin/hw/rild              u:object_r:rild_exec:s0
++#/system/socket/rild              u:object_r:rild_socket:s0
++#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
++/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
++/system/bin/chat                 u:object_r:ppp_exec:s0
++/system/etc/ppp/ip-up            u:object_r:ppp_exec:s0
++/system/etc/ppp/ip-down          u:object_r:ppp_exec:s0
++/system/etc/ppp/ip-up-vpn        u:object_r:ppp_exec:s0
+diff --git a/imx8m/sepolicy/ppp.te b/imx8m/sepolicy/ppp.te
+new file mode 100644
+index 00000000..ee487e54
+--- /dev/null
++++ b/imx8m/sepolicy/ppp.te
+@@ -0,0 +1,16 @@
++# support pppd dialing
++allow ppp rild:fd use;
++allow ppp rild:unix_stream_socket { read write };
++allow ppp rild:fifo_file { read write };
++allow ppp self:capability { setgid setuid };
++allow ppp postinstall_mnt_dir:dir getattr;
++allow ppp ppp_exec:file execute_no_trans;
++allow ppp rootfs:dir { open read };
++allow ppp shell_exec:file { execute_no_trans getattr map open read execute };
++allow ppp vendor_file:dir read;
++allow ppp toolbox_exec:file { getattr execute open read execute_no_trans map };
++allow ppp init:unix_stream_socket connectto;
++allow ppp property_socket:sock_file write;
++allow ppp radio_prop:property_service set;
++allow ppp shell_data_file:dir { getattr read };
++allow ppp system_data_file:dir read;
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index a6ecdcee..1ac2cd8e 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -254,3 +254,11 @@ unified_bt_logging                  u:object_r:vendor_bluetooth_prop:s0
+ persist.BT3_2.version               u:object_r:vendor_bluetooth_prop:s0
+ 
+ ro.radio.noril                      u:object_r:radio_prop:s0 exact string
++vendor.rild.                        u:object_r:radio_prop:s0
++rild.                               u:object_r:radio_prop:s0
++net.eth0.                           u:object_r:net_dns_prop:s0
++net.ppp0.dns1                       u:object_r:radio_prop:s0
++net.ppp0.dns2                       u:object_r:radio_prop:s0
++net.ppp0.local-ip                   u:object_r:radio_prop:s0
++net.ppp0.remote-ip                  u:object_r:radio_prop:s0
++net.ppp0.gw                         u:object_r:radio_prop:s0
+diff --git a/imx8m/evk_a300/sepolicy/rild.te b/imx8m/sepolicy/rild.te
+similarity index 96%
+rename from imx8m/evk_a300/sepolicy/rild.te
+rename to imx8m/sepolicy/rild.te
+index 6efa9e26..0339e76e 100644
+--- a/imx8m/evk_a300/sepolicy/rild.te
++++ b/imx8m/sepolicy/rild.te
+@@ -53,6 +53,10 @@ allow rild hal_bootctl_default:dir search;
+ allow rild hal_bootctl_default:lnk_file read;
+ allow rild hal_keymaster_default:dir search;
+ allow rild vold:dir search;
++allow rild toolbox_exec:file getattr;
++
++# support pppd dialing
++domain_auto_trans(rild, ppp_exec, ppp);
+ 
+ # property service
+ # The property permissions that Quectel requested, but too over
+diff --git a/imx8m/vp6820_8mn/sepolicy/device.te b/imx8m/vp6820_8mn/sepolicy/device.te
+deleted file mode 100644
+index 91ac6479..00000000
+--- a/imx8m/vp6820_8mn/sepolicy/device.te
++++ /dev/null
+@@ -1 +0,0 @@
+-type rild_device, dev_type;
+diff --git a/imx8m/vp6820_8mn/sepolicy/property_contexts b/imx8m/vp6820_8mn/sepolicy/property_contexts
+deleted file mode 100644
+index 2e0ec0f1..00000000
+--- a/imx8m/vp6820_8mn/sepolicy/property_contexts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-vendor.rild.                        u:object_r:radio_prop:s0
+-rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/vp6820_8mn/sepolicy/rild.te b/imx8m/vp6820_8mn/sepolicy/rild.te
+deleted file mode 100644
+index 6efa9e26..00000000
+--- a/imx8m/vp6820_8mn/sepolicy/rild.te
++++ /dev/null
+@@ -1,83 +0,0 @@
+-# rild - radio interface layer daemon
+-#type rild, domain;
+-#hal_server_domain(rild, hal_telephony)
+-#net_domain(rild)
+-
+-# type_transition must be private policy the domain_trans rules could stay
+-# public, but conceptually should go with this
+-#type rild_exec, exec_type, vendor_file_type, file_type;
+-#init_daemon_domain(rild)
+-typeattribute rild vendor_executes_system_violators;
+-
+-allow rild init:dir { search read open };
+-allow rild init:lnk_file read;
+-allow rild init:file read;
+-allow rild kernel:dir search;
+-allow rild kernel:system module_request;
+-allow rild kernel:lnk_file read;
+-allow rild kernel:file read;
+-allow rild rild_device:chr_file { read write ioctl open getattr create };
+-allow rild ppp_device:chr_file { read write ioctl open };
+-allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+-allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+-allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+-allow rild sysfs_wake_lock:file { open read write };
+-allow rild system_file:file { read open getattr execute_no_trans };
+-allow rild sysfs:file write;
+-allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild device:dir { write add_name };
+-allow rild rootfs:dir { read open };
+-allow rild hwservicemanager:dir search;
+-allow rild hwservicemanager:file read;
+-allow rild hwservicemanager:lnk_file read;
+-allow rild logd:dir { search read open };
+-allow rild logd:file read;
+-allow rild logd:lnk_file read;
+-allow rild servicemanager:dir { search read };
+-allow rild servicemanager:file read;
+-allow rild servicemanager:lnk_file read;
+-allow rild ueventd:dir { search read open };
+-allow rild ueventd:file read;
+-allow rild ueventd:lnk_file read;
+-allow rild vendor_init:dir { search read open };
+-allow rild vendor_init:lnk_file read;
+-allow rild vendor_init:file read;
+-allow rild vndservicemanager:dir search;
+-allow rild vndservicemanager:file read;
+-allow rild vndservicemanager:lnk_file read;
+-allow rild watchdogd:dir search;
+-allow rild watchdogd:lnk_file read;
+-allow rild watchdogd:file read;
+-allow rild watchdogd:dir { read open };
+-allow rild hal_bootctl_default:dir search;
+-allow rild hal_bootctl_default:lnk_file read;
+-allow rild hal_keymaster_default:dir search;
+-allow rild vold:dir search;
+-
+-# property service
+-# The property permissions that Quectel requested, but too over
+-#set_prop(rild, net_radio_prop)
+-#set_prop(rild, default_prop)
+-#set_prop(rild, system_prop)
+-# TODO: remove auditallow once if rild related functions are fully tested.
+-userdebug_or_eng(
+-  auditallow rild net_radio_prop:property_service set;
+-  auditallow rild default_prop:property_service set;
+-  auditallow rild system_prop:property_service set;
+-)
+-# The property permissions that hardware/ril exactly used
+-set_prop(rild, radio_prop)
+-set_prop(rild, net_dns_prop)
+-get_prop(rild, exported_default_prop)
+-
+-allow rild tty_device:chr_file rw_file_perms;
+-
+-# Allow rild to create and use netlink sockets.
+-allow rild self:netlink_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_generic_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+-
+-# Access to wake locks
+-wakelock_use(rild)
+-
+-allow rild self:socket create_socket_perms_no_ioctl;
+diff --git a/imx8m/vp6820_8mq/sepolicy/device.te b/imx8m/vp6820_8mq/sepolicy/device.te
+deleted file mode 100644
+index 91ac6479..00000000
+--- a/imx8m/vp6820_8mq/sepolicy/device.te
++++ /dev/null
+@@ -1 +0,0 @@
+-type rild_device, dev_type;
+diff --git a/imx8m/vp6820_8mq/sepolicy/file_contexts b/imx8m/vp6820_8mq/sepolicy/file_contexts
+index f9570e8d..64136a31 100644
+--- a/imx8m/vp6820_8mq/sepolicy/file_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/file_contexts
+@@ -47,10 +47,3 @@
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+ 
+-#quectel port
+-/dev/ttyUSB[0-9]*                u:object_r:tty_device:s0
+-/dev/ttyACM[0-9]*                u:object_r:tty_device:s0
+-/vendor/bin/hw/rild              u:object_r:rild_exec:s0
+-#/system/socket/rild              u:object_r:rild_socket:s0
+-#/system/socket/rild-debug        u:object_r:rild_debug_socket:s0
+-/dev/cdc-wdm[0-9]*               u:object_r:rild_device:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/property_contexts b/imx8m/vp6820_8mq/sepolicy/property_contexts
+deleted file mode 100644
+index 2e0ec0f1..00000000
+--- a/imx8m/vp6820_8mq/sepolicy/property_contexts
++++ /dev/null
+@@ -1,3 +0,0 @@
+-vendor.rild.                        u:object_r:radio_prop:s0
+-rild.                               u:object_r:radio_prop:s0
+-net.eth0.                           u:object_r:net_dns_prop:s0
+diff --git a/imx8m/vp6820_8mq/sepolicy/rild.te b/imx8m/vp6820_8mq/sepolicy/rild.te
+deleted file mode 100644
+index 6efa9e26..00000000
+--- a/imx8m/vp6820_8mq/sepolicy/rild.te
++++ /dev/null
+@@ -1,83 +0,0 @@
+-# rild - radio interface layer daemon
+-#type rild, domain;
+-#hal_server_domain(rild, hal_telephony)
+-#net_domain(rild)
+-
+-# type_transition must be private policy the domain_trans rules could stay
+-# public, but conceptually should go with this
+-#type rild_exec, exec_type, vendor_file_type, file_type;
+-#init_daemon_domain(rild)
+-typeattribute rild vendor_executes_system_violators;
+-
+-allow rild init:dir { search read open };
+-allow rild init:lnk_file read;
+-allow rild init:file read;
+-allow rild kernel:dir search;
+-allow rild kernel:system module_request;
+-allow rild kernel:lnk_file read;
+-allow rild kernel:file read;
+-allow rild rild_device:chr_file { read write ioctl open getattr create };
+-allow rild ppp_device:chr_file { read write ioctl open };
+-allow rild ppp_exec:file { read execute open execute_no_trans map getattr };
+-allow rild self:capability { net_admin setuid };   #sys_ptrace  removed
+-allow rild shell_exec:file { read execute open execute_no_trans getattr map };
+-allow rild sysfs_wake_lock:file { open read write };
+-allow rild system_file:file { read open getattr execute_no_trans };
+-allow rild sysfs:file write;
+-allow rild vendor_toolbox_exec:file { read getattr open execute execute_no_trans };
+-allow rild device:dir { write add_name };
+-allow rild rootfs:dir { read open };
+-allow rild hwservicemanager:dir search;
+-allow rild hwservicemanager:file read;
+-allow rild hwservicemanager:lnk_file read;
+-allow rild logd:dir { search read open };
+-allow rild logd:file read;
+-allow rild logd:lnk_file read;
+-allow rild servicemanager:dir { search read };
+-allow rild servicemanager:file read;
+-allow rild servicemanager:lnk_file read;
+-allow rild ueventd:dir { search read open };
+-allow rild ueventd:file read;
+-allow rild ueventd:lnk_file read;
+-allow rild vendor_init:dir { search read open };
+-allow rild vendor_init:lnk_file read;
+-allow rild vendor_init:file read;
+-allow rild vndservicemanager:dir search;
+-allow rild vndservicemanager:file read;
+-allow rild vndservicemanager:lnk_file read;
+-allow rild watchdogd:dir search;
+-allow rild watchdogd:lnk_file read;
+-allow rild watchdogd:file read;
+-allow rild watchdogd:dir { read open };
+-allow rild hal_bootctl_default:dir search;
+-allow rild hal_bootctl_default:lnk_file read;
+-allow rild hal_keymaster_default:dir search;
+-allow rild vold:dir search;
+-
+-# property service
+-# The property permissions that Quectel requested, but too over
+-#set_prop(rild, net_radio_prop)
+-#set_prop(rild, default_prop)
+-#set_prop(rild, system_prop)
+-# TODO: remove auditallow once if rild related functions are fully tested.
+-userdebug_or_eng(
+-  auditallow rild net_radio_prop:property_service set;
+-  auditallow rild default_prop:property_service set;
+-  auditallow rild system_prop:property_service set;
+-)
+-# The property permissions that hardware/ril exactly used
+-set_prop(rild, radio_prop)
+-set_prop(rild, net_dns_prop)
+-get_prop(rild, exported_default_prop)
+-
+-allow rild tty_device:chr_file rw_file_perms;
+-
+-# Allow rild to create and use netlink sockets.
+-allow rild self:netlink_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_generic_socket create_socket_perms_no_ioctl;
+-allow rild self:netlink_kobject_uevent_socket create_socket_perms_no_ioctl;
+-
+-# Access to wake locks
+-wakelock_use(rild)
+-
+-allow rild self:socket create_socket_perms_no_ioctl;

@@ -1,0 +1,566 @@
+00880778 George.Huang 2020-07-22
+
+AOS-273: sync changes for idtech-created files
+
+Change-Id: I6b2eccaa1b15d24e3d488fc631aad03651b8c60b
+
+diff --git a/imx8m/evk_a100/AndroidUboot.mk b/imx8m/evk_a100/AndroidUboot.mk
+index b899ee6c..e6a30180 100644
+--- a/imx8m/evk_a100/AndroidUboot.mk
++++ b/imx8m/evk_a100/AndroidUboot.mk
+@@ -13,12 +13,12 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mn-a100.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/fsl-imx8mn-evk.dtb; \
+-	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	if [ `echo $(2) | cut -d '-' -f2` = "evk" ]; then \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	else \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mn-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	fi; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+ 	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ]; then \
+@@ -32,21 +32,21 @@ define build_imx_uboot
+ 	fi; \
+ 	cp $(IMX_PATH)/arm-trusted-firmware/build/`echo $(2) | cut -d '-' -f1`/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/bl31.bin; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+-	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+-		if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_spl_uboot || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab || exit 1; \
+-		else \
++	if [ `echo $(2) | cut -d '-' -f2` = "evk" ]; then \
++		if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk || exit 1; \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab_ddr4 || exit 1; \
++		else \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk_no_hdmi_dual_bootloader || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab_ddr4 || exit 1; \
+ 		fi; \
+ 	else \
+-		if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
++		if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_spl_uboot || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab || exit 1; \
++		else \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_evk_no_hdmi_dual_bootloader || exit 1; \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
+-		else \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk_no_hdmi_dual_bootloader || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab_ddr4 || exit 1; \
+ 		fi; \
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+index d51e4acd..1a0d039a 100644
+--- a/imx8m/evk_a100/BoardConfig.mk
++++ b/imx8m/evk_a100/BoardConfig.mk
+@@ -24,6 +24,7 @@ SOONG_CONFIG_IMXPLUGIN += \
+ 
+ SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MN
+ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = false
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ 
+ #
+ # Product-specific compile-time definitions.
+@@ -133,20 +134,25 @@ BOARD_PREBUILT_DTBOIMAGE := out/target/product/evk_a100/dtbo-$(BOARD_SOM_TYPE)-$
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-product.dtb
+   else
+     # imx8mn with MIPI-HDMI display, BCM wifi and support trusty
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn:imx8mn-evk.dtb
+     # imx8mn with MIPI panel display and BCM wifi
+-    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
+     # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+-    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
++    # imx8mn with MIPI panel display and BCM wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-evk-rm67191.dtb
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
++    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-evk-rpmsg.dtb
+   endif
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
+   else
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-dynamic_partition.dtb
+   endif
+ endif
+ 
+diff --git a/imx8m/evk_a100/evk_a100.mk b/imx8m/evk_a100/evk_a100.mk
+index 001ecf32..6e47cd11 100644
+--- a/imx8m/evk_a100/evk_a100.mk
++++ b/imx8m/evk_a100/evk_a100.mk
+@@ -126,6 +126,7 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
+     frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
+     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.hardware.wifi.passpoint.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.passpoint.xml \
+     frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
+     frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
+     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
+@@ -270,6 +271,11 @@ PRODUCT_COPY_FILES += \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.clm_blob \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.txt
+ 
++# Wifi regulatory
++PRODUCT_COPY_FILES += \
++    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++
+ # Keymaster HAL
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/evk_a100/init.freescale.emmc.rc b/imx8m/evk_a100/init.freescale.emmc.rc
+deleted file mode 120000
+index bc0253a9..00000000
+--- a/imx8m/evk_a100/init.freescale.emmc.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.freescale.emmc.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/init.freescale.sd.rc b/imx8m/evk_a100/init.freescale.sd.rc
+deleted file mode 120000
+index 665efa5a..00000000
+--- a/imx8m/evk_a100/init.freescale.sd.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.freescale.sd.rc
+\ No newline at end of file
+diff --git a/imx8m/evk_a100/init.rc b/imx8m/evk_a100/init.rc
+index 6ed82c6e..e0f7e1e8 100644
+--- a/imx8m/evk_a100/init.rc
++++ b/imx8m/evk_a100/init.rc
+@@ -6,6 +6,20 @@ on early-init
+     # mount the debugfs
+     mount debugfs none /sys/kernel/debug/ mode=0755
+ 
++    # Mount binderfs
++    mkdir /dev/binderfs
++    mount binder binder /dev/binderfs stats=global
++    chmod 0755 /dev/binderfs
++
++    symlink /dev/binderfs/binder /dev/binder
++    symlink /dev/binderfs/hwbinder /dev/hwbinder
++    symlink /dev/binderfs/vndbinder /dev/vndbinder
++
++    chmod 0666 /dev/binderfs/hwbinder
++    chmod 0666 /dev/binderfs/binder
++    chmod 0666 /dev/binderfs/vndbinder
++
++
+ on early-init
+     start early_init_sh
+ 
+diff --git a/imx8m/evk_a300/AndroidUboot.mk b/imx8m/evk_a300/AndroidUboot.mk
+index d58268f1..92f3f8ca 100644
+--- a/imx8m/evk_a300/AndroidUboot.mk
++++ b/imx8m/evk_a300/AndroidUboot.mk
+@@ -13,7 +13,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/arch/arm/dts/imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+diff --git a/imx8m/evk_a300/BoardConfig.mk b/imx8m/evk_a300/BoardConfig.mk
+index 4b15fd1d..76cb095f 100644
+--- a/imx8m/evk_a300/BoardConfig.mk
++++ b/imx8m/evk_a300/BoardConfig.mk
+@@ -27,6 +27,7 @@ SOONG_CONFIG_IMXPLUGIN += \
+ SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MQ
+ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = true
+ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ 
+ #
+ # Product-specific compile-time definitions.
+diff --git a/imx8m/evk_a300/evk_a300.mk b/imx8m/evk_a300/evk_a300.mk
+index c55cac79..cb73f21c 100644
+--- a/imx8m/evk_a300/evk_a300.mk
++++ b/imx8m/evk_a300/evk_a300.mk
+@@ -120,6 +120,7 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
+     frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
+     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.hardware.wifi.passpoint.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.passpoint.xml \
+     frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
+     frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
+     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
+@@ -267,6 +268,11 @@ PRODUCT_COPY_FILES += \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.clm_blob \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.txt
+ 
++# Wifi regulatory
++PRODUCT_COPY_FILES += \
++    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++
+ # hardware backed keymaster service
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/evk_a300/init.rc b/imx8m/evk_a300/init.rc
+index b8e2ce2a..4db0ad0f 100644
+--- a/imx8m/evk_a300/init.rc
++++ b/imx8m/evk_a300/init.rc
+@@ -6,6 +6,20 @@ on early-init
+     # mount the debugfs
+     mount debugfs none /sys/kernel/debug/ mode=0755
+ 
++    # Mount binderfs
++    mkdir /dev/binderfs
++    mount binder binder /dev/binderfs stats=global
++    chmod 0755 /dev/binderfs
++
++    symlink /dev/binderfs/binder /dev/binder
++    symlink /dev/binderfs/hwbinder /dev/hwbinder
++    symlink /dev/binderfs/vndbinder /dev/vndbinder
++
++    chmod 0666 /dev/binderfs/hwbinder
++    chmod 0666 /dev/binderfs/binder
++    chmod 0666 /dev/binderfs/vndbinder
++
++
+ on early-init
+     start early_init_sh
+ 
+diff --git a/imx8m/evk_a300/sepolicy/genfs_contexts b/imx8m/evk_a300/sepolicy/genfs_contexts
+index 43a39ca4..fbff8135 100644
+--- a/imx8m/evk_a300/sepolicy/genfs_contexts
++++ b/imx8m/evk_a300/sepolicy/genfs_contexts
+@@ -1,3 +1,5 @@
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/hctosys     u:object_r:sysfs_rtc:s0
++
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply u:object_r:sysfs_batteryinfo:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/extcon   u:object_r:sysfs_extcon:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
+@@ -6,7 +8,6 @@ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30bb0000.spi/spi_maste
+ 
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a00000.mipi_dsi/30a00000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+-genfscon sysfs /devices/platform/30be0000.ethernet/net u:object_r:sysfs_net:s0
+ 
+ #/sys/class/net
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net               u:object_r:sysfs_net:s0
+diff --git a/imx8m/vp6820_8mn/AndroidUboot.mk b/imx8m/vp6820_8mn/AndroidUboot.mk
+index b899ee6c..e6a30180 100644
+--- a/imx8m/vp6820_8mn/AndroidUboot.mk
++++ b/imx8m/vp6820_8mn/AndroidUboot.mk
+@@ -13,12 +13,12 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mn-a100.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/fsl-imx8mn-evk.dtb; \
+-	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	if [ `echo $(2) | cut -d '-' -f2` = "evk" ]; then \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	else \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mn-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+-	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mn-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	fi; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+ 	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ]; then \
+@@ -32,21 +32,21 @@ define build_imx_uboot
+ 	fi; \
+ 	cp $(IMX_PATH)/arm-trusted-firmware/build/`echo $(2) | cut -d '-' -f1`/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/bl31.bin; \
+ 	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
+-	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+-		if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_spl_uboot || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab || exit 1; \
+-		else \
++	if [ `echo $(2) | cut -d '-' -f2` = "evk" ]; then \
++		if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk || exit 1; \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab_ddr4 || exit 1; \
++		else \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk_no_hdmi_dual_bootloader || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab_ddr4 || exit 1; \
+ 		fi; \
+ 	else \
+-		if [ `echo $(2) | cut -d '-' -f2` = "devboard" ]; then \
++		if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_spl_uboot || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN print_fit_hab || exit 1; \
++		else \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_evk_no_hdmi_dual_bootloader || exit 1; \
+ 		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
+-		else \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN flash_ddr4_evk_no_hdmi_dual_bootloader || exit 1; \
+-		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MN PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab_ddr4 || exit 1; \
+ 		fi; \
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index 565f3134..c37a51eb 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -24,6 +24,7 @@ SOONG_CONFIG_IMXPLUGIN += \
+ 
+ SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MN
+ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = false
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ 
+ #
+ # Product-specific compile-time definitions.
+@@ -133,20 +134,25 @@ BOARD_PREBUILT_DTBOIMAGE := out/target/product/vp6820_8mn/dtbo-$(BOARD_SOM_TYPE)
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-product.dtb
+   else
+     # imx8mn with MIPI-HDMI display, BCM wifi and support trusty
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn:imx8mn-evk.dtb
+     # imx8mn with MIPI panel display and BCM wifi
+-    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
+     # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+-    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
++    # imx8mn with MIPI panel display and BCM wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-evk-rm67191.dtb
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
++    TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-evk-rpmsg.dtb
+   endif
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-product-no-dynamic_partition.dtb
+   else
+-    TARGET_BOARD_DTS_CONFIG := imx8mn:imx8mn-ddr4-evk-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-dynamic_partition.dtb
+   endif
+ endif
+ 
+diff --git a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+index 651ffb59..daae79da 100644
+--- a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+@@ -15,16 +15,11 @@ endif
+ TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-evk-uuu:imx8mn_a100_devboard_android_uuu_defconfig:signed
+ 
+ # u-boot target for stand config and Trusty OS config
+-TARGET_BOOTLOADER_CONFIG += imx8mn-evk:vp6820_8mn_evk_android_defconfig:signed
+-TARGET_BOOTLOADER_CONFIG += imx8mn-evk-dual:vp6820_8mn_evk_android_dual_defconfig:signed
+-ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty:vp6820_8mn_evk_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty-secure-unlock:vp6820_8mn_evk_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty-dual:vp6820_8mn_evk_android_trusty_dual_defconfig
+-endif
++TARGET_BOOTLOADER_CONFIG += imx8mn-evk:vp6820_8mn_ddr4_evk_android_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mn-evk-dual:vp6820_8mn_ddr4_evk_android_dual_defconfig:signed
+ 
+ # u-boot target used by uuu for imx8mn_evk
+-TARGET_BOOTLOADER_CONFIG += imx8mn-evk-evk-uuu:vp6820_8mn_evk_android_uuu_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mn-evk-evk-uuu:vp6820_8mn_ddr4_evk_android_uuu_defconfig:signed
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
+diff --git a/imx8m/vp6820_8mn/init.freescale.emmc.rc b/imx8m/vp6820_8mn/init.freescale.emmc.rc
+deleted file mode 120000
+index bc0253a9..00000000
+--- a/imx8m/vp6820_8mn/init.freescale.emmc.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.freescale.emmc.rc
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/init.freescale.sd.rc b/imx8m/vp6820_8mn/init.freescale.sd.rc
+deleted file mode 120000
+index 665efa5a..00000000
+--- a/imx8m/vp6820_8mn/init.freescale.sd.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mn/init.freescale.sd.rc
+\ No newline at end of file
+diff --git a/imx8m/vp6820_8mn/init.rc b/imx8m/vp6820_8mn/init.rc
+index b51a6416..bccd8825 100644
+--- a/imx8m/vp6820_8mn/init.rc
++++ b/imx8m/vp6820_8mn/init.rc
+@@ -6,6 +6,20 @@ on early-init
+     # mount the debugfs
+     mount debugfs none /sys/kernel/debug/ mode=0755
+ 
++    # Mount binderfs
++    mkdir /dev/binderfs
++    mount binder binder /dev/binderfs stats=global
++    chmod 0755 /dev/binderfs
++
++    symlink /dev/binderfs/binder /dev/binder
++    symlink /dev/binderfs/hwbinder /dev/hwbinder
++    symlink /dev/binderfs/vndbinder /dev/vndbinder
++
++    chmod 0666 /dev/binderfs/hwbinder
++    chmod 0666 /dev/binderfs/binder
++    chmod 0666 /dev/binderfs/vndbinder
++
++
+ on early-init
+     start early_init_sh
+ 
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index d4eb13e4..e70332a1 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -129,6 +129,7 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
+     frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
+     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.hardware.wifi.passpoint.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.passpoint.xml \
+     frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
+     frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
+     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
+@@ -273,6 +274,11 @@ PRODUCT_COPY_FILES += \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.clm_blob \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.txt
+ 
++# Wifi regulatory
++PRODUCT_COPY_FILES += \
++    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++
+ # Keymaster HAL
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_PACKAGES += \
+diff --git a/imx8m/vp6820_8mq/AndroidUboot.mk b/imx8m/vp6820_8mq/AndroidUboot.mk
+index d58268f1..92f3f8ca 100644
+--- a/imx8m/vp6820_8mq/AndroidUboot.mk
++++ b/imx8m/vp6820_8mq/AndroidUboot.mk
+@@ -13,7 +13,7 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	cp $(UBOOT_OUT)/arch/arm/dts/fsl-imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/arch/arm/dts/imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+diff --git a/imx8m/vp6820_8mq/BoardConfig.mk b/imx8m/vp6820_8mq/BoardConfig.mk
+index 70dcc650..dca4b860 100644
+--- a/imx8m/vp6820_8mq/BoardConfig.mk
++++ b/imx8m/vp6820_8mq/BoardConfig.mk
+@@ -27,6 +27,7 @@ SOONG_CONFIG_IMXPLUGIN += \
+ SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MQ
+ SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = true
+ SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
+ 
+ #
+ # Product-specific compile-time definitions.
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index b11289fe..098d0a67 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -6,6 +6,20 @@ on early-init
+     # mount the debugfs
+     mount debugfs none /sys/kernel/debug/ mode=0755
+ 
++    # Mount binderfs
++    mkdir /dev/binderfs
++    mount binder binder /dev/binderfs stats=global
++    chmod 0755 /dev/binderfs
++
++    symlink /dev/binderfs/binder /dev/binder
++    symlink /dev/binderfs/hwbinder /dev/hwbinder
++    symlink /dev/binderfs/vndbinder /dev/vndbinder
++
++    chmod 0666 /dev/binderfs/hwbinder
++    chmod 0666 /dev/binderfs/binder
++    chmod 0666 /dev/binderfs/vndbinder
++
++
+ on early-init
+     start early_init_sh
+ 
+diff --git a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index 7e398371..79917b72 100644
+--- a/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/vp6820_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -209,4 +209,23 @@
+ 
+     <!-- If the system has the input method for each display - enable per-display focus. -->
+     <bool name="config_perDisplayFocusEnabled">true</bool>
++
++    <!-- Enable 802.11ac for Wifi hotspot (SAP) -->
++    <bool translatable="false" name="config_wifi_softap_ieee80211ac_supported">true</bool>
++
++    <!-- Enable ACS (auto channel selection) for Wifi hotspot (SAP) -->
++    <bool translatable="false" name="config_wifi_softap_acs_supported">true</bool>
++
++    <!-- Boolean indicating whether 802.11r Fast BSS Transition is enabled on this platform -->
++    <bool translatable="false" name="config_wifi_fast_bss_transition_enabled">true</bool>
++
++    <!-- Boolean indicating whether the wifi chipset has background scan support -->
++    <bool translatable="false" name="config_wifi_background_scan_support">true</bool>
++
++    <!-- Indicates that connected MAC randomization is supported on this device -->
++    <bool translatable="false" name="config_wifi_connected_mac_randomization_supported">true</bool>
++
++    <!-- Indicates that p2p MAC randomization is supported on this device -->
++    <bool translatable="false" name="config_wifi_p2p_mac_randomization_supported">true</bool>
++
+ </resources>
+diff --git a/imx8m/vp6820_8mq/sepolicy/genfs_contexts b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+index 43a39ca4..fbff8135 100644
+--- a/imx8m/vp6820_8mq/sepolicy/genfs_contexts
++++ b/imx8m/vp6820_8mq/sepolicy/genfs_contexts
+@@ -1,3 +1,5 @@
++genfscon sysfs /devices/platform/soc@0/soc@0:bus@30000000/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/hctosys     u:object_r:sysfs_rtc:s0
++
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/power_supply u:object_r:sysfs_batteryinfo:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a20000.i2c/i2c-0/0-0050/extcon   u:object_r:sysfs_extcon:s0
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30b40000.mmc/mmc_host/mmc0/mmc0:0001/block/mmcblk0 u:object_r:sysfs_block_devices:s0
+@@ -6,7 +8,6 @@ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30bb0000.spi/spi_maste
+ 
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30a00000.mipi_dsi/30a00000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
+ genfscon sysfs /devices/platform/backlight/backlight/backlight u:object_r:sysfs_leds:s0
+-genfscon sysfs /devices/platform/30be0000.ethernet/net u:object_r:sysfs_net:s0
+ 
+ #/sys/class/net
+ genfscon sysfs /devices/platform/soc@0/soc@0:bus@30800000/30be0000.ethernet/net               u:object_r:sysfs_net:s0
+diff --git a/imx8m/vp6820_8mq/vp6820_8mq_common.mk b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+index 3cafcb2e..6d24426e 100644
+--- a/imx8m/vp6820_8mq/vp6820_8mq_common.mk
++++ b/imx8m/vp6820_8mq/vp6820_8mq_common.mk
+@@ -123,6 +123,7 @@ PRODUCT_COPY_FILES += \
+     frameworks/native/data/etc/android.hardware.vulkan.version-1_1.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version-1_1.xml \
+     frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
+     frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.hardware.wifi.passpoint.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.passpoint.xml \
+     frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
+     frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
+     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
+@@ -270,6 +271,11 @@ PRODUCT_COPY_FILES += \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.clm_blob \
+     vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.txt
+ 
++# Wifi regulatory
++PRODUCT_COPY_FILES += \
++    external/wireless-regdb/regulatory.db:vendor/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:vendor/firmware/regulatory.db.p7s
++
+ # hardware backed keymaster service
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ PRODUCT_PACKAGES += \

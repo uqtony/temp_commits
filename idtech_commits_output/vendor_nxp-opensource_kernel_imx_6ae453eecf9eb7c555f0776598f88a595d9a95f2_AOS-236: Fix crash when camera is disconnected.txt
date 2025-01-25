@@ -1,0 +1,74 @@
+6ae453eecf9e owen.wen 2020-06-22
+
+AOS-236: Fix crash when camera is disconnected
+
+according to drivers/regulator/core.c
+need to disable regulator before regulator_put
+
+drivers/regulator/core.c:2044
+/* Docs say you must disable before calling regulator_put() */
+WARN_ON(regulator->enable_count);
+
+refer to ./drivers/media/platform/mxc/capture/ov5640_mipi_v2.c
+REF: https://gerrit.idtechproducts.com/plugins/gitiles/android-imx/linux-imx/+/98e786bdbd16645b40b8870a39c577f021cbf8c8
+
+test items:
+1. Camera unplugged: good, no WARNING message of regulator
+2. Camera plugged: good, camera works as normal
+
+Change-Id: If0c621ee1a5a2b9554e1ffe68e5dbec8c5d9668b
+
+diff --git a/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c b/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
+index f3422a1bad28..9d408ee41b8b 100644
+--- a/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
++++ b/drivers/media/platform/mxc/capture/ov2685_mipi_v2.c
+@@ -375,6 +375,21 @@ static const struct ov2685_datafmt
+ 	return NULL;
+ }
+ 
++static void ov2685_regulator_disable(void)
++{
++	if (analog_regulator)
++		regulator_disable(analog_regulator);
++
++	if (core_regulator)
++		regulator_disable(core_regulator);
++
++	if (io_regulator)
++		regulator_disable(io_regulator);
++
++	if (gpo_regulator)
++		regulator_disable(gpo_regulator);
++}
++
+ static void ov2685_power_down(struct ov2685 *sensor, int enable)
+ {
+ 	u32 delay_us;
+@@ -1432,19 +1447,24 @@ static int ov2685_probe(struct i2c_client *client,
+ 				 &chip_id_high);
+ 	if (retval < 0 || chip_id_high != 0x26) {
+ 		dev_warn(dev, "Camera is not found
+");
++		ov2685_regulator_disable();
+ 		clk_disable_unprepare(sensor->sensor_clk);
++		ov2685_power_down(sensor, 1);
+ 		return -ENODEV;
+ 	}
+ 	retval = ov2685_read_reg(sensor, OV2685_CHIP_ID_LOW_BYTE, &chip_id_low);
+ 	if (retval < 0 || chip_id_low != 0x85) {
+ 		dev_warn(dev, "Camera is not found
+");
++		ov2685_regulator_disable();
+ 		clk_disable_unprepare(sensor->sensor_clk);
++		ov2685_power_down(sensor, 1);
+ 		return -ENODEV;
+ 	}
+ 
+ 
+ 	retval = init_device(sensor);
+ 	if (retval < 0) {
++		ov2685_regulator_disable();
+ 		clk_disable_unprepare(sensor->sensor_clk);
+ 		dev_warn(dev, "Camera init failed
+");
+ 		ov2685_power_down(sensor, 1);

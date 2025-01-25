@@ -1,0 +1,58 @@
+f18cd06e George.Huang 2021-01-29
+
+AOS-491: change the android-info.txt rule
+
+Change-Id: I5334be0f5622c0830b3ddde3d8f41c8e24337251
+
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index 45d5eea6..e7e3fe44 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -579,7 +579,7 @@ set /A match_som=0
+ set /A match_mb=0
+ FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
+ FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
+-IF NOT [%match_som%] == [1] (
++IF NOT [%match_som%] GEQ [1] (
+     echo Error: %som_model% and values in android-info.txt are mismatched
+     set /A error_level=3 && goto :exit
+ )
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 854b9116..59f61ef1 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -263,7 +263,7 @@ function check_android_info
+         [ "${som_model}" == "${val}" ] && match_som=$((match_som + 1))
+     done
+ 
+-    if [ ! ${match_som} -eq 1 ]; then
++    if [ ! ${match_som} -ge 1 ]; then
+         echo -e ${RED}${som_model} and values in android-info.txt are mismatched
+         exit 1
+     fi
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 1e1ca9b4..ad0b2b72 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -995,7 +995,7 @@ set /A match_som=0
+ set /A match_mb=0
+ FOR %%F IN (%som_opt%) DO (if [%som_model%] == [%%F] set /A match_som+=1)
+ FOR %%F IN (%mb_opt%) DO (if [%mb_model%] == [%%F] set /A match_mb+=1)
+-IF NOT [%match_som%] == [1] (
++IF NOT [%match_som%] GEQ [1] (
+     echo Error: %som_model% and values in android-info.txt are mismatched
+     set /A error_level=3 && goto :exit
+ )
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 70372329..1d088c1e 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -317,7 +317,7 @@ function check_android_info
+         [ "${som_model}" == "${val}" ] && match_som=$((match_som + 1))
+     done
+ 
+-    if [ ! ${match_som} -eq 1 ]; then
++    if [ ! ${match_som} -ge 1 ]; then
+         echo -e ${RED}${som_model} and values in android-info.txt are mismatched
+         exit 1
+     fi

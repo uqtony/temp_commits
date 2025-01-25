@@ -1,0 +1,38 @@
+b0fedab77f1f max.yang 2020-12-01
+
+AOS-416: Make unknown source app installing as configurable
+
+  1. For pci/pcidev, this is always disabled due to pci limitation
+     on unauthorized app and firmware
+  2. For userdebug/production, this feature default disabled and
+     could be enabled by AMS
+
+Change-Id: I47ffe66780e2a5ea1cc1a6e67565f0985ab37355
+
+diff --git a/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java b/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+index 55ff591e3a1f..13482e13946a 100644
+--- a/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
++++ b/packages/PackageInstaller/src/com/android/packageinstaller/PackageInstallerActivity.java
+@@ -44,6 +44,7 @@ import android.net.Uri;
+ import android.os.Bundle;
+ import android.os.Process;
+ import android.os.UserManager;
++import android.os.SystemProperties;
+ import android.provider.Settings;
+ import android.util.Log;
+ import android.view.View;
+@@ -434,6 +435,14 @@ public class PackageInstallerActivity extends AlertActivity {
+                     UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY, Process.myUserHandle());
+             final int systemRestriction = UserManager.RESTRICTION_SOURCE_SYSTEM
+                     & (unknownSourcesRestrictionSource | unknownSourcesGlobalRestrictionSource);
++
++            // IDT added to disbale on pci* build, configurable by AMS on non-pci build
++            if (SystemProperties.get("ro.product.name").contains("pci") ||
++                SystemProperties.getInt("persist.idt.enable_externalsource", 0) == 0) {
++                showDialogInner(DLG_UNKNOWN_SOURCES_RESTRICTED_FOR_USER);
++                return;
++            }
++
+             if (systemRestriction != 0) {
+                 showDialogInner(DLG_UNKNOWN_SOURCES_RESTRICTED_FOR_USER);
+             } else if (unknownSourcesRestrictionSource != UserManager.RESTRICTION_NOT_SET) {

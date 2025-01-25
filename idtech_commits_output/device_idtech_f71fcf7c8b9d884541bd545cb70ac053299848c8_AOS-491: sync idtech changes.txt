@@ -1,0 +1,937 @@
+f71fcf7c George.Huang 2021-01-26
+
+AOS-491: sync idtech changes
+
+Change-Id: I7b9db6a22944dea35c36eb9b267c213c1cef10db
+
+diff --git a/imx8m/kingscanyon_8mq/AndroidBoard.mk b/imx8m/kingscanyon_8mq/AndroidBoard.mk
+index cb6595f6..7d2ec036 100644
+--- a/imx8m/kingscanyon_8mq/AndroidBoard.mk
++++ b/imx8m/kingscanyon_8mq/AndroidBoard.mk
+@@ -3,6 +3,7 @@ LOCAL_PATH := $(call my-dir)
+ include device/idtech/common/build/dtbo.mk
+ include device/idtech/common/build/imx-recovery.mk
+ include device/idtech/common/build/gpt.mk
++include device/idtech/common/build/userdata.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
+ include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
+ -include $(IMX_MEDIA_CODEC_XML_PATH)/mediacodec-profile/mediacodec-profile.mk
+diff --git a/imx8m/kingscanyon_8mq/AndroidUboot.mk b/imx8m/kingscanyon_8mq/AndroidUboot.mk
+index 54be2971..e9e79f26 100644
+--- a/imx8m/kingscanyon_8mq/AndroidUboot.mk
++++ b/imx8m/kingscanyon_8mq/AndroidUboot.mk
+@@ -13,11 +13,11 @@ define build_imx_uboot
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
+-	cp $(UBOOT_OUT)/arch/arm/dts/imx8mq-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/arch/arm/dts/idt_imx8mq_evt-0_ibr210_evt-0.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/imx8mq-evk.dtb; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/hdmi/cadence/signed_hdmi_imx8m.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+ 	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
+-	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
++	if [ `echo $(2) | cut -d '-' -f3` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
+ 		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mq.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
+ 		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
+ 	else \
+@@ -37,9 +37,15 @@ define build_imx_uboot
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	else \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/spl-$(strip $(2)).bin; \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/u-boot-ivt.itb $(UBOOT_COLLECTION)/bootloader-$(strip $(2)).img; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/spl-$(strip $(2)).bin bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	fi;
+ endef
+ 
+diff --git a/imx8m/kingscanyon_8mq/BoardConfig.mk b/imx8m/kingscanyon_8mq/BoardConfig.mk
+index 6c4378ab..0c10c0d3 100644
+--- a/imx8m/kingscanyon_8mq/BoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/BoardConfig.mk
+@@ -3,7 +3,8 @@
+ #
+ 
+ BOARD_SOC_TYPE := IMX8MQ
+-BOARD_TYPE := EVK
++BOARD_SOM_TYPE := imx8mq
++BOARD_TYPE := IBR210
+ BOARD_MAIN_DISPLAY_ROTATION := 0
+ BOARD_HAVE_VPU := true
+ BOARD_VPU_TYPE := hantro
+@@ -43,9 +44,9 @@ TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.nxp
+ 
+ # Support gpt
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+-  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab_super.bpt
++  BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab_super.bpt
+   ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab_super.bpt \
+-                           partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader_super.bpt \
+                            partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
+ else
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+@@ -54,9 +55,9 @@ else
+                              partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
+                              partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
+   else
+-    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-13GB-ab.bpt
++    BOARD_BPT_INPUT_FILES += device/idtech/common/partition/device-partitions-14.4GB-ab.bpt
+     ADDITION_BPT_PARTITION = partition-table-28GB:device/idtech/common/partition/device-partitions-28GB-ab.bpt \
+-                             partition-table-dual:device/idtech/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                             partition-table-dual:device/idtech/common/partition/device-partitions-14.4GB-ab-dual-bootloader.bpt \
+                              partition-table-28GB-dual:device/idtech/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
+   endif
+ endif
+@@ -98,9 +99,8 @@ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+ TARGET_USES_MKE2FS := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ 
+ BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
+ BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
+@@ -140,7 +140,9 @@ $(error "TARGET_USERIMAGES_USE_UBIFS and TARGET_USERIMAGES_USE_EXT4 config open
+ endif
+ endif
+ 
+-BOARD_PREBUILT_DTBOIMAGE := out/target/product/kingscanyon_8mq/dtbo-imx8mq.img
++LOWER_BOARD_TYPE  = $(shell echo $(BOARD_TYPE) | tr A-Z a-z)
++LOWER_BOARD_SOC_TYPE  = $(shell echo $(BOARD_SOC_TYPE) | tr A-Z a-z)
++BOARD_PREBUILT_DTBOIMAGE := out/target/product/kingscanyon_8mq/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
+@@ -158,7 +160,7 @@ else # no dynamic parition feature
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product-no-dynamic_partition.dtb
+   else
+-	TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-dynamic_partition.dtb
+   endif
+ endif
+ 
+@@ -177,3 +179,7 @@ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
+ BOARD_USES_METADATA_PARTITION := true
+ BOARD_ROOT_EXTRA_FOLDERS += metadata
++
++BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private
++
++AB_OTA_PARTITIONS += spl_bak
+diff --git a/imx8m/kingscanyon_8mq/SharedBoardConfig.mk b/imx8m/kingscanyon_8mq/SharedBoardConfig.mk
+index 47318712..98fc2d66 100644
+--- a/imx8m/kingscanyon_8mq/SharedBoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/SharedBoardConfig.mk
+@@ -7,10 +7,10 @@ PRODUCT_IMX_TRUSTY := true
+ #Enable this to disable product partition build.
+ #IMX_NO_PRODUCT_PARTITION := true
+ 
+-#NXP 8997 wifi driver module
++# BCM fmac wifi driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+-    $(KERNEL_OUT)/drivers/net/wireless/nxp/mxm_wifiex/wlan_src/mlan.ko \
+-    $(KERNEL_OUT)/drivers/net/wireless/nxp/mxm_wifiex/wlan_src/moal.ko
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmfmac/brcmfmac.ko \
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmutil/brcmutil.ko
+ 
+ # mipi-panel touch driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+diff --git a/imx8m/kingscanyon_8mq/UbootKernelBoardConfig.mk b/imx8m/kingscanyon_8mq/UbootKernelBoardConfig.mk
+index 5aa1ce35..22472590 100644
+--- a/imx8m/kingscanyon_8mq/UbootKernelBoardConfig.mk
++++ b/imx8m/kingscanyon_8mq/UbootKernelBoardConfig.mk
+@@ -2,19 +2,20 @@ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+ # u-boot target for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG := imx8mq:imx8mq_evk_android_defconfig
+-TARGET_BOOTLOADER_CONFIG += imx8mq-dual:imx8mq_evk_android_dual_defconfig
++TARGET_BOOTLOADER_CONFIG := imx8mq-lpddr4:imx8mq_evk_android_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mq-lpddr4-dual:imx8mq_evk_android_dual_defconfig:signed
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty:imx8mq_evk_android_trusty_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-secure-unlock:imx8mq_evk_android_trusty_secure_unlock_defconfig
+-  TARGET_BOOTLOADER_CONFIG += imx8mq-trusty-dual:imx8mq_evk_android_trusty_dual_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-lpddr4-trusty:imx8mq_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-lpddr4-trusty-secure-unlock:imx8mq_evk_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mq-lpddr4-trusty-dual:imx8mq_evk_android_trusty_dual_defconfig
+ endif
+ 
+ # u-boot target used by uuu for imx8mq_evk
+-TARGET_BOOTLOADER_CONFIG += imx8mq-evk-uuu:imx8mq_evk_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mq-lpddr4-evk-uuu:imx8mq_evk_android_uuu_defconfig:signed
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+-# TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
++TARGET_KERNEL_ADDITION_DEFCONF ?= android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+diff --git a/imx8m/kingscanyon_8mq/android_addition_defconfig b/imx8m/kingscanyon_8mq/android_addition_defconfig
+new file mode 100644
+index 00000000..6ec11015
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/android_addition_defconfig
+@@ -0,0 +1,255 @@
++CONFIG_IDG_SPI=y
++# CONFIG_USB_NET_QMI_WWAN is not set
++CONFIG_SINGLE_LOGO=y
++CONFIG_SPLASH_SCREEN_CENTERED=y
++CONFIG_USB_SERIAL=y
++CONFIG_USB_SERIAL_OPTION=y
++# CONFIG_INPUT_VL53L1X_ULD is not set
++CONFIG_SND_SOC_IMX_RT5640=y
++CONFIG_SND_SOC_RT5640=y
++# CONFIG_SND_SOC_IMX_TLV320AIC31XX is not set
++# CONFIG_SND_SOC_TLV320AIC31XX is not set
++CONFIG_KEYBOARD_MATRIX=y
++# CONFIG_TYPEC_HD3SS3220 is not set
++CONFIG_MXC_DUAL_MIPI_CAMERA=y
++CONFIG_MXC_CAMERA_OV2685_MIPI_V2=y
++# CONFIG_INPUT_ST is not set
++# CONFIG_INPUT_ECOMPASS is not set
++# CONFIG_INPUT_LSM303AGR is not set
++# CONFIG_INPUT_LSM303AGR_I2C is not set
++# CONFIG_TOUCHSCREEN_ILI9881_I2C is not set
++# CONFIG_DRM_PANEL_TIANMA_TM050JDHC02 is not set
++# CONFIG_TOUCHSCREEN_GOODIX is not set
++# CONFIG_DRM_PANEL_DATAIMAGE_5INCHLCM is not set
++CONFIG_DEBUG_FS=y
++CONFIG_PPP=y
++CONFIG_PPP_ASYNC=y
++CONFIG_PPP_SYNC_TTY=y
++
++CONFIG_PARAVIRT=y
++CONFIG_NETFILTER_XT_TARGET_CT=y
++CONFIG_MVMDIO=y
++CONFIG_MDIO_BITBANG=y
++CONFIG_I2C_SLAVE=y
++CONFIG_GPIOLIB=y
++CONFIG_GPIO_GENERIC_PLATFORM=y
++CONFIG_POWER_RESET_BRCMSTB=y
++CONFIG_REGULATOR=y
++CONFIG_DRM_I2C_CH7006=m
++CONFIG_DRM_I2C_SIL164=m
++CONFIG_TMPFS=y
++CONFIG_BCM_FLEXRM_MBOX=y
++CONFIG_PHY_SAMSUNG_USB2=y
++CONFIG_ARM_TIMER_SP804=y
++CONFIG_COMMON_CLK_VERSATILE=y
++CONFIG_CLK_SP810=y
++CONFIG_USB_SNP_UDC_PLAT=y
++CONFIG_USB_BDC_UDC=y
++CONFIG_BCM_SBA_RAID=m
++CONFIG_USB_PRINTER=y
++CONFIG_MLX90614=y
++CONFIG_HID_CP2112=y
++
++# CONFIG_KVM is not set
++# CONFIG_MTD_UBI is not set
++# CONFIG_VGA_ARB is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_ALPINE is not set
++# CONFIG_ARCH_BCM2835 is not set
++# CONFIG_ARCH_BCM_IPROC is not set
++# CONFIG_ARCH_BERLIN is not set
++# CONFIG_ARCH_BRCMSTB is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_LAYERSCAPE is not set
++# CONFIG_ARCH_LG1K is not set
++# CONFIG_ARCH_HISI is not set
++# CONFIG_ARCH_MEDIATEK is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_ARCH_QCOM is not set
++# CONFIG_ARCH_ROCKCHIP is not set
++# CONFIG_ARCH_SEATTLE is not set
++# CONFIG_ARCH_RENESAS is not set
++# CONFIG_ARCH_R8A7795 is not set
++# CONFIG_ARCH_R8A7796 is not set
++# CONFIG_ARCH_STRATIX10 is not set
++# CONFIG_ARCH_TEGRA is not set
++# CONFIG_ARCH_SPRD is not set
++# CONFIG_ARCH_THUNDER is not set
++# CONFIG_ARCH_THUNDER2 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_ARCH_VEXPRESS is not set
++# CONFIG_ARCH_XGENE is not set
++# CONFIG_ARCH_ZX is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_PCI_HISI is not set
++# CONFIG_PCIE_KIRIN is not set
++# CONFIG_PCI_AARDVARK is not set
++# CONFIG_PCIE_RCAR is not set
++# CONFIG_PCIE_ROCKCHIP is not set
++# CONFIG_XEN is not set
++# CONFIG_SPI_FSL_QUADSPI is not set
++# CONFIG_XEN_BLKDEV_BACKEND is not set
++# CONFIG_AHCI_MVEBU is not set
++# CONFIG_SATA_RCAR is not set
++# CONFIG_NET_XGENE is not set
++# CONFIG_MVNETA is not set
++# CONFIG_MVPP2 is not set
++# CONFIG_RAVB is not set
++# CONFIG_MESON_GXL_PHY is not set
++# CONFIG_XEN_NETDEV_BACKEND is not set
++# CONFIG_INPUT_PM8941_PWRKEY is not set
++# CONFIG_INPUT_HISI_POWERKEY is not set
++# CONFIG_SERIAL_8250_BCM2835AUX is not set
++# CONFIG_SERIAL_8250_MT6577 is not set
++# CONFIG_SERIAL_8250_UNIPHIER is not set
++# CONFIG_SERIAL_MESON is not set
++# CONFIG_SERIAL_MESON_CONSOLE is not set
++# CONFIG_SERIAL_SAMSUNG is not set
++# CONFIG_SERIAL_SAMSUNG_CONSOLE is not set
++# CONFIG_SERIAL_TEGRA is not set
++# CONFIG_SERIAL_SH_SCI is not set
++# CONFIG_SERIAL_SH_SCI_NR_UARTS is not set
++# CONFIG_SERIAL_SH_SCI_CONSOLE is not set
++# CONFIG_SERIAL_MSM is not set
++# CONFIG_SERIAL_MSM_CONSOLE is not set
++# CONFIG_SERIAL_XILINX_PS_UART is not set
++# CONFIG_SERIAL_XILINX_PS_UART_CONSOLE is not set
++# CONFIG_SERIAL_MVEBU_UART is not set
++# CONFIG_I2C_BCM2835 is not set
++# CONFIG_I2C_MESON is not set
++# CONFIG_I2C_MV64XXX is not set
++# CONFIG_I2C_PXA is not set
++# CONFIG_I2C_QUP is not set
++# CONFIG_I2C_SH_MOBILE is not set
++# CONFIG_I2C_TEGRA is not set
++# CONFIG_I2C_UNIPHIER_F is not set
++# CONFIG_I2C_RCAR is not set
++# CONFIG_SPI_BCM2835 is not set
++# CONFIG_SPI_BCM2835AUX is not set
++# CONFIG_SPI_MESON_SPICC is not set
++# CONFIG_SPI_ORION is not set
++# CONFIG_SPI_ROCKCHIP is not set
++# CONFIG_SPI_QUP is not set
++# CONFIG_SPI_S3C64XX is not set
++# CONFIG_PINCTRL_MAX77620 is not set
++# CONFIG_PINCTRL_IPQ8074 is not set
++# CONFIG_PINCTRL_MSM8916 is not set
++# CONFIG_PINCTRL_MSM8994 is not set
++# CONFIG_PINCTRL_MSM8996 is not set
++# CONFIG_PINCTRL_QDF2XXX is not set
++# CONFIG_PINCTRL_QCOM_SPMI_PMIC is not set
++# CONFIG_GPIO_RCAR is not set
++# CONFIG_GPIO_XGENE_SB is not set
++# CONFIG_POWER_RESET_MSM is not set
++# CONFIG_ROCKCHIP_THERMAL is not set
++# CONFIG_EXYNOS_THERMAL is not set
++# CONFIG_S3C2410_WATCHDOG is not set
++# CONFIG_MESON_GXBB_WATCHDOG is not set
++# CONFIG_MESON_WATCHDOG is not set
++# CONFIG_RENESAS_WDT is not set
++# CONFIG_UNIPHIER_WATCHDOG is not set
++# CONFIG_BCM2835_WDT is not set
++# CONFIG_MFD_AXP20X_RSB is not set
++# CONFIG_MFD_EXYNOS_LPASS is not set
++# CONFIG_MFD_HI655X_PMIC is not set
++# CONFIG_MFD_SPMI_PMIC is not set
++# CONFIG_REGULATOR_AXP20X is not set
++# CONFIG_REGULATOR_HI655X is not set
++# CONFIG_REGULATOR_QCOM_SMD_RPM is not set
++# CONFIG_RPMSG is not set
++# CONFIG_IR_MESON is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_JPEG is not set
++# CONFIG_VIDEO_SAMSUNG_S5P_MFC is not set
++# CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC is not set
++# CONFIG_VIDEO_RENESAS_FCP is not set
++# CONFIG_VIDEO_RENESAS_VSP1 is not set
++# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
++# CONFIG_ROCKCHIP_CDN_DP is not set
++# CONFIG_ROCKCHIP_DW_HDMI is not set
++# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
++# CONFIG_ROCKCHIP_INNO_HDMI is not set
++# CONFIG_SND_BCM2835_SOC_I2S is not set
++# CONFIG_SND_SOC_SAMSUNG is not set
++# CONFIG_SND_SOC_RCAR is not set
++# CONFIG_DRM_NOUVEAU is not set
++# CONFIG_DRM_EXYNOS is not set
++# CONFIG_DRM_EXYNOS5433_DECON is not set
++# CONFIG_DRM_EXYNOS7_DECON is not set
++# CONFIG_DRM_EXYNOS_DSI is not set
++# CONFIG_DRM_EXYNOS_DP is not set
++# CONFIG_DRM_EXYNOS_HDMI is not set
++# CONFIG_DRM_EXYNOS_MIC is not set
++# CONFIG_DRM_ROCKCHIP is not set
++# CONFIG_DRM_RCAR_DU is not set
++# CONFIG_DRM_RCAR_LVDS is not set
++# CONFIG_DRM_RCAR_VSP is not set
++# CONFIG_DRM_TEGRA is not set
++# CONFIG_DRM_VC4 is not set
++# CONFIG_DRM_MESON is not set
++# CONFIG_USB_XHCI_TEGRA is not set
++# CONFIG_USB_EHCI_MSM is not set
++# CONFIG_USB_EHCI_EXYNOS is not set
++# CONFIG_USB_OHCI_EXYNOS is not set
++# CONFIG_USB_RENESAS_USBHS is not set
++# CONFIG_USB_QCOM_8X16_PHY is not set
++# CONFIG_RASPBERRYPI_FIRMWARE is not set
++# CONFIG_PHY_SUN4I_USB is not set
++# CONFIG_PHY_HI6220_USB is not set
++# CONFIG_PHY_RCAR_GEN3_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_EMMC is not set
++# CONFIG_PHY_ROCKCHIP_INNO_USB2 is not set
++# CONFIG_PHY_ROCKCHIP_PCIE is not set
++# CONFIG_PHY_TEGRA_XUSB is not set
++# CONFIG_QCOM_L2_PMU is not set
++# CONFIG_QCOM_L3_PMU is not set
++# CONFIG_PWM_MESON is not set
++# CONFIG_PWM_ROCKCHIP is not set
++# CONFIG_PWM_SAMSUNG is not set
++# CONFIG_PWM_TEGRA is not set
++# CONFIG_QCOM_SMEM is not set
++# CONFIG_QCOM_SMD_RPM is not set
++# CONFIG_QCOM_SMP2P is not set
++# CONFIG_QCOM_SMSM is not set
++# CONFIG_ROCKCHIP_PM_DOMAINS is not set
++# CONFIG_ARCH_TEGRA_132_SOC is not set
++# CONFIG_ARCH_TEGRA_210_SOC is not set
++# CONFIG_ARCH_TEGRA_186_SOC is not set
++# CONFIG_EXYNOS_ADC is not set
++# CONFIG_ROCKCHIP_SARADC is not set
++# CONFIG_PWM_BCM2835 is not set
++# CONFIG_RPMSG_QCOM_SMD is not set
++# CONFIG_RASPBERRYPI_POWER is not set
++# CONFIG_BCM2835_MBOX is not set
++# CONFIG_HI6220_MBOX is not set
++# CONFIG_ROCKCHIP_IOMMU is not set
++# CONFIG_HWSPINLOCK_QCOM is not set
++# CONFIG_COMMON_CLK_QCOM is not set
++# CONFIG_QCOM_CLK_SMD_RPM is not set
++# CONFIG_IPQ_GCC_8074 is not set
++# CONFIG_MSM_GCC_8916 is not set
++# CONFIG_MSM_GCC_8994 is not set
++# CONFIG_MSM_MMCC_8996 is not set
++# CONFIG_USB_RENESAS_USBHS_UDC is not set
++# CONFIG_MMC_SDHCI_OF_ESDHC is not set
++# CONFIG_XEN_GNTDEV is not set
++# CONFIG_XEN_GRANT_DEV_ALLOC is not set
++# CONFIG_RCAR_DMAC is not set
++# CONFIG_TEGRA20_APB_DMA is not set
++# CONFIG_QCOM_BAM_DMA is not set
++# CONFIG_K3_DMA is not set
++# CONFIG_DMA_BCM2835 is not set
++# CONFIG_RTC_DRV_XGENE is not set
++# CONFIG_RTC_DRV_TEGRA is not set
++# CONFIG_RTC_DRV_S3C is not set
++# CONFIG_MMC_DW_ROCKCHIP is not set
++# CONFIG_MMC_SUNXI is not set
++# CONFIG_MMC_BCM2835 is not set
++# CONFIG_MMC_SDHCI_TEGRA is not set
++# CONFIG_MMC_MESON_GX is not set
++# CONFIG_MMC_SDHCI_MSM is not set
++# CONFIG_MMC_SDHI is not set
++# CONFIG_MMC_DW_EXYNOS is not set
+diff --git a/imx8m/kingscanyon_8mq/android_secure_defconfig b/imx8m/kingscanyon_8mq/android_secure_defconfig
+new file mode 100644
+index 00000000..9dea4bc9
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/android_secure_defconfig
+@@ -0,0 +1,2 @@
++# CONFIG_SERIAL_IMX_CONSOLE is not set
++# CONFIG_DEBUG_FS is not set
+diff --git a/imx8m/kingscanyon_8mq/fstab.nxp b/imx8m/kingscanyon_8mq/fstab.nxp
+index e6098afd..ef66c15b 100644
+--- a/imx8m/kingscanyon_8mq/fstab.nxp
++++ b/imx8m/kingscanyon_8mq/fstab.nxp
+@@ -10,3 +10,5 @@
+ /dev/block/zram0 none swap defaults zramsize=629145600
+ /tmp /sdcard none defaults,bind recoveryonly
+ 
++/devices/platform/soc@0/soc@0:bus@30800000/30b50000.mmc/mmc_host* /storage/sdcard1 vfat nosuid,nodev wait,voldmanaged=sdcard1:auto,encryptable=footer
++/devices/platform/soc@0/38100000.usb/* auto auto defaults voldmanaged=usb:auto
+diff --git a/imx8m/kingscanyon_8mq/init.imx8mq.rc b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+index 4b82e581..9e0b3c05 100755
+--- a/imx8m/kingscanyon_8mq/init.imx8mq.rc
++++ b/imx8m/kingscanyon_8mq/init.imx8mq.rc
+@@ -20,6 +20,9 @@ on early-boot
+     chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+     chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+ 
++    # disable 3D composition overlay to fix video rotate problem
++    setprop vendor.hwc.enable.overlay 0
++
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+@@ -45,3 +48,10 @@ on property:sys.boot_completed=1
+     # system-background is for system tasks that should only run on
+     # little cores, not on bigs to be used only by init
+     write /dev/cpuset/system-background/cpus 0-2
++
++on init
++    #IDtech added for AB ota update bootloader
++    symlink   /dev/block/mmcblk0boot0p1   /dev/block/by-name/spl_a
++    symlink   /dev/block/mmcblk0boot1p1   /dev/block/by-name/spl_b
++    symlink   /dev/block/mmcblk0boot0p2   /dev/block/by-name/spl_bak_a
++    symlink   /dev/block/mmcblk0boot1p2   /dev/block/by-name/spl_bak_b
+diff --git a/imx8m/kingscanyon_8mq/init.rc b/imx8m/kingscanyon_8mq/init.rc
+index 4cc05421..e6eba774 100644
+--- a/imx8m/kingscanyon_8mq/init.rc
++++ b/imx8m/kingscanyon_8mq/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /product/etc/init/hw/init.idt.common.rc
+ 
+ service vendor.charger /system/bin/charger
+     class charger
+diff --git a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+index 89f74773..5cc1365a 100644
+--- a/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
++++ b/imx8m/kingscanyon_8mq/kingscanyon_8mq.mk
+@@ -81,7 +81,13 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
++    device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img \
++    device/idtech/common/prebuilts/mem_info.img:$(PRODUCT_OUT)/mem_info.img \
++    device/idtech/common/prebuilts/mem_info.txt:$(PRODUCT_OUT)/mem_info.txt \
++    device/idtech/imx8m/device_policy.sh:$(TARGET_COPY_OUT_PRODUCT)/etc/init/hw/device_policy.sh
+ 
+ # We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
+ # boot ramdisk so far, we need this step to generate the vendor-ramdisk folder or build process would fail. This
+@@ -100,6 +106,8 @@ PRODUCT_COPY_FILES += \
+     device/idtech/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
+     device/idtech/common/audio-json/ak5558_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak5558_config.json \
+     device/idtech/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
++    device/idtech/common/audio-json/rt5640_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/rt5640_config.json \
++    device/idtech/common/audio-json/tlv320aic3110_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/tlv320aic3110_config.json \
+     device/idtech/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
+ 
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+@@ -363,14 +371,9 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+ PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
+ 
+-# Tensorflow lite camera demo
++# Multi-Client IME
+ PRODUCT_PACKAGES += \
+-                    tflitecamerademo
+-
+-# Multi-Display launcher
+-PRODUCT_PACKAGES += \
+-    MultiClientInputMethod \
+-    MultiDisplay
++    MultiClientInputMethod
+ 
+ # Specify rollback index for boot and vbmeta partitions
+ ifneq ($(AVB_RBINDEX),)
+@@ -410,3 +413,25 @@ PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/camera
+ $(call  inherit-product-if-exists, vendor/nxp-private/security/nxp_security.mk)
+ 
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
++
++#AMS
++PRODUCT_PACKAGES += \
++    deviceadmin \
++    appmanager \
++    amsconnector \
++    amsclouddrive \
++    amsbootmediasync \
++    welcomeapp \
++    diagnosis \
++    otaupdater \
++    peripheralmanager \
++    watchdog
++
++# Enable kernel log for diagnosis
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.logd.kernel=true
++
++PRODUCT_PACKAGES += \
++    kioskled.imx \
++    android.hardware.kioskled@1.0-service \
++    android.hardware.kioskled-V1.0-java
+diff --git a/imx8m/kingscanyon_8mq/manifest.xml b/imx8m/kingscanyon_8mq/manifest.xml
+index ce13861d..26e9a10b 100644
+--- a/imx8m/kingscanyon_8mq/manifest.xml
++++ b/imx8m/kingscanyon_8mq/manifest.xml
+@@ -170,4 +170,13 @@
+             <instance>default</instance>
+         </interface>
+     </hal>
++    <hal format="hidl">
++        <name>android.hardware.kioskled</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IKioskled</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
+ </manifest>
+diff --git a/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index be3cd041..4722b491 100644
+--- a/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -190,4 +190,11 @@
+ 
+     <!-- If the system has the input method for each display - enable per-display focus. -->
+     <bool name="config_perDisplayFocusEnabled">true</bool>
++
++    <!-- The default gravity for the picture-in-picture window.
++         Currently, this maps to Gravity.TOP | Gravity.RIGHT -->
++    <integer name="config_defaultPictureInPictureGravity">0x35</integer>
++
++    <!-- Flag indicating whether orientation is able to change by application.-->
++    <bool name="config_orientation_lock_available">true</bool>
+ </resources>
+diff --git a/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml
+new file mode 100644
+index 00000000..ab758423
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml
+@@ -0,0 +1,19 @@
++<!--
++/* Copyright 2012, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++<resources>
++  <java-symbol type="bool" name="config_orientation_lock_available" />
++</resources>
+diff --git a/imx8m/kingscanyon_8mq/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml b/imx8m/kingscanyon_8mq/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+index 660abbe5..0bf9ee21 100644
+--- a/imx8m/kingscanyon_8mq/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
++++ b/imx8m/kingscanyon_8mq/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+@@ -21,4 +21,5 @@
+     <bool name="def_user_setup_complete">true</bool>
+     <bool name="def_bluetooth_on">false</bool>
+     <bool name="def_stay_on_while_plugged_in">true</bool>
++    <string name="def_immersive_mode_confirmations" translatable="false">confirmed</string>
+ </resources>
+diff --git a/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/values/strings.xml b/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/values/strings.xml
+new file mode 100644
+index 00000000..34ef4132
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/values/strings.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2007 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
++    <!-- Display settings screen, setting option name to lock display orientation. [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_title">Lock display orientation</string>
++    <!-- Setting option summary [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_summary">Lock display orientation to avoid orientaion changed by application</string>
++    <!-- Search keywords for display orientation lock [CHAR LIMIT=NONE]-->
++    <string name="keywords_lock_display_orientation">display orientation, lock orientation, unlock orientation</string>
++</resources>
+diff --git a/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml b/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml
+new file mode 100644
+index 00000000..6c138ce2
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml
+@@ -0,0 +1,160 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2016 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<PreferenceScreen
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:settings="http://schemas.android.com/apk/res-auto"
++    android:key="display_settings_screen"
++    android:title="@string/display_settings"
++    settings:keywords="@string/keywords_display"
++    settings:initialExpandedChildrenCount="5">
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="brightness"
++        android:title="@string/brightness"
++        settings:keywords="@string/keywords_display_brightness_level"
++        settings:useAdminDisabledSummary="true"
++        settings:userRestriction="no_config_brightness">
++        <intent android:action="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
++    </com.android.settingslib.RestrictedPreference>
++
++    <com.android.settings.display.darkmode.DarkModePreference
++        android:key="dark_ui_mode"
++        android:title="@string/dark_ui_mode"
++        android:fragment="com.android.settings.display.darkmode.DarkModeSettingsFragment"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:controller="com.android.settings.display.DarkUIPreferenceController"
++        settings:searchable="false"/>
++
++    <com.android.settings.display.NightDisplayPreference
++        android:key="night_display"
++        android:title="@string/night_display_title"
++        android:fragment="com.android.settings.display.NightDisplaySettings"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="auto_brightness_entry"
++        android:title="@string/auto_brightness_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AutoBrightnessSettings"
++        settings:controller="com.android.settings.display.AutoBrightnessPreferenceController"/>
++
++    <SwitchPreference
++        android:key="lock_display_orientation"
++        android:title="@string/lock_orientation_title"
++        android:summary="@string/lock_orientation_summary"
++	settings:controller="com.android.settings.display.LockDisplayOrientPreferenceController" />
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="wallpaper"
++        android:title="@string/wallpaper_settings_title"
++        settings:keywords="@string/keywords_display_wallpaper"
++        settings:useAdminDisabledSummary="true"
++        settings:controller="com.android.settings.display.WallpaperPreferenceController">
++    </com.android.settingslib.RestrictedPreference>
++
++    <!-- Cross-listed item, if you change this, also change it in power_usage_summary.xml -->
++    <com.android.settings.display.TimeoutListPreference
++        android:key="screen_timeout"
++        android:title="@string/screen_timeout"
++        android:summary="@string/summary_placeholder"
++        android:entries="@array/screen_timeout_entries"
++        android:entryValues="@array/screen_timeout_values"
++        settings:keywords="@string/keywords_screen_timeout" />
++
++    <Preference
++        android:key="adaptive_sleep_entry"
++        android:title="@string/adaptive_sleep_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AdaptiveSleepSettings"
++        settings:controller="com.android.settings.display.AdaptiveSleepPreferenceController" />
++
++    <SwitchPreference
++        android:key="auto_rotate"
++        android:title="@string/accelerometer_title"
++        settings:keywords="@string/keywords_auto_rotate"
++        settings:controller="com.android.settings.display.AutoRotatePreferenceController" />
++
++    <Preference
++        android:key="color_mode"
++        android:title="@string/color_mode_title"
++        android:fragment="com.android.settings.display.ColorModePreferenceFragment"
++        settings:controller="com.android.settings.display.ColorModePreferenceController"
++        settings:keywords="@string/keywords_color_mode" />
++
++    <SwitchPreference
++        android:key="display_white_balance"
++        android:title="@string/display_white_balance_title"
++        android:summary="@string/display_white_balance_summary"
++        settings:controller="com.android.settings.display.DisplayWhiteBalancePreferenceController" />
++
++    <Preference
++        android:key="font_size"
++        android:title="@string/title_font_size"
++        android:fragment="com.android.settings.display.ToggleFontSizePreferenceFragment"
++        settings:controller="com.android.settings.display.FontSizePreferenceController" />
++
++    <com.android.settings.display.ScreenZoomPreference
++        android:key="display_settings_screen_zoom"
++        android:title="@string/screen_zoom_title"
++        android:fragment="com.android.settings.display.ScreenZoomSettings"
++        settings:searchable="false"/>
++
++    <SwitchPreference
++        android:key="show_operator_name"
++        android:title="@string/show_operator_name_title"
++        android:summary="@string/show_operator_name_summary" />
++
++    <Preference
++        android:key="screensaver"
++        android:title="@string/screensaver_settings_title"
++        android:fragment="com.android.settings.dream.DreamSettings"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="lockscreen_from_display_settings"
++        android:title="@string/lockscreen_settings_title"
++        android:fragment="com.android.settings.security.LockscreenDashboardFragment"
++        settings:controller="com.android.settings.security.screenlock.LockScreenPreferenceController" />
++
++    <SwitchPreference
++        android:key="camera_gesture"
++        android:title="@string/camera_gesture_title"
++        android:summary="@string/camera_gesture_desc" />
++
++    <SwitchPreference
++        android:key="lift_to_wake"
++        android:title="@string/lift_to_wake_title" />
++
++    <SwitchPreference
++        android:key="tap_to_wake"
++        android:title="@string/tap_to_wake"
++        android:summary="@string/tap_to_wake_summary" />
++
++    <ListPreference
++        android:key="theme"
++        android:title="@string/device_theme"
++        android:summary="@string/summary_placeholder" />
++
++    <Preference
++        android:key="vr_display_pref"
++        android:title="@string/display_vr_pref_title"
++        android:fragment="com.android.settings.display.VrDisplayPreferencePicker" />
++
++</PreferenceScreen>
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/attributes b/imx8m/kingscanyon_8mq/sepolicy/attributes
+new file mode 100644
+index 00000000..4f651be6
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/attributes
+@@ -0,0 +1,3 @@
++attribute hal_kioskled;
++attribute hal_kioskled_client;
++attribute hal_kioskled_server;
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/file.te b/imx8m/kingscanyon_8mq/sepolicy/file.te
+new file mode 100644
+index 00000000..13d940a6
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/file.te
+@@ -0,0 +1 @@
++type sysfs_idtech_kioskleds, fs_type, sysfs_type;
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/file_contexts b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+index bf7cde83..09cead84 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/file_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+@@ -23,6 +23,12 @@
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/userdata         u:object_r:userdata_block_device:s0
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/vbmeta_[ab]      u:object_r:vbmeta_block_device:s0
+ /dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/super            u:object_r:super_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/bootloader_[ab]  u:object_r:bootloader_block_device:s0
++/dev/block/platform/soc@0/soc@0\:bus@30800000/30b40000\.mmc/by-name/mem_info_[ab]    u:object_r:bootloader_block_device:s0
++
++# spl
++/dev/block/mmcblk0boot[01]            u:object_r:spl_block_device:s0
++/dev/block/mmcblk0boot[01]p[1-9]      u:object_r:spl_block_device:s0
+ 
+ #peripheral
+ /vendor/bin/magd                u:object_r:sensors_exec:s0
+@@ -41,3 +47,7 @@
+ /vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
+ 
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++#Kiosk Led file node
++/sys/devices/platform/leds/leds/LED_KIOSK_[0-9]/brightness     u:object_r:sysfs_idtech_kioskleds:s0
++/vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+new file mode 100644
+index 00000000..b6561eeb
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+@@ -0,0 +1,16 @@
++type hal_kioskled_default, domain, mlstrustedsubject;
++type hal_kioskled_default_exec, exec_type, vendor_file_type, file_type;
++
++init_daemon_domain(hal_kioskled_default)
++hal_server_domain(hal_kioskled_default, hal_kioskled)
++
++# HwBinder IPC from client to server, and callbacks
++binder_call(hal_kioskled_client, hal_kioskled_server)
++binder_call(hal_kioskled_server, hal_kioskled_client)
++
++add_hwservice(hal_kioskled_server, hal_kioskled_hwservice)
++allow hal_kioskled_client hal_kioskled_hwservice:hwservice_manager find;
++
++
++allow hal_kioskled_default sysfs_idtech_kioskleds:file rw_file_perms;
++allow hal_kioskled_default sysfs_leds:dir search;
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hwservice.te b/imx8m/kingscanyon_8mq/sepolicy/hwservice.te
+new file mode 100644
+index 00000000..560c4b41
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/hwservice.te
+@@ -0,0 +1 @@
++type hal_kioskled_hwservice, hwservice_manager_type;
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hwservice_contexts b/imx8m/kingscanyon_8mq/sepolicy/hwservice_contexts
+new file mode 100644
+index 00000000..cfc3211d
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/hwservice_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled::IKioskled      u:object_r:hal_kioskled_hwservice:s0
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/platform_app.te b/imx8m/kingscanyon_8mq/sepolicy/platform_app.te
+new file mode 100644
+index 00000000..3d928234
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/platform_app.te
+@@ -0,0 +1,4 @@
++allow platform_app sysfs_idtech_kioskleds:file { rw_file_perms };
++allow platform_app sysfs_leds:dir { search };
++allow platform_app hal_kioskled_hwservice:hwservice_manager { find };
++allow platform_app hal_kioskled_default:binder { call };
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/system_server.te b/imx8m/kingscanyon_8mq/sepolicy/system_server.te
+new file mode 100644
+index 00000000..dc511380
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/system_server.te
+@@ -0,0 +1 @@
++hal_client_domain(system_server, hal_kioskled)
+diff --git a/imx8m/kingscanyon_8mq/ueventd.nxp.rc b/imx8m/kingscanyon_8mq/ueventd.nxp.rc
+index 667dada7..a84f90c4 100644
+--- a/imx8m/kingscanyon_8mq/ueventd.nxp.rc
++++ b/imx8m/kingscanyon_8mq/ueventd.nxp.rc
+@@ -17,3 +17,8 @@
+ 
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
+ /sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++/dev/usb/lp0              0666   root         root
++
++#KIOSK LED
++/sys/class/leds/LED_KIOSK_* brightness 0666 root root

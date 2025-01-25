@@ -1,0 +1,156 @@
+70c43600 George.Huang 2021-12-13
+
+AOS-825: refine bringup_test.sh
+
+- run check_bringup service as root, not shell
+
+- use lspci command
+
+- add 2 inputs for check_sdcard
+  check_sdcard $test_size $sleep_sec
+
+- run 2 more functions in check_bringup
+  check_sdcard 1000 0
+  check_idg_version
+
+- predefine 14 i2c address for redwood
+
+Change-Id: I5ec60a6d5542638035557dc9d284ba599831a1e7
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 8f7e63f6..badd9358 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -59,46 +59,40 @@ check_uart() {
+ }
+ 
+ check_pcie() {
+-# /sys/bus/pci_express/devices/*
+-  pcie_node="/sys/bus/pci_express/devices/"
+-  logi "== check_pcie: ${pcie_node}X"
+-  logi "`ls -1d ${pcie_node}*`"
+-  pcie_num=`ls -1d ${pcie_node}* |wc -l`
++# lspci
++  logi "== check_pcie: lspci"
++  logi "`lspci`"
++  pcie_num=`lspci |wc -l`
+   [ $pcie_num -ge 1 ] &&
+   logi "${pcie_num} pcie devices are found" ||
+   loge "${pcie_num} pcie devices are found"
+   logi ""
+-
+-# /sys/firmware/devicetree/base/soc@0/pcie@33800000
+-# /sys/firmware/devicetree/base/soc@0/pcie@33c00000
+-#  pcie_node="/sys/firmware/devicetree/base/soc@0/pcie@"
+-#  pcie_id=("33800000" "33c00000")
+-#  pcie_num=${#pcie_id[@]}
+-#  logi "== check_pcie: ${pcie_node}OOXX"
+-#  for ii in $(seq 0 $((pcie_num - 1))); do
+-#    test_node="${pcie_node}${pcie_id[ii]}"
+-#    [ -e "${test_node}" ] &&
+-#    logi "${test_node} is found" ||
+-#    loge "${test_node} not found"
+-#  done
+ }
+ 
+ check_i2c() {
+ # i2cdetect -y 0-2
+   logi "== check_i2c: i2cdetect -y [0-2]"
++  if [ "$(getprop ro.product.name)" == "redwood_8mq" ]; then
++    i2c_array=("0-0008" "0-0020" "0-0024" "0-0055" \
++               "1-000c" "1-0010" "1-002c" "1-0036" "1-0037" "1-0051" \
++               "2-0018" "2-0045" "2-004e" "2-0068")
++    i2c_num=${#i2c_array[@]}
++  fi
++  if [ -z $i2c_num ]; then
++    i2c_array=(`ls /sys/bus/i2c/devices/`)
++    i2c_num=${#i2c_array[@]}
++  fi
++  for i in $(seq 0 $((i2c_num - 1))); do
++    i2c_addr=`echo ${i2c_array[$i]} |cut -d'-' -f1`
++    dev_path="/sys/bus/i2c/devices/${i2c_array[$i]}"
++    dev_name=`cat ${dev_path}/name`
++    [ -z "$dev_name" ] && dev_name="XXXXXX"
++    dev_addr=`echo ${i2c_array[$i]} |cut -d'-' -f2`
++    dev_status=`i2cget -f -y $i2c_addr 0x${dev_addr} 0x00`
++    [ -z "$dev_status" ] && dev_status="XXXX"
++    logi "${dev_path}: ${dev_name}: ${dev_status}"
++  done
+   for ii in $(seq 0 2); do
+-    [ ${ii} -eq 0 ] && logi "= check_i2c${ii}: usb_hub(NN) / touch(--)"
+-    [ ${ii} -eq 1 ] && logi "= check_i2c${ii}: lcd(UU) / display(--) / camera(--)"
+-    [ ${ii} -eq 2 ] && logi "= check_i2c${ii}: audio(UU) / optical(UU) / pcm_microphone(NN) / pcie_osc(NN)"
+-    dev_all_num=`i2cdetect -y ${ii} 2>&1 |sed "s|^.*: ||g" |grep -oe "[0-9A-Z][0-9A-Z]" |wc -l`
+-    dev_used_num=`i2cdetect -y ${ii} 2>&1 |sed "s|^.*: ||g" |grep -oe "UU" |wc -l`
+-    logi "i2c${ii} has ${dev_used_num} / ${dev_all_num} devices in use"
+-    for dev_path in `ls -d /sys/bus/i2c/devices/${ii}-*`; do
+-      dev_name=`cat ${dev_path}/name`
+-      dev_addr=`basename ${dev_path} |cut -d'-' -f2`
+-      dev_status=`i2cget -f -y $ii 0x${dev_addr} 0x00 2>&1`
+-      logi "${dev_path}: ${dev_name}: ${dev_status}"
+-    done
+     logi "`i2cdetect -y ${ii}`"
+   done
+   logi ""
+@@ -120,22 +114,28 @@ check_bringup() {
+   check_uart
+   check_pcie
+   check_spi
++  check_sdcard 1000 0
+   check_usb
+   check_i2c
++  check_idg_version
+   logi "====  END  ===="
+ }
+ 
+ check_sdcard() {
+-  logi "== check_sdcard"
+-  # 3GB
++  # default test 3GB
++  test_size=3000000
++  [ ! -z "$1" ] && test_size="$1"
++  sleep_sec=10
++  [ ! -z "$2" ] && sleep_sec="$2"
++  logi "== check_sdcard $test_size KB"
+   sdcard_path=$(df /mnt/media_rw/* | grep vold/public | cut -F6)
+   if [ -z "$sdcard_path" ]; then
+     # sleep 10 seconds and try again if sdcard not exist
+     logi "sdcard not found(df /mnt/media_rw/* | grep vold/public | cut -F6)"
+-    sleep 10
++    sleep $sleep_sec
+   else
+     logi "sdcard writing..."
+-    dd if=/dev/urandom of=$sdcard_path/urandom.img bs=1024 count=3000000
++    dd if=/dev/urandom of=$sdcard_path/urandom.img bs=1024 count=$test_size
+     ret=$?
+     if [ "$ret" = "0" ]; then
+       logi "sdcard writing... finish"
+@@ -143,6 +143,7 @@ check_sdcard() {
+       logi "sdcard writing... abort"
+     fi
+   fi
++  logi ""
+ }
+ 
+ check_idg_version() {
+diff --git a/imx8m/init.idt.bringuptest.rc b/imx8m/init.idt.bringuptest.rc
+index 51c55459..db64a30a 100644
+--- a/imx8m/init.idt.bringuptest.rc
++++ b/imx8m/init.idt.bringuptest.rc
+@@ -1,13 +1,13 @@
+ # uncomment below to enable auto start sdcard writing when boot complete
+ #on property:sys.boot_completed=1
+-#    setprop idt.repeat_times 5
+-#    start bringup_test
++#    setprop idt.repeat_times 1
++#    start check_bringup
+ 
+ service check_bringup /system/bin/sh /product/bin/bringup_test.sh check_bringup
+     class core
+     oneshot
+     disabled
+-    user shell
++    user root
+     group root shell
+     seclabel u:r:shell:s0
+     writepid /dev/cpuset/system-background/tasks

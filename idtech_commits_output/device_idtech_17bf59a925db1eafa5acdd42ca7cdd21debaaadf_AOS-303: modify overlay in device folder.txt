@@ -1,0 +1,470 @@
+17bf59a9 AndrewS 2020-09-14
+
+AOS-303: modify overlay in device folder
+
+Change-Id: I4d647e3b2319e014dfdae624669d7db4ead9e000
+
+diff --git a/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
+index 74da26b7..10cff2a0 100644
+--- a/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -209,4 +209,7 @@
+     <!-- Indicates that p2p MAC randomization is supported on this device -->
+     <bool translatable="false" name="config_wifi_p2p_mac_randomization_supported">true</bool>
+ 
++    <!-- Flag indicating whether orientation is able to change by application.-->
++    <bool name="config_orientation_lock_available">true</bool>
++
+ </resources>
+diff --git a/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/symbols.xml b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/symbols.xml
+new file mode 100644
+index 00000000..ab758423
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/overlay/frameworks/base/core/res/res/values/symbols.xml
+@@ -0,0 +1,19 @@
++<!--
++/* Copyright 2012, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++<resources>
++  <java-symbol type="bool" name="config_orientation_lock_available" />
++</resources>
+diff --git a/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/values/strings.xml b/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/values/strings.xml
+new file mode 100644
+index 00000000..34ef4132
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/values/strings.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2007 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
++    <!-- Display settings screen, setting option name to lock display orientation. [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_title">Lock display orientation</string>
++    <!-- Setting option summary [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_summary">Lock display orientation to avoid orientaion changed by application</string>
++    <!-- Search keywords for display orientation lock [CHAR LIMIT=NONE]-->
++    <string name="keywords_lock_display_orientation">display orientation, lock orientation, unlock orientation</string>
++</resources>
+diff --git a/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/xml/display_settings.xml b/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/xml/display_settings.xml
+new file mode 100644
+index 00000000..6c138ce2
+--- /dev/null
++++ b/imx8m/bigcypress_8mp/overlay/packages/apps/Settings/res/xml/display_settings.xml
+@@ -0,0 +1,160 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2016 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<PreferenceScreen
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:settings="http://schemas.android.com/apk/res-auto"
++    android:key="display_settings_screen"
++    android:title="@string/display_settings"
++    settings:keywords="@string/keywords_display"
++    settings:initialExpandedChildrenCount="5">
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="brightness"
++        android:title="@string/brightness"
++        settings:keywords="@string/keywords_display_brightness_level"
++        settings:useAdminDisabledSummary="true"
++        settings:userRestriction="no_config_brightness">
++        <intent android:action="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
++    </com.android.settingslib.RestrictedPreference>
++
++    <com.android.settings.display.darkmode.DarkModePreference
++        android:key="dark_ui_mode"
++        android:title="@string/dark_ui_mode"
++        android:fragment="com.android.settings.display.darkmode.DarkModeSettingsFragment"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:controller="com.android.settings.display.DarkUIPreferenceController"
++        settings:searchable="false"/>
++
++    <com.android.settings.display.NightDisplayPreference
++        android:key="night_display"
++        android:title="@string/night_display_title"
++        android:fragment="com.android.settings.display.NightDisplaySettings"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="auto_brightness_entry"
++        android:title="@string/auto_brightness_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AutoBrightnessSettings"
++        settings:controller="com.android.settings.display.AutoBrightnessPreferenceController"/>
++
++    <SwitchPreference
++        android:key="lock_display_orientation"
++        android:title="@string/lock_orientation_title"
++        android:summary="@string/lock_orientation_summary"
++	settings:controller="com.android.settings.display.LockDisplayOrientPreferenceController" />
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="wallpaper"
++        android:title="@string/wallpaper_settings_title"
++        settings:keywords="@string/keywords_display_wallpaper"
++        settings:useAdminDisabledSummary="true"
++        settings:controller="com.android.settings.display.WallpaperPreferenceController">
++    </com.android.settingslib.RestrictedPreference>
++
++    <!-- Cross-listed item, if you change this, also change it in power_usage_summary.xml -->
++    <com.android.settings.display.TimeoutListPreference
++        android:key="screen_timeout"
++        android:title="@string/screen_timeout"
++        android:summary="@string/summary_placeholder"
++        android:entries="@array/screen_timeout_entries"
++        android:entryValues="@array/screen_timeout_values"
++        settings:keywords="@string/keywords_screen_timeout" />
++
++    <Preference
++        android:key="adaptive_sleep_entry"
++        android:title="@string/adaptive_sleep_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AdaptiveSleepSettings"
++        settings:controller="com.android.settings.display.AdaptiveSleepPreferenceController" />
++
++    <SwitchPreference
++        android:key="auto_rotate"
++        android:title="@string/accelerometer_title"
++        settings:keywords="@string/keywords_auto_rotate"
++        settings:controller="com.android.settings.display.AutoRotatePreferenceController" />
++
++    <Preference
++        android:key="color_mode"
++        android:title="@string/color_mode_title"
++        android:fragment="com.android.settings.display.ColorModePreferenceFragment"
++        settings:controller="com.android.settings.display.ColorModePreferenceController"
++        settings:keywords="@string/keywords_color_mode" />
++
++    <SwitchPreference
++        android:key="display_white_balance"
++        android:title="@string/display_white_balance_title"
++        android:summary="@string/display_white_balance_summary"
++        settings:controller="com.android.settings.display.DisplayWhiteBalancePreferenceController" />
++
++    <Preference
++        android:key="font_size"
++        android:title="@string/title_font_size"
++        android:fragment="com.android.settings.display.ToggleFontSizePreferenceFragment"
++        settings:controller="com.android.settings.display.FontSizePreferenceController" />
++
++    <com.android.settings.display.ScreenZoomPreference
++        android:key="display_settings_screen_zoom"
++        android:title="@string/screen_zoom_title"
++        android:fragment="com.android.settings.display.ScreenZoomSettings"
++        settings:searchable="false"/>
++
++    <SwitchPreference
++        android:key="show_operator_name"
++        android:title="@string/show_operator_name_title"
++        android:summary="@string/show_operator_name_summary" />
++
++    <Preference
++        android:key="screensaver"
++        android:title="@string/screensaver_settings_title"
++        android:fragment="com.android.settings.dream.DreamSettings"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="lockscreen_from_display_settings"
++        android:title="@string/lockscreen_settings_title"
++        android:fragment="com.android.settings.security.LockscreenDashboardFragment"
++        settings:controller="com.android.settings.security.screenlock.LockScreenPreferenceController" />
++
++    <SwitchPreference
++        android:key="camera_gesture"
++        android:title="@string/camera_gesture_title"
++        android:summary="@string/camera_gesture_desc" />
++
++    <SwitchPreference
++        android:key="lift_to_wake"
++        android:title="@string/lift_to_wake_title" />
++
++    <SwitchPreference
++        android:key="tap_to_wake"
++        android:title="@string/tap_to_wake"
++        android:summary="@string/tap_to_wake_summary" />
++
++    <ListPreference
++        android:key="theme"
++        android:title="@string/device_theme"
++        android:summary="@string/summary_placeholder" />
++
++    <Preference
++        android:key="vr_display_pref"
++        android:title="@string/display_vr_pref_title"
++        android:fragment="com.android.settings.display.VrDisplayPreferencePicker" />
++
++</PreferenceScreen>
+diff --git a/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+index d1688c04..8d7c88d0 100644
+--- a/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
++++ b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -231,4 +231,7 @@
+     <!-- The default gravity for the picture-in-picture window.
+          Currently, this maps to Gravity.TOP | Gravity.RIGHT -->
+     <integer name="config_defaultPictureInPictureGravity">0x35</integer>
++
++    <!-- Flag indicating whether orientation is able to change by application.-->
++    <bool name="config_orientation_lock_available">true</bool>
+ </resources>
+diff --git a/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml
+new file mode 100644
+index 00000000..ab758423
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/overlay/frameworks/base/core/res/res/values/symbols.xml
+@@ -0,0 +1,19 @@
++<!--
++/* Copyright 2012, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++<resources>
++  <java-symbol type="bool" name="config_orientation_lock_available" />
++</resources>
+diff --git a/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/values/strings.xml b/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/values/strings.xml
+new file mode 100644
+index 00000000..34ef4132
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/values/strings.xml
+@@ -0,0 +1,23 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2007 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
++    <!-- Display settings screen, setting option name to lock display orientation. [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_title">Lock display orientation</string>
++    <!-- Setting option summary [CHAR LIMIT=NONE] -->
++    <string name="lock_orientation_summary">Lock display orientation to avoid orientaion changed by application</string>
++    <!-- Search keywords for display orientation lock [CHAR LIMIT=NONE]-->
++    <string name="keywords_lock_display_orientation">display orientation, lock orientation, unlock orientation</string>
++</resources>
+diff --git a/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml b/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml
+new file mode 100644
+index 00000000..6c138ce2
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/overlay/packages/apps/Settings/res/xml/display_settings.xml
+@@ -0,0 +1,160 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2016 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<PreferenceScreen
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:settings="http://schemas.android.com/apk/res-auto"
++    android:key="display_settings_screen"
++    android:title="@string/display_settings"
++    settings:keywords="@string/keywords_display"
++    settings:initialExpandedChildrenCount="5">
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="brightness"
++        android:title="@string/brightness"
++        settings:keywords="@string/keywords_display_brightness_level"
++        settings:useAdminDisabledSummary="true"
++        settings:userRestriction="no_config_brightness">
++        <intent android:action="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
++    </com.android.settingslib.RestrictedPreference>
++
++    <com.android.settings.display.darkmode.DarkModePreference
++        android:key="dark_ui_mode"
++        android:title="@string/dark_ui_mode"
++        android:fragment="com.android.settings.display.darkmode.DarkModeSettingsFragment"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:controller="com.android.settings.display.DarkUIPreferenceController"
++        settings:searchable="false"/>
++
++    <com.android.settings.display.NightDisplayPreference
++        android:key="night_display"
++        android:title="@string/night_display_title"
++        android:fragment="com.android.settings.display.NightDisplaySettings"
++        android:widgetLayout="@null"
++        settings:widgetLayout="@null"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="auto_brightness_entry"
++        android:title="@string/auto_brightness_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AutoBrightnessSettings"
++        settings:controller="com.android.settings.display.AutoBrightnessPreferenceController"/>
++
++    <SwitchPreference
++        android:key="lock_display_orientation"
++        android:title="@string/lock_orientation_title"
++        android:summary="@string/lock_orientation_summary"
++	settings:controller="com.android.settings.display.LockDisplayOrientPreferenceController" />
++
++    <com.android.settingslib.RestrictedPreference
++        android:key="wallpaper"
++        android:title="@string/wallpaper_settings_title"
++        settings:keywords="@string/keywords_display_wallpaper"
++        settings:useAdminDisabledSummary="true"
++        settings:controller="com.android.settings.display.WallpaperPreferenceController">
++    </com.android.settingslib.RestrictedPreference>
++
++    <!-- Cross-listed item, if you change this, also change it in power_usage_summary.xml -->
++    <com.android.settings.display.TimeoutListPreference
++        android:key="screen_timeout"
++        android:title="@string/screen_timeout"
++        android:summary="@string/summary_placeholder"
++        android:entries="@array/screen_timeout_entries"
++        android:entryValues="@array/screen_timeout_values"
++        settings:keywords="@string/keywords_screen_timeout" />
++
++    <Preference
++        android:key="adaptive_sleep_entry"
++        android:title="@string/adaptive_sleep_title"
++        android:summary="@string/summary_placeholder"
++        android:fragment="com.android.settings.display.AdaptiveSleepSettings"
++        settings:controller="com.android.settings.display.AdaptiveSleepPreferenceController" />
++
++    <SwitchPreference
++        android:key="auto_rotate"
++        android:title="@string/accelerometer_title"
++        settings:keywords="@string/keywords_auto_rotate"
++        settings:controller="com.android.settings.display.AutoRotatePreferenceController" />
++
++    <Preference
++        android:key="color_mode"
++        android:title="@string/color_mode_title"
++        android:fragment="com.android.settings.display.ColorModePreferenceFragment"
++        settings:controller="com.android.settings.display.ColorModePreferenceController"
++        settings:keywords="@string/keywords_color_mode" />
++
++    <SwitchPreference
++        android:key="display_white_balance"
++        android:title="@string/display_white_balance_title"
++        android:summary="@string/display_white_balance_summary"
++        settings:controller="com.android.settings.display.DisplayWhiteBalancePreferenceController" />
++
++    <Preference
++        android:key="font_size"
++        android:title="@string/title_font_size"
++        android:fragment="com.android.settings.display.ToggleFontSizePreferenceFragment"
++        settings:controller="com.android.settings.display.FontSizePreferenceController" />
++
++    <com.android.settings.display.ScreenZoomPreference
++        android:key="display_settings_screen_zoom"
++        android:title="@string/screen_zoom_title"
++        android:fragment="com.android.settings.display.ScreenZoomSettings"
++        settings:searchable="false"/>
++
++    <SwitchPreference
++        android:key="show_operator_name"
++        android:title="@string/show_operator_name_title"
++        android:summary="@string/show_operator_name_summary" />
++
++    <Preference
++        android:key="screensaver"
++        android:title="@string/screensaver_settings_title"
++        android:fragment="com.android.settings.dream.DreamSettings"
++        settings:searchable="false" />
++
++    <Preference
++        android:key="lockscreen_from_display_settings"
++        android:title="@string/lockscreen_settings_title"
++        android:fragment="com.android.settings.security.LockscreenDashboardFragment"
++        settings:controller="com.android.settings.security.screenlock.LockScreenPreferenceController" />
++
++    <SwitchPreference
++        android:key="camera_gesture"
++        android:title="@string/camera_gesture_title"
++        android:summary="@string/camera_gesture_desc" />
++
++    <SwitchPreference
++        android:key="lift_to_wake"
++        android:title="@string/lift_to_wake_title" />
++
++    <SwitchPreference
++        android:key="tap_to_wake"
++        android:title="@string/tap_to_wake"
++        android:summary="@string/tap_to_wake_summary" />
++
++    <ListPreference
++        android:key="theme"
++        android:title="@string/device_theme"
++        android:summary="@string/summary_placeholder" />
++
++    <Preference
++        android:key="vr_display_pref"
++        android:title="@string/display_vr_pref_title"
++        android:fragment="com.android.settings.display.VrDisplayPreferencePicker" />
++
++</PreferenceScreen>

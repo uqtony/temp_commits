@@ -1,0 +1,167 @@
+29b693d8c74f AndrewS 2021-10-14
+
+AOS-768: adjust LCD backlight settings
+
+Change-Id: Id83ca568de418db059254ebdc9c668ed4e509921
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 4d8ed8529c0a..aed9ac2276e4 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -328,8 +328,11 @@ backlight: backlight {
+ 		compatible = "led-backlight";
+ 		leds = <&lcd_bl>;
+ 
+-		brightness-levels = <0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255>;
+-		default-brightness-level = <12>;
++		brightness-levels = <0   15  31  47  63  79  95  111 127 135
++				     143 151 159 167 175 183 191 195 199 203
++				     207 211 215 219 223 227 231 235 239 243
++				     247 251 255>;
++		default-brightness-level = <20>;
+ 	};
+ 
+ 	gpio-leds {
+@@ -702,6 +705,11 @@ led-controller@36 {
+ 		reg = <0x36>;
+ 		enable-gpios = <&gpio3 10 GPIO_ACTIVE_HIGH>;
+ 		vled-supply = <&reg_backlight_5v_vdd>;
++		boost-ovp = <24>;
++		auto-headroom;
++		auto-frequency;
++		auto-freq-threshold = <0x74>;
++		start-up-ramp-level = <1>;
+ 
+ 		lcd_bl: led@0 {
+ 			reg = <0>;
+diff --git a/drivers/leds/leds-lm3697.c b/drivers/leds/leds-lm3697.c
+index 7d216cdb91a8..4f3c9b131c5a 100644
+--- a/drivers/leds/leds-lm3697.c
++++ b/drivers/leds/leds-lm3697.c
+@@ -19,6 +19,8 @@
+ #define LM3697_CTRL_A_B_BRT_CFG		0x16
+ #define LM3697_CTRL_A_FS_CURR_CFG	0x17
+ #define LM3697_CTRL_B_FS_CURR_CFG	0x18
++#define LM3697_CTRL_BOOST_CFG		0x1a
++#define LM3697_AUTO_FREQ_THRESHOLD	0x1b
+ #define LM3697_PWM_CFG			0x1c
+ #define LM3697_CTRL_A_BRT_LSB		0x20
+ #define LM3697_CTRL_A_BRT_MSB		0x21
+@@ -38,6 +40,16 @@
+ #define LM3697_CONTROL_B	1
+ #define LM3697_MAX_CONTROL_BANKS 2
+ 
++#define LM3697_CTRL_BOOST_OVP_MASK	(BIT(1) | BIT(2))
++#define LM3697_CTRL_BOOST_OVP_16V	0
++#define LM3697_CTRL_BOOST_OVP_24V	BIT(1)
++#define LM3697_CTRL_BOOST_OVP_32V	BIT(2)
++#define LM3697_CTRL_BOOST_OVP_40V	(BIT(1) | BIT(2))
++#define LM3697_CTRL_BOOST_AUTO_FREQ_EN	BIT(3)
++#define LM3697_CTRL_BOOST_AUTO_HROOM_EN	BIT(4)
++
++#define LM3697_CTRL_A_RAMP_START	(BIT(4) | BIT(5) | BIT(6) | BIT(7))
++
+ /**
+  * struct lm3697_led -
+  * @hvled_strings: Array of LED strings associated with a control bank
+@@ -160,6 +172,9 @@ static int lm3697_init(struct lm3697 *priv)
+ 	struct device *dev = priv->dev;
+ 	struct lm3697_led *led;
+ 	int i, ret;
++	int val, boost_ovp = 0;
++	int auto_freq_threshold = 0;
++	int start_up_ramp_level = 0;
+ 
+ 	if (priv->enable_gpio) {
+ 		gpiod_direction_output(priv->enable_gpio, 1);
+@@ -181,6 +196,73 @@ static int lm3697_init(struct lm3697 *priv)
+ 	if (ret)
+ 		dev_err(dev, "Cannot write OUTPUT config
+");
+ 
++	/* config OVP */
++	ret = of_property_read_u32(dev->of_node, "boost-ovp", &boost_ovp);
++	if (ret)
++		dev_err(dev, "boost ovp missing or invalid, set it as default
+");
++
++	switch (boost_ovp) {
++	case 16:
++	default:
++		val = LM3697_CTRL_BOOST_OVP_16V;
++		break;
++	case 24:
++		val = LM3697_CTRL_BOOST_OVP_24V;
++		break;
++	case 32:
++		val = LM3697_CTRL_BOOST_OVP_32V;
++		break;
++	case 40:
++		val = LM3697_CTRL_BOOST_OVP_40V;
++		break;
++	}
++
++	ret = regmap_update_bits(priv->regmap, LM3697_CTRL_BOOST_CFG,
++				 LM3697_CTRL_BOOST_OVP_MASK,
++				 val);
++	if (ret)
++		dev_err(dev, "Cannot set OVP value
+");
++
++	if (of_get_property(dev->of_node, "auto-frequency", NULL)) {
++		ret = of_property_read_u32(dev->of_node, "auto-freq-threshold",
++					   &auto_freq_threshold);
++		if (!ret) {
++			ret = regmap_update_bits(priv->regmap, LM3697_CTRL_BOOST_CFG,
++						 LM3697_CTRL_BOOST_AUTO_FREQ_EN,
++						 LM3697_CTRL_BOOST_AUTO_FREQ_EN);
++			if (!ret) {
++				ret = regmap_update_bits(priv->regmap,
++							 LM3697_AUTO_FREQ_THRESHOLD,
++							 0xff,
++							 auto_freq_threshold);
++				if (ret)
++					dev_err(dev, "Cannot set auto freq threshold
+");
++			} else {
++				dev_err(dev, "Cannot set auto freq en
+");
++			}
++		}
++	}
++
++	if (of_get_property(dev->of_node, "auto-headroom", NULL)) {
++		ret = regmap_update_bits(priv->regmap, LM3697_CTRL_BOOST_CFG,
++					 LM3697_CTRL_BOOST_AUTO_HROOM_EN,
++					 LM3697_CTRL_BOOST_AUTO_HROOM_EN);
++		if (ret)
++			dev_err(dev, "Cannot enable auto head room
+");
++	}
++
++	ret = of_property_read_u32(dev->of_node, "start-up-ramp-level", &start_up_ramp_level);
++	if (ret)
++		dev_err(dev, "start up ramp missing or invalid
+");
++
++	if (start_up_ramp_level) {
++		ret = regmap_update_bits(priv->regmap, LM3697_CTRL_A_RAMP,
++					 LM3697_CTRL_A_RAMP_START,
++					 start_up_ramp_level << 4);
++		if (ret)
++			dev_err(dev, "Cannot set start_up_ramp_level value
+");
++	}
++
+ 	for (i = 0; i < priv->num_banks; i++) {
+ 		led = &priv->leds[i];
+ 		ret = ti_lmu_common_set_ramp(&led->lmu_data);
+@@ -239,7 +321,7 @@ static int lm3697_probe_dt(struct lm3697 *priv)
+ 
+ 		led->control_bank = control_bank;
+ 		led->lmu_data.regmap = priv->regmap;
+-		led->lmu_data.runtime_ramp_reg = LM3697_CTRL_A_RAMP +
++		led->lmu_data.runtime_ramp_reg = LM3697_CTRL_A_B_RT_RAMP +
+ 						 control_bank;
+ 		led->lmu_data.msb_brightness_reg = LM3697_CTRL_A_BRT_MSB +
+ 						   led->control_bank * 2;

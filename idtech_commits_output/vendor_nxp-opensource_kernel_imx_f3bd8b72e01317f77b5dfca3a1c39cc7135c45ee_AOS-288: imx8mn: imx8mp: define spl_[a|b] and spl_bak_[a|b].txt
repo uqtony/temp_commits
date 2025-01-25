@@ -1,0 +1,47 @@
+f3bd8b72e013 George.Huang 2020-08-24
+
+AOS-288: imx8mn: imx8mp: define spl_[a|b] and spl_bak_[a|b]
+
+imx8mq spl_offset is 66 sectors = 33K
+imx8mn spl_offset is  0 sectors =  0K
+imx8mp spl_offset is  0 sectors =  0K
+
+Change-Id: I66f9b4aacf87356f15c66ba7e8f9439fae3c8d1a
+
+diff --git a/drivers/mmc/core/block.c b/drivers/mmc/core/block.c
+index be3435139bfa..b0d328cdf14e 100644
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -2869,6 +2869,7 @@ static int mmc_blk_probe(struct mmc_card *card)
+ {
+ 	struct mmc_blk_data *md, *part_md;
+ 	char cap_str[10];
++	size_t spl_offset = 0;
+ 
+ 	/*
+ 	 * Check that the card supports the command class(es) we need.
+@@ -2913,12 +2914,19 @@ static int mmc_blk_probe(struct mmc_card *card)
+ 		 */
+ 		if ((part_md->area_type & MMC_BLK_DATA_AREA_BOOT)) {
+ 			if (of_machine_is_compatible("fsl,imx8mq")) {
++				/* for imx8mq only */
+ 				/* primary spl: 66 sectors=33K, 4030 sectors=2048K-33K */
+-				pr_info("IDTech added partition at offset 33k
+");
+-				add_partition(part_md->disk, 1, 66, 4030, 0, NULL);
+ 				/* secondary spl: 4162 sectors=2048K+33K, 4030 sectors=2048K-33K */
+-				add_partition(part_md->disk, 2, 4162, 4030, 0, NULL);
++				spl_offset = 66;
++			} else {
++				/* for imx8mp and imx8mn */
++				/* primary spl: 0 sectors=0K, 4096 sectors=2048K */
++				/* secondary spl: 4096 sectors=2048K, 4096 sectors=2048K */
++				spl_offset = 0;
+ 			}
++			pr_info("IDTech added partition at offset %zu sectors
+", spl_offset);
++			add_partition(part_md->disk, 1, 0    + spl_offset, 4096 - spl_offset, 0, NULL);
++			add_partition(part_md->disk, 2, 4096 + spl_offset, 4096 - spl_offset, 0, NULL);
+ 		}
+ 	}
+ 

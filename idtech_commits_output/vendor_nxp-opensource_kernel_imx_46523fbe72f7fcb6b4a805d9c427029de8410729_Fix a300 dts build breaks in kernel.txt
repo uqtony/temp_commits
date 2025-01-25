@@ -1,0 +1,252 @@
+46523fbe72f7 George.Huang 2020-06-08
+
+Fix a300 dts build breaks in kernel
+
+Change-Id: I0ebd8ad664f8d4bcaf55437e6e0daed5c22277af
+
+diff --git a/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-0.dts
+index 5c202a83a270..7c997424e5cd 100755
+--- a/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-0.dts
+@@ -149,20 +149,6 @@ pcie1_refclk: pcie0-refclk {
+ 		clock-frequency = <100000000>;
+ 	};
+ 
+-	ptn36043 {
+-		compatible = "nxp,ptn36043";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ss_sel>;
+-		switch-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+-		orientation-switch;
+-
+-		port {
+-			usb3_data_ss: endpoint {
+-				remote-endpoint = <&typec_con_ss>;
+-			};
+-		};
+-	};
+-
+ 	reg_usdhc2_vmmc: regulator-vsd-3v3 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_reg_usdhc2>;
+@@ -205,6 +191,7 @@ sound-wm8524 {
+ 		simple-audio-card,routing =
+ 			"Left Line Out Jack", "LINEVOUTL",
+ 			"Right Line Out Jack", "LINEVOUTR";
++		status = "disabled";
+ 
+ 		cpudai: simple-audio-card,cpu {
+ 			sound-dai = <&sai2>;
+@@ -216,7 +203,6 @@ link_codec: simple-audio-card,codec {
+ 			sound-dai = <&wm8524>;
+ 			clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+ 		};
+-		status = "disabled";
+ 	};
+ 
+ 	sound-hdmi {
+@@ -822,12 +808,7 @@ &usb_dwc3_0 {
+ 	snps,dis-u1-entry-quirk;
+ 	snps,dis-u2-entry-quirk;
+ 	status = "okay";
+-
+-	port {
+-		usb3_drd_sw: endpoint {
+-			remote-endpoint = <&typec_hd3ss3220>;
+-		};
+-	};
++	extcon = <&typec_hd3ss3220>;
+ };
+ 
+ &usb3_phy1 {
+@@ -1242,13 +1223,13 @@ &lcdif {
+ 	max-res = <720>, <1280>;
+ 
+ 	port@0 {
+-		lcdif_mipi_dsi: endpoint {
++		lcdif_out: endpoint {
+ 			remote-endpoint = <&mipi_dsi_in>;
+ 		};
+ 	};
+ };
+ 
+-&mipi_dsi_phy {
++&dphy {
+ 	status = "okay";
+ };
+ 
+@@ -1257,16 +1238,6 @@ &mipi_dsi {
+ 	as_bridge;
+ 	sync-pol = <1>;
+ 
+-	port@1 {
+-		mipi_dsi_in: endpoint {
+-			remote-endpoint = <&lcdif_mipi_dsi>;
+-		};
+-	};
+-};
+-
+-&mipi_dsi_bridge {
+-	status = "okay";
+-
+ 	panel@0 {
+ 		compatible = "ilitek,ili9881cc";
+ 		reg = <0>;
+@@ -1300,13 +1271,19 @@ timing {
+ 
+ 		port {
+ 			panel1_in: endpoint {
+-				remote-endpoint = <&mipi_dsi_bridge_out>;
++				remote-endpoint = <&mipi_dsi_out>;
+ 			};
+ 		};
+ 	};
+ 
++	port@1 {
++		mipi_dsi_in: endpoint {
++			remote-endpoint = <&lcdif_out>;
++		};
++	};
++
+ 	port@2 {
+-		mipi_dsi_bridge_out: endpoint {
++		mipi_dsi_out: endpoint {
+ 			remote-endpoint = <&panel1_in>;
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-1.dts b/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-1.dts
+index f482cccaed62..a56ff3ec9b51 100755
+--- a/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm64/boot/dts/freescale/a300_evt-0_devboard_evt-1.dts
+@@ -149,20 +149,6 @@ pcie1_refclk: pcie0-refclk {
+ 		clock-frequency = <100000000>;
+ 	};
+ 
+-	ptn36043 {
+-		compatible = "nxp,ptn36043";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ss_sel>;
+-		switch-gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+-		orientation-switch;
+-
+-		port {
+-			usb3_data_ss: endpoint {
+-				remote-endpoint = <&typec_con_ss>;
+-			};
+-		};
+-	};
+-
+ 	reg_usdhc2_vmmc: regulator-vsd-3v3 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_reg_usdhc2>;
+@@ -205,6 +191,7 @@ sound-wm8524 {
+ 		simple-audio-card,routing =
+ 			"Left Line Out Jack", "LINEVOUTL",
+ 			"Right Line Out Jack", "LINEVOUTR";
++		status = "disabled";
+ 
+ 		cpudai: simple-audio-card,cpu {
+ 			sound-dai = <&sai2>;
+@@ -216,7 +203,6 @@ link_codec: simple-audio-card,codec {
+ 			sound-dai = <&wm8524>;
+ 			clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+ 		};
+-		status = "disabled";
+ 	};
+ 
+ 	sound-hdmi {
+@@ -843,12 +829,7 @@ &usb_dwc3_0 {
+ 	snps,dis-u1-entry-quirk;
+ 	snps,dis-u2-entry-quirk;
+ 	status = "okay";
+-
+-	port {
+-		usb3_drd_sw: endpoint {
+-			remote-endpoint = <&typec_hd3ss3220>;
+-		};
+-	};
++	extcon = <&typec_hd3ss3220>;
+ };
+ 
+ &usb3_phy1 {
+@@ -1263,13 +1244,13 @@ &lcdif {
+ 	max-res = <720>, <1280>;
+ 
+ 	port@0 {
+-		lcdif_mipi_dsi: endpoint {
++		lcdif_out: endpoint {
+ 			remote-endpoint = <&mipi_dsi_in>;
+ 		};
+ 	};
+ };
+ 
+-&mipi_dsi_phy {
++&dphy {
+ 	status = "okay";
+ };
+ 
+@@ -1278,16 +1259,6 @@ &mipi_dsi {
+ 	as_bridge;
+ 	sync-pol = <1>;
+ 
+-	port@1 {
+-		mipi_dsi_in: endpoint {
+-			remote-endpoint = <&lcdif_mipi_dsi>;
+-		};
+-	};
+-};
+-
+-&mipi_dsi_bridge {
+-	status = "okay";
+-
+ 	panel@0 {
+ 		compatible = "himax,hx8394f";
+ 		reg = <0>;
+@@ -1321,13 +1292,19 @@ timing {
+ 
+ 		port {
+ 			panel1_in: endpoint {
+-				remote-endpoint = <&mipi_dsi_bridge_out>;
++				remote-endpoint = <&mipi_dsi_out>;
+ 			};
+ 		};
+ 	};
+ 
++	port@1 {
++		mipi_dsi_in: endpoint {
++			remote-endpoint = <&lcdif_out>;
++		};
++	};
++
+ 	port@2 {
+-		mipi_dsi_bridge_out: endpoint {
++		mipi_dsi_out: endpoint {
+ 			remote-endpoint = <&panel1_in>;
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index 054b774da8e0..f1a51f77b691 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@ -10,7 +10,7 @@
+ #include "a300_evt-0_devboard_evt-0.dts"
+ 
+ / {
+-	idt,prod-id = "idt_a300_evt-0_devboard_evk-0";
++	idt,prod-id = "idt_a300_evt-0_devboard_evt-0";
+ };
+ 
+ / {
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+index 8fe16cd0beea..9bb40e5acfa3 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-1.dts
+@@ -10,7 +10,7 @@
+ #include "a300_evt-0_devboard_evt-1.dts"
+ 
+ / {
+-	idt,prod-id = "idt_a300_evt-0_devboard_evk-1";
++	idt,prod-id = "idt_a300_evt-0_devboard_evt-1";
+ };
+ 
+ / {

@@ -1,0 +1,31 @@
+a4b4a3466daa Arthur Chen 2020-08-11
+
+AOS-269: import NXP patch: MLK-24483-1
+
+MLK-24483-1: dmaengine: imx-sdma: remove ecspi_fixed on imx8mq
+
+ERR009165 are  not fix on i.mx8m family, so remove 'ecspi_fixed' on
+sdma_imx8mq, otherwise, i.mx8mn ecspi not work in dma mode as below:
+
+[ 8163.444680] SPI transfer using DMA
+[ 8163.448144] SPI DMA tx transfer timer: 500
+[ 8165.468250] spi_imx 30820000.spi: I/O Error in DMA TX
+[ 8165.473353] spidev spi0.0: SPI transfer failed: -110
+[ 8165.478446] spi_master spi0: failed to transfer one message from queue
+
+Signed-off-by: Robin Gong <yibin.gong@nxp.com>
+
+Change-Id: I7a4a0f1436b3b72112d63102260905aa4a2d8426
+
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 09ae4282ad56..a145004f649b 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -639,7 +639,6 @@ static struct sdma_driver_data sdma_imx8mq = {
+ 	.num_events = 48,
+ 	.script_addrs = &sdma_script_imx7d,
+ 	.check_ratio = 1,
+-	.ecspi_fixed = true,
+ };
+ 
+ static struct sdma_driver_data sdma_imx8mp = {

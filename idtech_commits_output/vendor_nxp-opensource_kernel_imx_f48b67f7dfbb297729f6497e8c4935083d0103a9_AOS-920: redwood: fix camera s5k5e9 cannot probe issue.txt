@@ -1,0 +1,22 @@
+f48b67f7dfbb Jay 2022-03-07
+
+AOS-920: redwood: fix camera s5k5e9 cannot probe issue
+
+Change error code as EPROBE_DEFER when cannot read chip id, kernel
+will retry probe again after related driver ready.
+
+Change-Id: Ib64e4bf7c2097da05e9ab607139573212ec7a6d5
+
+diff --git a/drivers/media/i2c/s5k5e9.c b/drivers/media/i2c/s5k5e9.c
+index 87bce90a101f..d5b4d5be0a26 100644
+--- a/drivers/media/i2c/s5k5e9.c
++++ b/drivers/media/i2c/s5k5e9.c
+@@ -758,7 +758,7 @@ static int s5k5e9_probe(struct i2c_client *client)
+ 	v4l2_i2c_subdev_init(sd, client, &s5k5e9_subdev_ops);
+ 	ret = s5k5e9_check_chip_id(sensor);
+ 	if (ret)
+-		return ret;
++		return -EPROBE_DEFER;
+ 
+ 	sensor->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+ 	sensor->format.code = s5k5e9_formats[0].code;

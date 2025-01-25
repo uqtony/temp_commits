@@ -1,0 +1,24 @@
+538f85747b George.Huang 2022-03-08
+
+AOS-887: fix build break from android-12.0.0_1.0.0
+
+Log:
+frameworks/av/services/audiopolicy/enginedefault/src/Engine.cpp:74:21:
+error: assigning to 'audio_devices_t' from incompatible type 'int64_t' (aka 'long')
+    reRouting_dev = property_get_int64("persist.idt.audio_rerouting_device", 0);
+
+Change-Id: Ic308cb6ca04154e7e63d9805a01259a6a0e25923
+
+diff --git a/services/audiopolicy/enginedefault/src/Engine.cpp b/services/audiopolicy/enginedefault/src/Engine.cpp
+index 92000e4bf0..2def16240a 100644
+--- a/services/audiopolicy/enginedefault/src/Engine.cpp
++++ b/services/audiopolicy/enginedefault/src/Engine.cpp
+@@ -71,7 +71,7 @@ Engine::Engine()
+     for (const auto &strategy : legacyStrategy) {
+         mLegacyStrategyMap[getProductStrategyByName(strategy.name)] = strategy.id;
+     }
+-    reRouting_dev = property_get_int64("persist.idt.audio_rerouting_device", 0);
++    reRouting_dev = (audio_devices_t)property_get_int64("persist.idt.audio_rerouting_device", 0);
+ }
+ 
+ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config)

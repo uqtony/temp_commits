@@ -1,0 +1,641 @@
+5822f1e Jay 2021-11-03
+
+AOS-787: support camera RAW format
+
+Support camera RAW format, transfer Bayer pattern to
+YUV420 by function "v4lconvert_bayer_to_yuv420" and transfer
+YUV420 to YUY2 by libyuv::I420ToYUY2.
+
+Now, camera hal support bayer pattern 8 and 10 bits format.
+But, imx8 mipi csi driver only support "BGGR8", "GRBG10"
+and "BGGR10". If want to use other format, must modify
+imx8 mipi csi driver first.
+
+Change-Id: Id75aaf9b4e4f139ae09b13dbcd0376b8adad8c3b
+
+diff --git a/camera/CameraDeviceHWLImpl.cpp b/camera/CameraDeviceHWLImpl.cpp
+index 07f3d3e..e53a0d3 100644
+--- a/camera/CameraDeviceHWLImpl.cpp
++++ b/camera/CameraDeviceHWLImpl.cpp
+@@ -229,6 +229,30 @@ status_t CameraDeviceHwlImpl::initSensorStaticData()
+     if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+         sensorFormats[index] = v4l2_fourcc('M', 'J', 'P', 'G');
+         availFormats[index++] = v4l2_fourcc('M', 'J', 'P', 'G');
++    } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
++        sensorFormats[index] = v4l2_fourcc('B', 'G', '1', '0');
++        availFormats[index++] = v4l2_fourcc('B', 'G', '1', '0');
++    } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
++        sensorFormats[index] = v4l2_fourcc('G', 'B', '1', '0');
++        availFormats[index++] = v4l2_fourcc('G', 'B', '1', '0');
++    } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
++        sensorFormats[index] = v4l2_fourcc('B', 'A', '1', '0');
++        availFormats[index++] = v4l2_fourcc('B', 'A', '1', '0');
++    } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
++        sensorFormats[index] = v4l2_fourcc('R', 'G', '1', '0');
++        availFormats[index++] = v4l2_fourcc('R', 'G', '1', '0');
++    } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
++        sensorFormats[index] = v4l2_fourcc('B', 'A', '8', '1');
++        availFormats[index++] = v4l2_fourcc('B', 'A', '8', '1');
++    } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
++        sensorFormats[index] = v4l2_fourcc('G', 'B', 'R', 'G');
++        availFormats[index++] = v4l2_fourcc('G', 'B', 'R', 'G');
++    } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
++        sensorFormats[index] = v4l2_fourcc('G', 'R', 'B', 'G');
++        availFormats[index++] = v4l2_fourcc('G', 'R', 'B', 'G');
++    } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
++        sensorFormats[index] = v4l2_fourcc('R', 'G', 'G', 'B');
++        availFormats[index++] = v4l2_fourcc('R', 'G', 'G', 'B');
+     } else {
+         sensorFormats[index] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+         availFormats[index++] = v4l2_fourcc('Y', 'U', 'Y', 'V');
+diff --git a/camera/CameraDeviceSessionHWLImpl.cpp b/camera/CameraDeviceSessionHWLImpl.cpp
+index 33cd511..badcf43 100644
+--- a/camera/CameraDeviceSessionHWLImpl.cpp
++++ b/camera/CameraDeviceSessionHWLImpl.cpp
+@@ -99,6 +99,15 @@ status_t CameraDeviceSessionHwlImpl::Initialize(
+     property_get("persist.idt.camera_format", value, "");
+     if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+         mMJPEG_format = true;
++    } else if (!strncmp(value, "BGGR10", strlen("BGGR10")) ||
++               !strncmp(value, "GBRG10", strlen("GBRG10")) ||
++               !strncmp(value, "GRBG10", strlen("GRBG10")) ||
++               !strncmp(value, "RGGB10", strlen("RGGB10")) ||
++               !strncmp(value, "BGGR8", strlen("BGGR8")) ||
++               !strncmp(value, "GBRG8", strlen("GBRG8")) ||
++               !strncmp(value, "GRBG8", strlen("GRBG8")) ||
++               !strncmp(value, "RGGB8", strlen("RGGB8"))) {
++        mRAW_format = true;
+     }
+ 
+     m_meta = pDev->m_meta->Clone();
+@@ -674,8 +683,7 @@ status_t CameraDeviceSessionHwlImpl::ProcessCapturedBuffer(ImxStreamBuffer *srcB
+         if (dstBuf->mStream->format() == HAL_PIXEL_FORMAT_BLOB) {
+             mJpegBuilder->reset();
+             mJpegBuilder->setMetadata(&requestMeta);
+-
+-            if (mMJPEG_format) {
++            if (mMJPEG_format || mRAW_format) {
+                 fsl::ImageProcess *imageProcess = fsl::ImageProcess::getInstance();
+                 CscHw csc_hw = NONE;
+                 imageProcess->handleFrame(*dstBuf, *srcBuf, csc_hw);
+diff --git a/camera/CameraDeviceSessionHWLImpl.h b/camera/CameraDeviceSessionHWLImpl.h
+index bab90b6..48ffcc5 100644
+--- a/camera/CameraDeviceSessionHWLImpl.h
++++ b/camera/CameraDeviceSessionHWLImpl.h
+@@ -298,6 +298,7 @@ private:
+     int callbackIdx;
+ 
+     bool mMJPEG_format = false;
++    bool mRAW_format = false;
+ 
+     std::unique_ptr<HalCameraMetadata> mSettings;
+ 
+diff --git a/camera/CameraUtils.cpp b/camera/CameraUtils.cpp
+index 4af8ded..e48d966 100644
+--- a/camera/CameraUtils.cpp
++++ b/camera/CameraUtils.cpp
+@@ -64,6 +64,14 @@ int32_t changeSensorFormats(int *src, int *dst, int len)
+                 break;
+ 
+             case v4l2_fourcc('M', 'J', 'P', 'G'):
++            case v4l2_fourcc('B', 'G', '1', '0'):
++            case v4l2_fourcc('G', 'B', '1', '0'):
++            case v4l2_fourcc('B', 'A', '1', '0'):
++            case v4l2_fourcc('R', 'G', '1', '0'):
++            case v4l2_fourcc('B', 'A', '8', '1'):
++            case v4l2_fourcc('G', 'B', 'R', 'G'):
++            case v4l2_fourcc('G', 'R', 'B', 'G'):
++            case v4l2_fourcc('R', 'G', 'G', 'B'):
+                 dst[k++] = HAL_PIXEL_FORMAT_YCbCr_422_I;
+                 break;
+ 
+@@ -97,9 +105,25 @@ int getCaptureMode(int fd, int width, int height)
+         cam_frmsize.index = index++;
+         if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+             cam_frmsize.pixel_format = v4l2_fourcc('M', 'J', 'P', 'G');
+-	} else {
++        } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('B', 'G', '1', '0');
++        } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('G', 'B', '1', '0');
++        } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('B', 'A', '1', '0');
++        } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('R', 'G', '1', '0');
++        } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('B', 'A', '8', '1');
++        } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('G', 'B', 'R', 'G');
++        } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('G', 'R', 'B', 'G');
++        } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
++            cam_frmsize.pixel_format = v4l2_fourcc('R', 'G', 'G', 'B');
++        } else {
+             cam_frmsize.pixel_format = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-	}
++        }
+         ret = ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &cam_frmsize);
+         if ((cam_frmsize.discrete.width == (uint32_t)width) && (cam_frmsize.discrete.height == (uint32_t)height) && (ret == 0)) {
+             capturemode = cam_frmsize.index;
+@@ -134,9 +158,25 @@ int convertPixelFormatToV4L2Format(PixelFormat format, bool invert)
+             property_get("persist.idt.camera_format", value, "");
+             if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+                 nFormat = v4l2_fourcc('M', 'J', 'P', 'G');
+-	    } else {
++            } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
++                nFormat = v4l2_fourcc('B', 'G', '1', '0');
++            } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
++                nFormat = v4l2_fourcc('G', 'B', '1', '0');
++            } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
++                nFormat = v4l2_fourcc('B', 'A', '1', '0');
++            } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
++                nFormat = v4l2_fourcc('R', 'G', '1', '0');
++            } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
++                nFormat = v4l2_fourcc('B', 'A', '8', '1');
++            } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
++                nFormat = v4l2_fourcc('G', 'B', 'R', 'G');
++            } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
++                nFormat = v4l2_fourcc('G', 'R', 'B', 'G');
++            } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
++                nFormat = v4l2_fourcc('R', 'G', 'G', 'B');
++            } else {
+                 nFormat = v4l2_fourcc('Y', 'U', 'Y', 'V');
+-	    }
++            }
+             break;
+         case HAL_PIXEL_FORMAT_YCbCr_422_SP:
+             nFormat = v4l2_fourcc('N', 'V', '1', '6');
+diff --git a/camera/ImageProcess.cpp b/camera/ImageProcess.cpp
+index 115bbe2..c7e751a 100644
+--- a/camera/ImageProcess.cpp
++++ b/camera/ImageProcess.cpp
+@@ -72,6 +72,285 @@ static bool getDefaultG2DLib(char *libName, int size)
+     return true;
+ }
+ 
++static void v4lconvert_border_bayer_line_to_y(
++	const unsigned char* bayer, const unsigned char* adjacent_bayer,
++	unsigned char *y, int width, int start_with_green, int blue_line)
++{
++	int t0, t1;
++
++	if (start_with_green) {
++		/* First pixel */
++		if (blue_line) {
++			*y++ = (8453*adjacent_bayer[0] + 16594*bayer[0] + 3223*bayer[1] + 524288)
++			       >> 15;
++		} else {
++			*y++ = (8453*bayer[1] + 16594*bayer[0] + 3223*adjacent_bayer[0] + 524288)
++			       >> 15;
++		}
++		/* Second pixel */
++		t0 = bayer[0] + bayer[2] + adjacent_bayer[1];
++		t1 = adjacent_bayer[0] + adjacent_bayer[2];
++		if (blue_line) {
++			*y++ = (4226*t1 + 5531*t0 + 3223*bayer[1] + 524288) >> 15;
++		} else {
++			*y++ = (8453*bayer[1] + 5531*t0 + 1611*t1 + 524288) >> 15;
++		}
++		bayer++;
++		adjacent_bayer++;
++		width -= 2;
++	} else {
++		/* First pixel */
++		t0 = bayer[1] + adjacent_bayer[0];
++		if (blue_line) {
++			*y++ = (8453*adjacent_bayer[1] + 8297*t0 + 3223*bayer[0] + 524288)
++			       >> 15;
++		} else {
++			*y++ = (8453*bayer[0] + 8297*t0 + 3223*adjacent_bayer[1] + 524288)
++			       >> 15;
++		}
++		width--;
++	}
++
++	if (blue_line) {
++		for ( ; width > 2; width -= 2) {
++			t0 = bayer[0] + bayer[2];
++			*y++ = (8453*adjacent_bayer[1] + 16594*bayer[1] + 1611*t0 + 524288)
++			       >> 15;
++			bayer++;
++			adjacent_bayer++;
++
++			t0 = bayer[0] + bayer[2] + adjacent_bayer[1];
++			t1 = adjacent_bayer[0] + adjacent_bayer[2];
++			*y++ = (4226*t1 + 5531*t0 + 3223*bayer[1] + 524288) >> 15;
++			bayer++;
++			adjacent_bayer++;
++		}
++	} else {
++		for ( ; width > 2; width -= 2) {
++			t0 = bayer[0] + bayer[2];
++			*y++ = (4226*t0 + 16594*bayer[1] + 3223*adjacent_bayer[1] + 524288)
++			       >> 15;
++			bayer++;
++			adjacent_bayer++;
++
++			t0 = bayer[0] + bayer[2] + adjacent_bayer[1];
++			t1 = adjacent_bayer[0] + adjacent_bayer[2];
++			*y++ = (8453*bayer[1] + 5531*t0 + 1611*t1 + 524288) >> 15;
++			bayer++;
++			adjacent_bayer++;
++		}
++	}
++
++	if (width == 2) {
++		/* Second to last pixel */
++		t0 = bayer[0] + bayer[2];
++		if (blue_line) {
++			*y++ = (8453*adjacent_bayer[1] + 16594*bayer[1] + 1611*t0 + 524288)
++			       >> 15;
++		} else {
++			*y++ = (4226*t0 + 16594*bayer[1] + 3223*adjacent_bayer[1] + 524288)
++			       >> 15;
++		}
++		/* Last pixel */
++		t0 = bayer[1] + adjacent_bayer[2];
++		if (blue_line) {
++			*y++ = (8453*adjacent_bayer[1] + 8297*t0 + 3223*bayer[2] + 524288)
++			       >> 15;
++		} else {
++			*y++ = (8453*bayer[2] + 8297*t0 + 3223*adjacent_bayer[1] + 524288)
++			       >> 15;
++		}
++	} else {
++		/* Last pixel */
++		if (blue_line) {
++			*y++ = (8453*adjacent_bayer[1] + 16594*bayer[1] + 3223*bayer[0] + 524288)
++			       >> 15;
++		} else {
++			*y++ = (8453*bayer[0] + 16594*bayer[1] + 3223*adjacent_bayer[1] + 524288)
++			       >> 15;
++		}
++	}
++}
++
++static void v4lconvert_bayer_to_yuv420(const unsigned char *bayer, unsigned char *ydata,
++		unsigned char *udata, unsigned char *vdata,
++		int width, int height, unsigned int src_pixfmt)
++{
++	int blue_line = 0, start_with_green = 0, x, y;
++	unsigned char *ydst = ydata;
++	unsigned char *udst = udata;
++	unsigned char *vdst = vdata;
++
++	/* First calculate the u and v planes 2x2 pixels at a time */
++	switch (src_pixfmt) {
++	case V4L2_PIX_FMT_SBGGR8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				b  = bayer[x];
++				g  = bayer[x+1];
++				g += bayer[x+width];
++				r  = bayer[x+width+1];
++				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
++				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
++			}
++			bayer += 2 * width;
++		}
++		blue_line = 1;
++		break;
++
++	case V4L2_PIX_FMT_SRGGB8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				r  = bayer[x];
++				g  = bayer[x+1];
++				g += bayer[x+width];
++				b  = bayer[x+width+1];
++				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
++				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
++			}
++			bayer += 2 * width;
++		}
++		break;
++
++	case V4L2_PIX_FMT_SGBRG8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				g  = bayer[x];
++				b  = bayer[x+1];
++				r  = bayer[x+width];
++				g += bayer[x+width+1];
++				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
++				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
++			}
++			bayer += 2 * width;
++		}
++		blue_line = 1;
++		start_with_green = 1;
++		break;
++
++	case V4L2_PIX_FMT_SGRBG8:
++		for (y = 0; y < height; y += 2) {
++			for (x = 0; x < width; x += 2) {
++				int b, g, r;
++				g  = bayer[x];
++				r  = bayer[x+1];
++				b  = bayer[x+width];
++				g += bayer[x+width+1];
++				*udst++ = (-4878 * r - 4789 * g + 14456 * b + 4210688) >> 15;
++				*vdst++ = (14456 * r - 6052 * g -  2351 * b + 4210688) >> 15;
++			}
++			bayer += 2 * width;
++		}
++		start_with_green = 1;
++		break;
++	}
++
++	bayer -= width * height;
++	/* render the first line */
++	v4lconvert_border_bayer_line_to_y(bayer, bayer + width, ydst, width,
++		start_with_green, blue_line);
++	ydst += width;
++
++	/* reduce height by 2 because of the border */
++	for (height -= 2; height; height--) {
++		int t0, t1;
++		/* (width - 2) because of the border */
++		const unsigned char *bayerEnd = bayer + (width - 2);
++
++		if (start_with_green) {
++			t0 = bayer[1] + bayer[width * 2 + 1];
++			/* Write first pixel */
++			t1 = bayer[0] + bayer[width * 2] + bayer[width + 1];
++			if (blue_line)
++				*ydst++ = (8453*bayer[width] + 5516*t1 + 1661*t0 + 524288) >> 15;
++			else
++				*ydst++ = (4226*t0 + 5516*t1 + 3223*bayer[width] + 524288) >> 15;
++
++			/* Write second pixel */
++			t1 = bayer[width] + bayer[width + 2];
++			if (blue_line)
++				*ydst++ = (4226*t1 + 16594*bayer[width+1] + 1611*t0 + 524288) >> 15;
++			else
++				*ydst++ = (4226*t0 + 16594*bayer[width+1] + 1611*t1 + 524288) >> 15;
++			bayer++;
++		} else {
++			/* Write first pixel */
++			t0 = bayer[0] + bayer[width * 2];
++			if (blue_line) {
++				*ydst++ = (8453*bayer[width+1] + 16594*bayer[width] + 1661*t0 +
++					  524288) >> 15;
++			} else {
++				*ydst++ = (4226*t0 + 16594*bayer[width] + 3223*bayer[width+1] +
++					  524288) >> 15;
++			}
++		}
++
++		if (blue_line) {
++			for (; bayer <= bayerEnd - 2; bayer += 2) {
++				t0 = bayer[0] + bayer[2] + bayer[width * 2] + bayer[width * 2 + 2];
++				t1 = bayer[1] + bayer[width] + bayer[width + 2] + bayer[width * 2 + 1];
++				*ydst++ = (8453*bayer[width+1] + 4148*t1 + 806*t0 + 524288) >> 15;
++
++				t0 = bayer[2] + bayer[width * 2 + 2];
++				t1 = bayer[width + 1] + bayer[width + 3];
++				*ydst++ = (4226*t1 + 16594*bayer[width+2] + 1611*t0 + 524288) >> 15;
++			}
++		} else {
++			for (; bayer <= bayerEnd - 2; bayer += 2) {
++				t0 = bayer[0] + bayer[2] + bayer[width * 2] + bayer[width * 2 + 2];
++				t1 = bayer[1] + bayer[width] + bayer[width + 2] + bayer[width * 2 + 1];
++				*ydst++ = (2113*t0 + 4148*t1 + 3223*bayer[width+1] + 524288) >> 15;
++
++				t0 = bayer[2] + bayer[width * 2 + 2];
++				t1 = bayer[width + 1] + bayer[width + 3];
++				*ydst++ = (4226*t0 + 16594*bayer[width+2] + 1611*t1 + 524288) >> 15;
++			}
++		}
++
++		if (bayer < bayerEnd) {
++			/* Write second to last pixel */
++			t0 = bayer[0] + bayer[2] + bayer[width * 2] + bayer[width * 2 + 2];
++			t1 = bayer[1] + bayer[width] + bayer[width + 2] + bayer[width * 2 + 1];
++			if (blue_line)
++				*ydst++ = (8453*bayer[width+1] + 4148*t1 + 806*t0 + 524288) >> 15;
++			else
++				*ydst++ = (2113*t0 + 4148*t1 + 3223*bayer[width+1] + 524288) >> 15;
++
++			/* write last pixel */
++			t0 = bayer[2] + bayer[width * 2 + 2];
++			if (blue_line) {
++				*ydst++ = (8453*bayer[width+1] + 16594*bayer[width+2] + 1661*t0 +
++					  524288) >> 15;
++			} else {
++				*ydst++ = (4226*t0 + 16594*bayer[width+2] + 3223*bayer[width+1] +
++					  524288) >> 15;
++			}
++			bayer++;
++		} else {
++			/* write last pixel */
++			t0 = bayer[0] + bayer[width * 2];
++			t1 = bayer[1] + bayer[width * 2 + 1] + bayer[width];
++			if (blue_line)
++				*ydst++ = (8453*bayer[width+1] + 5516*t1 + 1661*t0 + 524288) >> 15;
++			else
++				*ydst++ = (4226*t0 + 5516*t1 + 3223*bayer[width+1] + 524288) >> 15;
++		}
++
++		/* skip 2 border pixels */
++		bayer += 2;
++
++		blue_line = !blue_line;
++		start_with_green = !start_with_green;
++	}
++
++	/* render the last line */
++	v4lconvert_border_bayer_line_to_y(bayer + width, bayer, ydst, width,
++		!start_with_green, !blue_line);
++}
++
+ ImageProcess* ImageProcess::getInstance()
+ {
+     Mutex::Autolock _l(sLock);
+@@ -100,6 +379,22 @@ ImageProcess::ImageProcess()
+     property_get("persist.idt.camera_format", value, "");
+     if (!strncmp(value, "MJPEG", strlen("MJPEG"))) {
+         mMJPEG_format = true;
++    } else if (!strncmp(value, "BGGR10", strlen("BGGR10"))) {
++        mRAW_format = BGGR_10BITS;
++    } else if (!strncmp(value, "GBRG10", strlen("GBRG10"))) {
++        mRAW_format = GBRG_10BITS;
++    } else if (!strncmp(value, "GRBG10", strlen("GRBG10"))) {
++        mRAW_format = GRBG_10BITS;
++    } else if (!strncmp(value, "RGGB10", strlen("RGGB10"))) {
++        mRAW_format = RGGB_10BITS;
++    } else if (!strncmp(value, "BGGR8", strlen("BGGR8"))) {
++        mRAW_format = BGGR_8BITS;
++    } else if (!strncmp(value, "GBRG8", strlen("GBRG8"))) {
++        mRAW_format = GBRG_8BITS;
++    } else if (!strncmp(value, "GRBG8", strlen("GRBG8"))) {
++        mRAW_format = GRBG_8BITS;
++    } else if (!strncmp(value, "RGGB8", strlen("RGGB8"))) {
++        mRAW_format = RGGB_8BITS;
+     }
+ 
+     //When open pxp device, need allocate a channel at the same time.
+@@ -272,7 +567,10 @@ int ImageProcess::handleFrame(ImxStreamBuffer& dstBuf, ImxStreamBuffer& srcBuf,
+         dstBuf.mVirtAddr, dstBuf.mPhyAddr, dstBuf.mSize, dstBuf.mStream->width(), dstBuf.mStream->height(), dstBuf.mStream->format());
+ 
+     if (dstBuf.mStream->format() == HAL_PIXEL_FORMAT_BLOB) {
+-        ret = convertMJPGToYUY2(srcBuf);
++        if (mMJPEG_format)
++            ret = convertMJPGToYUY2(srcBuf);
++        if (mRAW_format)
++            convertRAWToYUY2(srcBuf, mRAW_format);
+         return ret;
+     }
+ 
+@@ -702,6 +1000,100 @@ err_out:
+     return ret;
+ }
+ 
++// This function will convert Bayer pattern stream to YUY2 stream and store it in input buffer
++// srcBuf: input frame from RAW stream
++int ImageProcess::convertRAWToYUY2(ImxStreamBuffer& srcBuf, int format)
++{
++	int ret = 0, i=0;
++	ImxStream *src = srcBuf.mStream;
++	uint32_t width = src->width();
++	uint32_t height = src->height();
++	uint32_t half_width = (width + 1) / 2;
++	uint32_t half_height = (height + 1) / 2;
++	uint8_t *rawData = NULL, *raw = NULL;
++	uint8_t* y_component = NULL;
++	uint8_t* u_component = NULL;
++	uint8_t* v_component = NULL;
++	unsigned int src_pixfmt;
++
++	y_component = (uint8_t*)malloc(width * height);
++	if (!y_component) {
++		ret = -EINVAL;
++		goto err_out;
++	}
++	u_component = (uint8_t*)malloc(half_width * half_height);
++	if (!u_component) {
++		ret = -EINVAL;
++		goto err_out;
++	}
++	v_component = (uint8_t*)malloc(half_width * half_height);
++	if (!v_component) {
++		ret = -EINVAL;
++		goto err_out;
++	}
++
++	raw = (uint8_t *)malloc(width*height);
++	if (!raw) {
++		ret = -EINVAL;
++		goto err_out;
++	}
++
++	rawData = (uint8_t *)srcBuf.mVirtAddr;
++
++	for(i=0; i<width*height; i++) {
++		if (format == BGGR_10BITS ||
++			format == GBRG_10BITS ||
++			format == GRBG_10BITS ||
++			format == RGGB_10BITS)
++			raw[i] = ((rawData[i*2 + 1] << 8) | rawData[i*2]) >> 2 ;
++		else
++			raw[i] = rawData[i*2];
++	}
++
++	switch (format) {
++	case BGGR_10BITS:
++	case BGGR_8BITS:
++		src_pixfmt = V4L2_PIX_FMT_SBGGR8;
++		break;
++	case GBRG_10BITS:
++	case GBRG_8BITS:
++		src_pixfmt = V4L2_PIX_FMT_SGBRG8;
++		break;
++	case GRBG_10BITS:
++	case GRBG_8BITS:
++		src_pixfmt = V4L2_PIX_FMT_SGRBG8;
++		break;
++	case RGGB_10BITS:
++	case RGGB_8BITS:
++	default:
++		src_pixfmt = V4L2_PIX_FMT_SRGGB8;
++		break;
++	}
++
++	v4lconvert_bayer_to_yuv420(raw, y_component, u_component, v_component, width, height, src_pixfmt);
++
++	ret = libyuv::I420ToYUY2(y_component, width, u_component,
++				 half_width, v_component, half_width,
++				 (uint8_t *)srcBuf.mVirtAddr,
++				 width*2, width, height);
++
++	if (ret)
++		goto err_out;
++
++err_out:
++
++	if (raw)
++		free(raw);
++	if (y_component)
++		free(y_component);
++	if (u_component)
++		free(u_component);
++	if (v_component)
++		free(v_component);
++	return ret;
++}
++
++
+ static void Revert16BitEndian(uint8_t *pSrc, uint8_t *pDst, uint32_t pixels)
+ {
+     ALOGV("enter Revert16BitEndian, src %p, dst %p, pixels %d", pSrc, pDst, pixels);
+@@ -750,6 +1142,8 @@ int ImageProcess::handleFrameByGPU_3D(ImxStreamBuffer& dstBuf, ImxStreamBuffer&
+         if (mMJPEG_format) {
+             convertMJPGToYUY2(srcBuf);
+         }
++        if (mRAW_format)
++            convertRAWToYUY2(srcBuf, mRAW_format);
+         if (HAL_PIXEL_FORMAT_RAW16 == src->format())
+             Revert16BitEndian((uint8_t *)srcBuf.mVirtAddr, (uint8_t *)dstBuf.mVirtAddr, src->width()*src->height());
+         else
+diff --git a/camera/ImageProcess.h b/camera/ImageProcess.h
+index 2548005..f6ff5fa 100644
+--- a/camera/ImageProcess.h
++++ b/camera/ImageProcess.h
+@@ -32,6 +32,18 @@ typedef int (*hwc_func1)(void* handle);
+ typedef int (*hwc_func3)(void* handle, void* arg1, void* arg2);
+ typedef int (*hwc_func4)(void* handle, void* arg1, void* arg2, void* arg3);
+ 
++enum RawFormat {
++	NOT_RAW_FORMAT = 0,
++	BGGR_10BITS,
++	GBRG_10BITS,
++	GRBG_10BITS,
++	RGGB_10BITS,
++	BGGR_8BITS,
++	GBRG_8BITS,
++	GRBG_8BITS,
++	RGGB_8BITS,
++};
++
+ class ImageProcess
+ {
+ public:
+@@ -43,6 +55,7 @@ public:
+ private:
+     int convertNV12toNV21(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int convertMJPGToYUY2(ImxStreamBuffer& srcBuf);
++    int convertRAWToYUY2(ImxStreamBuffer & srcBuf, int format);
+     int handleFrameByPXP(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByIPU(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+     int handleFrameByG2DCopy(ImxStreamBuffer& dst, ImxStreamBuffer& src);
+@@ -95,6 +108,7 @@ private:
+     hwc_func1 mCLFinish;
+ 
+     bool mMJPEG_format = false;
++    int mRAW_format = NOT_RAW_FORMAT;
+ };
+ 
+ }

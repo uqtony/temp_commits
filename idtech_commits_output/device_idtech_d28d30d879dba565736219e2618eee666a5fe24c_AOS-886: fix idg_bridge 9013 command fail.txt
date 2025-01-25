@@ -1,0 +1,23 @@
+d28d30d8 owen.wen 2022-02-09
+
+AOS-886: fix idg_bridge 9013 command fail
+
+symptom: 9013 command fail, response is 9005 which means wrong args
+root cause: 0x13 and 0x11 are software flow control
+solution: remove 0x13 and 0x11 support in ttyGS0
+
+Change-Id: I4f3c69f65fc3a35669defbf79fedbb9aeaebac77
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 6660e200..da7df434 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -707,6 +707,8 @@ idg_bridge() {
+   stty -F /dev/ttyGS0 raw
+   stty -F /dev/ttyGS0 -echo # disable echo, otherwise GS will repeat input
+   stty -F /dev/ttyGS0 -iuclc # disable upper case to lower case
++  stty -F /dev/ttyGS0 -ixon  # pass 0x13 to K81 instead of handled by ttyGS0
++  stty -F /dev/ttyGS0 -ixoff # pass 0x11 to K81 instead of handled by ttyGS0
+   socat -u PIPE:/dev/ttyGS0 - | tee /dev/ttyIDG > /dev/null &
+   socat -u exec:"cat /dev/ttyIDG" PIPE:/dev/ttyGS0
+ }

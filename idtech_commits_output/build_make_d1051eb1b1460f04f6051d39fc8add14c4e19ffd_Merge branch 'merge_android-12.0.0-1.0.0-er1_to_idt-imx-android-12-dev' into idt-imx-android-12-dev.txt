@@ -1,0 +1,645 @@
+d1051eb1b jenkins 2022-02-21
+
+Merge branch 'merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev' into idt-imx-android-12-dev
+
+Change-Id: I1e6744f374f6a8f3eb4abb4b32c3be14f360feb0
+
+diff --cc core/Makefile
+index 508efa06d,2d56edb9e..8b69d60a1
+--- a/core/Makefile
++++ b/core/Makefile
+@@@ -3134,10 -3103,8 +3108,9 @@@ BUILT_VENDORIMAGE_TARGET := $(PRODUCT_O
+  define build-vendorimage-target
+    $(call pretty,"Target vendor fs image: $(INSTALLED_VENDORIMAGE_TARGET)")
+    @mkdir -p $(TARGET_OUT_VENDOR)
+-   $(call create-vendor-odm-symlink)
+    @mkdir -p $(vendorimage_intermediates) && rm -rf $(vendorimage_intermediates)/vendor_image_info.txt
+    $(call generate-image-prop-dictionary, $(vendorimage_intermediates)/vendor_image_info.txt,vendor,skip_fsck=true)
+ +  $(hide) echo "vendor_block_list=$(vendorimage_intermediates)/vendor.map" >> $(vendorimage_intermediates)/vendor_image_info.txt
+    PATH=$(INTERNAL_USERIMAGES_BINARY_PATHS):$$PATH \
+        $(BUILD_IMAGE) \
+            $(TARGET_OUT_VENDOR) $(vendorimage_intermediates)/vendor_image_info.txt \
+@@@ -4856,53 -5234,14 +5269,64 @@@ ifdef BOARD_PREBUILT_DTBOIMAG
+  	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+  	$(hide) cp $(INSTALLED_DTBOIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
+  endif # BOARD_PREBUILT_DTBOIMAGE
+++<<<<<<< HEAD
+ +
+ +	# IDtech added for image consistency
+ +	$(hide) mkdir -p $(zip_root)/IMAGES
+ +	# boot image
+ +	$(hide) cp $(INSTALLED_BOOTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# vendor image and vendor.map
+ +	$(hide) cp $(INSTALLED_VENDORIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	$(hide) cp $(vendorimage_intermediates)/vendor.map $(zip_root)/IMAGES/
+ +	# system image and system.map
+ +	$(hide) cp $(INSTALLED_SYSTEMIMAGE) $(zip_root)/IMAGES/
+ +	$(hide) cp $(systemimage_intermediates)/system.map $(zip_root)/IMAGES/
+ +	# system ext image
+ +	$(hide) cp $(INSTALLED_SYSTEM_EXTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# vendor_boot image
+ +	$(hide) cp $(INSTALLED_VENDOR_BOOTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# product image
+ +	$(hide) cp $(INSTALLED_PRODUCTIMAGE_TARGET) $(zip_root)/IMAGES/
+ +	# IDtech specific dtbo/vbmeta image
+ +	cp $(PRODUCT_OUT)/dtbo.img $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/vbmeta.img $(zip_root)/IMAGES/
+ +	# partition table
+ +	cp $(PRODUCT_OUT)/partition-table*.img $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/partition-table*.bpt $(zip_root)/META/
+ +
+ +	# Copy IDtech's images and scripts
+ +	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/mem_info.* $(zip_root)/IMAGES/
+ +	# Flashing script
+ +	cp $(PRODUCT_OUT)/*.sh $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/*.bat $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/uuu* $(zip_root)/IMAGES/
+ +	# U-boot
+ +	cp $(PRODUCT_OUT)/*.imx $(zip_root)/IMAGES/
+ +	# For dual bootloader option
+ +	cp $(PRODUCT_OUT)/spl* $(zip_root)/IMAGES/
+ +	cp $(PRODUCT_OUT)/bootloader* $(zip_root)/IMAGES/
+ +	# U-boot for ota update
+ +	cp $(PRODUCT_OUT)/u-boot-$(LOWER_BOARD_SOC_TYPE)-lpddr4.imx $(zip_root)/IMAGES/bootloader.img
+ +	# Dual bootloader images for ota update
+ +	cp -f $(PRODUCT_OUT)/bootloader-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.img $(zip_root)/IMAGES/bootloader.img
+ +	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl.img
+ +	# backup spl images for ota update
+ +	cp -f $(PRODUCT_OUT)/spl-$(LOWER_BOARD_SOC_TYPE)-lpddr4-dual.bin $(zip_root)/IMAGES/spl_bak.img
+ +	# gather signed bootloader images used for post signing process
+ +	$(hide) mkdir -p $(zip_root)/TEST_SIGN
+ +	cp $(PRODUCT_OUT)/*signed* $(zip_root)/TEST_SIGN/
+ +
+++=======
++ ifdef BOARD_PREBUILT_PVMFWIMAGE
++ 	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
++ 	$(hide) cp $(INSTALLED_PVMFWIMAGE_TARGET) $(zip_root)/PREBUILT_IMAGES/
++ endif # BOARD_PREBUILT_PVMFWIMAGE
++ ifdef BOARD_PREBUILT_BOOTLOADER
++ 	$(hide) mkdir -p $(zip_root)/IMAGES
++ 	$(hide) cp $(INSTALLED_BOOTLOADER_MODULE) $(zip_root)/IMAGES/
++ endif
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  ifneq ($(strip $(BOARD_CUSTOMIMAGES_PARTITION_LIST)),)
+  	$(hide) mkdir -p $(zip_root)/PREBUILT_IMAGES
+  	$(hide) $(foreach partition,$(BOARD_CUSTOMIMAGES_PARTITION_LIST), \
+diff --cc core/build_id.mk
+index da413bd1d,0fb59d9ce..8df45102e
+--- a/core/build_id.mk
++++ b/core/build_id.mk
+@@@ -18,4 -18,4 +18,8 @@@
+  # (like "CRB01").  It must be a single word, and is
+  # capitalized by convention.
+  
+++<<<<<<< HEAD
+ +BUILD_ID=RQ2A.210505.002
+++=======
++ BUILD_ID=SQ1A.211205.008
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+diff --cc core/main.mk
+index dc96a4f14,c10a3cc54..ec236f1fb
+--- a/core/main.mk
++++ b/core/main.mk
+@@@ -1576,10 -1769,13 +1769,15 @@@ else ifeq ($(TARGET_BUILD_UNBUNDLED),$(
+      $(INSTALLED_FILES_JSON_SYSTEMOTHER) \
+      $(INSTALLED_FILES_FILE_RECOVERY) \
+      $(INSTALLED_FILES_JSON_RECOVERY) \
+-     $(INSTALLED_BUILD_PROP_TARGET) \
++     $(INSTALLED_BUILD_PROP_TARGET):build.prop \
++     $(INSTALLED_VENDOR_BUILD_PROP_TARGET):build.prop-vendor \
++     $(INSTALLED_PRODUCT_BUILD_PROP_TARGET):build.prop-product \
++     $(INSTALLED_ODM_BUILD_PROP_TARGET):build.prop-odm \
++     $(INSTALLED_SYSTEM_EXT_BUILD_PROP_TARGET):build.prop-system_ext \
++     $(INSTALLED_RAMDISK_BUILD_PROP_TARGET):build.prop-ramdisk \
+      $(BUILT_TARGET_FILES_PACKAGE) \
+ +    $(BUILT_APKS_TO_SIGN_PACKAGE) \
+ +    $(BUILT_APEX_TO_SIGN_PACKAGE) \
+      $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+      $(INSTALLED_MISC_INFO_TARGET) \
+      $(INSTALLED_RAMDISK_TARGET) \
+diff --cc core/version_defaults.mk
+index b32474d02,f429d7c72..d9ecf3ce3
+--- a/core/version_defaults.mk
++++ b/core/version_defaults.mk
+@@@ -240,7 -240,7 +240,11 @@@ ifndef PLATFORM_SECURITY_PATC
+      #  It must be of the form "YYYY-MM-DD" on production devices.
+      #  It must match one of the Android Security Patch Level strings of the Public Security Bulletins.
+      #  If there is no $PLATFORM_SECURITY_PATCH set, keep it empty.
+++<<<<<<< HEAD
+ +      PLATFORM_SECURITY_PATCH := 2021-05-05
+++=======
++       PLATFORM_SECURITY_PATCH := 2021-12-05
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  endif
+  .KATI_READONLY := PLATFORM_SECURITY_PATCH
+  
+diff --cc target/product/base_system.mk
+index 40d64f627,14ce1af74..63f2a2b1d
+--- a/target/product/base_system.mk
++++ b/target/product/base_system.mk
+@@@ -14,15 -14,9 +14,16 @@@
+  # limitations under the License.
+  #
+  
+ +# package removed on user build (production and pci)
+ +ifneq (user,$(TARGET_BUILD_VARIANT))
+ +PRODUCT_PACKAGES += \
+ +    monkey \
+ +    WallpaperBackup
+ +endif
+ +
+  # Base modules and settings for the system partition.
+  PRODUCT_PACKAGES += \
++     abx \
+      adbd_system_api \
+      am \
+      android.hidl.allocator@1.0-service \
+diff --cc target/product/gsi/current.txt
+index 3459d2f9f,971ec922a..a9ad44303
+--- a/target/product/gsi/current.txt
++++ b/target/product/gsi/current.txt
+@@@ -142,111 -69,30 +69,50 @@@ VNDK-core: android.hardware.graphics.al
+  VNDK-core: android.hardware.graphics.allocator@4.0.so
+  VNDK-core: android.hardware.graphics.bufferqueue@1.0.so
+  VNDK-core: android.hardware.graphics.bufferqueue@2.0.so
+++<<<<<<< HEAD
+ +VNDK-core: android.hardware.graphics.composer@2.1.so
+ +VNDK-core: android.hardware.graphics.composer@2.2.so
+ +VNDK-core: android.hardware.graphics.composer@2.3.so
+ +VNDK-core: android.hardware.graphics.composer@2.4.so
+ +VNDK-core: android.hardware.health.storage@1.0.so
+ +VNDK-core: android.hardware.health@1.0.so
+ +VNDK-core: android.hardware.health@2.0.so
+ +VNDK-core: android.hardware.health@2.1.so
+ +VNDK-core: android.hardware.identity-V2-ndk_platform.so
+ +VNDK-core: android.hardware.input.classifier@1.0.so
+ +VNDK-core: android.hardware.input.common@1.0.so
+ +VNDK-core: android.hardware.ir@1.0.so
+ +VNDK-core: android.hardware.keymaster-V2-ndk_platform.so
+ +VNDK-core: android.hardware.keymaster@3.0.so
+ +VNDK-core: android.hardware.keymaster@4.0.so
+ +VNDK-core: android.hardware.keymaster@4.1.so
+ +VNDK-core: android.hardware.kioskled-V1-ndk_platform.so
+++=======
++ VNDK-core: android.hardware.health.storage-V1-ndk_platform.so
++ VNDK-core: android.hardware.identity-V3-ndk_platform.so
++ VNDK-core: android.hardware.keymaster-V3-ndk_platform.so
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  VNDK-core: android.hardware.light-V1-ndk_platform.so
+- VNDK-core: android.hardware.light@2.0.so
+- VNDK-core: android.hardware.media.bufferpool@1.0.so
+  VNDK-core: android.hardware.media.bufferpool@2.0.so
+- VNDK-core: android.hardware.media.c2@1.0.so
+- VNDK-core: android.hardware.media.c2@1.1.so
+  VNDK-core: android.hardware.media.omx@1.0.so
+  VNDK-core: android.hardware.media@1.0.so
++ VNDK-core: android.hardware.memtrack-V1-ndk_platform.so
+  VNDK-core: android.hardware.memtrack@1.0.so
+- VNDK-core: android.hardware.neuralnetworks@1.0.so
+- VNDK-core: android.hardware.neuralnetworks@1.1.so
+- VNDK-core: android.hardware.neuralnetworks@1.2.so
+- VNDK-core: android.hardware.neuralnetworks@1.3.so
+- VNDK-core: android.hardware.nfc@1.0.so
+- VNDK-core: android.hardware.nfc@1.1.so
+- VNDK-core: android.hardware.nfc@1.2.so
+- VNDK-core: android.hardware.oemlock@1.0.so
+- VNDK-core: android.hardware.power-V1-ndk_platform.so
+- VNDK-core: android.hardware.power.stats@1.0.so
+- VNDK-core: android.hardware.power@1.0.so
+- VNDK-core: android.hardware.power@1.1.so
+- VNDK-core: android.hardware.power@1.2.so
+- VNDK-core: android.hardware.power@1.3.so
+- VNDK-core: android.hardware.radio.config@1.0.so
+- VNDK-core: android.hardware.radio.config@1.1.so
+- VNDK-core: android.hardware.radio.config@1.2.so
+- VNDK-core: android.hardware.radio.deprecated@1.0.so
+- VNDK-core: android.hardware.radio@1.0.so
+- VNDK-core: android.hardware.radio@1.1.so
+- VNDK-core: android.hardware.radio@1.2.so
+- VNDK-core: android.hardware.radio@1.3.so
+- VNDK-core: android.hardware.radio@1.4.so
+- VNDK-core: android.hardware.radio@1.5.so
++ VNDK-core: android.hardware.oemlock-V1-ndk_platform.so
++ VNDK-core: android.hardware.power-V2-ndk_platform.so
++ VNDK-core: android.hardware.power.stats-V1-ndk_platform.so
+  VNDK-core: android.hardware.rebootescrow-V1-ndk_platform.so
+- VNDK-core: android.hardware.secure_element@1.0.so
+- VNDK-core: android.hardware.secure_element@1.1.so
+- VNDK-core: android.hardware.secure_element@1.2.so
+- VNDK-core: android.hardware.sensors@1.0.so
+- VNDK-core: android.hardware.sensors@2.0.so
+- VNDK-core: android.hardware.sensors@2.1.so
++ VNDK-core: android.hardware.security.keymint-V1-ndk_platform.so
++ VNDK-core: android.hardware.security.secureclock-V1-ndk_platform.so
++ VNDK-core: android.hardware.security.sharedsecret-V1-ndk_platform.so
+  VNDK-core: android.hardware.soundtrigger@2.0-core.so
+  VNDK-core: android.hardware.soundtrigger@2.0.so
+- VNDK-core: android.hardware.soundtrigger@2.1.so
+- VNDK-core: android.hardware.soundtrigger@2.2.so
+- VNDK-core: android.hardware.soundtrigger@2.3.so
+- VNDK-core: android.hardware.tetheroffload.config@1.0.so
+- VNDK-core: android.hardware.tetheroffload.control@1.0.so
+- VNDK-core: android.hardware.thermal@1.0.so
+- VNDK-core: android.hardware.thermal@1.1.so
+- VNDK-core: android.hardware.thermal@2.0.so
+- VNDK-core: android.hardware.tv.cec@1.0.so
+- VNDK-core: android.hardware.tv.cec@2.0.so
+- VNDK-core: android.hardware.tv.input@1.0.so
+- VNDK-core: android.hardware.tv.tuner@1.0.so
+- VNDK-core: android.hardware.usb.gadget@1.0.so
+- VNDK-core: android.hardware.usb.gadget@1.1.so
+- VNDK-core: android.hardware.usb@1.0.so
+- VNDK-core: android.hardware.usb@1.1.so
+- VNDK-core: android.hardware.usb@1.2.so
+- VNDK-core: android.hardware.vibrator-V1-ndk_platform.so
+- VNDK-core: android.hardware.vibrator@1.0.so
+- VNDK-core: android.hardware.vibrator@1.1.so
+- VNDK-core: android.hardware.vibrator@1.2.so
+- VNDK-core: android.hardware.vibrator@1.3.so
+- VNDK-core: android.hardware.vr@1.0.so
+- VNDK-core: android.hardware.weaver@1.0.so
+- VNDK-core: android.hardware.wifi.hostapd@1.0.so
+- VNDK-core: android.hardware.wifi.hostapd@1.1.so
+- VNDK-core: android.hardware.wifi.hostapd@1.2.so
+- VNDK-core: android.hardware.wifi.offload@1.0.so
+- VNDK-core: android.hardware.wifi.supplicant@1.0.so
+- VNDK-core: android.hardware.wifi.supplicant@1.1.so
+- VNDK-core: android.hardware.wifi.supplicant@1.2.so
+- VNDK-core: android.hardware.wifi.supplicant@1.3.so
+- VNDK-core: android.hardware.wifi@1.0.so
+- VNDK-core: android.hardware.wifi@1.1.so
+- VNDK-core: android.hardware.wifi@1.2.so
+- VNDK-core: android.hardware.wifi@1.3.so
+- VNDK-core: android.hardware.wifi@1.4.so
+- VNDK-core: android.hidl.allocator@1.0.so
+- VNDK-core: android.hidl.memory.block@1.0.so
++ VNDK-core: android.hardware.vibrator-V2-ndk_platform.so
++ VNDK-core: android.hardware.weaver-V1-ndk_platform.so
+  VNDK-core: android.hidl.token@1.0-utils.so
+  VNDK-core: android.hidl.token@1.0.so
+- VNDK-core: android.system.net.netd@1.0.so
+- VNDK-core: android.system.net.netd@1.1.so
++ VNDK-core: android.system.keystore2-V1-ndk_platform.so
+  VNDK-core: android.system.suspend@1.0.so
+- VNDK-core: android.system.wifi.keystore@1.0.so
+- VNDK-core: libadf.so
+  VNDK-core: libaudioroute.so
+  VNDK-core: libaudioutils.so
+  VNDK-core: libbinder.so
+diff --cc target/product/handheld_system.mk
+index 506c65d7b,b7a2d0dad..a1aec09d1
+--- a/target/product/handheld_system.mk
++++ b/target/product/handheld_system.mk
+@@@ -49,9 -44,9 +50,8 @@@ PRODUCT_PACKAGES += 
+      CaptivePortalLogin \
+      CertInstaller \
+      clatd \
+-     clatd.conf \
+      DocumentsUI \
+      DownloadProviderUi \
+ -    EasterEgg \
+      ExternalStorageProvider \
+      FusedLocation \
+      InputDevices \
+diff --cc target/product/telephony_product.mk
+index aaf7e5bb1,18374d4b2..8ac1c7891
+--- a/target/product/telephony_product.mk
++++ b/target/product/telephony_product.mk
+@@@ -17,12 -17,7 +17,17 @@@
+  # This is the list of modules that are specific to products that have telephony
+  # hardware, and install to the product partition.
+  
+ +ifneq (user,$(TARGET_BUILD_VARIANT))
+ +PRODUCT_PACKAGES += \
+ +    EmergencyInfo \
+ +    Dialer
+ +endif
+ +
+  # /product packages
+  PRODUCT_PACKAGES += \
+++<<<<<<< HEAD
+ +    CarrierConfig
+++=======
++     Dialer \
++     ImsServiceEntitlement \
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+diff --cc tools/releasetools/common.py
+index cc13888c9,f678d08e2..e62504d99
+--- a/tools/releasetools/common.py
++++ b/tools/releasetools/common.py
+@@@ -698,12 -835,23 +835,27 @@@ def LoadInfoDict(input_file, repacking=
+    # Set up the salt (based on fingerprint) that will be used when adding AVB
+    # hash / hashtree footers.
+    if d.get("avb_enable") == "true":
+-     build_info = BuildInfo(d)
+-     for partition in PARTITIONS_WITH_CARE_MAP:
++     build_info = BuildInfo(d, use_legacy_id=True)
++     for partition in PARTITIONS_WITH_BUILD_PROP:
+        fingerprint = build_info.GetPartitionFingerprint(partition)
+        if fingerprint:
+++<<<<<<< HEAD
+ +        d["avb_{}_salt".format(partition)] = sha256(fingerprint.encode('utf-8')).hexdigest()
+++=======
++         d["avb_{}_salt".format(partition)] = sha256(
++             fingerprint.encode()).hexdigest()
++ 
++     # Set the vbmeta digest if exists
++     try:
++       d["vbmeta_digest"] = read_helper("META/vbmeta_digest.txt").rstrip()
++     except KeyError:
++       pass
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
++   try:
++     d["ab_partitions"] = read_helper("META/ab_partitions.txt").split("
+")
++   except KeyError:
++     logger.warning("Can't find META/ab_partitions.txt")
+    return d
+  
+  
+diff --cc tools/releasetools/img_from_target_files.py
+index 541f79080,cbb51e178..831dbd0b3
+--- a/tools/releasetools/img_from_target_files.py
++++ b/tools/releasetools/img_from_target_files.py
+@@@ -131,19 -124,11 +133,25 @@@ def EntriesForUserImages(input_file)
+  
+    for image_path in [name for name in namelist if name.startswith('IMAGES/')]:
+      image = os.path.basename(image_path)
+-     if OPTIONS.bootable_only and image not in ('boot.img', 'recovery.img'):
++     if OPTIONS.bootable_only and image not in('boot.img', 'recovery.img', 'bootloader'):
+        continue
+++<<<<<<< HEAD
+ +    if "SIGNED/" + image in namelist:
+ +      print('Replace by SIGNED one: {}'.format(image))
+ +      entries.append('{}:{}'.format("SIGNED/" + image, image))
+ +      continue
+ +    if not image.endswith(".img") and not image.endswith(".sh") \
+ +       and not image.endswith(".imx") and not image.endswith(".bat") \
+ +       and not image.startswith("spl") \
+ +       and not image.startswith("uuu") \
+ +       and not image == "mem_info.txt":
+ +      continue
+ +    if image == "recovery-two-step.img":
+++=======
++     if not image.endswith('.img') and image != 'bootloader':
++       continue
++     if image == 'bootloader' and not OPTIONS.put_bootloader:
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+        continue
+      # Filter out super_empty and the images that are already in super partition.
+      if OPTIONS.put_super:
+diff --cc tools/releasetools/ota_from_target_files.py
+index 268760ea5,42d1211ba..87d8f353d
+--- a/tools/releasetools/ota_from_target_files.py
++++ b/tools/releasetools/ota_from_target_files.py
+@@@ -210,13 -225,11 +229,15 @@@ A/B OTA specific option
+  
+  from __future__ import print_function
+  
+- import collections
+- import copy
+- import itertools
+  import logging
+  import multiprocessing
++ import os
+  import os.path
+++<<<<<<< HEAD
+ +import os
+++=======
++ import re
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  import shlex
+  import shutil
+  import struct
+@@@ -263,18 -276,16 +284,21 @@@ OPTIONS.payload_signer = Non
+  OPTIONS.payload_signer_args = []
+  OPTIONS.payload_signer_maximum_signature_size = None
+  OPTIONS.extracted_input = None
+- OPTIONS.key_passwords = []
+  OPTIONS.skip_postinstall = False
+- OPTIONS.retrofit_dynamic_partitions = False
+  OPTIONS.skip_compatibility_check = False
+++<<<<<<< HEAD
+ +OPTIONS.output_metadata_path = None
+ +OPTIONS.board_feature = None
+++=======
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  OPTIONS.disable_fec_computation = False
+- OPTIONS.force_non_ab = False
+- OPTIONS.boot_variable_file = None
++ OPTIONS.disable_verity_computation = False
++ OPTIONS.partial = None
++ OPTIONS.custom_images = {}
++ OPTIONS.disable_vabc = False
++ OPTIONS.spl_downgrade = False
++ OPTIONS.vabc_downgrade = False
+  
+- 
+- METADATA_NAME = 'META-INF/com/android/metadata'
+  POSTINSTALL_CONFIG = 'META/postinstall_config.txt'
+  DYNAMIC_PARTITION_INFO = 'META/dynamic_partitions_info.txt'
+  AB_PARTITIONS = 'META/ab_partitions.txt'
+@@@ -1757,60 -771,80 +784,137 @@@ def GetTargetFilesZipWithoutPostinstall
+    return target_file
+  
+  
+++<<<<<<< HEAD
+ +def GetTargetFilesZipWithBoardFeature(input_file, product, board_feature, set_empty=False):
+ +  """Returns a target-files.zip that's with specific board_feature.
+ +
+ +  This allows to re-asign bootloader.img with u-boot-*-<board_feature>.imx
+ +
+ +  Args:
+ +    input_file: the input target-files.zip filename.
+ +    product: product name, ex: 8mq.
+ +    board_feature: asigned board_feature for u-boot image, ex: lpddr4-dual-signed.
+ +    set_empty: set as True for source_file to use FullUpdateGenerator().
+ +
+ +  Returns:
+ +    The filename of target-files.zip that replaced bootloader.img with specific
+ +    board_feature.
+ +  """
+ +  target_file = common.MakeTempFile(prefix="targetfiles-", suffix=".zip")
+ +  shutil.copyfile(input_file, target_file)
+ +
+ +  with zipfile.ZipFile(input_file, 'r') as input_zip:
+ +    namelist = input_zip.namelist()
+ +
+ +  src_spl = "IMAGES/spl-imx{}-{}.bin".format(product, board_feature)
+ +  tgt_spl = "IMAGES/spl.img"
+ +  tgt_spl_bak = "IMAGES/spl_bak.img"
+ +  if src_spl in namelist:
+ +    src_bootloader = "IMAGES/bootloader-imx{}-{}.img".format(product, board_feature)
+ +    tgt_bootloader = "IMAGES/bootloader.img"
+ +    replace = {tgt_bootloader: src_bootloader, tgt_spl: src_spl, tgt_spl_bak: src_spl}
+ +  else:
+ +    src_bootloader = "IMAGES/u-boot-imx{}-{}.imx".format(product, board_feature)
+ +    tgt_bootloader = "IMAGES/bootloader.img"
+ +    replace = {tgt_bootloader: src_bootloader}
+ +
+ +  # unzip src images
+ +  unique_src = set( val for dic in replace for val in replace.values())
+ +  input_tmp = common.UnzipTemp(input_file, unique_src)
+ +  # delete tgt images
+ +  common.ZipDelete(target_file, replace.keys())
+ +  target_zip = zipfile.ZipFile(target_file, 'a', allowZip64=True)
+ +
+ +  for dst, src in replace.items():
+ +    logger.info("Exchange %s with %s", dst, src)
+ +    assert src in namelist, \
+ +          'Missing {} in {}; {} cannot be written'.format(src, input_file, dst)
+ +    unzipped_file = os.path.join(input_tmp, *src.split('/'))
+ +    if set_empty:
+ +      # set src images as an empty file
+ +      os.remove(unzipped_file)
+ +      open(unzipped_file, 'a').close()
+ +    common.ZipWrite(target_zip, unzipped_file, arcname=dst)
+ +
+ +  common.ZipClose(target_zip)
+ +
+ +  return target_file
+++=======
++ def ParseInfoDict(target_file_path):
++   with zipfile.ZipFile(target_file_path, 'r', allowZip64=True) as zfp:
++     return common.LoadInfoDict(zfp)
++ 
++ 
++ def GetTargetFilesZipForPartialUpdates(input_file, ab_partitions):
++   """Returns a target-files.zip for partial ota update package generation.
++ 
++   This function modifies ab_partitions list with the desired partitions before
++   calling the brillo_update_payload script. It also cleans up the reference to
++   the excluded partitions in the info file, e.g misc_info.txt.
++ 
++   Args:
++     input_file: The input target-files.zip filename.
++     ab_partitions: A list of partitions to include in the partial update
++ 
++   Returns:
++     The filename of target-files.zip used for partial ota update.
++   """
++ 
++   def AddImageForPartition(partition_name):
++     """Add the archive name for a given partition to the copy list."""
++     for prefix in ['IMAGES', 'RADIO']:
++       image_path = '{}/{}.img'.format(prefix, partition_name)
++       if image_path in namelist:
++         copy_entries.append(image_path)
++         map_path = '{}/{}.map'.format(prefix, partition_name)
++         if map_path in namelist:
++           copy_entries.append(map_path)
++         return
++ 
++     raise ValueError("Cannot find {} in input zipfile".format(partition_name))
++ 
++   with zipfile.ZipFile(input_file, allowZip64=True) as input_zip:
++     original_ab_partitions = input_zip.read(
++         AB_PARTITIONS).decode().splitlines()
++     namelist = input_zip.namelist()
++ 
++   unrecognized_partitions = [partition for partition in ab_partitions if
++                              partition not in original_ab_partitions]
++   if unrecognized_partitions:
++     raise ValueError("Unrecognized partitions when generating partial updates",
++                      unrecognized_partitions)
++ 
++   logger.info("Generating partial updates for %s", ab_partitions)
++ 
++   copy_entries = ['META/update_engine_config.txt']
++   for partition_name in ab_partitions:
++     AddImageForPartition(partition_name)
++ 
++   # Use zip2zip to avoid extracting the zipfile.
++   partial_target_file = common.MakeTempFile(suffix='.zip')
++   cmd = ['zip2zip', '-i', input_file, '-o', partial_target_file]
++   cmd.extend(['{}:{}'.format(name, name) for name in copy_entries])
++   common.RunAndCheckOutput(cmd)
++ 
++   partial_target_zip = zipfile.ZipFile(partial_target_file, 'a',
++                                        allowZip64=True)
++   with zipfile.ZipFile(input_file, allowZip64=True) as input_zip:
++     common.ZipWriteStr(partial_target_zip, 'META/ab_partitions.txt',
++                        '
+'.join(ab_partitions))
++     for info_file in ['META/misc_info.txt', DYNAMIC_PARTITION_INFO]:
++       if info_file not in input_zip.namelist():
++         logger.warning('Cannot find %s in input zipfile', info_file)
++         continue
++       content = input_zip.read(info_file).decode()
++       modified_info = UpdatesInfoForSpecialUpdates(
++           content, lambda p: p in ab_partitions)
++       common.ZipWriteStr(partial_target_zip, info_file, modified_info)
++ 
++     # TODO(xunchang) handle 'META/care_map.pb', 'META/postinstall_config.txt'
++   common.ZipClose(partial_target_zip)
++ 
++   return partial_target_file
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  
+  def GetTargetFilesZipForRetrofitDynamicPartitions(input_file,
+@@@ -1921,18 -1086,19 +1156,31 @@@ def GenerateAbOtaPackage(target_file, o
+      target_file = GetTargetFilesZipForRetrofitDynamicPartitions(
+          target_file, target_info.get("super_block_devices").strip().split(),
+          target_info.get("dynamic_partition_list").strip().split())
++   elif OPTIONS.partial:
++     target_file = GetTargetFilesZipForPartialUpdates(target_file,
++                                                      OPTIONS.partial)
++     additional_args += ["--is_partial_update", "true"]
+    elif OPTIONS.skip_postinstall:
+      target_file = GetTargetFilesZipWithoutPostinstallConfig(target_file)
++   # Target_file may have been modified, reparse ab_partitions
++   with zipfile.ZipFile(target_file, allowZip64=True) as zfp:
++     target_info.info_dict['ab_partitions'] = zfp.read(
++         AB_PARTITIONS).decode().strip().split("
+")
+  
+++<<<<<<< HEAD
+ +  if OPTIONS.board_feature:
+ +    target_file = GetTargetFilesZipWithBoardFeature(target_file,
+ +        target_info.GetBuildProp('ro.build.product').split('_')[-1],
+ +        OPTIONS.board_feature)
+ +  if OPTIONS.board_feature and source_file is not None:
+ +    source_file = GetTargetFilesZipWithBoardFeature(source_file,
+ +        target_info.GetBuildProp('ro.build.product').split('_')[-1],
+ +        OPTIONS.board_feature, True)
+ +
+++=======
++   # Metadata to comply with Android OTA package format.
++   metadata = GetPackageMetadata(target_info, source_info)
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+    # Generate payload.
+    payload = Payload()
+  
+@@@ -2172,10 -1269,10 +1351,12 @@@ def main(argv)
+        OPTIONS.skip_compatibility_check = True
+      elif o == "--output_metadata_path":
+        OPTIONS.output_metadata_path = a
+ +    elif o == "--board_feature":
+ +      OPTIONS.board_feature = a
+      elif o == "--disable_fec_computation":
+        OPTIONS.disable_fec_computation = True
++     elif o == "--disable_verity_computation":
++       OPTIONS.disable_verity_computation = True
+      elif o == "--force_non_ab":
+        OPTIONS.force_non_ab = True
+      elif o == "--boot_variable_file":
+@@@ -2215,10 -1327,15 +1411,16 @@@
+                                   "retrofit_dynamic_partitions",
+                                   "skip_compatibility_check",
+                                   "output_metadata_path=",
+ +                                 "board_feature=",
+                                   "disable_fec_computation",
++                                  "disable_verity_computation",
+                                   "force_non_ab",
+                                   "boot_variable_file=",
++                                  "partial=",
++                                  "custom_image=",
++                                  "disable_vabc",
++                                  "spl_downgrade",
++                                  "vabc_downgrade",
+                               ], extra_option_handler=option_handler)
+  
+    if len(args) != 2:

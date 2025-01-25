@@ -1,0 +1,30 @@
+73248e3de8 jenkins 2020-05-28
+
+Merge branch 'merge_imx-android-10.0.0_2.0.0_to_idt-imx-android-10-test' into idt-imx-android-10-test
+
+Change-Id: I7b1d309478ff47b9d882da4a255b977a68344687
+
+diff --cc services/surfaceflinger/Scheduler/Scheduler.cpp
+index 5a98232e97,f8bd95872c..32a5dbd30d
+--- a/services/surfaceflinger/Scheduler/Scheduler.cpp
++++ b/services/surfaceflinger/Scheduler/Scheduler.cpp
+@@@ -567,9 -567,13 +567,19 @@@ Scheduler::RefreshRateType Scheduler::c
+      }
+  
+      // Content detection is on, find the appropriate refresh rate with minimal error
+++<<<<<<< HEAD
+ +    // TODO(b/139751853): Scan allowed refresh rates only (SurfaceFlinger::mAllowedDisplayConfigs)
+ +    auto iter = min_element(mRefreshRateConfigs.getRefreshRates().cbegin(),
+ +                            mRefreshRateConfigs.getRefreshRates().cend(),
+++=======
++     auto begin = mRefreshRateConfigs.getRefreshRates().cbegin();
++ 
++     // Skip POWER_SAVING config as it is not a real config
++     if (begin->first == RefreshRateType::POWER_SAVING) {
++         ++begin;
++     }
++     auto iter = min_element(begin, mRefreshRateConfigs.getRefreshRates().cend(),
+++>>>>>>> merge_imx-android-10.0.0_2.0.0_to_idt-imx-android-10-test
+                              [rate = mContentRefreshRate](const auto& l, const auto& r) -> bool {
+                                  return std::abs(l.second->fps - static_cast<float>(rate)) <
+                                          std::abs(r.second->fps - static_cast<float>(rate));

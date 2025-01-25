@@ -1,0 +1,99 @@
+c21144ee5b George.Huang 2020-01-06
+
+AOS-59: Enable fastboot flash bootloader1 u-boot.imx
+
+Change-Id: Ib7702ea3d1ffe1ac19d5112257df683f3551135e
+
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_dev.c b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+index f1c116bea2..6db6d1076e 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_dev.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_dev.c
+@@ -124,7 +124,7 @@ static int get_fastboot_target_dev(char *mmc_dev, struct fastboot_ptentry *ptn)
+ 			printf("Flash target is mmc%d
+", dev);
+ 			if (target_mmc->part_config != MMCPART_NOAVAILABLE)
+ 				sprintf(mmc_dev, "mmc dev %x %x", dev, /*slot no*/
+-						FASTBOOT_MMC_BOOT_PARTITION_ID/*part no*/);
++						ptn->partition_id/*part no*/);
+ 			else
+ 				sprintf(mmc_dev, "mmc dev %x", dev);
+ 			}
+@@ -559,4 +559,4 @@ void process_erase_mmc(const char *cmdbuf, char *response)
+ 	sprintf(response, "OKAY");
+ 
+     return;
+-}
+\ No newline at end of file
++}
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 62c7af8635..07a250a29c 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@ -46,6 +46,9 @@ enum {
+ #endif
+ 	PTN_ALL_INDEX,
+ 	PTN_BOOTLOADER_INDEX,
++#ifdef IDT_DUAL_BOOTLOADER
++	PTN_BOOTLOADER1_INDEX,
++#endif
+ };
+ 
+ struct fastboot_ptentry g_ptable[MAX_PTN];
+@@ -235,10 +238,26 @@ static int _fastboot_parts_load_from_ptable(void)
+ 	ptable[PTN_BOOTLOADER_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+ 	strcpy(ptable[PTN_BOOTLOADER_INDEX].fstype, "raw");
+ 
++#ifdef IDT_DUAL_BOOTLOADER
++	/* Bootloader1 */
++	strcpy(ptable[PTN_BOOTLOADER1_INDEX].name, FASTBOOT_PARTITION_BOOTLOADER1);
++	ptable[PTN_BOOTLOADER1_INDEX].start =
++				bootloader_mmc_offset() / dev_desc->blksz;
++	ptable[PTN_BOOTLOADER1_INDEX].length =
++				 ANDROID_BOOTLOADER_SIZE / dev_desc->blksz;
++	ptable[PTN_BOOTLOADER1_INDEX].partition_id = boot_partition + 1;
++	ptable[PTN_BOOTLOADER1_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
++	strcpy(ptable[PTN_BOOTLOADER1_INDEX].fstype, "raw");
++#endif
++
+ 	int tbl_idx;
+ 	int part_idx = 1;
+ 	int ret;
++#ifdef IDT_DUAL_BOOTLOADER
++	for (tbl_idx = PTN_BOOTLOADER1_INDEX + 1; tbl_idx < MAX_PTN; tbl_idx++) {
++#else
+ 	for (tbl_idx = PTN_BOOTLOADER_INDEX + 1; tbl_idx < MAX_PTN; tbl_idx++) {
++#endif
+ 		ret = _fastboot_parts_add_ptable_entry(tbl_idx,
+ 				part_idx++,
+ 				user_partition,
+@@ -326,6 +345,9 @@ bool fastboot_parts_is_raw(struct fastboot_ptentry *ptn)
+ 		if (!strncmp(ptn->name, FASTBOOT_PARTITION_BOOTLOADER,
+ 			strlen(FASTBOOT_PARTITION_BOOTLOADER)))
+ 			return true;
++		else if (!strncmp(ptn->name, FASTBOOT_PARTITION_BOOTLOADER1,
++			strlen(FASTBOOT_PARTITION_BOOTLOADER1)))
++			return true;
+ #ifdef CONFIG_ANDROID_AB_SUPPORT
+ 		else if (!strncmp(ptn->name, FASTBOOT_PARTITION_GPT,
+ 			strlen(FASTBOOT_PARTITION_GPT)) ||
+diff --git a/include/configs/imx8mq_evk.h b/include/configs/imx8mq_evk.h
+index f3b777de5a..0caa0f1553 100644
+--- a/include/configs/imx8mq_evk.h
++++ b/include/configs/imx8mq_evk.h
+@@ -301,3 +301,4 @@
+ #include "imx8mq_evk_android.h"
+ #endif
+ #endif
++#define IDT_DUAL_BOOTLOADER
+diff --git a/include/fb_fsl.h b/include/fb_fsl.h
+index 2d79d785f5..4a851252c1 100644
+--- a/include/fb_fsl.h
++++ b/include/fb_fsl.h
+@@ -55,6 +55,7 @@
+ #define FASTBOOT_PARTITION_RECOVERY "recovery"
+ #define FASTBOOT_PARTITION_SYSTEM_A "system_a"
+ #define FASTBOOT_PARTITION_BOOTLOADER "bootloader0"
++#define FASTBOOT_PARTITION_BOOTLOADER1 "bootloader1"
+ #define FASTBOOT_PARTITION_DATA "userdata"
+ #define FASTBOOT_PARTITION_BOOT_B "boot_b"
+ #define FASTBOOT_PARTITION_SYSTEM_B "system_b"

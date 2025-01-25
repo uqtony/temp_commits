@@ -1,0 +1,47 @@
+d3a6ac4 George.Huang 2020-02-17
+
+Fix build break
+
+Change-Id: I0f4ca82b33a4b6788d3b1fb1bff4afe861f7daa5
+
+diff --git a/Android.mk b/Android.mk
+index 821480d..e4b3086 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -1,6 +1,6 @@
+ LOCAL_PATH := $(call my-dir)
+ BASE_PATH := $(LOCAL_PATH)
+-DTBS_PATH := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/arch/$(TARGET_KERNEL_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/
++DTBS_PATH := $(TARGET_KERNEL_SRC)/arch/$(KERNEL_SRC_ARCH)/boot/dts/$(DTS_ADDITIONAL_PATH)/
+ 
+ include $(CLEAR_VARS)
+ 
+@@ -18,9 +18,13 @@ define cleanup
+ endef
+ 
+ ##################################
+-boardinfoimages: $(BOARD_PREBUILT_DTBOIMAGE)
++boardinfoimages :=
++$(boardinfoimages):
+ 	$(call generate_imgs,$(abspath $(DTBS_PATH)))
+ 	$(call copy_imgs)
+ 	$(call cleanup)
+ 
+-ALL_DEFAULT_INSTALLED_MODULES += boardinfoimages
++ALL_DEFAULT_INSTALLED_MODULES += $(boardinfoimages)
++
++.PHONY: bdinfo
++bdinfo: $(boardinfoimages)
+diff --git a/board_info_gen.py b/board_info_gen.py
+index d08e59b..e1daaad 100755
+--- a/board_info_gen.py
++++ b/board_info_gen.py
+@@ -9,7 +9,7 @@ from hexdump import *
+ 
+ g_img_name = "board_info"
+ g_cfg_name_pre = "idt"
+-g_cfg_name_ext = "dtb"
++g_cfg_name_ext = "dts"
+ g_img_size_bytes = 1024*1024
+ 
+ class GenBoardInfo(object):

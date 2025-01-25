@@ -1,0 +1,426 @@
+32a3d0eede55 AndrewS 2022-01-25
+
+AOS-807: register driver for 2 usb-c port
+
+Change-Id: I9cf4a875c3ac28f8e98a4d200a8cbe46bfe18c9b
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 6127fda2f55d..a93d9d8ebc00 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -692,6 +692,8 @@ tp_st1633i: st1633i@55 {
+ 	typec_tps65994: usb-pd@20 {
+ 		compatible = "ti,tps65994";
+ 		reg = <0x20>;
++		main-port;
++		usb-otg;
+ 
+ 		connector {
+ 			ports {
+@@ -716,6 +718,11 @@ usb_con_ss: endpoint {
+ 			};
+ 		};
+ 	};
++
++	typec_tps65994_b: usb-pd-b@24 {
++		compatible = "ti,tps65994";
++		reg = <0x24>;
++	};
+ };
+ 
+ &i2c2 {
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+index 64b512aa8a51..13641e6a9207 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-1.dtsi
+@@ -34,7 +34,7 @@ typec_tps65994: usb-pd@20 {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_typec>;
+ 		interrupt-parent = <&gpio1>;
+-		interrupts = <23 IRQ_TYPE_EDGE_FALLING>;
++		interrupts = <23 IRQ_TYPE_EDGE_BOTH>;
+ 
+ 		port {
+ 			typec_dr_sw: endpoint {
+@@ -46,6 +46,7 @@ typec_dr_sw: endpoint {
+ 
+ &usb_dwc3_0 {
+ 	usb-role-switch;
++	role-switch-default-mode = "none";
+ 	/delete-property/ extcon;
+ 
+ 	port {
+diff --git a/drivers/usb/typec/tps65994.c b/drivers/usb/typec/tps65994.c
+index 4c4d3d310650..1f6baf4ed8d0 100644
+--- a/drivers/usb/typec/tps65994.c
++++ b/drivers/usb/typec/tps65994.c
+@@ -16,6 +16,8 @@
+ #include <linux/usb/typec.h>
+ #include <linux/usb/role.h>
+ #include <linux/extcon-provider.h>
++#include <linux/spinlock.h>
++#include <linux/mutex.h>
+ 
+ /* Register offsets */
+ #define TPS_REG_VID			0x00
+@@ -23,6 +25,7 @@
+ #define TPS_REG_CUSTUSE 		0x06
+ #define TPS_REG_CMD1			0x08
+ #define TPS_REG_DATA1			0x09
++#define TPS_REG_CMD2			0x10
+ #define TPS_REG_DATA2			0x11
+ #define TPS_REG_INT_EVENT1		0x14
+ #define TPS_REG_INT_EVENT2		0x15
+@@ -38,8 +41,10 @@
+ #define TPS_REG_BUILD_DESC		0x2e
+ #define TPS_REG_DEVICE_INFO		0x2f
+ #define TPS_REG_POWER_STATUS		0x3f
++#define TPS_REG_PD3_STATUS		0x41
+ #define TPS_REG_RX_IDENTITY_SOP 	0x48
+ #define TPS_REG_USER_VID_CONF		0x4a
++#define TPS_REG_DATA_CONTROL		0x50
+ #define TPS_REG_DP_SID_STATUS		0x58
+ #define TPS_REG_GPIO_CONFIG		0x5c
+ #define TPS_REG_I2CMASTER_CONF		0x64
+@@ -90,6 +95,12 @@ enum {
+ #define PATCH_VER_HEADER		"Ver."
+ #define PATCH_VER_HEADER_LEN		4
+ 
++/* tps65994 type c port */
++enum tps65994_typec_port {
++	TPS65994_TYPEC_PORT_A,
++	TPS65994_TYPEC_PORT_B,
++};
++
+ static char patch_path[64];
+ 
+ extern int gSizeLowregionArrayGandalf;
+@@ -149,6 +160,8 @@ struct tps65994 {
+ 	struct device *dev;
+ 	struct i2c_client *i2c_client;
+ 	struct mutex lock; /* device lock */
++	spinlock_t irq_lock;
++	struct work_struct irq_work;
+ 
+ 	struct typec_port *port;
+ 	struct typec_partner *partner;
+@@ -166,6 +179,7 @@ struct tps65994 {
+ 
+ 	struct extcon_dev *extcon;
+ 	struct notifier_block tps65994_nb;
++	bool main_port;
+ };
+ 
+ static const unsigned int tps_cables[] = {
+@@ -357,30 +371,23 @@ static void tps65994_disconnect(struct tps65994 *tps, u32 status)
+ 	power_supply_changed(tps->psy);
+ }
+ 
+-static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
+-			     size_t in_len, u8 *in_data,
+-			     size_t out_len, u8 *out_data)
++static int tps65994_cmd_write(struct tps65994 *tps, const char *cmd,
++			      enum tps65994_typec_port port)
+ {
+ 	struct i2c_client *client = tps->i2c_client;
++	int cmd_reg = (tps->main_port) ? TPS_REG_CMD1 : TPS_REG_CMD2;
+ 	unsigned long timeout;
+-	u32 val;
++	u32 val = 0;
+ 	int ret;
+ 
+-	if (in_len) {
+-		ret = tps65994_i2c_write(client, TPS_REG_DATA1,
+-					 in_data, in_len);
+-		if (ret)
+-			return ret;
+-	}
+-
+-	ret = tps65994_i2c_write(client, TPS_REG_CMD1, cmd, 4);
+-	if (ret < 0)
++	ret = tps65994_i2c_write(client, cmd_reg, cmd, 4);
++	if (ret)
+ 		return ret;
+ 
+ 	/* set timeout as 2s */
+ 	timeout = jiffies + msecs_to_jiffies(2000);
+ 	do {
+-		ret = tps65994_i2c_read(client, TPS_REG_CMD1, &val, NULL);
++		ret = tps65994_i2c_read(client, cmd_reg, &val, NULL);
+ 		if (ret)
+ 			return ret;
+ 		if (INVALID_CMD(val))
+@@ -392,6 +399,28 @@ static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
+ 		usleep_range(10000, 11000);
+ 	} while (val);
+ 
++	return 0;
++}
++
++static int tps65994_exec_cmd(struct tps65994 *tps, const char *cmd,
++			     size_t in_len, u8 *in_data,
++			     size_t out_len, u8 *out_data)
++{
++	struct i2c_client *client = tps->i2c_client;
++	u32 val = 0;
++	int ret;
++
++	if (in_len) {
++		ret = tps65994_i2c_write(client, TPS_REG_DATA1,
++					 in_data, in_len);
++		if (ret)
++			return ret;
++	}
++
++	ret = tps65994_cmd_write(tps, cmd, TPS65994_TYPEC_PORT_A);
++	if (ret)
++		return ret;
++
+ 	if (out_len) {
+ 		ret = tps65994_i2c_read(client, TPS_REG_DATA1,
+ 					out_data, NULL);
+@@ -546,7 +575,8 @@ static int tps65994_load_patch(struct tps65994 *tps)
+ 		if (!(out_data[10] & 0x1)) {
+ 			usleep_range(10000, 11000);
+ 			if (retry_cnt++ > 100) {
+-				dev_err(&client->dev, "check PatchLoaded bit INT_EVENT1 failed
+");
++				dev_err(&client->dev,
++						"check PatchLoaded bit INT_EVENT1 failed
+");
+ 				ret = -EAGAIN;
+ 				goto out_unlock;
+ 			}
+@@ -741,7 +771,7 @@ static int tps65994_write_eeprom(struct tps65994 *tps, int region, int source)
+ 	/* cold reset */
+ 	ret = tps65994_i2c_write(tps->i2c_client, TPS_REG_CMD1, cmd_reset, 4);
+ 	if (ret < 0)
+-		return ret;
++		dev_err(tps->dev, "failed to send reset command to PD
+");
+ 
+ out_unlock:
+ 	mutex_unlock(&tps->lock);
+@@ -1135,29 +1165,30 @@ static struct attribute_group tps65994_group = {
+ 	.attrs = tps65994_attrs,
+ };
+ 
+-static irqreturn_t tps65994_interrupt(int irq, void *data)
++static void tps65994_irq_work(struct work_struct *work)
+ {
+-	struct tps65994 *tps = data;
++	struct tps65994 *tps = container_of(work, struct tps65994, irq_work);
+ 	u8 event[11];
+ 	u8 status[5];
+ 	u16 pwr_status;
+ 	enum typec_pwr_opmode mode;
+ 	int ret;
+ 
+-	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_INT_EVENT1, &event, NULL);
++	mutex_lock(&tps->lock);
++	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_INT_EVENT1, event, NULL);
+ 	if (ret) {
+ 		dev_err(tps->dev, "%s: failed to read events
+", __func__);
+-		goto err_out;
+-	}
+-
+-	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS, status, NULL);
+-	if (ret) {
+-		dev_err(tps->dev, "%s: failed to read status
+", __func__);
+ 		goto err_clear_ints;
+ 	}
+ 
+ 	/* Handle plug insert or removal */
+ 	if (event[0] & TPS_REG_INT_PLUG_EVENT) {
++		ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS, status, NULL);
++		if (ret) {
++			dev_err(tps->dev, "%s: failed to read status
+", __func__);
++			goto err_clear_ints;
++		}
++
+ 		ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_POWER_STATUS,
+ 					&pwr_status, NULL);
+ 		if (ret) {
+@@ -1179,8 +1210,18 @@ static irqreturn_t tps65994_interrupt(int irq, void *data)
+ 
+ err_clear_ints:
+ 	tps65994_i2c_write(tps->i2c_client, TPS_REG_INT_CLEAR1, event, 11);
++	mutex_unlock(&tps->lock);
++}
++
++static irqreturn_t tps65994_interrupt(int irq, void *data)
++{
++	struct tps65994 *tps = data;
++	unsigned long flags;
++
++	spin_lock_irqsave(&tps->irq_lock, flags);
++	schedule_work(&tps->irq_work);
++	spin_unlock_irqrestore(&tps->irq_lock, flags);
+ 
+-err_out:
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1211,33 +1252,39 @@ static int tps65994_probe(struct i2c_client *client)
+ {
+ 	struct typec_capability typec_cap = { };
+ 	struct tps65994 *tps;
+-	struct fwnode_handle *fwnode;
++	struct device_node *np = client->dev.of_node;
++	struct fwnode_handle *fwnode = NULL;
+ 	u8 status[5];
+ 	u32 conf;
+ 	int ret;
++	bool usb_otg = false;
+ 
+ 	tps = devm_kzalloc(&client->dev, sizeof(*tps), GFP_KERNEL);
+ 	if (!tps)
+ 		return -ENOMEM;
+ 
+ 	mutex_init(&tps->lock);
++	spin_lock_init(&tps->irq_lock);
+ 	tps->dev = &client->dev;
+ 
+-	/*
+-	 * This fwnode has a "compatible" property, but is never populated as a
+-	 * struct device. Instead we simply parse it to read the properties.
+-	 * This breaks fw_devlink=on. To maintain backward compatibility
+-	 * with existing DT files, we work around this by deleting any
+-	 * fwnode_links to/from this fwnode.
+-	 */
+-	fwnode = device_get_named_child_node(&client->dev, "connector");
+-	if (!fwnode)
+-		return -ENODEV;
+-
+-	tps->role_sw = fwnode_usb_role_switch_get(fwnode);
+-	if (IS_ERR(tps->role_sw)) {
+-		ret = PTR_ERR(tps->role_sw);
+-		goto err_fwnode_put;
++	usb_otg = of_property_read_bool(np, "usb-otg");
++	if (usb_otg) {
++		/*
++		 * This fwnode has a "compatible" property, but is never populated as a
++		 * struct device. Instead we simply parse it to read the properties.
++		 * This breaks fw_devlink=on. To maintain backward compatibility
++		 * with existing DT files, we work around this by deleting any
++		 * fwnode_links to/from this fwnode.
++		 */
++		fwnode = device_get_named_child_node(&client->dev, "connector");
++		if (!fwnode)
++			return -ENODEV;
++
++		tps->role_sw = fwnode_usb_role_switch_get(fwnode);
++		if (IS_ERR(tps->role_sw)) {
++			ret = PTR_ERR(tps->role_sw);
++			goto err_fwnode_put;
++		}
+ 	}
+ 
+ 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
+@@ -1247,12 +1294,17 @@ static int tps65994_probe(struct i2c_client *client)
+         }
+ 
+ 	tps->i2c_client = client;
+-	/* Make sure the controller has application firmware running */
+-	ret = tps65994_check_mode(tps);
+-	if (ret)
+-		return ret;
+ 
+-	tps65994_check_version(tps);
++	tps->main_port = of_property_read_bool(np, "main-port");
++
++	if (tps->main_port) {
++		/* Make sure the controller has application firmware running */
++		ret = tps65994_check_mode(tps);
++		if (ret)
++			return ret;
++
++		tps65994_check_version(tps);
++	}
+ 
+ 	ret = tps65994_i2c_read(tps->i2c_client, TPS_REG_STATUS,
+ 				status, NULL);
+@@ -1306,34 +1358,37 @@ static int tps65994_probe(struct i2c_client *client)
+ 	}
+ 
+ 	i2c_set_clientdata(client, tps);
++	INIT_WORK(&tps->irq_work, tps65994_irq_work);
++
++	if (usb_otg) {
++		if (client->irq > 0) {
++			ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
++							tps65994_interrupt, IRQF_ONESHOT,
++							dev_name(&client->dev), tps);
++			if (ret) {
++				dev_err(&client->dev, "failed to request irq
+");
++				goto err_discon;
++			}
++		} else {
++			tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
++			if (IS_ERR(tps->extcon)) {
++				dev_err(&client->dev, "failed to allocate extcon device
+");
++				ret = PTR_ERR(tps->extcon);
++				goto err_discon;
++			}
+ 
+-	if (client->irq > 0) {
+-		ret = devm_request_threaded_irq(&client->dev, client->irq, NULL,
+-						tps65994_interrupt, IRQF_ONESHOT,
+-						dev_name(&client->dev), tps);
+-		if (ret) {
+-			dev_err(&client->dev, "failed to request irq
+");
+-			goto err_discon;
+-		}
+-	} else {
+-		tps->extcon = devm_extcon_dev_allocate(&client->dev, tps_cables);
+-		if (IS_ERR(tps->extcon)) {
+-			dev_err(&client->dev, "failed to allocate extcon device
+");
+-			ret = PTR_ERR(tps->extcon);
+-			goto err_discon;
+-		}
+-
+-		ret = devm_extcon_dev_register(&client->dev, tps->extcon);
+-		if (ret < 0) {
+-			dev_err(&client->dev, "failed to register extcon device
+");
+-			goto err_discon;
+-		}
++			ret = devm_extcon_dev_register(&client->dev, tps->extcon);
++			if (ret < 0) {
++				dev_err(&client->dev, "failed to register extcon device
+");
++				goto err_discon;
++			}
+ 
+-		tps->tps65994_nb.notifier_call = tps65994_notifier;
+-		ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
+-		if (ret < 0) {
+-			dev_err(&client->dev, "couldn't register notifier
+");
+-			goto err_discon;
++			tps->tps65994_nb.notifier_call = tps65994_notifier;
++			ret = extcon_register_notifier(tps->extcon, EXTCON_USB, &tps->tps65994_nb);
++			if (ret < 0) {
++				dev_err(&client->dev, "couldn't register notifier
+");
++				goto err_discon;
++			}
+ 		}
+ 	}
+ 
+@@ -1342,7 +1397,6 @@ static int tps65994_probe(struct i2c_client *client)
+ 		dev_err(&client->dev, "failed to create group in sysfs
+");
+ 		goto err_sysfs;
+ 	}
+-
+ 	return 0;
+ 
+ err_sysfs:

@@ -1,0 +1,64 @@
+f79508d56a George.Huang 2022-03-14
+
+AOS-933: redwood_8mq: fix wrong ddr size from uboot
+
+- calculate idtech full ddr size only in board_phys_sdram_size
+
+- then other functions will call board_phys_sdram_size
+  to get idtech full ddr size
+
+- for redwood_8mq:
+  PHYS_SDRAM_SIZE                    = 2G
+  PHYS_SDRAM_2_SIZE                  = 0G
+  idt_banksize_1st(*size)            = 3G
+  idt_banksize_2nd(mem_map)          = 1G
+  board_phys_sdram_size(&sdram_size) = 4G
+
+Change-Id: I03878b6659fe44eee80c239d47a36ba064c33583
+
+diff --git a/arch/arm/mach-imx/imx8m/soc.c b/arch/arm/mach-imx/imx8m/soc.c
+index 1bb5268c8e..014b9655c7 100644
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@ -223,6 +223,7 @@ __weak int board_phys_sdram_size(phys_size_t *size)
+ 
+ 	idt_adjust_mem_map(mem_map, size);
+ 	*size = idt_banksize_1st(*size);
++	*size += idt_banksize_2nd(mem_map);
+ 	return 0;
+ #endif
+ 
+@@ -247,11 +248,6 @@ int dram_init(void)
+ 	else
+ 		gd->ram_size = sdram_size;
+ 
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	gd->ram_size = sdram_size + idt_banksize_2nd(mem_map);
+-	return 0;
+-#endif
+-
+ 	return 0;
+ }
+ 
+@@ -302,9 +298,6 @@ int dram_init_banksize(void)
+ 		}
+ 		gd->bd->bi_dram[bank].start = 0x100000000UL;
+ 		gd->bd->bi_dram[bank].size = sdram_b2_size;
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-		gd->bd->bi_dram[bank].size = gd->ram_size - sdram_size;
+-#endif
+ 	}
+ 
+ 	return 0;
+@@ -315,11 +308,6 @@ phys_size_t get_effective_memsize(void)
+ 	int ret;
+ 	phys_size_t sdram_size;
+ 	phys_size_t sdram_b1_size;
+-
+-#if defined(CONFIG_IDT_MULTIPLE_DDR)
+-	return idt_banksize_1st(gd->ram_size);
+-#endif
+-
+ 	ret = board_phys_sdram_size(&sdram_size);
+ 	if (!ret) {
+ 		/* Bank 1 can't cross over 4GB space */

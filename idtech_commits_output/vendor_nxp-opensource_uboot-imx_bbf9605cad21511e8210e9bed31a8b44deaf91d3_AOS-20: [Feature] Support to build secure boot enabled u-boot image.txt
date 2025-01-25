@@ -1,0 +1,25 @@
+bbf9605cad max.yang 2019-11-04
+
+AOS-20: [Feature] Support to build secure boot enabled u-boot image
+
+1. when "SECURE_BOOT=1" pass from make instruction in uboot.mk, enable CONFIG_SECURE_BOOT flag
+2. With CONFIG_SECURE_BOOT, spl will try to authenticate u-boot image
+Test Result: When enable this flag, uart log will show below messgae
+  Authenticate image from DDR location 0x401fcdc0...
+
+Change-Id: Ibe65eb69e3cee142edac1480bfe4d7a731f7af02
+
+diff --git a/Makefile b/Makefile
+index afc79040fe..f3c917734e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -386,6 +386,9 @@ KBUILD_AFLAGS   := -D__ASSEMBLY__
+ KBUILD_CFLAGS	+= $(call cc-option,-fno-PIE)
+ KBUILD_AFLAGS	+= $(call cc-option,-fno-PIE)
+ 
++ifeq ($(SECURE_BOOT), 1)
++	KBUILD_CPPFLAGS += -DCONFIG_SECURE_BOOT
++endif
+ # Read UBOOTRELEASE from include/config/uboot.release (if it exists)
+ UBOOTRELEASE = $(shell cat include/config/uboot.release 2> /dev/null)
+ UBOOTVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)

@@ -1,0 +1,87 @@
+4ef7392 owen.wen 2020-10-19
+
+AOS-363: Fastboot HAL_MODULE_INFO_SYM implementation
+
+this module implement the Fastboot OEM HAL function
+
+fastboot format userdata
+if type is ext4, then fastboot will generate an empty ext4 image and
+flash the image to the partition
+if type is raw, then fastboot do nothing
+
+Change-Id: I445c451e790302e0344edae3dc74d69a7d72b3ed
+
+diff --git a/Android.bp b/Android.bp
+new file mode 100644
+index 0000000..3c7a9fc
+--- /dev/null
++++ b/Android.bp
+@@ -0,0 +1,16 @@
++cc_library_shared {
++
++    name: "fastboot.default",
++
++    //recovery_available: true, // not work, this setting won't install the module into recovery image
++    recovery: true,
++
++    relative_install_path: "hw",
++
++    include_dirs: [
++        "hardware/libhardware/include",
++    ],
++
++    srcs: ["Fastboot.cpp"],
++
++}
+diff --git a/Fastboot.cpp b/Fastboot.cpp
+new file mode 100644
+index 0000000..dc797cc
+--- /dev/null
++++ b/Fastboot.cpp
+@@ -0,0 +1,46 @@
++/*
++ *  FASTBOOT
++ *
++ *  Copyright (c) 2020 ID TECH.
++ *  Author: Owen Wen <owen.wen@idtechproducts.com>
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License version 2 as
++ *  published by the Free Software Foundation.
++ */
++
++#include <hardware/hardware.h>
++#include <hardware/fastboot.h>
++#include <cstring>
++
++#define USERDATA "userdata"
++
++static struct hw_module_methods_t fastboot_module_methods = {
++	.open = NULL,
++};
++
++/* refer hardware/interfaces/fastboot/1.0/types.hal for the return value of this function
++ * 0: EXT4
++ * 1: F2FS
++ * 2: RAW
++ */
++static int module_getPartitionType(fastboot_module_t* /*module*/, const char* partitionName) {
++	if (std::strncmp(partitionName, USERDATA, std::strlen(USERDATA)) == 0) {
++		return 0;
++	} else {
++		return 2;
++	}
++}
++
++fastboot_module_t HAL_MODULE_INFO_SYM = {
++	.common = {
++		.tag = HARDWARE_MODULE_TAG,
++		.version_major = 1,
++		.version_minor = 0,
++		.id = FASTBOOT_MODULE_ID,
++		.name = "Fastboot HAL Module",
++		.author = "Owen Wen",
++		.methods = &fastboot_module_methods,
++	},
++	.getPartitionType = module_getPartitionType,
++};

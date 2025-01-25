@@ -1,0 +1,316 @@
+fed2923acf AndrewS 2022-05-06
+
+AOS-1001: update redwood_8mm u-boot device tree
+
+Change-Id: Ie4bcde2ddaddf886d07368cecc9abe12dcf572ac
+
+diff --git a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-0.dts b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-0.dts
+index 9d8f07cfa9..16f3238ac1 100644
+--- a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-0.dts
++++ b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-0.dts
+@@ -22,6 +22,7 @@
+ 		compatible = "gpio-leds";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_gpio_led>;
++		status = "disabled";
+ 
+ 		status {
+ 			label = "status";
+@@ -30,6 +31,33 @@
+ 		};
+ 	};
+ 
++	reg_backlight_5v_vdd: fixed-regulator-5v-vdd {
++		compatible = "regulator-fixed";
++		regulator-name = "backligkt_5v_supply";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
++	reg_lcm_lcd_vdd: fixed-regulator-3v3-vdd {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd_3v3_supply";
++		regualtor-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio4 11 GPIO_ACTIVE_LOW>;
++		off-on_delay-us = <2000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
++
++	reg_lcm_bridg_vdd: fixed-regulator-3v3-vdd {
++		compatible = "regulator-fixed";
++		regualtor-name = "bridge_3v3_supply";
++		regualtor-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
+ 	reg_usdhc2_vmmc: regulator-usdhc2 {
+ 		compatible = "regulator-fixed";
+ 		pinctrl-names = "default";
+@@ -38,10 +66,12 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+ 		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		off-on-delay-us = <20000>;
+ 		enable-active-high;
+ 	};
+ 
+ 	ir-receiver {
++		status = "disabled";
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+ 		pinctrl-names = "default";
+@@ -50,6 +80,7 @@
+ 	};
+ 
+ 	wm8524: audio-codec {
++		status = "disabled";
+ 		#sound-dai-cells = <0>;
+ 		compatible = "wlf,wm8524";
+ 		pinctrl-names = "default";
+@@ -58,6 +89,7 @@
+ 	};
+ 
+ 	sound-wm8524 {
++		status = "disabled";
+ 		compatible = "simple-audio-card";
+ 		simple-audio-card,name = "wm8524-audio";
+ 		simple-audio-card,format = "i2s";
+@@ -84,10 +116,11 @@
+ 
+ 	dsi_host: dsi-host {
+ 		compatible = "samsung,sec-mipi-dsi";
+-		status = "okay";
++		status = "disabled";
+ 	};
+ 
+ 	rm67199_panel {
++		status = "disabled";
+ 		compatible = "raydium,rm67199";
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+@@ -99,7 +132,6 @@
+ 					 */
+ 		panel-width-mm = <68>;
+ 		panel-height-mm = <121>;
+-		status = "okay";
+ 
+ 		port {
+ 			rm67191_from_dsim: endpoint {
+@@ -133,7 +165,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi2 &pinctrl_ecspi2_cs>;
+ 	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
+-	status = "okay";
++	status = "disabled";
+ 
+ 	spidev0: spi@0 {
+ 		reg = <0>;
+@@ -148,7 +180,7 @@
+ 	phy-mode = "rgmii-id";
+ 	phy-handle = <&ethphy0>;
+ 	fsl,magic-packet;
+-	status = "okay";
++	status = "disabled";
+ 
+ 	mdio {
+ 		#address-cells = <1>;
+@@ -159,6 +191,7 @@
+ 			reg = <0>;
+ 			reset-gpios = <&gpio4 22 GPIO_ACTIVE_LOW>;
+ 			reset-assert-us = <10000>;
++			status = "disabled";
+ 		};
+ 	};
+ };
+@@ -304,7 +337,7 @@
+ 		reg = <0x3d>;
+ 		adi,addr-cec = <0x3c>;
+ 		adi,dsi-lanes = <4>;
+-		status = "okay";
++		status = "disabled";
+ 
+ 		port {
+ 			adv7535_from_dsim: endpoint {
+@@ -320,7 +353,7 @@
+ 		reg = <0x50>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <11 8>;
+-		status = "okay";
++		status = "disabled";
+ 
+ 		port {
+ 			typec1_dr_sw: endpoint {
+@@ -339,6 +372,7 @@
+ 				     PDO_VAR(5000, 20000, 3000)>;
+ 			op-sink-microwatt = <15000000>;
+ 			self-powered;
++			status = "disabled";
+ 		};
+ 	};
+ };
+@@ -357,6 +391,7 @@
+ 		reg = <0x20>;
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++		status = "disabled";
+ 	};
+ };
+ 
+@@ -366,16 +401,17 @@
+ 	assigned-clocks = <&clk IMX8MM_CLK_SAI3>;
+ 	assigned-clock-parents = <&clk IMX8MM_AUDIO_PLL1_OUT>;
+ 	assigned-clock-rates = <24576000>;
+-	status = "okay";
++	status = "disabled";
+ };
+ 
+ &snvs_pwrkey {
+-	status = "okay";
++	status = "disabled";
+ };
+ 
+ &uart2 { /* console */
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart2>;
++	fsl,uart-has-rtscts;
+ 	status = "okay";
+ };
+ 
+@@ -388,7 +424,7 @@
+ 	disable-over-current;
+ 	samsung,picophy-pre-emp-curr-control = <3>;
+ 	samsung,picophy-dc-vol-level-adjust = <7>;
+-	status = "okay";
++	status = "disabled";
+ 
+ 	port {
+ 		usb1_drd_sw: endpoint {
+@@ -404,7 +440,7 @@
+ 	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
+ 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
+ 	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
+-	cd-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
++	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
+ 	bus-width = <4>;
+ 	vmmc-supply = <&reg_usdhc2_vmmc>;
+ 	status = "okay";
+@@ -419,7 +455,7 @@
+ 
+ &lcdif {
+ 	display = <&display0>;
+-	status = "okay";
++	status = "disabled";
+ 
+ 	display0: display@0 {
+ 		bits-per-pixel = <24>;
+@@ -428,7 +464,7 @@
+ };
+ 
+ &mipi_dsi {
+-	status = "okay";
++	status = "disabled";
+ 
+ 	port@1 {
+ 		dsim_to_adv7535: endpoint {
+@@ -569,12 +605,14 @@
+ 		fsl,pins = <
+ 			MX8MM_IOMUXC_UART2_RXD_UART2_DCE_RX	0x140
+ 			MX8MM_IOMUXC_UART2_TXD_UART2_DCE_TX	0x140
++			MX8MM_IOMUXC_UART4_RXD_UART2_DCE_CTS_B	0x140
++			MX8MM_IOMUXC_UART4_TXD_UART2_DCE_RTS_B	0x140
+ 		>;
+ 	};
+ 
+ 	pinctrl_usdhc2_gpio: usdhc2grpgpiogrp {
+ 		fsl,pins = <
+-			MX8MM_IOMUXC_GPIO1_IO15_GPIO1_IO15	0x1c4
++			MX8MM_IOMUXC_SD2_CD_B_GPIO2_IO12			0x16	/* usdhc2.CD_B */
+ 		>;
+ 	};
+ 
+diff --git a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1-u-boot.dtsi b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1-u-boot.dtsi
+index 6f7b37cba2..14d284d0db 100644
+--- a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1-u-boot.dtsi
++++ b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1-u-boot.dtsi
+@@ -10,25 +10,6 @@
+ 		u-boot,dm-spl;
+ 	};
+ 
+-	aliases {
+-		usbgadget0 = &usbg1;
+-		usbgadget1 = &usbg2;
+-	};
+-
+-	usbg1: usbg1 {
+-		compatible = "fsl,imx27-usb-gadget";
+-		dr_mode = "peripheral";
+-		chipidea,usb = <&usbotg1>;
+-		status = "okay";
+-	};
+-
+-	usbg2: usbg2 {
+-		compatible = "fsl,imx27-usb-gadget";
+-		dr_mode = "peripheral";
+-		chipidea,usb = <&usbotg2>;
+-		status = "okay";
+-	};
+-
+ 	firmware {
+ 		optee {
+ 			compatible = "linaro,optee-tz";
+@@ -121,13 +102,6 @@
+ 	u-boot,dm-spl;
+ };
+ 
+-&usdhc1 {
+-	u-boot,dm-spl;
+-	assigned-clocks = <&clk IMX8MM_CLK_USDHC1>;
+-	assigned-clock-rates = <400000000>;
+-	assigned-clock-parents = <&clk IMX8MM_SYS_PLL1_400M>;
+-};
+-
+ &usdhc2 {
+ 	u-boot,dm-spl;
+ 	sd-uhs-sdr104;
+@@ -183,11 +157,6 @@
+ 	u-boot,dm-spl;
+ };
+ 
+-&usbotg1 {
+-	status = "okay";
+-	extcon = <&ptn5110>;
+-};
+-
+ &lcdif {
+ 	/delete-property/ assigned-clocks;
+ 	/delete-property/ assigned-clock-parents;
+diff --git a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1.dts b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1.dts
+index c07eb8be8e..299c4b02c7 100644
+--- a/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1.dts
++++ b/arch/arm/dts/idt_imx8mm_evt-0_redwood_evt-1.dts
+@@ -6,10 +6,10 @@
+ /dts-v1/;
+ 
+ #include <dt-bindings/usb/pd.h>
+-#include "imx8mm-evk.dtsi"
++#include "idt_imx8mm_evt-0_redwood_evt-0.dts"
+ 
+ / {
+-	model = "NXP i.MX8MM EVK board";
++	model = "IDTECH REDWOOD MINI";
+ 	compatible = "fsl,imx8mm-evk", "fsl,imx8mm";
+ 
+ 	chosen {
+@@ -44,7 +44,7 @@
+ &flexspi {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_flexspi>;
+-	status = "okay";
++	status = "disabled";
+ 
+ 	flash@0 {
+ 		reg = <0>;

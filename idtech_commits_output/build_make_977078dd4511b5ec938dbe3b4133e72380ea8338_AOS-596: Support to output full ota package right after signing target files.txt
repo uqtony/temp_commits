@@ -1,0 +1,165 @@
+977078dd4 max.yang 2021-04-27
+
+AOS-596: Support to output full ota package right after signing target files
+
+Change-Id: Ib15a77d53cb0ea88e1df36f0c2bd63c2682d96d9
+
+diff --git a/tools/releasetools/idt_sign_ota_package.py b/tools/releasetools/idt_sign_ota_package.py
+index 961ad20be..d96100955 100644
+--- a/tools/releasetools/idt_sign_ota_package.py
++++ b/tools/releasetools/idt_sign_ota_package.py
+@@ -156,28 +156,11 @@ def replace_ca_signature(package):
+     package_file.seek(length - 6 - 256, 0) # footer and signature size
+     package_file.write(sig)
+ 
+-def main(argv):
+-  if len(argv) != 2 or (argv[0] != "DEMO" and argv[0] != "PROD"):
+-    usage()
+-  if not os.path.exists(argv[1]):
+-    print('Cannot find input file')
+-    sys.exit(1)
+-  if argv[0] == "PROD":
+-    idt_cert_dir = "device/idtech/common/security/IDT_CA_OFFICIAL/"
+-  else:
+-    idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING/"
+-
+-  # PATH environment, otatools/bin should put at front, or it will use system's mke2fs
+-  os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
+-  print('PATH: {}'.format(os.environ["PATH"]))
+-
++def sign_ota_package(ws_obj, sign_env, input_file, idt_cert_dir):
+   global WS
+-  WS = idt_web_service.web_service(argv[0])
+-  WS.dual_login()
+-  WS.regist_socket()
++  WS = ws_obj
+ 
+-  input_file  = argv[1]
+-  output_file = os.path.splitext(input_file)[0] + "_" + argv[0] + "_release.zip"
++  output_file = os.path.splitext(input_file)[0] + "_" + sign_env + "_release.zip"
+ 
+   input_zip = zipfile.ZipFile(input_file, "r")
+   output_zip = zipfile.ZipFile(output_file, "w", compression=zipfile.ZIP_DEFLATED)
+@@ -202,6 +185,25 @@ def main(argv):
+   print('*************************************************')
+   print('Signing OTA PACKAGE process finished successfully')
+ 
++def main(argv):
++  if len(argv) != 2 or (argv[0] != "DEMO" and argv[0] != "PROD"):
++    usage()
++  if not os.path.exists(argv[1]):
++    print('Cannot find input file')
++    sys.exit(1)
++  if argv[0] == "PROD":
++    idt_cert_dir = "device/idtech/common/security/IDT_CA_OFFICIAL/"
++  else:
++    idt_cert_dir = "device/idtech/common/security/IDT_CA_TESTING/"
++  os.environ["PATH"] = os.getcwd() + "/bin" + os.pathsep + os.getenv("PATH")
++  print('PATH: {}'.format(os.environ["PATH"]))
++
++  WS = idt_web_service.web_service(argv[0])
++  WS.dual_login()
++  WS.regist_socket()
++
++  sign_ota_package(WS, argv[0], argv[1], idt_cert_dir)
++
+ if __name__ == "__main__":
+   main(sys.argv[1:])
+ 
+diff --git a/tools/releasetools/idt_sign_target_files_ca.py b/tools/releasetools/idt_sign_target_files_ca.py
+index 8ac2ce608..8e01691c0 100644
+--- a/tools/releasetools/idt_sign_target_files_ca.py
++++ b/tools/releasetools/idt_sign_target_files_ca.py
+@@ -15,12 +15,13 @@ import sign_target_files_apks
+ import apex_utils
+ import post_sign_vbmeta
+ import idt_web_service
++import idt_sign_ota_package
+ from xml.etree import ElementTree
+ from distutils.spawn import find_executable
+ from hashlib import sha256
+ 
+ # VERSION: Android Ver.Major.Minor
+-OTATOOL_VERSION = "11.01.005"
++OTATOOL_VERSION = "11.01.006"
+ 
+ WS = None
+ idt_key_map = {}
+@@ -370,6 +371,16 @@ def create_released_images(file_path):
+   new_args.append(file_path)
+   add_img_to_target_files.main(new_args)
+ 
++def replace_image_in_package(file_path, name, output_zip):
++  output_file = output_zip.filename
++  common.ZipClose(output_zip)
++  common.ZipDelete(output_file, name)
++  output_zip = zipfile.ZipFile(output_file, "a",
++                               compression=zipfile.ZIP_DEFLATED,
++                               allowZip64=True)
++  common.ZipWrite(output_zip, file_path, arcname=name)
++  return output_zip
++
+ def create_released_vbmeta(sign_env, output_zip, tmp_dir):
+   output_zip.extract("IMAGES/vbmeta.img", tmp_dir)
+   new_args = [sign_env, "extract_sign_data", "--image", tmp_dir + "/IMAGES/vbmeta.img"]
+@@ -389,8 +400,8 @@ def create_released_vbmeta(sign_env, output_zip, tmp_dir):
+   post_sign_vbmeta.main(new_args)
+ 
+   # Update vbmeta.img-partial to zip
+-  with open(tmp_dir + "/IMAGES/vbmeta.img-partial", "r") as f_vbmeta:
+-    common.ZipWriteStr(output_zip, "SIGNED/vbmeta.img", f_vbmeta.read())
++  output_zip = replace_image_in_package(tmp_dir + "/IMAGES/vbmeta.img-partial", "IMAGES/vbmeta.img", output_zip)
++  return output_zip
+ 
+ def bootloader_gen_sig(tgt_img, prefix, key):
+   to_sign = "./vendor/idtech/cst/" + prefix + "_" + key + "_tosign"
+@@ -441,8 +452,21 @@ def create_released_bootloader(sign_env, output_zip, tmp_dir):
+       raise ValueError('Error combining bootloader: {} signature file, abort script'.format(file))
+ 
+     # Packing into target-file
+-    with open(img_path, "r") as f_img:
+-      common.ZipWriteStr(output_zip, "SIGNED/" + file, f_img.read())
++    output_zip = replace_image_in_package(img_path, "IMAGES/" + file, output_zip)
++  return output_zip
++
++def create_fullota_package(sign_env, orig_filename, output_tgtfile, idt_cert_dir):
++  ota_test = orig_filename.replace("target_files", "fullota")
++  # create package
++  cmd = ['python', 'releasetools/ota_from_target_files.py',
++         '--board_feature', 'lpddr4-dual-signed',
++         output_tgtfile, ota_test]
++  common.RunAndCheckOutput(cmd)
++
++  # Sign by CA
++  idt_sign_ota_package.sign_ota_package(WS, sign_env, ota_test, idt_cert_dir)
++
++  os.remove(ota_test)
+ 
+ def main(argv):
+   if len(argv) != 2 or (argv[0] != "DEMO" and argv[0] != "PROD"):
+@@ -493,18 +517,22 @@ def main(argv):
+   output_zip = zipfile.ZipFile(output_file, "a",
+                                compression=zipfile.ZIP_DEFLATED,
+                                allowZip64=True)
+-  create_released_vbmeta(argv[0], output_zip, tmp_folder)
++  output_zip = create_released_vbmeta(argv[0], output_zip, tmp_folder)
+ 
+   # Sign bootloader images, pack into target-files
+-  create_released_bootloader(argv[0], output_zip, tmp_folder)
++  output_zip = create_released_bootloader(argv[0], output_zip, tmp_folder)
+ 
+   # Clean up temporary files
+   shutil.rmtree(tmp_folder)
+   common.ZipClose(input_zip)
+   common.ZipClose(output_zip)
+ 
++  print("Signing target-file finished, creating full ota package")
++
++  create_fullota_package(argv[0], input_file, output_file, idt_cert_dir)
++
+   print("*************************************")
+-  print("Signing process successfully finished")
++  print("All process successfully finished")
+ 
+ if __name__ == '__main__':
+   try:

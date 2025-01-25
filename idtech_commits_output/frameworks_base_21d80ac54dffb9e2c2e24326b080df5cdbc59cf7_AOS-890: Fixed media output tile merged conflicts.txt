@@ -1,0 +1,103 @@
+21d80ac54dff Brian Lee 2022-02-24
+
+AOS-890: Fixed media output tile merged conflicts
+
+Add media output tile to android 12
+
+Change-Id: I6244e4e49a91e880f6507f86e29735ea1d1a56f7
+
+diff --git a/packages/SystemUI/res/values/strings.xml b/packages/SystemUI/res/values/strings.xml
+index 58abede2b971..cc68320d0b0f 100644
+--- a/packages/SystemUI/res/values/strings.xml
++++ b/packages/SystemUI/res/values/strings.xml
+@@ -993,9 +993,9 @@
+     <!-- QuickSettings: Text to prompt the user to stop an ongoing recording [CHAR LIMIT=20] -->
+     <string name="quick_settings_screen_record_stop">Stop</string>
+ 
+-<<<<<<< HEAD
++    <!-- QuickSettings: Media output tile [CHAR LIMIT=NONE] -->
+     <string name="quick_settings_media_output">Media Output</string>
+-=======
++
+     <!--- Title of dialog triggered if the microphone is disabled but an app tried to access it. [CHAR LIMIT=150] -->
+     <string name="sensor_privacy_start_use_mic_dialog_title">Unblock device microphone?</string>
+     <!--- Title of dialog triggered if the camera is disabled but an app tried to access it. [CHAR LIMIT=150] -->
+@@ -1009,7 +1009,6 @@
+     <string name="sensor_privacy_start_use_camera_dialog_content">This unblocks access for all apps and services allowed to use your camera.</string>
+     <!--- Content of dialog triggered if the camera is disabled but an app tried to access it. [CHAR LIMIT=NONE] -->
+     <string name="sensor_privacy_start_use_mic_camera_dialog_content">This unblocks access for all apps and services allowed to use your camera or microphone.</string>
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     <!-- Default name for the media device shown in the output switcher when the name is not available [CHAR LIMIT=30] -->
+     <string name="media_seamless_other_device">Other device</string>
+diff --git a/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java b/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
+index 8b1c720d828b..885b352399b1 100644
+--- a/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
++++ b/packages/SystemUI/src/com/android/systemui/qs/tileimpl/QSFactoryImpl.java
+@@ -40,11 +40,8 @@ import com.android.systemui.qs.tiles.FlashlightTile;
+ import com.android.systemui.qs.tiles.HotspotTile;
+ import com.android.systemui.qs.tiles.InternetTile;
+ import com.android.systemui.qs.tiles.LocationTile;
+-<<<<<<< HEAD
+ import com.android.systemui.qs.tiles.MediaOutputTile;
+-=======
+ import com.android.systemui.qs.tiles.MicrophoneToggleTile;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ import com.android.systemui.qs.tiles.NfcTile;
+ import com.android.systemui.qs.tiles.NightDisplayTile;
+ import com.android.systemui.qs.tiles.QuickAccessWalletTile;
+@@ -88,16 +85,13 @@ public class QSFactoryImpl implements QSFactory {
+     private final Provider<GarbageMonitor.MemoryTile> mMemoryTileProvider;
+     private final Provider<UiModeNightTile> mUiModeNightTileProvider;
+     private final Provider<ScreenRecordTile> mScreenRecordTileProvider;
+-<<<<<<< HEAD
+     private final Provider<MediaOutputTile> mMediaOutputTileProvider;
+-=======
+     private final Provider<ReduceBrightColorsTile> mReduceBrightColorsTileProvider;
+     private final Provider<CameraToggleTile> mCameraToggleTileProvider;
+     private final Provider<MicrophoneToggleTile> mMicrophoneToggleTileProvider;
+     private final Provider<DeviceControlsTile> mDeviceControlsTileProvider;
+     private final Provider<AlarmTile> mAlarmTileProvider;
+     private final Provider<QuickAccessWalletTile> mQuickAccessWalletTileProvider;
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+ 
+     private final Lazy<QSHost> mQsHostLazy;
+     private final Provider<CustomTile.Builder> mCustomTileBuilderProvider;
+@@ -126,10 +120,7 @@ public class QSFactoryImpl implements QSFactory {
+             Provider<NfcTile> nfcTileProvider,
+             Provider<GarbageMonitor.MemoryTile> memoryTileProvider,
+             Provider<UiModeNightTile> uiModeNightTileProvider,
+-<<<<<<< HEAD
+             Provider<MediaOutputTile> mediaOutputTileProvider,
+-            Provider<ScreenRecordTile> screenRecordTileProvider) {
+-=======
+             Provider<ScreenRecordTile> screenRecordTileProvider,
+             Provider<ReduceBrightColorsTile> reduceBrightColorsTileProvider,
+             Provider<CameraToggleTile> cameraToggleTileProvider,
+@@ -137,7 +128,6 @@ public class QSFactoryImpl implements QSFactory {
+             Provider<DeviceControlsTile> deviceControlsTileProvider,
+             Provider<AlarmTile> alarmTileProvider,
+             Provider<QuickAccessWalletTile> quickAccessWalletTileProvider) {
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         mQsHostLazy = qsHostLazy;
+         mCustomTileBuilderProvider = customTileBuilderProvider;
+ 
+@@ -223,10 +213,8 @@ public class QSFactoryImpl implements QSFactory {
+                 return mUiModeNightTileProvider.get();
+             case "screenrecord":
+                 return mScreenRecordTileProvider.get();
+-<<<<<<< HEAD
+             case "mediaoutput":
+                 return mMediaOutputTileProvider.get();
+-=======
+             case "reduce_brightness":
+                 return mReduceBrightColorsTileProvider.get();
+             case "cameratoggle":
+@@ -239,7 +227,6 @@ public class QSFactoryImpl implements QSFactory {
+                 return mAlarmTileProvider.get();
+             case "wallet":
+                 return mQuickAccessWalletTileProvider.get();
+->>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+         }
+ 
+         // Custom tiles

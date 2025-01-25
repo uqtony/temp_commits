@@ -1,0 +1,62 @@
+80f6ff05f702 jay deng 2020-09-24
+
+AOS-349: Configure GPIO4~7 of CP2112 as KIOSK LED
+
+Configure GPIO4~7 of CP2112 as KIOSK LED. GPIO is set to "GPIO_ACTIVE_HIGH"
+and default state is "off".
+
+Change-Id: Iafe6a6f0b63f94284fb39a7d260cf34e2ffe09b0
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
+index b5eeff7098b5..1dd10aa2b57b 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_evk_evk-0_mic3g.dts
+@@ -23,6 +23,36 @@ mlx90xxx: mlx90614@5a {
+ 			reg = <0x5a>;
+ 		};
+ 	};
++
++	cp2112_gpio: gpio@cp2112 {
++		#gpio-cells = <2>;
++		compatible = "cp2112";
++		gpio-controller;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		LED_KIOSK_4 {
++			label = "LED_KIOSK_4";
++			gpios = <&cp2112_gpio 4 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		LED_KIOSK_5 {
++			label = "LED_KIOSK_5";
++			gpios = <&cp2112_gpio 5 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		LED_KIOSK_6 {
++			label = "LED_KIOSK_6";
++			gpios = <&cp2112_gpio 6 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		LED_KIOSK_7 {
++			label = "LED_KIOSK_7";
++			gpios = <&cp2112_gpio 7 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
+ };
+ 
+ &i2c2 {
+diff --git a/drivers/hid/hid-cp2112.c b/drivers/hid/hid-cp2112.c
+index 3f14d8ede07e..dbec872f967b 100644
+--- a/drivers/hid/hid-cp2112.c
++++ b/drivers/hid/hid-cp2112.c
+@@ -1338,6 +1338,7 @@ static int cp2112_probe(struct hid_device *hdev, const struct hid_device_id *id)
+ 	dev->gc.ngpio			= 8;
+ 	dev->gc.can_sleep		= 1;
+ 	dev->gc.parent			= &hdev->dev;
++	dev->gc.of_node = of_find_node_by_path("/gpio@cp2112");
+ 
+ 	ret = gpiochip_add_data(&dev->gc, dev);
+ 	if (ret < 0) {

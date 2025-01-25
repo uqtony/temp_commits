@@ -1,0 +1,35 @@
+2b58915c max.yang 2019-11-21
+
+AOS-20: [Uboot Sign][Fix] Let makefile abort when we meet fail
+
+1. Remove pipe and tee so that it won't use sub-shell to execute instructions
+2. Directly re-direct log into sig_info, we need it for sign process
+3. print log we re-directed, so that the uboot modified could still check log
+
+After this modification, the exit command should work to abort makefile
+
+Change-Id: I8a1a9a51f7e8d09d8378b30be83b5de46d1fef39
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index f02a9e31..1a087902 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -132,7 +132,7 @@ CST_PATH := ./vendor/idtech/cst
+ 
+ define sign_imx_uboot
+        echo IDTech sign uboot process ...; \
+-       $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab 2>&1 | tee $(UBOOT_OUT)/hab_info.txt; \
++       $(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MQ print_fit_hab > $(UBOOT_OUT)/hab_info.txt 2>&1; \
+        cp $(CST_PATH)/*.txt $(UBOOT_OUT)/.; \
+        cp $(UBOOT_BIN) $(CST_PATH)/flash.bin; \
+        $(CST_PATH)/sign_uboot.py $(UBOOT_OUT) $(PRODUCT_OUT) $(CST_PATH);
+@@ -161,7 +161,8 @@ $(UBOOT_BIN): $(UBOOTENVSH) | $(UBOOT_COLLECTION) $(UBOOT_OUT)
+ 		fi; \
+ 		install -D $(UBOOT_COLLECTION)/u-boot-$$UBOOT_PLATFORM.imx $(UBOOT_BIN); \
+ 		$(call sign_imx_uboot) \
+-	done 2>&1 | tee $(UBOOT_OUT)/sig_info.txt
++	done > $(UBOOT_OUT)/sig_info.txt 2>&1
++	cat $(UBOOT_OUT)/sig_info.txt
+ 
+ .PHONY: bootloader $(UBOOT_BIN) $(UBOOTENVSH)
+ 

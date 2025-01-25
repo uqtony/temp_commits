@@ -1,0 +1,288 @@
+c8f86c7d7627 Arthur Chen 2020-08-03
+
+AOS-219: sound: Add tlv320aic3110 driver source.
+
+Change-Id: I346091bab67c19aa1efbcbce21deb93eef8397d5
+
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index 6e361d17595c..7ee89dbd2549 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -393,6 +393,19 @@ config SND_SOC_IMX_RT5640
+ 	  Say Y if you want to add support for SoC audio on an i.MX board with
+ 	  a rt5640 codec.
+ 
++config SND_SOC_IMX_TLV320AIC31XX
++	tristate "SoC Audio support for i.MX boards with tlv320aic31xx"
++	depends on OF && I2C
++	select SND_SOC_TLV320AIC31XX
++	select SND_SOC_IMX_PCM_DMA
++	select SND_SOC_FSL_SAI
++	select SND_SOC_FSL_UTILS
++	select SND_KCTL_JACK
++	help
++	  SoC Audio support for i.MX boards with tlv320aic31xx
++	  Say Y if you want to add support for SoC audio on an i.MX board with
++	  a tlv320aic31xx codec.
++
+ config SND_SOC_IMX_SII902X
+ 	tristate "SoC Audio support for i.MX boards with sii902x"
+ 	depends on OF && I2C
+diff --git a/sound/soc/fsl/Makefile b/sound/soc/fsl/Makefile
+index 7936dd969129..ac498f0b99bc 100644
+--- a/sound/soc/fsl/Makefile
++++ b/sound/soc/fsl/Makefile
+@@ -99,6 +99,7 @@ snd-soc-imx-ak5558-objs := imx-ak5558.o
+ snd-soc-imx-ak4497-objs := imx-ak4497.o
+ snd-soc-imx-micfil-objs := imx-micfil.o
+ snd-soc-imx-rt5640-objs := imx-rt5640.o
++snd-soc-imx-tlv320aic31xx-objs := imx-tlv320aic31xx.o
+ snd-soc-imx-dsp-objs := imx-dsp.o
+ snd-soc-imx-si476x-objs := imx-si476x.o
+ snd-soc-imx-hdmi-objs := imx-hdmi.o
+@@ -129,6 +130,7 @@ obj-$(CONFIG_SND_SOC_IMX_AK4458) += snd-soc-imx-ak4458.o
+ obj-$(CONFIG_SND_SOC_IMX_AK5558) += snd-soc-imx-ak5558.o
+ obj-$(CONFIG_SND_SOC_IMX_AK4497) += snd-soc-imx-ak4497.o
+ obj-$(CONFIG_SND_SOC_IMX_RT5640) += snd-soc-imx-rt5640.o
++obj-$(CONFIG_SND_SOC_IMX_TLV320AIC31XX) += snd-soc-imx-tlv320aic31xx.o
+ obj-$(CONFIG_SND_SOC_IMX_MICFIL) += snd-soc-imx-micfil.o
+ obj-$(CONFIG_SND_SOC_IMX_DSP) += snd-soc-imx-dsp.o
+ obj-$(CONFIG_SND_SOC_IMX_SI476X) += snd-soc-imx-si476x.o
+diff --git a/sound/soc/fsl/imx-tlv320aic31xx.c b/sound/soc/fsl/imx-tlv320aic31xx.c
+new file mode 100644
+index 000000000000..74bd48f56af8
+--- /dev/null
++++ b/sound/soc/fsl/imx-tlv320aic31xx.c
+@@ -0,0 +1,224 @@
++// SPDX-License-Identifier: GPL-2.0+
++//
++// Copyright 2020 IDTECH, Inc.
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/i2c.h>
++#include <linux/clk.h>
++#include <sound/soc.h>
++
++#include "../codecs/tlv320aic31xx.h"
++#include "fsl_sai.h"
++#include "imx-audmux.h"
++
++#define DAI_NAME_SIZE	32
++
++struct imx_tlv320aic31xx_data {
++	struct snd_soc_dai_link dai;
++	struct snd_soc_card card;
++	char codec_dai_name[DAI_NAME_SIZE];
++	char platform_name[DAI_NAME_SIZE];
++	struct clk *codec_clk;
++	unsigned int clk_frequency;
++};
++
++static int imx_tlv320aic31xx_dai_init(struct snd_soc_pcm_runtime *rtd)
++{
++	struct imx_tlv320aic31xx_data *data = snd_soc_card_get_drvdata(rtd->card);
++	struct device *dev = rtd->card->dev;
++	int ret;
++
++	ret = snd_soc_dai_set_sysclk(rtd->codec_dai, AIC31XX_PLL_CLKIN_MCLK,
++				     data->clk_frequency, SND_SOC_CLOCK_IN);
++	if (ret) {
++		dev_err(dev, "could not set codec driver set_sysclk params
+");
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct snd_soc_dapm_widget imx_tlv320aic31xx_dapm_widgets[] = {
++	SND_SOC_DAPM_HP("Headphone", NULL),
++	SND_SOC_DAPM_SPK("Speaker", NULL),
++	SND_SOC_DAPM_MIC("Headphone Mic", NULL),
++};
++
++static int imx_tlv320aic31xx_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *cpu_np, *codec_np;
++	struct platform_device *cpu_pdev;
++	struct i2c_client *codec_dev;
++	struct imx_tlv320aic31xx_data *data = NULL;
++	struct snd_soc_dai_link_component *comp;
++	int int_port, ext_port;
++	int ret;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data) {
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	comp = devm_kzalloc(&pdev->dev, 3 * sizeof(*comp), GFP_KERNEL);
++	if (!comp) {
++		ret = -ENOMEM;
++		goto fail;
++	}
++
++	cpu_np = of_parse_phandle(pdev->dev.of_node, "audio-cpu", 0);
++	if (!cpu_np) {
++		dev_err(&pdev->dev, "audio dai phandle missing or invalid
+");
++		ret = -EINVAL;
++		goto fail;
++	}
++	codec_np = of_parse_phandle(pdev->dev.of_node, "audio-codec", 0);
++	if (!codec_np) {
++		dev_err(&pdev->dev, "audio codec phandle missing or invalid
+");
++		ret = -EINVAL;
++		goto fail;
++	}
++
++	cpu_pdev = of_find_device_by_node(cpu_np);
++	if (!cpu_pdev) {
++		dev_err(&pdev->dev, "failed to find SAI platform device
+");
++		ret = -EINVAL;
++		goto fail;
++	}
++
++	codec_dev = of_find_i2c_device_by_node(codec_np);
++	if (!codec_dev) {
++		dev_dbg(&pdev->dev, "failed to find codec platform device
+");
++		ret = -EPROBE_DEFER;
++		goto fail;
++	}
++
++	data->codec_clk = devm_clk_get(&codec_dev->dev, "mclk");
++	if (IS_ERR(data->codec_clk)) {
++		ret = PTR_ERR(data->codec_clk);
++		dev_err(&pdev->dev, "failed to get codec clk: %d
+", ret);
++		goto fail;
++	}
++
++	ret = clk_prepare_enable(data->codec_clk);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to enable codec clk: %d
+", ret);
++		goto fail;
++	}
++
++	data->clk_frequency = clk_get_rate(data->codec_clk);
++
++	data->dai.cpus		= &comp[0];
++	data->dai.codecs	= &comp[1];
++	data->dai.platforms	= &comp[2];
++
++	data->dai.num_cpus	= 1;
++	data->dai.num_codecs	= 1;
++	data->dai.num_platforms	= 1;
++
++	data->dai.name = "tlv320aic3110";
++	data->dai.stream_name = "Audio";
++	data->dai.codecs->dai_name = "tlv320aic31xx-hifi";
++	data->dai.codecs->of_node = codec_np;
++	data->dai.cpus->of_node = cpu_np;
++	data->dai.cpus->dai_name = dev_name(&cpu_pdev->dev);
++	data->dai.platforms->of_node = cpu_np;
++	data->dai.dpcm_playback = 1;
++	data->dai.dpcm_capture = 1;
++	data->dai.init = &imx_tlv320aic31xx_dai_init;
++	data->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			    SND_SOC_DAIFMT_CBM_CFM;
++
++	data->card.dev = &pdev->dev;
++	ret = snd_soc_of_parse_card_name(&data->card, "model");
++	if (ret)
++		goto fail;
++
++	ret = snd_soc_of_parse_audio_routing(&data->card, "audio-routing");
++	if (ret)
++		goto fail;
++
++	data->card.num_links = 1;
++	data->card.owner = THIS_MODULE;
++	data->card.dai_link = &data->dai;
++	data->card.dapm_widgets = imx_tlv320aic31xx_dapm_widgets;
++	data->card.num_dapm_widgets = ARRAY_SIZE(imx_tlv320aic31xx_dapm_widgets);
++
++	platform_set_drvdata(pdev, &data->card);
++	snd_soc_card_set_drvdata(&data->card, data);
++	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
++	if (ret) {
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "snd_soc_register_card failed (%d)
+",
++				ret);
++		goto fail;
++	}
++
++	if (cpu_np)
++		of_node_put(cpu_np);
++	if (codec_np)
++		of_node_put(codec_np);
++
++	return 0;
++
++fail:
++	if (data && !IS_ERR(data->codec_clk))
++		clk_put(data->codec_clk);
++	of_node_put(cpu_np);
++	of_node_put(codec_np);
++
++	return ret;
++}
++
++static int imx_tlv320aic31xx_remove(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
++	struct imx_tlv320aic31xx_data *data = snd_soc_card_get_drvdata(card);
++
++	clk_put(data->codec_clk);
++
++	return 0;
++}
++
++static const struct of_device_id imx_tlv320aic31xx_dt_ids[] = {
++	{ .compatible = "fsl,imx-audio-tlv320aic31xx", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, imx_tlv320aic31xx_dt_ids);
++
++static struct platform_driver imx_tlv320aic31xx_driver = {
++	.driver = {
++		.name = "imx-tlv320aic31xx",
++		.pm = &snd_soc_pm_ops,
++		.of_match_table = imx_tlv320aic31xx_dt_ids,
++	},
++	.probe = imx_tlv320aic31xx_probe,
++	.remove = imx_tlv320aic31xx_remove,
++};
++
++static struct platform_driver * const imx_codec_drivers[] = {
++	&imx_tlv320aic31xx_driver,
++};
++
++static int __init imx_tlv320aic31xx_driver_init(void)
++{
++	return platform_register_drivers(imx_codec_drivers,
++					 ARRAY_SIZE(imx_codec_drivers));
++};
++
++static void __exit imx_tlv320aic31xx_driver_exit(void)
++{
++	platform_unregister_drivers(imx_codec_drivers,
++				    ARRAY_SIZE(imx_codec_drivers));
++};
++
++late_initcall(imx_tlv320aic31xx_driver_init);
++module_exit(imx_tlv320aic31xx_driver_exit);
++
++MODULE_AUTHOR("Arthur Chen <arthur.chen@idtechproducts.com>");
++MODULE_DESCRIPTION("TI TLV320AIC31xx ASoC machine driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:imx-tlv320aic31xx");

@@ -1,0 +1,1092 @@
+cfe065f93c Jay 2021-12-21
+
+AOS-780: add lm3697 backlight driver
+
+Base on uboot gpio backlight driver and linux lm3697 driver to
+implement a simple uboot backlight driver for lm3697
+
+Change-Id: I9eb7d8ce0f175edf5f45d259d209c4a06d9c2f42
+
+diff --git a/arch/arm/dts/Makefile b/arch/arm/dts/Makefile
+index 8b526eac82..90d84facef 100644
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@ -871,6 +871,7 @@ dtb-$(CONFIG_ARCH_IMX8M) += \
+ 	imx8mq-evk.dtb \
+ 	idt_a300_evt-0_devboard_evt-1.dtb \
+ 	idt_imx8mq_evt-0_ibr210_evt-0.dtb \
++	idt_imx8mq_evt-0_redwood_evt-0.dtb \
+ 	imx8mm-beacon-kit.dtb \
+ 	imx8mn-beacon-kit.dtb \
+ 	imx8mq-phanbell.dtb \
+diff --git a/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts b/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts
+new file mode 100644
+index 0000000000..04ff2217a3
+--- /dev/null
++++ b/arch/arm/dts/idt_imx8mq_evt-0_redwood_evt-0.dts
+@@ -0,0 +1,739 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++/*
++ * Copyright 2017 NXP
++ * Copyright (C) 2017-2018 Pengutronix, Lucas Stach <kernel@pengutronix.de>
++ * Copyright (C) 2020 IDTECH
++ */
++
++/dts-v1/;
++
++#include "imx8mq.dtsi"
++
++/ {
++	model = "IDTECH VP6820 Redwood";
++	compatible = "fsl,imx8mq-a300", "fsl,imx8mq";
++
++	chosen {
++		bootargs = "console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200";
++		stdout-path = &uart1;
++	};
++
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
++
++	memory@40000000 {
++		device_type = "memory";
++		reg = <0x00000000 0x40000000 0 0xc0000000>;
++	};
++
++	pcie0_refclk: pcie0-refclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <100000000>;
++	};
++
++	reg_usdhc2_vmmc: regulator-vsd-3v3 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_usdhc2>;
++		compatible = "regulator-fixed";
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++		off-on-delay-us = <20000>;
++		enable-active-high;
++	};
++
++	buck2_reg: regulator-buck2 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_buck2>;
++		compatible = "regulator-gpio";
++		regulator-name = "vdd_arm";
++		regulator-min-microvolt = <900000>;
++		regulator-max-microvolt = <1000000>;
++		gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++		states = <1000000 0x0
++			  900000 0x1>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	ir-receiver {
++		compatible = "gpio-ir-receiver";
++		gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ir>;
++		linux,autosuspend-period = <125>;
++	};
++
++	wm8524: audio-codec {
++		#sound-dai-cells = <0>;
++		compatible = "wlf,wm8524";
++		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
++	};
++
++	sound-wm8524 {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "wm8524-audio";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,frame-master = <&cpudai>;
++		simple-audio-card,bitclock-master = <&cpudai>;
++		simple-audio-card,widgets =
++			"Line", "Left Line Out Jack",
++			"Line", "Right Line Out Jack";
++		simple-audio-card,routing =
++			"Left Line Out Jack", "LINEVOUTL",
++			"Right Line Out Jack", "LINEVOUTR";
++
++		cpudai: simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++		};
++
++		link_codec: simple-audio-card,codec {
++			sound-dai = <&wm8524>;
++			clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
++		};
++	};
++
++	sound-spdif {
++		compatible = "fsl,imx-audio-spdif";
++		model = "imx-spdif";
++		spdif-controller = <&spdif1>;
++		spdif-out;
++		spdif-in;
++	};
++
++	sound-hdmi-arc {
++		compatible = "fsl,imx-audio-spdif";
++		model = "imx-hdmi-arc";
++		spdif-controller = <&spdif2>;
++		spdif-in;
++	};
++
++	panel_backlight: backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&A53_0 {
++	cpu-supply = <&buck2_reg>;
++};
++
++&A53_1 {
++	cpu-supply = <&buck2_reg>;
++};
++
++&A53_2 {
++	cpu-supply = <&buck2_reg>;
++};
++
++&A53_3 {
++	cpu-supply = <&buck2_reg>;
++};
++
++&ddrc {
++	operating-points-v2 = <&ddrc_opp_table>;
++
++	ddrc_opp_table: opp-table {
++		compatible = "operating-points-v2";
++
++		opp-25M {
++			opp-hz = /bits/ 64 <25000000>;
++		};
++
++		opp-100M {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++
++		/*
++		 * On imx8mq B0 PLL can't be bypassed so low bus is 166M
++		 */
++		opp-166M {
++			opp-hz = /bits/ 64 <166935483>;
++		};
++
++		opp-800M {
++			opp-hz = /bits/ 64 <800000000>;
++		};
++	};
++};
++
++&dphy {
++	status = "okay";
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
++	phy-mode = "rgmii-id";
++	phy-handle = <&ethphy0>;
++	fsl,magic-packet;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy0: ethernet-phy@0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++			reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
++			reset-assert-us = <10000>;
++			at803x,eee-disabled;
++		};
++	};
++};
++
++&gpio5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wifi_reset>;
++
++	wl-reg-on-hog {
++		gpio-hog;
++		gpios = <29 GPIO_ACTIVE_HIGH>;
++		output-high;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default", "gpio";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	pinctrl-1 = <&pinctrl_i2c1_gpio>;
++	scl-gpios = <&gpio5 14 GPIO_ACTIVE_HIGH>;
++	sda-gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++
++	pmic@8 {
++		compatible = "fsl,pfuze100";
++		fsl,pfuze-support-disable-sw;
++		reg = <0x8>;
++
++		regulators {
++			sw1a_reg: sw1ab {
++				regulator-min-microvolt = <825000>;
++				regulator-max-microvolt = <1100000>;
++			};
++
++			sw1c_reg: sw1c {
++				regulator-min-microvolt = <825000>;
++				regulator-max-microvolt = <1100000>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3ab {
++				regulator-min-microvolt = <825000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-always-on;
++			};
++
++			sw4_reg: sw4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-always-on;
++			};
++
++			vgen1_reg: vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2_reg: vgen2 {
++				regulator-min-microvolt = <850000>;
++				regulator-max-microvolt = <975000>;
++				regulator-always-on;
++			};
++
++			vgen3_reg: vgen3 {
++				regulator-min-microvolt = <1675000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: vgen4 {
++				regulator-min-microvolt = <1625000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vgen5 {
++				regulator-min-microvolt = <3075000>;
++				regulator-max-microvolt = <3625000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++		};
++	};
++};
++
++&lcdif {
++	display = <&display0>;
++	status = "okay";
++
++	display0: display@0 {
++		bits-per-pixel = <24>;
++		bus-width = <24>;
++	};
++};
++
++&dphy {
++	status = "okay";
++};
++
++&mipi_dsi {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	status = "okay";
++	data-lanes-num = <4>;
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default", "gpio";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	pinctrl-1 = <&pinctrl_i2c2_gpio>;
++	scl-gpios = <&gpio5 16 GPIO_ACTIVE_HIGH>;
++	sda-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++
++	lm3697_backlight: backlight@36 {
++		compatible = "ti,lm3697";
++		reg = <0x36>;
++		enable-gpios = <&gpio3 10 GPIO_ACTIVE_HIGH>;
++		boost-ovp = <24>;
++		auto-headroom;
++		auto-frequency;
++		auto-freq-threshold = <0x74>;
++		start-up-ramp-level = <1>;
++		default-on;
++	};
++};
++
++&pcie0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie0>;
++	reset-gpio = <&gpio5 28 GPIO_ACTIVE_LOW>;
++	clocks = <&clk IMX8MQ_CLK_PCIE1_ROOT>,
++		 <&clk IMX8MQ_CLK_PCIE1_AUX>,
++		 <&clk IMX8MQ_CLK_PCIE1_PHY>,
++		 <&pcie0_refclk>;
++	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
++	hard-wired = <1>;
++	status = "okay";
++};
++
++&pgc_gpu {
++	power-supply = <&sw1a_reg>;
++};
++
++&qspi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi>;
++	status = "okay";
++
++	flash0: n25q256a@0 {
++		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "jedec,spi-nor";
++		spi-max-frequency = <29000000>;
++		spi-tx-bus-width = <4>;
++		spi-rx-bus-width = <4>;
++		spi-nor,ddr-quad-read-dummy = <6>;
++	};
++};
++
++&sai2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2>;
++	assigned-clocks = <&clk IMX8MQ_AUDIO_PLL1_BYPASS>, <&clk IMX8MQ_CLK_SAI2>;
++	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1>, <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <0>, <24576000>;
++	status = "okay";
++};
++
++&snvs_pwrkey {
++	status = "okay";
++};
++
++&spdif1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_spdif1>;
++	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF1>;
++	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <24576000>;
++	status = "okay";
++};
++
++&spdif2 {
++	assigned-clocks = <&clk IMX8MQ_CLK_SPDIF2>;
++	assigned-clock-parents = <&clk IMX8MQ_AUDIO_PLL1_OUT>;
++	assigned-clock-rates = <24576000>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
++	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
++	status = "okay";
++};
++
++&usb3_phy0 {
++	status = "okay";
++};
++
++&usb_dwc3_0 {
++	dr_mode = "otg";
++	hnp-disable;
++	srp-disable;
++	adp-disable;
++	usb-role-switch;
++	snps,dis-u1-entry-quirk;
++	snps,dis-u2-entry-quirk;
++	status = "okay";
++};
++
++&usb3_phy1 {
++	status = "okay";
++};
++
++&usb_dwc3_1 {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usdhc1 {
++	assigned-clocks = <&clk IMX8MQ_CLK_USDHC1>;
++	assigned-clock-rates = <400000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
++	vqmmc-supply = <&sw4_reg>;
++	bus-width = <8>;
++	non-removable;
++	no-sd;
++	no-sdio;
++	status = "okay";
++};
++
++&usdhc2 {
++	assigned-clocks = <&clk IMX8MQ_CLK_USDHC2>;
++	assigned-clock-rates = <200000000>;
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
++	cd-gpios = <&gpio2 12 GPIO_ACTIVE_LOW>;
++	vmmc-supply = <&reg_usdhc2_vmmc>;
++	status = "okay";
++};
++
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++	status = "okay";
++};
++
++&dcss {
++	status = "okay";
++	port@0 {
++		dcss_out: endpoint {
++			remote-endpoint = <&hdmi_in>;
++		};
++	};
++};
++
++&hdmi {
++	compatible = "fsl,imx8mq-hdmi";
++	status = "okay";
++
++	display-timings {
++		native-mode = <&timing1>;
++
++		timing1: timing1 {
++			clock-frequency = <74250000>;
++			hactive = <1280>;
++			vactive = <720>;
++			hfront-porch = <110>;
++			hback-porch = <220>;
++			hsync-len = <40>;
++			vback-porch = <20>;
++			vfront-porch = <5>;
++			vsync-len = <5>;
++			hsync-active = <1>;
++			vsync-active = <1>;
++		};
++	};
++
++	port@0 {
++		hdmi_in: endpoint {
++			remote-endpoint = <&dcss_out>;
++		};
++	};
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++
++	pinctrl_buck2: vddarmgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_GPIO1_IO13_GPIO1_IO13		0x19
++		>;
++
++	};
++
++	pinctrl_fec1: fec1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3
++			MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO		0x23
++			MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3		0x1f
++			MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2		0x1f
++			MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		0x1f
++			MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		0x1f
++			MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3		0x91
++			MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2		0x91
++			MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		0x91
++			MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		0x91
++			MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC		0x1f
++			MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC		0x91
++			MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
++			MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
++			MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9		0x19
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
++			MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
++		>;
++	};
++
++	pinctrl_ir: irgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_GPIO1_IO12_GPIO1_IO12		0x4f
++		>;
++	};
++
++	pinctrl_mipi_dsi: mipidsigrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_CE3_B_GPIO3_IO4		0x19  /* DSI_RESET */
++			MX8MQ_IOMUXC_NAND_READY_B_GPIO3_IO16		0x19  /* DSI_TE */
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL	0x40000067
++			MX8MQ_IOMUXC_I2C2_SDA_I2C2_SDA	0x40000067
++		>;
++	};
++
++	pinctrl_i2c1_gpio: i2c1grp-gpio {
++		fsl,pins = <
++			MX8MQ_IOMUXC_I2C1_SCL_GPIO5_IO14        		0x7f
++			MX8MQ_IOMUXC_I2C1_SDA_GPIO5_IO15        		0x7f
++		>;
++	};
++
++	pinctrl_i2c2_gpio: i2c2grp-gpio {
++		fsl,pins = <
++			MX8MQ_IOMUXC_I2C2_SCL_GPIO5_IO16        		0x7f
++			MX8MQ_IOMUXC_I2C2_SDA_GPIO5_IO17        		0x7f
++		>;
++	};
++
++	pinctrl_pcie0: pcie0grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_I2C4_SCL_PCIE1_CLKREQ_B		0x76
++			MX8MQ_IOMUXC_UART4_RXD_GPIO5_IO28		0x16
++		>;
++	};
++
++	pinctrl_qspi: qspigrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_ALE_QSPI_A_SCLK	0x82
++			MX8MQ_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B	0x82
++			MX8MQ_IOMUXC_NAND_DATA00_QSPI_A_DATA0	0x82
++			MX8MQ_IOMUXC_NAND_DATA01_QSPI_A_DATA1	0x82
++			MX8MQ_IOMUXC_NAND_DATA02_QSPI_A_DATA2	0x82
++			MX8MQ_IOMUXC_NAND_DATA03_QSPI_A_DATA3	0x82
++
++		>;
++	};
++
++	pinctrl_reg_usdhc2: regusdhc2gpiogrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12	0x41
++			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19		0x41
++		>;
++	};
++
++	pinctrl_sai2: sai2grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SAI2_TXFS_SAI2_TX_SYNC     0xd6
++			MX8MQ_IOMUXC_SAI2_TXC_SAI2_TX_BCLK      0xd6
++			MX8MQ_IOMUXC_SAI2_MCLK_SAI2_MCLK        0xd6
++			MX8MQ_IOMUXC_SAI2_TXD0_SAI2_TX_DATA0    0xd6
++			MX8MQ_IOMUXC_GPIO1_IO08_GPIO1_IO8       0xd6
++		>;
++	};
++
++	pinctrl_spdif1: spdif1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SPDIF_TX_SPDIF1_OUT	0xd6
++			MX8MQ_IOMUXC_SPDIF_RX_SPDIF1_IN		0xd6
++		>;
++	};
++
++	pinctrl_ss_sel: usb3ssgrp{
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_RE_B_GPIO3_IO15		0x16
++		>;
++	};
++
++	pinctrl_typec: typecgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_NAND_CE2_B_GPIO3_IO3		0x17059
++		>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX		0x49
++			MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX		0x49
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
++			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
++			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
++			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
++			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
++			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
++			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
++			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
++			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
++			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
++			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x83
++			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++		>;
++	};
++
++	pinctrl_usdhc1_100mhz: usdhc1-100grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x8d
++			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xcd
++			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xcd
++			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xcd
++			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xcd
++			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xcd
++			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xcd
++			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xcd
++			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xcd
++			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xcd
++			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x8d
++			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++		>;
++	};
++
++	pinctrl_usdhc1_200mhz: usdhc1-200grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x9f
++			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xdf
++			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xdf
++			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xdf
++			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xdf
++			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xdf
++			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xdf
++			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xdf
++			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xdf
++			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xdf
++			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x9f
++			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
++			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
++			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
++			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
++			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
++			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
++			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_100mhz: usdhc2-100grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
++			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
++			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
++			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
++			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
++			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
++			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++		>;
++	};
++
++	pinctrl_usdhc2_200mhz: usdhc2-200grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
++			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
++			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
++			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
++			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
++			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
++			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++		>;
++	};
++
++	pinctrl_wdog: wdog1grp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B		0xc6
++		>;
++	};
++
++	pinctrl_wifi_reset: wifiresetgrp {
++		fsl,pins = <
++			MX8MQ_IOMUXC_UART4_TXD_GPIO5_IO29		0x16
++		>;
++	};
++};
+diff --git a/configs/redwood_8mq_evk_android_defconfig b/configs/redwood_8mq_evk_android_defconfig
+index 104e6e581a..c1670fcc62 100644
+--- a/configs/redwood_8mq_evk_android_defconfig
++++ b/configs/redwood_8mq_evk_android_defconfig
+@@ -162,3 +162,4 @@ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
++CONFIG_BACKLIGHT_LM3697=y
+\ No newline at end of file
+diff --git a/configs/redwood_8mq_evk_android_dp_dual_defconfig b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+index 176149b3e6..4dfd32e4aa 100644
+--- a/configs/redwood_8mq_evk_android_dp_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dp_dual_defconfig
+@@ -165,3 +165,4 @@ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
++CONFIG_BACKLIGHT_LM3697=y
+\ No newline at end of file
+diff --git a/configs/redwood_8mq_evk_android_dual_defconfig b/configs/redwood_8mq_evk_android_dual_defconfig
+index 8568c48a43..5df418ba39 100644
+--- a/configs/redwood_8mq_evk_android_dual_defconfig
++++ b/configs/redwood_8mq_evk_android_dual_defconfig
+@@ -165,3 +165,4 @@ CONFIG_NR_DRAM_BANKS=2
+ CONFIG_IDT_MULTIPLE_DDR=y
+ CONFIG_IDT_BOARD_INFO_PARSER=y
+ CONFIG_IDT_LINUX_DTB=y
++CONFIG_BACKLIGHT_LM3697=y
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index 5e767d79e9..94ffee2119 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -74,6 +74,15 @@ config BACKLIGHT_GPIO
+ 	  it understands the standard device tree
+ 	  (leds/backlight/gpio-backlight.txt)
+ 
++config BACKLIGHT_LM3697
++	bool "LM3697 Backlight Driver"
++	depends on BACKLIGHT
++	help
++	  If you want to use lm3697 as backlight, say Y to enable
++	  this driver.
++	  This driver can be used with "simple-panel" and
++	  it understands the standard device tree
++
+ config CMD_VIDCONSOLE
+ 	bool "Enable vidconsole commands lcdputs and setcurs"
+ 	depends on DM_VIDEO
+diff --git a/drivers/video/Makefile b/drivers/video/Makefile
+index c1c5eed60e..b62fe161bf 100644
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@ -7,6 +7,7 @@ ifdef CONFIG_DM
+ obj-$(CONFIG_BACKLIGHT) += backlight-uclass.o
+ obj-$(CONFIG_BACKLIGHT_GPIO) += backlight_gpio.o
+ obj-$(CONFIG_BACKLIGHT_PWM) += pwm_backlight.o
++obj-$(CONFIG_BACKLIGHT_LM3697) += backlight_lm3697.o
+ obj-$(CONFIG_CONSOLE_NORMAL) += console_normal.o
+ obj-$(CONFIG_CONSOLE_ROTATION) += console_rotate.o
+ obj-$(CONFIG_CONSOLE_TRUETYPE) += console_truetype.o fonts/
+diff --git a/drivers/video/backlight_lm3697.c b/drivers/video/backlight_lm3697.c
+new file mode 100644
+index 0000000000..22f58399ad
+--- /dev/null
++++ b/drivers/video/backlight_lm3697.c
+@@ -0,0 +1,241 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2022, ID Tech - All Rights Reserved
++ * Author: Jay Deng <jay.deng@idtechproducts.com>
++ */
++
++#include <common.h>
++#include <dm.h>
++#include <dm/device_compat.h>
++#include <backlight.h>
++#include <asm/gpio.h>
++#include <regmap.h>
++#include <i2c.h>
++
++#define LM3697_REV			0x0
++#define LM3697_RESET			0x1
++#define LM3697_OUTPUT_CONFIG		0x10
++#define LM3697_CTRL_A_RAMP		0x11
++#define LM3697_CTRL_B_RAMP		0x12
++#define LM3697_CTRL_A_B_RT_RAMP		0x13
++#define LM3697_CTRL_A_B_RAMP_CFG	0x14
++#define LM3697_CTRL_A_B_BRT_CFG		0x16
++#define LM3697_CTRL_A_FS_CURR_CFG	0x17
++#define LM3697_CTRL_B_FS_CURR_CFG	0x18
++#define LM3697_CTRL_BOOST_CFG		0x1a
++#define LM3697_AUTO_FREQ_THRESHOLD	0x1b
++#define LM3697_PWM_CFG			0x1c
++#define LM3697_CTRL_A_BRT_LSB		0x20
++#define LM3697_CTRL_A_BRT_MSB		0x21
++#define LM3697_CTRL_B_BRT_LSB		0x22
++#define LM3697_CTRL_B_BRT_MSB		0x23
++#define LM3697_CTRL_ENABLE		0x24
++
++#define LM3697_SW_RESET		BIT(0)
++
++#define LM3697_CTRL_A_EN	BIT(0)
++#define LM3697_CTRL_B_EN	BIT(1)
++#define LM3697_CTRL_A_B_EN	(LM3697_CTRL_A_EN | LM3697_CTRL_B_EN)
++
++#define LM3697_MAX_LED_STRINGS	3
++
++#define LM3697_CONTROL_A	0
++#define LM3697_CONTROL_B	1
++#define LM3697_MAX_CONTROL_BANKS 2
++
++#define LM3697_CTRL_BOOST_OVP_MASK	(BIT(1) | BIT(2))
++#define LM3697_CTRL_BOOST_OVP_16V	0
++#define LM3697_CTRL_BOOST_OVP_24V	BIT(1)
++#define LM3697_CTRL_BOOST_OVP_32V	BIT(2)
++#define LM3697_CTRL_BOOST_OVP_40V	(BIT(1) | BIT(2))
++#define LM3697_CTRL_BOOST_AUTO_FREQ_EN	BIT(3)
++#define LM3697_CTRL_BOOST_AUTO_HROOM_EN	BIT(4)
++
++#define LM3697_CTRL_A_RAMP_START	(BIT(4) | BIT(5) | BIT(6) | BIT(7))
++
++#define LM3697_DEFAULT_BRIGHTNESS	190
++#define LM3697_DISABLE	0
++#define LM3697_ENABLE	1
++
++struct lm3697_backlight_priv {
++	struct gpio_desc enable;
++	struct regmap *map;
++	bool def_value;
++};
++
++static int lm3697_init(struct udevice *dev)
++{
++	struct lm3697_backlight_priv *priv = dev_get_priv(dev);
++	int i, ret;
++	u16 val = 0;
++	int auto_freq_threshold = 0;
++	int start_up_ramp_level = 0;
++	u8 data;
++	u32 boost_ovp = 0;
++
++	if (&priv->enable) {
++		dm_gpio_set_value(&priv->enable, 1);
++	} else {
++		ret = dm_i2c_reg_write(dev, LM3697_RESET, LM3697_SW_RESET);
++		if (ret) {
++			dev_err(dev, "%s: Cannot reset the device
+", __func__);
++			goto out;
++		}
++	}
++
++	ret = dm_i2c_reg_write(dev, LM3697_CTRL_ENABLE, LM3697_DISABLE);
++	if (ret) {
++		dev_err(dev, "%s: Cannot write ctrl enable
+", __func__);
++		goto out;
++	}
++
++	ret = dm_i2c_reg_write(dev, LM3697_OUTPUT_CONFIG, LM3697_CONTROL_A);
++	if (ret)
++		dev_err(dev, "%s: Cannot write OUTPUT config
+", __func__);
++
++	/* config OVP */
++	ret = dev_read_u32(dev, "boost-ovp", &boost_ovp);
++	if (ret)
++		dev_err(dev, "%s: boost ovp missing or invalid, set it as default
+", __func__);
++
++	ret = dm_i2c_read(dev, LM3697_CTRL_BOOST_CFG, &val, 1);
++	if (ret)
++		dev_err(dev, "%s: Cannot get boost cfg
+", __func__);
++
++	switch (boost_ovp) {
++	case 16:
++	default:
++		val |= LM3697_CTRL_BOOST_OVP_16V;
++		break;
++	case 24:
++		val |= LM3697_CTRL_BOOST_OVP_24V;
++		break;
++	case 32:
++		val |= LM3697_CTRL_BOOST_OVP_32V;
++		break;
++	case 40:
++		val |= LM3697_CTRL_BOOST_OVP_40V;
++		break;
++	}
++
++	ret = dm_i2c_reg_write(dev, LM3697_CTRL_BOOST_CFG, val);
++	if (ret)
++		dev_err(dev, "%s: Cannot set OVP value
+", __func__);
++
++	if (dev_read_bool(dev, "auto-frequency")) {
++		ret = dev_read_u32(dev, "auto-freq-threshold", &auto_freq_threshold);
++		if (!ret) {
++			val = 0;
++			ret = dm_i2c_read(dev, LM3697_CTRL_BOOST_CFG, &val, 1);
++			if (ret)
++				dev_err(dev, "%s: Cannot get boost cfg
+", __func__);
++
++			val |= LM3697_CTRL_BOOST_AUTO_FREQ_EN;
++			ret = dm_i2c_reg_write(dev, LM3697_CTRL_BOOST_CFG, val);
++			if (!ret) {
++				ret = dm_i2c_reg_write(dev, LM3697_AUTO_FREQ_THRESHOLD, auto_freq_threshold);
++				if (ret)
++					dev_err(dev, "%s: Cannot set auto freq threshold
+", __func__);
++			} else {
++				dev_err(dev, "%s: Cannot set auto freq en
+", __func__);
++			}
++		}
++	}
++
++	if (dev_read_bool(dev, "auto-headroom")) {
++		val = 0;
++		ret = dm_i2c_read(dev, LM3697_CTRL_BOOST_CFG, &val, 1);
++		if (ret)
++			dev_err(dev, "%s: Cannot get boost cfg
+", __func__);
++
++		val |= LM3697_CTRL_BOOST_AUTO_HROOM_EN;
++		ret = dm_i2c_reg_write(dev, LM3697_CTRL_BOOST_CFG, val);
++		if (ret)
++			dev_err(dev, "%s: Cannot enable auto head room
+", __func__);
++	}
++
++	ret = dev_read_u32(dev, "start-up-ramp-level", &start_up_ramp_level);
++	if (ret)
++		dev_err(dev, "%s: start up ramp missing or invalid
+", __func__);
++
++	if (start_up_ramp_level) {
++		val = 0;
++		ret = dm_i2c_read(dev, LM3697_CTRL_A_RAMP, &val, 1);
++		if (ret)
++			dev_err(dev, "%s: Cannot get ramp data
+", __func__);
++
++		val |= (start_up_ramp_level << 4);
++		ret = dm_i2c_reg_write(dev, LM3697_CTRL_A_RAMP, val);
++		if (ret)
++			dev_err(dev, "%s: Cannot set start_up_ramp_level value
+", __func__);
++	}
++out:
++	return ret;
++}
++
++static int lm3697_backlight_enable(struct udevice *dev)
++{
++	int ret = 0;
++	struct lm3697_backlight_psriv *priv = dev_get_priv(dev);
++
++	ret = dm_i2c_reg_write(dev, LM3697_CTRL_ENABLE, LM3697_ENABLE);
++	if (ret)
++		dev_err(dev, "%s: Enable lm3697 failed
+", __func__);
++
++	ret = dm_i2c_reg_write(dev, LM3697_CTRL_A_BRT_MSB, LM3697_DEFAULT_BRIGHTNESS);
++	if (ret)
++		dev_err(dev, "%s: Set brightness failed
+", __func__);
++
++	return 0;
++}
++
++static int lm3697_backlight_of_to_plat(struct udevice *dev)
++{
++	struct lm3697_backlight_priv *priv = dev_get_priv(dev);
++	int ret;
++
++	ret = gpio_request_by_name(dev, "enable-gpios", 0, &priv->enable,
++				   GPIOD_IS_OUT);
++	if (ret) {
++		dev_err(dev, "%s: Warning: cannot get GPIO: ret=%d
+",
++		      __func__, ret);
++		return ret;
++	}
++
++	priv->def_value = dev_read_bool(dev, "default-on");
++
++	return 0;
++}
++
++static int lm3697_backlight_probe(struct udevice *dev)
++{
++	int ret;
++	struct lm3697_backlight_priv *priv = dev_get_priv(dev);
++
++	ret = lm3697_init(dev);
++	if (ret) {
++		dev_err(dev, "%s: Init lm3697 failed
+", __func__);
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct backlight_ops lm3697_backlight_ops = {
++	.enable	= lm3697_backlight_enable,
++};
++
++static const struct udevice_id lm3697_backlight_ids[] = {
++	{ .compatible = "ti,lm3697" },
++	{ }
++};
++
++U_BOOT_DRIVER(lm3697_backlight) = {
++	.name	= "lm3697_backlight",
++	.id	= UCLASS_PANEL_BACKLIGHT,
++	.of_match = lm3697_backlight_ids,
++	.ops	= &lm3697_backlight_ops,
++	.of_to_plat	= lm3697_backlight_of_to_plat,
++	.probe		= lm3697_backlight_probe,
++	.priv_auto	= sizeof(struct lm3697_backlight_priv),
++};

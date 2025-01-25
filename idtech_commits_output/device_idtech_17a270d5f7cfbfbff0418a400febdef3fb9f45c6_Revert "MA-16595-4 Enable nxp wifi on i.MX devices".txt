@@ -1,0 +1,323 @@
+17a270d5 George.Huang 2020-07-23
+
+Revert "MA-16595-4 Enable nxp wifi on i.MX devices"
+
+This reverts commit 931c040901acb6483b2276d437beb600b240520d.
+
+Change-Id: I4bc9aa566e826d71e50fd36701a6b010c3e0d1f5
+
+diff --git a/imx8m/evk_8mn/BoardConfig.mk b/imx8m/evk_8mn/BoardConfig.mk
+index 86cf2300..0829e699 100644
+--- a/imx8m/evk_8mn/BoardConfig.mk
++++ b/imx8m/evk_8mn/BoardConfig.mk
+@@ -66,14 +66,14 @@ TARGET_BOOTLOADER_BOARD_NAME := EVK
+ 
+ USE_OPENGL_RENDERER := true
+ 
+-BOARD_WLAN_DEVICE            := nxp
++BOARD_WLAN_DEVICE            := bcmdhd
+ WPA_SUPPLICANT_VERSION       := VER_0_8_X
+ BOARD_WPA_SUPPLICANT_DRIVER  := NL80211
+ BOARD_HOSTAPD_DRIVER         := NL80211
+ BOARD_HOSTAPD_PRIVATE_LIB               := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+ BOARD_WPA_SUPPLICANT_PRIVATE_LIB        := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+ 
+-WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
++WIFI_DRIVER_FW_PATH_PARAM := "/sys/module/brcmfmac/parameters/alternative_fw_path"
+ 
+ BOARD_USE_SENSOR_FUSION := true
+ 
+@@ -82,8 +82,8 @@ TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
+ 
+ BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
+ 
+-# NXP 8987 BT
+-BOARD_HAVE_BLUETOOTH_NXP := true
++# BCM 1MW BT
++BOARD_HAVE_BLUETOOTH_BCM := true
+ 
+ BOARD_HAVE_USB_CAMERA := true
+ BOARD_HAVE_USB_MJPEG_CAMERA := false
+@@ -133,16 +133,16 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+     TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk-no-product.dtb
+   else
+-    # imx8mn with MIPI-HDMI display, wifi and support trusty
++    # imx8mn with MIPI-HDMI display, BCM wifi and support trusty
+     TARGET_BOARD_DTS_CONFIG := imx8mn-ddr4:imx8mn-ddr4-evk.dtb
+     TARGET_BOARD_DTS_CONFIG += imx8mn:imx8mn-evk.dtb
+-    # imx8mn with MIPI panel display and wifi
++    # imx8mn with MIPI panel display and BCM wifi
+     TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-mipi-panel:imx8mn-ddr4-evk-rm67191.dtb
+-    # imx8mn with MIPI-HDMI display and wifi and M7 image
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+     TARGET_BOARD_DTS_CONFIG += imx8mn-ddr4-rpmsg:imx8mn-ddr4-evk-rpmsg.dtb
+-    # imx8mn with MIPI panel display and wifi
++    # imx8mn with MIPI panel display and BCM wifi
+     TARGET_BOARD_DTS_CONFIG += imx8mn-mipi-panel:imx8mn-evk-rm67191.dtb
+-    # imx8mn with MIPI-HDMI display and wifi and M7 image
++    # imx8mn with MIPI-HDMI display and BCM wifi and M7 image
+     TARGET_BOARD_DTS_CONFIG += imx8mn-rpmsg:imx8mn-evk-rpmsg.dtb
+   endif
+ else
+diff --git a/imx8m/evk_8mn/SharedBoardConfig.mk b/imx8m/evk_8mn/SharedBoardConfig.mk
+index 15a03d1f..d8ce857d 100644
+--- a/imx8m/evk_8mn/SharedBoardConfig.mk
++++ b/imx8m/evk_8mn/SharedBoardConfig.mk
+@@ -10,10 +10,10 @@ PRODUCT_IMX_TRUSTY := true
+ #Enable this to disable product partition build.
+ #IMX_NO_PRODUCT_PARTITION := true
+ 
+-# NXP 8987 wifi driver module
++# BCM fmac wifi driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+-    $(KERNEL_OUT)/drivers/net/wireless/nxp/mxm_wifiex/wlan_src/mlan.ko \
+-    $(KERNEL_OUT)/drivers/net/wireless/nxp/mxm_wifiex/wlan_src/moal.ko \
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmfmac/brcmfmac.ko \
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmutil/brcmutil.ko
+ 
+ # mipi-panel touch driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+diff --git a/imx8m/evk_8mn/android_addition_defconfig b/imx8m/evk_8mn/android_addition_defconfig
+index f51bd5ff..18be38d6 100644
+--- a/imx8m/evk_8mn/android_addition_defconfig
++++ b/imx8m/evk_8mn/android_addition_defconfig
+@@ -1,2 +1 @@
+-CONFIG_WLAN_VENDOR_NXP=y
+-CONFIG_MXMWIFIEX=m
++CONFIG_CLD_HL_SDIO_CORE=y
+diff --git a/imx8m/evk_8mn/early.init.cfg b/imx8m/evk_8mn/early.init.cfg
+index ccd094bd..585fd85f 100644
+--- a/imx8m/evk_8mn/early.init.cfg
++++ b/imx8m/evk_8mn/early.init.cfg
+@@ -1,4 +1,4 @@
+ insmod vendor/lib/modules/wlan.ko
++insmod vendor/lib/modules/brcmutil.ko
++insmod vendor/lib/modules/brcmfmac.ko
+ insmod vendor/lib/modules/synaptics_dsx_i2c.ko
+-insmod vendor/lib/modules/mlan.ko
+-insmod vendor/lib/modules/moal.ko sta_name=wlan uap_name=wlan wfd_name=p2p max_vir_bss=1 cfg80211_wext=0xf cal_data_cfg=none fw_name=sdiouart8987_combo_v0.bin
+diff --git a/imx8m/evk_8mn/evk_8mn.mk b/imx8m/evk_8mn/evk_8mn.mk
+index a205ee7c..d454b725 100644
+--- a/imx8m/evk_8mn/evk_8mn.mk
++++ b/imx8m/evk_8mn/evk_8mn.mk
+@@ -76,7 +76,7 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/fsl/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/fsl/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -240,19 +240,25 @@ PRODUCT_PACKAGES += \
+     android.hardware.bluetooth@1.0-impl \
+     android.hardware.bluetooth@1.0-service
+ 
+-# NXP 8987 Bluetooth vendor config
++# BCM Bluetooth vendor config
+ PRODUCT_PACKAGES += \
+     bt_vendor.conf
+ 
++# BCM 1MW Bluetooth Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/BCM4345C0.1MW.hcd:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/CYW4345C0.1MW.hcd
++
+ # WiFi HAL
+ PRODUCT_PACKAGES += \
+     android.hardware.wifi@1.0-service \
+     wifilogd \
+     wificond
+ 
+-# NXP 8987 Wifi and Bluetooth Combo Firmware
++# BCM 1MW Wifi Firmware
+ PRODUCT_COPY_FILES += \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8987/sdiouart8987_combo_v0.bin:vendor/firmware/sdiouart8987_combo_v0.bin
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.bin \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.clm_blob \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1MW_CYW43455/brcmfmac43455-sdio.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac43455-sdio.txt
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/evk_8mn/init.rc b/imx8m/evk_8mn/init.rc
+index e344120b..89a96e79 100644
+--- a/imx8m/evk_8mn/init.rc
++++ b/imx8m/evk_8mn/init.rc
+@@ -106,10 +106,17 @@ on early-boot
+     # Set period_us for usb audio
+     setprop ro.audio.usb.period_us 20000
+ 
++    # Wifi firmware reload path
++    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
++
+     # Prepare for wifi
+     setprop wifi.interface wlan0
+-    setprop wifi.direct.interface p2p0
+-    setprop wifi.concurrent.interface wlan1
++    setprop wifi.direct.interface p2p-dev-wlan0
++
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
+ 
+     setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
+ 
+diff --git a/imx8m/evk_8mp/evk_8mp.mk b/imx8m/evk_8mp/evk_8mp.mk
+index 8628a13a..573195e0 100644
+--- a/imx8m/evk_8mp/evk_8mp.mk
++++ b/imx8m/evk_8mp/evk_8mp.mk
+@@ -251,9 +251,11 @@ PRODUCT_PACKAGES += \
+     wifilogd \
+     wificond
+ 
+-# nxp 8997 wifi and bluetooth combo Firmware
++# nxp 8997 Firmware
+ PRODUCT_COPY_FILES += \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/pcieuart8997_combo_v4.bin
++    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcie8997_wlan_v4.bin:vendor/firmware/mrvl/pcie8997_wlan_v4.bin \
++    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/mrvl/pcieuart8997_combo_v4.bin \
++    vendor/nxp/imx-firmware/nxp/FwImage_8997/uart8997_bt_v4.bin:vendor/firmware/mrvl/uart8997_bt_v4.bin \
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/evk_8mq/BoardConfig.mk b/imx8m/evk_8mq/BoardConfig.mk
+index db7c4991..c466cecc 100644
+--- a/imx8m/evk_8mq/BoardConfig.mk
++++ b/imx8m/evk_8mq/BoardConfig.mk
+@@ -69,19 +69,21 @@ TARGET_BOOTLOADER_BOARD_NAME := EVK
+ 
+ USE_OPENGL_RENDERER := true
+ 
+-BOARD_WLAN_DEVICE            := nxp
++BOARD_WLAN_DEVICE            := bcmdhd
+ WPA_SUPPLICANT_VERSION       := VER_0_8_X
+ BOARD_WPA_SUPPLICANT_DRIVER  := NL80211
+ BOARD_HOSTAPD_DRIVER         := NL80211
+ BOARD_HOSTAPD_PRIVATE_LIB           := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+ BOARD_WPA_SUPPLICANT_PRIVATE_LIB    := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
+ 
+-WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
++WIFI_DRIVER_FW_PATH_PARAM := "/sys/module/brcmfmac/parameters/alternative_fw_path"
++
++#WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
+ 
+ BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
+ 
+-# NXP 8997 BT
+-BOARD_HAVE_BLUETOOTH_NXP := true
++# BCM 1CX BT
++BOARD_HAVE_BLUETOOTH_BCM := true
+ 
+ BOARD_USE_SENSOR_FUSION := true
+ 
+@@ -136,7 +138,7 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+     TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-no-product.dtb
+   else
+     # imx8mq with HDMI display
+-    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk-pcie1-m2.dtb
++    TARGET_BOARD_DTS_CONFIG ?= imx8mq:imx8mq-evk.dtb
+     # imx8mq with MIPI-HDMI display
+     TARGET_BOARD_DTS_CONFIG += imx8mq-mipi:imx8mq-evk-lcdif-adv7535.dtb
+     # imx8mq with HDMI and MIPI-HDMI display
+diff --git a/imx8m/evk_8mq/SharedBoardConfig.mk b/imx8m/evk_8mq/SharedBoardConfig.mk
+index 330ab1c5..98fc2d66 100644
+--- a/imx8m/evk_8mq/SharedBoardConfig.mk
++++ b/imx8m/evk_8mq/SharedBoardConfig.mk
+@@ -7,10 +7,10 @@ PRODUCT_IMX_TRUSTY := true
+ #Enable this to disable product partition build.
+ #IMX_NO_PRODUCT_PARTITION := true
+ 
+-#NXP 8997 wifi driver module
++# BCM fmac wifi driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+-    $(KERNEL_OUT)/drivers/net/wireless/marvell/mrvl8997/wlan_src/mlan.ko \
+-    $(KERNEL_OUT)/drivers/net/wireless/marvell/mrvl8997/wlan_src/pcie8xxx.ko
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmfmac/brcmfmac.ko \
++    $(KERNEL_OUT)/drivers/net/wireless/broadcom/brcm80211/brcmutil/brcmutil.ko
+ 
+ # mipi-panel touch driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+diff --git a/imx8m/evk_8mq/early.init.cfg b/imx8m/evk_8mq/early.init.cfg
+index 9262d953..7403f68b 100644
+--- a/imx8m/evk_8mq/early.init.cfg
++++ b/imx8m/evk_8mq/early.init.cfg
+@@ -1,3 +1,4 @@
+-insmod vendor/lib/modules/mlan.ko
+-insmod vendor/lib/modules/pcie8xxx.ko sta_name=wlan uap_name=wlan wfd_name=p2p max_vir_bss=1 cfg80211_wext=0xf cal_data_cfg=none p2p_enh=1 fw_name=pcieuart8997_combo_v4.bin
++insmod vendor/lib/modules/brcmutil.ko
++insmod vendor/lib/modules/brcmfmac.ko
++insmod vendor/lib/modules/wlan.ko
+ insmod vendor/lib/modules/synaptics_dsx_i2c.ko
+diff --git a/imx8m/evk_8mq/evk_8mq.mk b/imx8m/evk_8mq/evk_8mq.mk
+index 7db1b212..049e3602 100644
+--- a/imx8m/evk_8mq/evk_8mq.mk
++++ b/imx8m/evk_8mq/evk_8mq.mk
+@@ -74,7 +74,7 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/fsl/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/fsl/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/fsl/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/fsl/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -246,13 +246,19 @@ PRODUCT_PACKAGES += \
+     wifilogd \
+     wificond
+ 
+-# NXP 8997 Bluetooth vendor config
++# BCM Bluetooth vendor config
+ PRODUCT_PACKAGES += \
+     bt_vendor.conf
+ 
+-# NXP 8997 Wifi and Bluetooth Combo Firmware
++# BCM 1CX Bluetooth Firmware
+ PRODUCT_COPY_FILES += \
+-    vendor/nxp/imx-firmware/nxp/FwImage_8997/pcieuart8997_combo_v4.bin:vendor/firmware/pcieuart8997_combo_v4.bin
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/BCM4354A2.1CX.hcd:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/CYW4354A2.1CX.hcd
++
++# BCM 1CX Wifi Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.bin \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.clm_blob:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.clm_blob \
++    vendor/nxp/imx-firmware/cyw-wifi-bt/1CX_CYW4356/brcmfmac4356-pcie.txt:$(TARGET_COPY_OUT_VENDOR)/firmware/brcm/brcmfmac4356-pcie.txt
+ 
+ # Wifi regulatory
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/evk_8mq/init.rc b/imx8m/evk_8mq/init.rc
+index 1472b83e..b77882da 100644
+--- a/imx8m/evk_8mq/init.rc
++++ b/imx8m/evk_8mq/init.rc
+@@ -108,13 +108,19 @@ on early-boot
+     # Set period_us for usb audio
+     setprop ro.audio.usb.period_us 20000
+ 
++    # Wifi firmware reload path
++    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
++
+     # Prepare for wifi
+     setprop wifi.interface wlan0
+-    setprop wifi.direct.interface p2p0
+-    setprop wifi.concurrent.interface wlan1
+ 
+     setprop persist.service.bdroid.bdaddr 22:22:67:C6:69:73
+ 
++    # Prepare for bluetooth
++    chmod 665 /sys/class/rfkill/rfkill0/state
++    chown bluetooth bluetooth /sys/class/rfkill/rfkill0/state
++    write /sys/class/rfkill/rfkill0/state 0
++
+     # Prepare for RIL
+     setprop ro.ril.wake_lock_timeout 300
+ 
+@@ -153,6 +159,9 @@ on early-boot
+     # enlarge media max memory size to 3G.
+     setprop ro.media.maxmem 3221225471
+ 
++    setprop wifi.direct.interface p2p-dev-wlan0
++    start vendor.wifi_hal_legacy
++
+ on boot
+     start audioserver
+     start mediadrm

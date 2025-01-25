@@ -1,0 +1,108 @@
+7736c6bf2b76 Arthur Chen 2020-03-09
+
+arm64: dts: a300 devboard: Port idg_spi misc spi driver to devboard.
+
+Change-Id: I8b1fee3d646d2f284835076ff16bdb702e5569e0
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+index 09416213c2e4..a3ec49d9c2e9 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dts
+@@ -325,7 +325,6 @@ &iomuxc {
+ 	imx8mq-evk {
+ 		pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+-				MX8MQ_IOMUXC_NAND_DATA05_GPIO3_IO11		0x19  //GPIO_04, K81_DAV
+ 				MX8MQ_IOMUXC_NAND_DATA06_GPIO3_IO12		0x19  //GPIO_05, DNI
+ 				MX8MQ_IOMUXC_SAI5_MCLK_GPIO3_IO25		0x51  //LTE_VBAT_EN
+ 				MX8MQ_IOMUXC_SAI5_RXFS_GPIO3_IO19		0x51  //LTE_AP_READY
+@@ -410,7 +409,6 @@ MX8MQ_IOMUXC_SAI5_RXD2_GPIO3_IO23		0x16  //PCIE_nDIS
+ 
+ 		pinctrl_ecspi1: ecspi1grp {
+ 			fsl,pins = <
+-				//MX8MQ_IOMUXC_ECSPI1_SS0_ECSPI1_SS0		0x19
+ 				MX8MQ_IOMUXC_ECSPI1_SS0_GPIO5_IO9		0x19
+ 				MX8MQ_IOMUXC_ECSPI1_MISO_ECSPI1_MISO		0x19
+ 				MX8MQ_IOMUXC_ECSPI1_SCLK_ECSPI1_SCLK		0x19
+@@ -418,19 +416,6 @@ MX8MQ_IOMUXC_ECSPI1_MOSI_ECSPI1_MOSI		0x19
+ 			>;
+ 		};
+ 
+-		/*
+-		use customer's setting
+-		pinctrl_ecspi2: ecspi2grp {
+-			fsl,pins = <
+-				//MX8MQ_IOMUXC_ECSPI2_SS0_ECSPI2_SS0		0x19
+-				MX8MQ_IOMUXC_ECSPI2_SS0_GPIO5_IO13		0x19
+-				MX8MQ_IOMUXC_ECSPI2_MISO_ECSPI2_MISO		0x19
+-				MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK		0x19
+-				MX8MQ_IOMUXC_ECSPI2_MOSI_ECSPI2_MOSI		0x19
+-			>;
+-		};
+-		*/
+-
+ 		pinctrl_ecspi2: ecspi2grp {
+ 			fsl,pins = <
+ 				MX8MQ_IOMUXC_ECSPI2_SCLK_ECSPI2_SCLK	0x82
+@@ -690,42 +675,37 @@ ethphy0: ethernet-phy@0 {
+ };
+ 
+ &ecspi1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi1>;
+ 	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>;
++	dmas = <&sdma2 10 24 0>, <&sdma2 11 24 0>;
++	dma-names = "rx", "tx";
+ 	status = "okay";
+-};
+ 
+-/*
+-use customer's setting
+-&ecspi2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_ecspi2>;
+-	fsl,spi-num-chipselects = <1>;
+-	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
+-	status = "okay";
++	/* for ttyIDG & ttyIDGV5 device entry */
++	idg_spi@0 {
++		reg = <0>;
++		compatible = "idtech,idg-spi";
++		interrupt-parent = <&gpio3>;
++		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
++		spi-max-frequency = <4000000>; /* 4 MHz */
++		spi-bits-per-word = <8>; /* 8 bits */
++		spi-working-mode = <0>; /* SPI_MODE_0 */
++		spi-cs-gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* CS control */
++		idg-low-triggered; /* interrupt work with low level triggered */
++		/* idg-keep-sense */
++		status = "okay";
++	};
+ };
+-*/
+ 
+ &ecspi2 {
+-	#address-cells = <1>;
+-	#size-cells = <0>;
+-	fsl,spi-num-chipselects = <1>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_ecspi2>;
++	fsl,spi-num-chipselects = <1>;
+ 	cs-gpios = <&gpio5 13 GPIO_ACTIVE_LOW>;
+-	dmas = <&sdma2 3 7 1>, <&sdma2 4 7 2>;
+-	dma-names = "rx", "tx";
+ 	status = "okay";
+-
+-	/* for device entry */
+-	spidev0: spi@0 {
+-		reg = <0>;
+-		compatible = "spidev";
+-		spi-max-frequency = <500000>;
+-		status = "okay";
+-	};
+ };
+ 
+ &i2c1 {

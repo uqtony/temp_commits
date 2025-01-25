@@ -1,0 +1,149 @@
+fd79b1749e54 Arthur Chen 2020-03-30
+
+drivers: misc: idg_spi: To match C-SDK read logic.
+
+Change-Id: Ied24913d786b09e45dd59cfec7dd7219ef2cf02e
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 77c688a5d2b3..b445238049b6 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -41,6 +41,8 @@
+ 
+ #define IDG_INPUT_HEX_NUMBER	0  /* enable: 1, disable: 0 */
+ 
++#define IDG_RETURN_WITH_HEADER	1  /* enable: 1, disable: 0 */
++
+ #define IDG_DEBUG_INFO		0  /* enable: 1, disable: 0 */
+ 
+ static struct spi_device *idg_spi_tty;
+@@ -128,9 +130,17 @@ int fifo_get_msg(struct mt_fifo *fifo, char *msg)
+ 
+ 	if (fifo->msg_cnt) {
+ 		fifo->msg_cnt--;
++#if IDG_RETURN_WITH_HEADER
++		ret = msg[IDG_SIZE_MSB] << 8;
++		ret += msg[IDG_SIZE_LSB];
++		ret += IDG_HEADER_LEN;
++		ret += NEOII_CMD_LEN;
++		ret += NEOII_CRC_LEN;
++#else
+ 		ret = msg[RX_SIZE_MSB] << 8;
+ 		ret += msg[RX_SIZE_LSB];
+ 		ret += NEOII_CMD_LEN;
++#endif /* IDG_RETURN_WITH_HEADER */
+ 	} else {
+ 		ret = 0;
+ 	}
+@@ -849,6 +859,14 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		if ((!err) &&
+ 		    (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V2,
+ 			     NEOII_VERSION_LEN) == 0)) {
++#if IDG_RETURN_WITH_HEADER
++			if (fifo_add_msg(idg_dev->v2_fifo, data)) {
++				fifo_clean(idg_dev->v2_fifo);
++				dev_info(&spi->dev, "FIFO v2 overflow, "
++						    "cleaned
+");
++				fifo_add_msg(idg_dev->v2_fifo, data);
++			}
++#else
+ 			if (fifo_add_msg(idg_dev->v2_fifo,
+ 					 &data[IDG_HEADER_LEN])) {
+ 				fifo_clean(idg_dev->v2_fifo);
+@@ -857,9 +875,18 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				fifo_add_msg(idg_dev->v2_fifo,
+ 					     &data[IDG_HEADER_LEN]);
+ 			}
++#endif /* IDG_RETURN_WITH_HEADER */
+ 		} else if ((!err) &&
+ 			   (strncmp(&data[NEOII_HEADER_LEN], NEOII_Header_V5,
+ 				    NEOII_VERSION_LEN) == 0)) {
++#if IDG_RETURN_WITH_HEADER
++			if (fifo_add_msg(idg_dev->v5_fifo, data)) {
++				fifo_clean(idg_dev->v5_fifo);
++				dev_info(&spi->dev, "FIFO v5 overflow. "
++						    "cleaned
+");
++				fifo_add_msg(idg_dev->v5_fifo, data);
++			}
++#else
+ 			if (fifo_add_msg(idg_dev->v5_fifo,
+ 					 &data[IDG_HEADER_LEN])) {
+ 				fifo_clean(idg_dev->v5_fifo);
+@@ -868,14 +895,22 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				fifo_add_msg(idg_dev->v5_fifo,
+ 					     &data[IDG_HEADER_LEN]);
+ 			}
++#endif /* IDG_RETURN_WITH_HEADER */
+ 		} else {
+ 			switch (err) {
+ 			case EINVAL:
+ 				dev_info(&spi->dev, "read data failed "
+ 						    "by invalid
+");
++#if IDG_RETURN_WITH_HEADER
++				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_CRC_HD,
++				       ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
++				       READ_ERROR_CRC, READ_ERROR_CRC_SIZE);
++#else
+ 				memcpy(data, READ_ERROR_CRC_HD, ERROR_HD_SIZE);
+ 				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_CRC,
+ 				       READ_ERROR_CRC_SIZE);
++#endif /* IDG_RETURN_WITH_HEADER */
+ 				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+ 					fifo_clean(idg_dev->v2_fifo);
+ 					dev_info(&spi->dev, "FIFO v2 overflow, "
+@@ -885,9 +920,16 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 				break;
+ 			case EBUSY:
+ 				dev_info(&spi->dev, "read data failed
+");
++#if IDG_RETURN_WITH_HEADER
++				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_K81_HD,
++				       ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
++				       READ_ERROR_K81, READ_ERROR_K81_SIZE);
++#else
+ 				memcpy(data, READ_ERROR_K81_HD, ERROR_HD_SIZE);
+ 				memcpy(&data[ERROR_HD_SIZE], READ_ERROR_K81,
+ 				       READ_ERROR_K81_SIZE);
++#endif /* IDG_RETURN_WITH_HEADER */
+ 				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+ 					fifo_clean(idg_dev->v2_fifo);
+ 					dev_info(&spi->dev, "FIFO v2 overflow, "
+@@ -900,10 +942,16 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 					pr_err("%s: idg spi second "
+ 					       "report failed(%d)", DRVNAME,
+ 					       status_s);
+-
++#if IDG_RETURN_WITH_HEADER
++				memcpy(&data[IDG_HEADER_LEN], READ_ERROR_HD,
++				       ERROR_HD_SIZE);
++				memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN],
++				       READ_ERROR, READ_ERROR_SIZE);
++#else
+ 				memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
+ 				memcpy(&data[ERROR_HD_SIZE], READ_ERROR,
+ 				       READ_ERROR_SIZE);
++#endif /* IDG_RETURN_WITH_HEADER */
+ 				if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+ 					fifo_clean(idg_dev->v2_fifo);
+ 					dev_info(&spi->dev, "FIFO v2 overflow, "
+@@ -919,8 +967,14 @@ static void idg_spi_report(struct idg_spi_device *idg_dev)
+ 		}
+ 	} else {
+ 		pr_err("%s: idg spi report failed(%d)", DRVNAME, status);
++#if IDG_RETURN_WITH_HEADER
++		memcpy(&data[IDG_HEADER_LEN], READ_ERROR_HD, ERROR_HD_SIZE);
++		memcpy(&data[ERROR_HD_SIZE + IDG_HEADER_LEN], READ_ERROR,
++		       READ_ERROR_SIZE);
++#else
+ 		memcpy(data, READ_ERROR_HD, ERROR_HD_SIZE);
+ 		memcpy(&data[ERROR_HD_SIZE], READ_ERROR, READ_ERROR_SIZE);
++#endif /* IDG_RETURN_WITH_HEADER */
+ 		if (fifo_add_msg(idg_dev->v2_fifo, data)) {
+ 			fifo_clean(idg_dev->v2_fifo);
+ 			dev_info(&spi->dev, "FIFO v2 overflow, cleaned
+");

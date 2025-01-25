@@ -1,0 +1,63 @@
+0ec86209 owen.wen 2022-02-18
+
+AOS-864: add lte function into bringup_test.sh
+
+lte:                           OK_(operator:  T Star)
+lte_signal:                    FAIL
+
+Change-Id: Ia9f368281d9956cc74847d8779afe76849ac1b9e
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index c01210d7..f51529d7 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -715,7 +715,8 @@ check_bringup_stage1_func() {
+   log_rst "==== STAGE1_FUNC =============" "======"
+   check_light_sensor "input"
+   check_idg_version
+-# check_func_lte
++  check_func_lte
++  check_func_lte_signal
+ # check_func_bt
+ # check_audio
+ # check_func_rs232
+@@ -842,6 +843,39 @@ check_idg_version() {
+   logi ""
+ }
+ 
++check_func_lte() {
++  logi "== check_func_lte"
++  unset_test_array
++
++  test_key="lte"
++  logi "getprop gsm.sim.operator.alpha" # get carrier name
++  logi "`getprop gsm.sim.operator.alpha`"
++  operator=`getprop gsm.sim.operator.alpha`
++  if [ ! -z "$operator" ]; then
++    log_rst "${test_key}:" "OK_(operator: $operator)"
++  else
++    log_rst "${test_key}:" "FAIL"
++  fi
++  logi ""
++}
++
++check_func_lte_signal() {
++  logi "== check_func_lte_signal"
++  unset_test_array
++
++  test_key="lte_signal"
++  logi "dumpsys telephony.registry | grep mSignalStrength="
++  logi "`dumpsys telephony.registry | grep mSignalStrength=`"
++  string=`dumpsys telephony.registry | grep mSignalStrength=`
++  rsrp=`echo ${string#*rsrp=} | cut -d' ' -f1`
++  if [ "$rsrp" = "2147483647" ]; then
++    log_rst "${test_key}:" "FAIL"
++  else
++    log_rst "${test_key}:" "OK_(rsrp: $rsrp)"
++  fi
++  logi ""
++}
++
+ check_idg_nfc() {
+   logi "== check idg nfc"
+   logi ""

@@ -1,0 +1,54 @@
+ccdb0a994 owen.wen 2020-04-13
+
+AOS-147: check product, vendor priv permission
+
+since we add idtech app into /product/priv-app, so need to check apps under /product/priv-app as well
+
+Change-Id: Icb9fa16c08a1e891973219743986540f7563429f
+
+diff --git a/tools/privapp_permissions/privapp_permissions.py b/tools/privapp_permissions/privapp_permissions.py
+index 4016573a4..feac54bbe 100755
+--- a/tools/privapp_permissions/privapp_permissions.py
++++ b/tools/privapp_permissions/privapp_permissions.py
+@@ -158,6 +158,8 @@ class Resources(object):
+ 
+         self.privapp_apks = self._resolve_apks(apks)
+         self.permissions_dir = self._resolve_sys_path('system/etc/permissions')
++        self.permissions_product_dir = self._resolve_sys_path('product/etc/permissions')
++        self.permissions_vendor_dir = self._resolve_sys_path('vendor/etc/permissions')
+         self.sysconfig_dir = self._resolve_sys_path('system/etc/sysconfig')
+         self.framework_res_apk = self._resolve_sys_path('system/framework/'
+                                                         'framework-res.apk')
+@@ -313,6 +315,14 @@ class Resources(object):
+         if self._is_android_env:
+             priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'],
+                                         'system/priv-app')
++            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')):
++                product_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'product/priv-app')
++            else:
++                product_priv_app_dir = ''
++            if os.path.isdir(os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')):
++                vendor_priv_app_dir = os.path.join(os.environ['ANDROID_PRODUCT_OUT'], 'vendor/priv-app')
++            else:
++                vendor_priv_app_dir = ''
+         else:
+             try:
+                 priv_app_dir = self.adb.pull('/system/priv-app/')
+@@ -321,7 +331,7 @@ class Resources(object):
+                     'Directory "/system/priv-app" could not be pulled from on '
+                     'device "%s".' % self.adb.serial)
+ 
+-        return get_output('find %s -name "*.apk"' % priv_app_dir).split()
++        return get_output('find %s %s %s -name "*.apk"' % (priv_app_dir, product_priv_app_dir, vendor_priv_app_dir)).split()
+ 
+     def _resolve_sys_path(self, file_path):
+         """Resolves a path that is a part of an Android System Image."""
+@@ -400,6 +410,8 @@ def create_permission_file(resources):
+     # to be re-added
+     base_permissions = {}
+     base_xml_files = itertools.chain(list_xml_files(resources.permissions_dir),
++                                     list_xml_files(resources.permissions_product_dir),
++                                     list_xml_files(resources.permissions_vendor_dir),
+                                      list_xml_files(resources.sysconfig_dir))
+     for xml_file in base_xml_files:
+         parse_config_xml(xml_file, base_permissions)

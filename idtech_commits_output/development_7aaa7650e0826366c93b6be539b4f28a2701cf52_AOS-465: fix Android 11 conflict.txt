@@ -1,0 +1,76 @@
+7aaa7650e owen.wen 2020-12-23
+
+AOS-465: fix Android 11 conflict
+
+fix the Android 11 merge conflict
+and revert the DEBUG value which I turn on on Android 10
+
+Change-Id: I9f85543484ccc86cb487763aa532413c0649690b
+
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
+index 54655c423..6f5d89d5a 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/ClientCallbackImpl.java
+@@ -31,7 +31,7 @@ import android.view.inputmethod.InputConnection;
+ 
+ final class ClientCallbackImpl implements MultiClientInputMethodServiceDelegate.ClientCallback {
+     private static final String TAG = "ClientCallbackImpl";
+-    private static final boolean DEBUG = true;
++    private static final boolean DEBUG = false;
+ 
+     private final MultiClientInputMethodServiceDelegate mDelegate;
+     private final SoftInputWindowManager mSoftInputWindowManager;
+@@ -159,14 +159,6 @@ final class ClientCallbackImpl implements MultiClientInputMethodServiceDelegate.
+         }
+         final int lastClientId = mInputMethod.mDisplayToLastClientId.get(mSelfReportedDisplayId);
+         if (lastClientId != mClientId) {
+-<<<<<<< HEAD
+-            if (DEBUG) {
+-                Log.v(TAG, "mSelfReportedDisplayId: " + mSelfReportedDisplayId
+-                        + ", lastClientId: " + lastClientId
+-                        + ", mClientId: " + mClientId);
+-            }
+-=======
+->>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+             // deactivate previous client and activate current.
+             mDelegate.setActive(lastClientId, false /* active */);
+             mDelegate.setActive(mClientId, true /* active */);
+diff --git a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
+index 309b905e7..4057c43f8 100644
+--- a/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
++++ b/samples/MultiClientInputMethod/src/com/example/android/multiclientinputmethod/MultiClientInputMethod.java
+@@ -26,10 +26,7 @@ import android.inputmethodservice.MultiClientInputMethodServiceDelegate;
+ import android.os.IBinder;
+ import android.util.Log;
+ import android.util.SparseIntArray;
+-<<<<<<< HEAD
+-=======
+ import android.view.Display;
+->>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+ 
+ /**
+  * A {@link Service} that implements multi-client IME protocol.
+@@ -40,12 +37,9 @@ public final class MultiClientInputMethod extends Service implements DisplayList
+ 
+     // last client that had active InputConnection for a given displayId.
+     final SparseIntArray mDisplayToLastClientId = new SparseIntArray();
+-<<<<<<< HEAD
+-=======
+     // Mapping table from the display where IME is attached to the display where IME window will be
+     // shown.  Assumes that missing display will use the same display for the IME window.
+     SparseIntArray mInputDisplayToImeDisplay;
+->>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+     SoftInputWindowManager mSoftInputWindowManager;
+     MultiClientInputMethodServiceDelegate mDelegate;
+ 
+@@ -96,10 +90,7 @@ public final class MultiClientInputMethod extends Service implements DisplayList
+ 
+     @Override
+     public void onDisplayAdded(int displayId) {
+-<<<<<<< HEAD
+-=======
+         mInputDisplayToImeDisplay = buildInputDisplayToImeDisplay();
+->>>>>>> merge_imx-android-11.0.0_1.0.0_to_idt-imx-android-11-dev
+     }
+ 
+     @Override

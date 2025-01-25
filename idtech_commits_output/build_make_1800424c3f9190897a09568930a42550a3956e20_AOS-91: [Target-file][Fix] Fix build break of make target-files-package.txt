@@ -1,0 +1,40 @@
+1800424c3 max.yang 2020-02-20
+
+AOS-91: [Target-file][Fix] Fix build break of make target-files-package
+
+  1. In Android 10, Google modify image object's name from input_name to name
+  2. In Android 10, Google expected partition-table.bpt in /META, not in /IMAGES
+  3. Modify print() to logger.info() to avoid log dislocation
+
+Change-Id: Ia9d06971353d227375816e9e57726a11e7903cd2
+
+diff --git a/core/Makefile b/core/Makefile
+index 03dc35ca7..343f5d2d1 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -4168,7 +4168,7 @@ endif # BOARD_PREBUILT_DTBOIMAGE
+ 	cp $(PRODUCT_OUT)/vbmeta.img $(zip_root)/IMAGES/
+ 	# partition table
+ 	cp $(BUILT_BPTIMAGE_TARGET) $(zip_root)/IMAGES/
+-	cp $(BUILT_BPTJSON_TARGET) $(zip_root)/IMAGES/
++	cp $(BUILT_BPTJSON_TARGET) $(zip_root)/META/
+ 
+ 	# Copy IDtech's images and scripts
+ 	cp $(PRODUCT_OUT)/board_info* $(zip_root)/IMAGES/
+diff --git a/tools/releasetools/add_img_to_target_files.py b/tools/releasetools/add_img_to_target_files.py
+index 8a48df29b..649745d7a 100755
+--- a/tools/releasetools/add_img_to_target_files.py
++++ b/tools/releasetools/add_img_to_target_files.py
+@@ -482,9 +482,9 @@ def AddPartitionTable(output_zip):
+   bpt = OutputFile(
+       output_zip, OPTIONS.input_tmp, "META", "partition-table.bpt")
+ 
+-  if os.path.exists(img.input_name) and os.path.exists(bpt.input_name):
+-   print("partition-table already exists; not rebuilding...")
+-   return img.input_name
++  if os.path.exists(img.name) and os.path.exists(bpt.name):
++   logger.info("partition-table already exists; not rebuilding...")
++   return img.name
+ 
+   # use BPTTOOL from environ, or "bpttool" if empty or not set.
+   bpttool = os.getenv("BPTTOOL") or "bpttool"

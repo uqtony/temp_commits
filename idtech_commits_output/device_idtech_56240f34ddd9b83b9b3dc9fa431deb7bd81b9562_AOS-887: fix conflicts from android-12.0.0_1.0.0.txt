@@ -1,0 +1,780 @@
+56240f34 George.Huang 2022-03-03
+
+AOS-887: fix conflicts from android-12.0.0_1.0.0
+
+Change-Id: I558317bbb5d8d326b8539a63834dc5fd87d5c02e
+
+diff --git a/common/build/build_info.mk b/common/build/build_info.mk
+index 94add0d8..7e58481d 100644
+--- a/common/build/build_info.mk
++++ b/common/build/build_info.mk
+@@ -1,7 +1,3 @@
+ # -------@release build info-------
+ PRODUCT_PROPERTY_OVERRIDES += \
+-<<<<<<< HEAD
+-    ro.vendor.build_id=android-11.0.0_2.2.0-rc2
+-=======
+     ro.vendor.build_id=android-12.0.0_1.0.0-rc2
+->>>>>>> android-12.0.0_1.0.0-er1
+diff --git a/common/build/dtbo.mk b/common/build/dtbo.mk
+index 8ffdf0d1..cb43ad8e 100644
+--- a/common/build/dtbo.mk
++++ b/common/build/dtbo.mk
+@@ -72,11 +72,10 @@ dtboimage: $(BOARD_PREBUILT_DTBOIMAGE)
+ 
+ IMX_INSTALLED_VBMETAIMAGE_TARGET := $(PRODUCT_OUT)/vbmeta-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img
+ $(IMX_INSTALLED_VBMETAIMAGE_TARGET): $(PRODUCT_OUT)/vbmeta.img $(BOARD_PREBUILT_DTBOIMAGE) | $(AVBTOOL)
+-<<<<<<< HEAD
+ 	VBMETA_IMG=`echo $(PRODUCT_OUT)/vbmeta-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img`; \
+ 	DTBO_IMG=`echo $(PRODUCT_OUT)/dtbo-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img`; \
+ 	RECOVERY_IMG=`echo $(PRODUCT_OUT)/recovery-$(BOARD_SOM_TYPE)-$(LOWER_BOARD_TYPE).img`; \
+-	$(if $(filter true, $(BOARD_USES_RECOVERY_AS_BOOT)), \
++	$(if $(strip $(filter true, $(BOARD_USES_RECOVERY_AS_BOOT) $(BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT))), \
+ 		$(AVBTOOL) make_vbmeta_image \
+ 			--algorithm $(BOARD_AVB_ALGORITHM) --key $(BOARD_AVB_KEY_PATH)  \
+ 			$(BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS) \
+@@ -92,28 +91,6 @@ $(IMX_INSTALLED_VBMETAIMAGE_TARGET): $(PRODUCT_OUT)/vbmeta.img $(BOARD_PREBUILT_
+ 			--include_descriptors_from_image $$RECOVERY_IMG \
+ 			--padding_size $(BOARD_VBMETAIMAGE_PARTITION_SIZE) \
+ 			--output $$VBMETA_IMG); \
+-=======
+-	for dtsplat in $(TARGET_BOARD_DTS_CONFIG); do \
+-		DTS_PLATFORM=`echo $$dtsplat | cut -d':' -f1`; \
+-		DTBO_IMG=`echo $(PRODUCT_OUT)/dtbo-$${DTS_PLATFORM}.img`; \
+-		VBMETA_IMG=`echo $(PRODUCT_OUT)/vbmeta-$${DTS_PLATFORM}.img`; \
+-		RECOVERY_IMG=`echo $(PRODUCT_OUT)/recovery-$${DTS_PLATFORM}.img`; \
+-		$(if $(strip $(filter true, $(BOARD_USES_RECOVERY_AS_BOOT) $(BOARD_MOVE_RECOVERY_RESOURCES_TO_VENDOR_BOOT))), \
+-			$(AVBTOOL) make_vbmeta_image \
+-				--algorithm $(BOARD_AVB_ALGORITHM) --key $(BOARD_AVB_KEY_PATH)  \
+-				$(BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS) \
+-				--include_descriptors_from_image $(PRODUCT_OUT)/vbmeta.img \
+-				--include_descriptors_from_image $$DTBO_IMG \
+-				--output $$VBMETA_IMG, \
+-			$(AVBTOOL) make_vbmeta_image \
+-				--algorithm $(BOARD_AVB_ALGORITHM) --key $(BOARD_AVB_KEY_PATH) \
+-				$(BOARD_AVB_MAKE_VBMETA_IMAGE_ARGS) \
+-				--include_descriptors_from_image $(PRODUCT_OUT)/vbmeta.img \
+-				--include_descriptors_from_image $$DTBO_IMG \
+-				--include_descriptors_from_image $$RECOVERY_IMG \
+-				--output $$VBMETA_IMG); \
+-	done
+->>>>>>> android-12.0.0_1.0.0-er1
+ 	cp $(IMX_INSTALLED_VBMETAIMAGE_TARGET) $(PRODUCT_OUT)/vbmeta.img
+ 	mv $(IMX_INSTALLED_VBMETAIMAGE_TARGET) $(IMX_INSTALLED_VBMETAIMAGE_TARGET).bak
+ 	mv $(BOARD_PREBUILT_DTBOIMAGE) $(BOARD_PREBUILT_DTBOIMAGE).bak
+diff --git a/common/tools/fastboot_imx_flashall.bat b/common/tools/fastboot_imx_flashall.bat
+index de1d18c3..476592ab 100755
+--- a/common/tools/fastboot_imx_flashall.bat
++++ b/common/tools/fastboot_imx_flashall.bat
+@@ -92,17 +92,10 @@ set board_type=
+ :: board running different set of images(android and automative for a example), so misuse the features of one set of
+ :: images when flash another set of images can not be detect early with this scenario.
+ set imx8mm_uboot_feature=dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty
+-<<<<<<< HEAD
+ set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed
+ set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed
+ set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed
+-set imx8ulp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock
+-=======
+-set imx8mn_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4
+-set imx8mp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave
+ set imx8ulp_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+-set imx8mq_uboot_feature=dual trusty-dual evk-uuu trusty-secure-unlock trusty
+->>>>>>> android-12.0.0_1.0.0-er1
+ set imx8qxp_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu
+ set imx8qm_uboot_feature=mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen
+ set imx7ulp_uboot_feature=evk-uuu
+@@ -273,18 +266,11 @@ goto :eof
+ ::----------------------------------------------------------------------------------
+ 
+ :help
+-<<<<<<< HEAD
+-echo Version: 1.7
+-echo Last change: generate super.img when flash images with dynamic partition feature
+-echo.
+-echo eg: fastboot_imx_flashall.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+-echo eg: fastboot_imx_flashall.bat -f imx7ulp -D C:\Users\user_01ndroid10vk_7ulp
+-=======
+ echo Version: 1.6
+ echo Last change: update the parameters which can be followed with "-d" option
+ echo.
++echo eg: fastboot_imx_flashall.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+ echo eg: fastboot_imx_flashall.bat -f imx8mm -a -D C:\Users\user_01vk_8mm
+->>>>>>> android-12.0.0_1.0.0-er1
+ echo.
+ echo Usage: %script_name% ^<option^>
+ echo.
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index a39f0055..ea8f220c 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -5,18 +5,11 @@ help() {
+ bn=`basename $0`
+ cat << EOF
+ 
+-<<<<<<< HEAD
+-Version: 1.7
+-Last change: generate super.img when flash images with dynamic partition feature
+-
+-eg: sudo ./fastboot_imx_flashall.sh -f imx8mm -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+-eg: sudo ./fastboot_imx_flashall.sh -f imx7ulp -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+-=======
+ Version: 1.6
+ Last change: update the parameters which can be followed with "-d" option
+ 
++eg: sudo ./fastboot_imx_flashall.sh -f imx8mq -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+ eg: sudo ./fastboot_imx_flashall.sh -f imx8mm -a -D ~/evk_8mm/
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ Usage: $bn <option>
+ 
+@@ -514,17 +507,10 @@ board_type=""
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+ # images when flash another set of images can not be detect early with this scenario.
+ imx8mm_uboot_feature=(dual trusty-dual 4g-evk-uuu 4g ddr4-evk-uuu ddr4 evk-uuu trusty-4g trusty-secure-unlock trusty)
+-<<<<<<< HEAD
+ imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4 signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed)
+ imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed)
+ imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave signed dual-signed prod-dual-signed trusty-dual-signed dp-dual-signed)
+-imx8ulp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock)
+-=======
+-imx8mn_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty ddr4-evk-uuu ddr4)
+-imx8mq_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+-imx8mp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty powersave trusty-powersave)
+ imx8ulp_uboot_feature=(dual trusty-dual evk-uuu trusty-secure-unlock trusty)
+->>>>>>> android-12.0.0_1.0.0-er1
+ imx8qxp_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock c0 trusty-c0 mek-c0-uuu)
+ imx8qm_uboot_feature=(mek-uuu trusty-secure-unlock trusty secure-unlock md hdmi xen)
+ imx7ulp_uboot_feature=(evk-uuu)
+diff --git a/common/tools/imx-make.sh b/common/tools/imx-make.sh
+index 5195e2e5..42aeb890 100755
+--- a/common/tools/imx-make.sh
++++ b/common/tools/imx-make.sh
+@@ -128,13 +128,8 @@ if [ "${build_bootloader}" = "" ] && [ "${build_kernel}" = "" ] && \
+     build_whole_android_flag=1
+ fi
+ 
+-<<<<<<< HEAD
+-# vvcam.ko need build with kernel each time to make sure "insmod vvcam.ko" works
+-if [ -n "${build_kernel}" ] && [ ${TARGET_PRODUCT##*_} = "8mp" ]; then
+-=======
+ # vvcam.ko need build with in-tree modules each time to make sure "insmod vvcam.ko" works
+ if [ -n "${build_kernel_modules}" ] && [ ${TARGET_PRODUCT} = "evk_8mp" ]; then
+->>>>>>> android-12.0.0_1.0.0-er1
+     build_vvcam="vvcam";
+     build_kernel_oot_module_flag=1;
+ fi
+diff --git a/common/tools/uuu_imx_android_flash.bat b/common/tools/uuu_imx_android_flash.bat
+index 0b54cbc1..2afa6b8d 100755
+--- a/common/tools/uuu_imx_android_flash.bat
++++ b/common/tools/uuu_imx_android_flash.bat
+@@ -1,12 +1,8 @@
+ :: Do not output the command
+ @echo off
+ 
+-<<<<<<< HEAD
+ set uuu_version=1.4.139
+ echo This script is validated with uuu %uuu_version% version, it is recommended to align with this version.
+-=======
+-echo This script is validated with uuu 1.4.139 version, it is recommended to align with this version.
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ ::---------------------------------------------------------------------------------
+ ::Variables
+@@ -113,10 +109,7 @@ if not [%tmp_dir%] == [] (
+     set tmp_dir=%tmp_dir%\
+ )
+ set /A shared_uuu_uboot=0
+-<<<<<<< HEAD
+-=======
+ set usb_paths=
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ 
+ :: We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+@@ -169,14 +162,11 @@ if %1 == -y set yocto_image=%2&shift &shift & goto :parse_loop
+ if %1 == -i set /A intervene=1 & shift & goto :parse_loop
+ if %1 == -daemon set /A daemon_mode=1 & shift & goto :parse_loop
+ if %1 == -dryrun set /A dryrun=1 & shift & goto :parse_loop
+-<<<<<<< HEAD
++if %1 == -usb set usb_paths=%usb_paths% -m %2&shift &shift & goto :parse_loop
+ if %1 == -bdinfo set board_info_file=%2& shift & shift & goto :parse_loop
+ if %1 == -serial set serialno_str=%2& set /A write_bdinfo_serial=1& shift & shift & goto :parse_loop
+ if %1 == -macaddr set macaddr_str=%2& set /A write_bdinfo_macaddr=1& shift & shift & goto :parse_loop
+ if %1 == -displayid set display_id_str=%2& set /A write_bdinfo_display_id=1& shift & shift & goto :parse_loop
+-=======
+-if %1 == -usb set usb_paths=%usb_paths% -m %2&shift &shift & goto :parse_loop
+->>>>>>> android-12.0.0_1.0.0-er1
+ echo unknown option "%1", please check it.
+ call :help & set /A error_level=1 && goto :exit
+ :parse_end
+@@ -599,15 +589,9 @@ IF EXIST %image_directory%%uuu_tool% (
+     set uuu_tool=%image_directory%%uuu_tool%
+ )
+ if %daemon_mode% equ 1 (
+-<<<<<<< HEAD
+-    %uuu_tool% -d %tmp_dir%uuu.lst
+-) else (
+-    %uuu_tool% %tmp_dir%uuu.lst
+-=======
+-    uuu %usb_paths% -d %tmp_dir%uuu.lst
++    %uuu_tool% %usb_paths% -d %tmp_dir%uuu.lst
+ ) else (
+-    uuu %usb_paths% %tmp_dir%uuu.lst
+->>>>>>> android-12.0.0_1.0.0-er1
++    %uuu_tool% %usb_paths% %tmp_dir%uuu.lst
+     del %tmp_dir%*.link
+     del %tmp_dir%uuu.lst
+ )
+@@ -629,10 +613,7 @@ echo Version: 1.8
+ echo Last change: support -usb option to specify the usb path to monitor
+ echo currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+ echo.
+-<<<<<<< HEAD
+-echo eg: uuu_imx_android_flash.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_evk_idtechspi-0.img
+-=======
+->>>>>>> android-12.0.0_1.0.0-er1
++echo eg: uuu_imx_android_flash.bat -f imx8mq -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+ echo eg: uuu_imx_android_flash.bat -f imx8mm -a -e -D C:\Users\user_01\imagesvk_8mm\ -t emmc -u trusty -d mipi-panel
+ echo.
+ echo Usage: %script_name% ^<option^>
+@@ -715,14 +696,11 @@ echo  -i                with this option used, after uboot for uuu loaded and ex
+ echo                        This option is for users to manually flash the images to partitions they want to
+ echo  -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+ echo  -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-<<<<<<< HEAD
++echo  -usb usb_path     specify a usb path like 1:1 to monitor. It can be used multiple times to specify more than one path
+ echo  -bdinfo board_info_file  flash board_info with this board_info_file image
+ echo  -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+ echo  -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once
+ echo  -displayid display_id_str  write display id into device emmc.
+-=======
+-echo  -usb usb_path     specify a usb path like 1:1 to monitor. It can be used multiple times to specify more than one path
+->>>>>>> android-12.0.0_1.0.0-er1
+ goto :eof
+ 
+ 
+@@ -768,11 +746,7 @@ if [%board%] == [] (
+ goto :eof
+ 
+ :uuu_load_uboot
+-<<<<<<< HEAD
+ echo uuu_version %uuu_version% > %tmp_dir%uuu.lst
+-=======
+-echo uuu_version 1.4.139 > %tmp_dir%uuu.lst
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ if exist %tmp_dir%%bootloader_used_by_uuu%.link (
+     del %tmp_dir%%bootloader_used_by_uuu%.link
+@@ -812,11 +786,7 @@ if %intervene% == 1 (
+         set uuu_tool=%image_directory%%uuu_tool%
+     )
+     echo FB: done >> %tmp_dir%uuu.lst
+-<<<<<<< HEAD
+-    %uuu_tool% %tmp_dir%uuu.lst
+-=======
+-    uuu %usb_paths% %tmp_dir%uuu.lst
+->>>>>>> android-12.0.0_1.0.0-er1
++    %uuu_tool% %usb_paths% %tmp_dir%uuu.lst
+     set /A error_level=1 && goto :exit
+ )
+ 
+diff --git a/common/tools/uuu_imx_android_flash.sh b/common/tools/uuu_imx_android_flash.sh
+index 283046da..74b27ad1 100755
+--- a/common/tools/uuu_imx_android_flash.sh
++++ b/common/tools/uuu_imx_android_flash.sh
+@@ -9,12 +9,8 @@ Version: 1.8
+ Last change: support -usb option to specify the usb path to monitor
+ currently suported platforms: evk_7ulp, evk_8mm, evk_8mq, evk_8mn, evk_8mp, mek_8q, mek_8q_car
+ 
+-<<<<<<< HEAD
+-eg: ./uuu_imx_android_flash.sh -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_evk_evk-0.img
+-eg: ./uuu_imx_android_flash.sh -f imx8qm -a -e -D ~/android10/mek_8q/ -t emmc -u trusty -d mipi-panel
+-=======
++eg: ./uuu_imx_android_flash.sh -f imx8mq -e -a -bdinfo board_info-imx8mq_evt-0_redwood_evt-1_ktc4g.img
+ eg: ./uuu_imx_android_flash.sh -f imx8mm -a -e -D ~/evk_8mm/ -t emmc -u trusty -d mipi-panel
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ Usage: $bn <option>
+ 
+@@ -96,15 +92,12 @@ options:
+                         This option is for users to manually flash the images to partitions they want to
+   -daemon           after uuu script generated, uuu will be invoked with daemon mode. It is used for flash multi boards
+   -dryrun           only generate the uuu script under /tmp direcbory but not flash images
+-<<<<<<< HEAD
++  -usb usb_path     specify a usb path like 1:1 to monitor. It can be used multiple times to specify more than one path
+   -bdinfo board_info_file  flash board_info with this board_info_file image
+                                If not set, use naming from current board_info partition
+   -serial serialno_str  write serial number into device emmc, this could be program once in secure-user build
+   -macaddr macaddr_str  write mac address of built-in ethernet into device emmc, this could be program once
+   -displayid display_id_str write display id into device emmc.
+-=======
+-  -usb usb_path     specify a usb path like 1:1 to monitor. It can be used multiple times to specify more than one path
+->>>>>>> android-12.0.0_1.0.0-er1
+ EOF
+ 
+ }
+@@ -134,11 +127,7 @@ function whether_in_array
+ 
+ function uuu_load_uboot
+ {
+-<<<<<<< HEAD
+     echo uuu_version ${uuu_version} > /tmp/uuu.lst
+-=======
+-    echo uuu_version 1.4.139 > /tmp/uuu.lst
+->>>>>>> android-12.0.0_1.0.0-er1
+     rm -f /tmp/${bootloader_used_by_uuu}
+     ln -s ${sym_link_directory}${bootloader_used_by_uuu} /tmp/${bootloader_used_by_uuu}
+     echo ${sdp}: boot -f ${bootloader_used_by_uuu} >> /tmp/uuu.lst
+@@ -536,12 +525,9 @@ yocto_image_sym_link=""
+ daemon_mode=0
+ dryrun=0
+ result_value=0
+-<<<<<<< HEAD
++usb_paths=""
+ board_type=""
+ max_download_size=0x19000000
+-=======
+-usb_paths=""
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -565,12 +551,8 @@ imx8ulp_dtb_feature=(hdmi epdc)
+ imx7ulp_dtb_feature=(evk-mipi evk mipi)
+ 
+ 
+-<<<<<<< HEAD
+ uuu_version="1.4.139"
+ echo -e This script is validated with ${RED}uuu ${uuu_version}${STD} version, it is recommended to align with this version.
+-=======
+-echo -e This script is validated with ${RED}uuu 1.4.139${STD} version, it is recommended to align with this version.
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ if [ $# -eq 0 ]; then
+     echo -e >&2 ${RED}please provide more information with command script options${STD}
+@@ -596,14 +578,11 @@ while [ $# -gt 0 ]; do
+         -i) intervene=1 ;;
+         -daemon) daemon_mode=1 ;;
+         -dryrun) dryrun=1 ;;
+-<<<<<<< HEAD
++        -usb) usb_paths="${usb_paths} -m $2"; shift;;
+         -bdinfo) board_info_file=$2; shift;;
+         -serial) serialno_str=$2; write_bdinfo_serial=1; shift;;
+         -macaddr) macaddr_str=$2; write_bdinfo_macaddr=1; shift;;
+         -displayid) display_id_str=$2; write_bdinfo_display_id=1; shift;;
+-=======
+-        -usb) usb_paths="${usb_paths} -m $2"; shift;;
+->>>>>>> android-12.0.0_1.0.0-er1
+         *)  echo -e >&2 ${RED}the option \"${1}\"  you specified is not supported, please check it${STD}
+             help; exit;;
+     esac
+@@ -980,15 +959,9 @@ if [ -f "${image_directory}${uuu_tool}$(echo _$(uname -m) |grep aarch64 || true)
+     uuu_tool="${image_directory}${uuu_tool}$(echo _$(uname -m) |grep aarch64 || true)"
+ fi
+ if [ ${daemon_mode} -eq 1 ]; then
+-<<<<<<< HEAD
+-    $uuu_tool -d /tmp/uuu.lst
+-else
+-    $uuu_tool /tmp/uuu.lst
+-=======
+-    uuu ${usb_paths} -d /tmp/uuu.lst
++    $uuu_tool ${usb_paths} -d /tmp/uuu.lst
+ else
+-    uuu ${usb_paths} /tmp/uuu.lst
+->>>>>>> android-12.0.0_1.0.0-er1
++    $uuu_tool ${usb_paths} /tmp/uuu.lst
+ fi
+ 
+ exit 0
+diff --git a/imx8m/BoardConfigCommon.mk b/imx8m/BoardConfigCommon.mk
+index 49b4448c..57ec041b 100644
+--- a/imx8m/BoardConfigCommon.mk
++++ b/imx8m/BoardConfigCommon.mk
+@@ -223,14 +223,6 @@ BOARD_VNDK_VERSION := current
+ -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_ms_codec/BoardConfig.mk
+ -include $(FSL_RESTRICTED_CODEC_PATH)/fsl-restricted-codec/fsl_real_dec/BoardConfig.mk
+ 
+-<<<<<<< HEAD
+-SOONG_CONFIG_NAMESPACES += IDT
+-SOONG_CONFIG_IDT += PCI_RM_ADBD
+-SOONG_CONFIG_IDT_PCI_RM_ADBD ?= false
+-
+-# add symbolic link for idtechdata
+-BOARD_ROOT_EXTRA_SYMLINKS := /mnt/vendor/idtechdata:/idtechdata
+-=======
+ BOARD_MOVE_GSI_AVB_KEYS_TO_VENDOR_BOOT := true
+ 
+ # Set Vendor SPL to match platform
+@@ -238,4 +230,10 @@ VENDOR_SECURITY_PATCH = $(PLATFORM_SECURITY_PATCH)
+ 
+ # Set boot SPL
+ BOOT_SECURITY_PATCH = $(PLATFORM_SECURITY_PATCH)
+->>>>>>> android-12.0.0_1.0.0-er1
++
++SOONG_CONFIG_NAMESPACES += IDT
++SOONG_CONFIG_IDT += PCI_RM_ADBD
++SOONG_CONFIG_IDT_PCI_RM_ADBD ?= false
++
++# add symbolic link for idtechdata
++BOARD_ROOT_EXTRA_SYMLINKS := /mnt/vendor/idtechdata:/idtechdata
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index 96da2e65..883b8da8 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -36,16 +36,14 @@ PRODUCT_PROPERTY_OVERRIDES += \
+ PRODUCT_PROPERTY_OVERRIDES += \
+     ro.control_privapp_permissions=enforce
+ 
+-<<<<<<< HEAD
++# add dmabufheap debug info
++PRODUCT_PROPERTY_OVERRIDES += \
++    debug.c2.use_dmabufheaps=1
++
+ # set ENABLE_TASKBAR := false to disable
+ ifneq ($(ENABLE_TASKBAR),false)
+ PRODUCT_PACKAGE_OVERLAYS += \
+     $(CONFIG_REPO_PATH)/common/apps/taskbar/overlays
+-=======
+-# add dmabufheap debug info
+-PRODUCT_PROPERTY_OVERRIDES += \
+-    debug.c2.use_dmabufheaps=1
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ PRODUCT_PACKAGES += \
+     Taskbar
+@@ -349,14 +347,6 @@ PRODUCT_PACKAGES += \
+ 
+ PRODUCT_PACKAGES += \
+     mlanutl
+-<<<<<<< HEAD
+-=======
+-
+-# wifionly device
+-PRODUCT_PROPERTY_OVERRIDES += \
+-    ro.radio.noril=yes
+-
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ # -------@block_bluetooth-------
+ 
+diff --git a/imx8m/sepolicy/audioserver.te b/imx8m/sepolicy/audioserver.te
+index 69c45259..83a43120 100644
+--- a/imx8m/sepolicy/audioserver.te
++++ b/imx8m/sepolicy/audioserver.te
+@@ -1,8 +1,4 @@
+-<<<<<<< HEAD
+-get_prop(audioserver, vendor_default_prop)
+-get_prop(audioserver, vendor_idtech_prop)
+-=======
+ get_prop(audioserver, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
++get_prop(audioserver, vendor_idtech_prop)
+ 
+ allow audioserver rootfs:lnk_file { getattr };
+diff --git a/imx8m/sepolicy/bootanim.te b/imx8m/sepolicy/bootanim.te
+index 25058c92..02d6c260 100644
+--- a/imx8m/sepolicy/bootanim.te
++++ b/imx8m/sepolicy/bootanim.te
+@@ -1,10 +1,6 @@
+-<<<<<<< HEAD
+ typeattribute bootanim mlstrustedsubject;
+ 
+-get_prop(bootanim, vendor_default_prop)
+-=======
+ get_prop(bootanim, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ allow bootanim ashmem_device:chr_file {execute};
+ allow bootanim self:process execmem;
+diff --git a/imx8m/sepolicy/device.te b/imx8m/sepolicy/device.te
+index 9042d545..d290c763 100644
+--- a/imx8m/sepolicy/device.te
++++ b/imx8m/sepolicy/device.te
+@@ -12,11 +12,8 @@ type emmc_boot0, dev_type;
+ type sdcard, dev_type;
+ type vsi_daemon_ctrl_device, dev_type;
+ type bootloader_block_device, dev_type;
+-<<<<<<< HEAD
+ type spl_block_device, dev_type;
+ type rild_device, dev_type;
+ type ptr_device, dev_type;
+ type idtechdata_block_device, dev_type;
+ type idg_device, dev_type;
+-=======
+->>>>>>> android-12.0.0_1.0.0-er1
+diff --git a/imx8m/sepolicy/file_contexts b/imx8m/sepolicy/file_contexts
+index a2986ee6..5ef87f7b 100644
+--- a/imx8m/sepolicy/file_contexts
++++ b/imx8m/sepolicy/file_contexts
+@@ -119,15 +119,12 @@
+ /dev/block/by-name/vbmeta_[ab]               u:object_r:vbmeta_block_device:s0
+ /dev/block/by-name/super                     u:object_r:super_block_device:s0
+ /dev/block/by-name/bootloader_[ab]           u:object_r:bootloader_block_device:s0
+-<<<<<<< HEAD
+ /dev/block/by-name/mem_info_[ab]             u:object_r:bootloader_block_device:s0
+ /dev/block/by-name/idtechdata                u:object_r:idtechdata_block_device:s0
+ 
+ # spl
+ /dev/block/mmcblk[02]boot[01]                u:object_r:spl_block_device:s0
+ /dev/block/mmcblk[02]boot[01]p[1-9]          u:object_r:spl_block_device:s0
+-=======
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ /vendor/bin/hw/android\.hardware\.camera\.provider@2\.7-service-google       u:object_r:hal_camera_default_exec:s0
+ 
+@@ -139,7 +136,9 @@
+ /dev/vsi_daemon_ctrl                          u:object_r:vsi_daemon_ctrl_device:s0
+ /data/vendor/vsi(/.*)?                        u:object_r:vsi_data_file:s0
+ 
+-<<<<<<< HEAD
++/dev/dmabuf_imx                               u:object_r:ion_device:s0
++/dev/dma_heap/secure                          u:object_r:dmabuf_system_secure_heap_device:s0
++
+ # lsusb command
+ /sys/devices/platform/dummy_hcd\.[0-1]/usb[0-9]/uevent                                   u:object_r:sysfs_usb_uevent:s0
+ /sys/devices/platform/dummy_hcd\.[0-1]/usb[0-9]/.*/uevent                                u:object_r:sysfs_usb_uevent:s0
+@@ -167,7 +166,3 @@
+ /dev/mhi_QMI0                    u:object_r:radio_device:s0
+ 
+ /dev/usb/lp0                     u:object_r:ptr_device:s0
+-=======
+-/dev/dmabuf_imx                               u:object_r:ion_device:s0
+-/dev/dma_heap/secure                          u:object_r:dmabuf_system_secure_heap_device:s0
+->>>>>>> android-12.0.0_1.0.0-er1
+diff --git a/imx8m/sepolicy/hal_camera_default.te b/imx8m/sepolicy/hal_camera_default.te
+index 382a7675..2a406c65 100644
+--- a/imx8m/sepolicy/hal_camera_default.te
++++ b/imx8m/sepolicy/hal_camera_default.te
+@@ -7,8 +7,5 @@ allow hal_camera_default sysfs:file { open read getattr };
+ allow hal_camera_default hal_graphics_mapper_hwservice:hwservice_manager find;
+ allow hal_camera_default opencl_cache_file:dir create_dir_perms;
+ allow hal_camera_default opencl_cache_file:file create_file_perms;
+-<<<<<<< HEAD
+-get_prop(hal_camera_default, vendor_idtech_prop)
+-=======
+ allow hal_camera_default dmabuf_heap_device:chr_file {ioctl read open };
+->>>>>>> android-12.0.0_1.0.0-er1
++get_prop(hal_camera_default, vendor_idtech_prop)
+diff --git a/imx8m/sepolicy/mdnsd.te b/imx8m/sepolicy/mdnsd.te
+index 8f91cdd2..55ec183f 100644
+--- a/imx8m/sepolicy/mdnsd.te
++++ b/imx8m/sepolicy/mdnsd.te
+@@ -1 +1 @@
+-allow mdnsd vendor_default_prop:file { read getattr map open };
++allow mdnsd vendor_public_default_prop:file { read getattr map open };
+diff --git a/imx8m/sepolicy/platform_app.te b/imx8m/sepolicy/platform_app.te
+index 9abdb0ff..3d8aa943 100644
+--- a/imx8m/sepolicy/platform_app.te
++++ b/imx8m/sepolicy/platform_app.te
+@@ -14,9 +14,5 @@ allow platform_app idtech_bootmedia_data_file:dir { add_name write };
+ allow platform_app mnt_vendor_file:dir { search };
+ allow platform_app hal_graphics_allocator_default_tmpfs:file { read write };
+ 
+-<<<<<<< HEAD
+ get_prop(platform_app, vendor_idtech_prop)
+-get_prop(platform_app, vendor_default_prop)
+-=======
+ get_prop(platform_app, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
+diff --git a/imx8m/sepolicy/priv_app.te b/imx8m/sepolicy/priv_app.te
+index 585c8916..9d0af803 100644
+--- a/imx8m/sepolicy/priv_app.te
++++ b/imx8m/sepolicy/priv_app.te
+@@ -4,9 +4,5 @@ allow priv_app ota_package_file:dir rw_dir_perms;
+ allow priv_app ota_package_file:file create_file_perms;
+ allow priv_app hal_graphics_allocator_default_tmpfs:file { read write };
+ 
+-<<<<<<< HEAD
+-get_prop(priv_app, vendor_default_prop)
+-allow priv_app vendor_idtech_prop:file { open read getattr map };
+-=======
+ get_prop(priv_app, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
++allow priv_app vendor_idtech_prop:file { open read getattr map };
+diff --git a/imx8m/sepolicy/property.te b/imx8m/sepolicy/property.te
+index cdae60ee..55e1bce7 100644
+--- a/imx8m/sepolicy/property.te
++++ b/imx8m/sepolicy/property.te
+@@ -1,13 +1,3 @@
+-<<<<<<< HEAD
+-type vendor_wc_prop, property_type;
+-type vendor_usb_config_prop, property_type;
+-type vendor_power_hal_prop, property_type;
+-type vendor_bluetooth_prop, property_type;
+-type vendor_idtech_prop, property_type;
+-type vendor_public_default_prop, property_type;
+-type vendor_wifi_version, property_type;
+-type vendor_logging_prop, property_type;
+-=======
+ vendor_internal_prop(vendor_wc_prop)
+ vendor_restricted_prop(vendor_usb_config_prop)
+ vendor_internal_prop(vendor_power_hal_prop)
+@@ -15,4 +5,4 @@ vendor_internal_prop(vendor_bluetooth_prop)
+ vendor_restricted_prop(vendor_public_default_prop)
+ vendor_internal_prop(vendor_wifi_version)
+ vendor_internal_prop(vendor_logging_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
++vendor_internal_prop(vendor_idtech_prop)
+diff --git a/imx8m/sepolicy/property_contexts b/imx8m/sepolicy/property_contexts
+index 70d145b0..eb8c436d 100644
+--- a/imx8m/sepolicy/property_contexts
++++ b/imx8m/sepolicy/property_contexts
+@@ -182,36 +182,36 @@ vendor.hwc.drm.fbTileSupport        u:object_r:vendor_public_default_prop:s0
+ media.log.level                     u:object_r:vendor_public_default_prop:s0
+ vendor.display.state                u:object_r:vendor_public_default_prop:s0
+ 
+-<<<<<<< HEAD
+-ro.boot.gui_resolution              u:object_r:vendor_default_prop:s0
+-ro.boot.primary_display             u:object_r:vendor_default_prop:s0
+-vendor.hwc.drm.device               u:object_r:vendor_default_prop:s0
+-vendor.hwc.enable.overlay           u:object_r:vendor_default_prop:s0
+-ro.boot.displaymode                 u:object_r:vendor_default_prop:s0
+-ro.hardware.lightsensor             u:object_r:vendor_default_prop:s0
+-vendor.ro.lightsensor.threshold     u:object_r:vendor_default_prop:s0
+-vendor.rw.camera.test               u:object_r:vendor_default_prop:s0
+-vendor.audio.lpa.hold_second        u:object_r:vendor_default_prop:s0
+-vendor.audio.lpa.period_ms          u:object_r:vendor_default_prop:s0
+-vendor.qcom.bluetooth.soc           u:object_r:vendor_default_prop:s0
+-vendor.hwc.debug.dump_compose       u:object_r:vendor_default_prop:s0
+-vendor.hwc.debug.dump_bitmap        u:object_r:vendor_default_prop:s0
+-vendor.hwc.debug.dump_split_area    u:object_r:vendor_default_prop:s0
+-vendor.hwc.stretch.filter           u:object_r:vendor_default_prop:s0
+-vendor.hwc.debug.disable_compression       u:object_r:vendor_default_prop:s0
+-vendor.persist.audio.pass.through   u:object_r:vendor_default_prop:s0
+-vendor.rw.VIDEO_RENDER_NAME         u:object_r:vendor_default_prop:s0
+-vendor.sys.SECOND_DISPLAY_ENABLED   u:object_r:vendor_default_prop:s0
+-vendor.AQROOT                       u:object_r:vendor_default_prop:s0
+-vendor.CL_NOPREPROCESS              u:object_r:vendor_default_prop:s0
+-back_camera_name                    u:object_r:vendor_default_prop:s0
+-back_camera_orient                  u:object_r:vendor_default_prop:s0
+-front_camera_name                   u:object_r:vendor_default_prop:s0
+-front_camera_orient                 u:object_r:vendor_default_prop:s0
+-ro.rfkilldisabled                   u:object_r:vendor_default_prop:s0
++ro.boot.gui_resolution              u:object_r:vendor_public_default_prop:s0
++ro.boot.primary_display             u:object_r:vendor_public_default_prop:s0
++vendor.hwc.drm.device               u:object_r:vendor_public_default_prop:s0
++vendor.hwc.enable.overlay           u:object_r:vendor_public_default_prop:s0
++ro.boot.displaymode                 u:object_r:vendor_public_default_prop:s0
++ro.hardware.lightsensor             u:object_r:vendor_public_default_prop:s0
++vendor.ro.lightsensor.threshold     u:object_r:vendor_public_default_prop:s0
++vendor.rw.camera.test               u:object_r:vendor_public_default_prop:s0
++vendor.audio.lpa.hold_second        u:object_r:vendor_public_default_prop:s0
++vendor.audio.lpa.period_ms          u:object_r:vendor_public_default_prop:s0
++vendor.audio.dump                   u:object_r:vendor_public_default_prop:s0
++vendor.qcom.bluetooth.soc           u:object_r:vendor_public_default_prop:s0
++vendor.hwc.debug.dump_compose       u:object_r:vendor_public_default_prop:s0
++vendor.hwc.debug.dump_bitmap        u:object_r:vendor_public_default_prop:s0
++vendor.hwc.debug.dump_split_area    u:object_r:vendor_public_default_prop:s0
++vendor.hwc.stretch.filter           u:object_r:vendor_public_default_prop:s0
++vendor.hwc.debug.disable_compression       u:object_r:vendor_public_default_prop:s0
++vendor.persist.audio.pass.through   u:object_r:vendor_public_default_prop:s0
++vendor.rw.VIDEO_RENDER_NAME         u:object_r:vendor_public_default_prop:s0
++vendor.sys.SECOND_DISPLAY_ENABLED   u:object_r:vendor_public_default_prop:s0
++vendor.AQROOT                       u:object_r:vendor_public_default_prop:s0
++vendor.CL_NOPREPROCESS              u:object_r:vendor_public_default_prop:s0
++back_camera_name                    u:object_r:vendor_public_default_prop:s0
++back_camera_orient                  u:object_r:vendor_public_default_prop:s0
++front_camera_name                   u:object_r:vendor_public_default_prop:s0
++front_camera_orient                 u:object_r:vendor_public_default_prop:s0
++ro.rfkilldisabled                   u:object_r:vendor_public_default_prop:s0
+ 
+ # serial number for mdnsd broadcast
+-ro.idt.serialno                     u:object_r:vendor_default_prop:s0
++ro.idt.serialno                     u:object_r:vendor_public_default_prop:s0
+ 
+ ro.radio.noril                      u:object_r:exported_radio_prop:s0 exact string
+ vendor.rild.                        u:object_r:radio_prop:s0
+@@ -225,30 +225,6 @@ net.ppp0.gw                         u:object_r:radio_prop:s0
+ 
+ # create new property header for IDTECH products
+ persist.idt.                        u:object_r:vendor_idtech_prop:s0
+-=======
+-ro.boot.gui_resolution              u:object_r:vendor_public_default_prop:s0
+-ro.boot.primary_display             u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.drm.device               u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.enable.overlay           u:object_r:vendor_public_default_prop:s0
+-ro.boot.displaymode                 u:object_r:vendor_public_default_prop:s0
+-ro.hardware.lightsensor             u:object_r:vendor_public_default_prop:s0
+-vendor.ro.lightsensor.threshold     u:object_r:vendor_public_default_prop:s0
+-vendor.rw.camera.test               u:object_r:vendor_public_default_prop:s0
+-vendor.audio.lpa.hold_second        u:object_r:vendor_public_default_prop:s0
+-vendor.audio.lpa.period_ms          u:object_r:vendor_public_default_prop:s0
+-vendor.audio.dump                   u:object_r:vendor_public_default_prop:s0
+-vendor.qcom.bluetooth.soc           u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.debug.dump_compose              u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.debug.dump_bitmap               u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.debug.dump_split_area           u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.stretch.filter                  u:object_r:vendor_public_default_prop:s0
+-vendor.hwc.debug.disable_compression       u:object_r:vendor_public_default_prop:s0
+-vendor.persist.audio.pass.through          u:object_r:vendor_public_default_prop:s0
+-vendor.rw.VIDEO_RENDER_NAME                u:object_r:vendor_public_default_prop:s0
+-vendor.sys.SECOND_DISPLAY_ENABLED          u:object_r:vendor_public_default_prop:s0
+-vendor.AQROOT                              u:object_r:vendor_public_default_prop:s0
+-vendor.CL_NOPREPROCESS                     u:object_r:vendor_public_default_prop:s0
+->>>>>>> android-12.0.0_1.0.0-er1
+ 
+ # vendor_wifi_version
+ vendor.wlan.driver.version    u:object_r:vendor_wifi_version:s0
+diff --git a/imx8m/sepolicy/system_app.te b/imx8m/sepolicy/system_app.te
+index ce3a1ea8..f7740b2a 100644
+--- a/imx8m/sepolicy/system_app.te
++++ b/imx8m/sepolicy/system_app.te
+@@ -20,9 +20,5 @@ allow system_app idtech_orientation_data_file:file { create_file_perms rw_file_p
+ allow system_app apk_data_file:dir { write };
+ allow system_app idg_device:chr_file { open getattr read write };
+ 
+-<<<<<<< HEAD
+-get_prop(system_app, vendor_default_prop)
+-set_prop(system_app, vendor_idtech_prop)
+-=======
+ get_prop(system_app, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
++set_prop(system_app, vendor_idtech_prop)
+diff --git a/imx8m/sepolicy/system_server.te b/imx8m/sepolicy/system_server.te
+index b17a09ff..374755e3 100644
+--- a/imx8m/sepolicy/system_server.te
++++ b/imx8m/sepolicy/system_server.te
+@@ -1,9 +1,5 @@
+-<<<<<<< HEAD
+-get_prop(system_server, vendor_default_prop)
+-get_prop(system_server, vendor_idtech_prop)
+-=======
+ get_prop(system_server, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
++get_prop(system_server, vendor_idtech_prop)
+ 
+ allow system_server unlabeled:dir {relabelfrom rw_dir_perms};
+ allow system_server unlabeled:sock_file {link unlink rw_file_perms};
+diff --git a/imx8m/sepolicy/update_engine.te b/imx8m/sepolicy/update_engine.te
+index c2740080..1a0054a5 100644
+--- a/imx8m/sepolicy/update_engine.te
++++ b/imx8m/sepolicy/update_engine.te
+@@ -9,9 +9,6 @@ allow update_engine sdcardfs:file { read open getattr };
+ allow update_engine media_rw_data_file:file { read open getattr };
+ allow update_engine loop_device:blk_file { open write };
+ allow update_engine bootloader_block_device:blk_file { open read write ioctl getattr };
+-<<<<<<< HEAD
+ allow update_engine vfat:file { getattr open read };
+ allow update_engine fuse:file { getattr open read };
+ allow update_engine fuse:dir search;
+-=======
+->>>>>>> android-12.0.0_1.0.0-er1
+diff --git a/imx8m/sepolicy/vendor_init.te b/imx8m/sepolicy/vendor_init.te
+index fe0d2247..4f6d7e91 100644
+--- a/imx8m/sepolicy/vendor_init.te
++++ b/imx8m/sepolicy/vendor_init.te
+@@ -11,12 +11,7 @@ set_prop(vendor_init, vendor_usb_config_prop)
+ set_prop(vendor_init, vendor_power_hal_prop)
+ set_prop(vendor_init, vendor_bluetooth_prop)
+ set_prop(vendor_init, vendor_public_default_prop)
+-<<<<<<< HEAD
+-set_prop(vendor_init, vendor_default_prop)
+-get_prop(vendor_init, default_prop)
+-set_prop(vendor_init, vendor_idtech_prop)
+-=======
+ set_prop(vendor_init, vendor_public_default_prop)
+->>>>>>> android-12.0.0_1.0.0-er1
+ set_prop(vendor_init, system_prop)
+ set_prop(vendor_init, vendor_logging_prop)
++set_prop(vendor_init, vendor_idtech_prop)

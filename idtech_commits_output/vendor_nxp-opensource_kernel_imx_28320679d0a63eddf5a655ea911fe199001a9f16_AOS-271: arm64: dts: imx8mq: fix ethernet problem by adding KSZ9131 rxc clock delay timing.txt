@@ -1,0 +1,98 @@
+28320679d0a6 George.Huang 2020-08-25
+
+AOS-271: arm64: dts: imx8mq: fix ethernet problem by adding KSZ9131 rxc clock delay timing
+
+Symptom:
+  Ethernet RX packet error number is high
+  ping www.google.com will have packet loss
+  browsing web is unstable
+
+Root cause:
+  clock delay timing is not met to entire RGMII system timings
+  (PHY on-chip, PCB trace delay, MAC on-chip)
+
+Solution:
+  define a proper rxc timing delay rxc-skew-psec
+
+Test step:
+  adb root &&
+  adb push ~/Downloads/iperf /data/local/tmp/iperf &&
+  adb shell chmod +x /data/local/tmp/iperf &&
+  adb shell ifconfig eth0 &&
+  adb shell ping -c 30 www.google.com &&
+  adb shell ifconfig eth0 &&
+  adb shell /data/local/tmp/iperf -c 192.168.1.103 -w 100M -t 120 -i 20 &&
+  adb shell ifconfig eth0
+
+  scrcpy & (search youtube and play videos)
+  adb shell ifconfig eth0
+
+Test results:
+  Range of the value -700 to 2400, default value 0.
+  For A300 evt0 devboard: rxc-skew-psec = <500~1200> is acceptable
+  For A300 evt1 devboard: rxc-skew-psec = <900~1200> is acceptable
+   800: RX packets:640258 errors:275 dropped:0 overruns:0 frame:275
+   900: RX packets:682669 errors:6 dropped:0 overruns:0 frame:6
+  1000: RX packets:681475 errors:0 dropped:0 overruns:0 frame:0
+  1100: RX packets:684229 errors:2 dropped:0 overruns:0 frame:2
+  1200: RX packets:684797 errors:3 dropped:0 overruns:0 frame:3
+  1300: RX packets:670655 errors:53 dropped:0 overruns:0 frame:53
+  1500: RX packets:656196 errors:266 dropped:0 overruns:0 frame:266
+
+Reference1:
+- http://ww1.microchip.com/downloads/en/DeviceDoc/00002841B.pdf
+  4.9.3.2 RGMII Pad Skew Registers
+  It is common to implement RGMII PHY-to-MAC designs that either PHY, MAC,
+  or both PHY and MAC are not fully RGMII v2.0 compliant with on-chip clock
+  delay. These combinations of mixed RGMII v1.3/v2.0 designs and plus sometimes
+  non-matching RGMII PCB trace routings require a review of the entire RGMII
+  system timings (PHY on-chip, PCB trace delay, MAC on-chip) to compute the
+  aggregate clock delay and determine if the clock delay timing is met.
+  If timing adjustment is needed, pad skew registers are available for all
+  RGMII pins (clocks, control signals, and data bits) to provide programming
+  options to adjust or correct the timing relationship for each RGMII pin.
+  Because RGMII is a source-synchronous bus interface, the timing relationship
+  needs to be maintained only within the RGMII pin’s respective timing group.
+
+Reference2:
+- Documentation/devicetree/bindings/net/micrel-ksz90x1.txt
+  All skew control options are specified in picoseconds. The increment
+  step is 100ps. Unlike KSZ9031, the values represent picoseccond delays.
+  A negative value can be assigned as rxc-skew-psec = <(-100)>;.
+  Optional properties:
+
+    Range of the value -700 to 2400, default value 0:
+      - rxc-skew-psec : Skew control of RX clock pad
+      - txc-skew-psec : Skew control of TX clock pad
+
+    Range of the value -700 to 800, default value 0:
+      - rxdv-skew-psec : Skew control of RX CTL pad
+      - txen-skew-psec : Skew control of TX CTL pad
+      - rxd0-skew-psec : Skew control of RX data 0 pad
+      - rxd1-skew-psec : Skew control of RX data 1 pad
+      - rxd2-skew-psec : Skew control of RX data 2 pad
+      - rxd3-skew-psec : Skew control of RX data 3 pad
+      - txd0-skew-psec : Skew control of TX data 0 pad
+      - txd1-skew-psec : Skew control of TX data 1 pad
+      - txd2-skew-psec : Skew control of TX data 2 pad
+      - txd3-skew-psec : Skew control of TX data 3 pad
+
+Change-Id: I4c818825ceefc8d0c216fd8f58d70baf1237f97a
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index 0a876ea52e52..43f837e64c44 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -360,6 +360,12 @@ mdio {
+ 
+ 		ethphy0: ethernet-phy@0 {
+ 			compatible = "ethernet-phy-ieee802.3-c22";
++			rxen-skew-psec = <0>;
++			rxd0-skew-psec = <0>;
++			rxd1-skew-psec = <0>;
++			rxd2-skew-psec = <0>;
++			rxd3-skew-psec = <0>;
++			rxc-skew-psec = <1000>;
+ 			reg = <0>;
+ 			at803x,led-act-blind-workaround;
+ 			at803x,eee-disabled;

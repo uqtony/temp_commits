@@ -1,0 +1,70 @@
+60ff1c2bba8e Brian Lee 2021-11-16
+
+AOS-789: Add the navigation bar configuration on secondary display
+
+Follow the below steps to hide/show the navigation bar on the secondary display
+
+$ adb root
+
+// VALUE, 0 -> hide, 1 -> show
+$ adb shell setprop persist.idt.secondary_display.navigation_bar.enable VALUE
+
+// take effect
+$ adb reboot
+
+Change-Id: I11b4988d2291f93bc8b2532760778471043fa030
+
+diff --git a/core/java/android/view/Display.java b/core/java/android/view/Display.java
+index 0cc469a2d5eb..364875076523 100644
+--- a/core/java/android/view/Display.java
++++ b/core/java/android/view/Display.java
+@@ -116,6 +116,12 @@ public final class Display {
+      */
+     public static final int DEFAULT_DISPLAY = 0;
+ 
++    /**
++     * The Secondary Display id, which is the id of the secondary display.
++     * @hide
++     */
++    public static final int SECONDARY_DISPLAY = 1;
++
+     /**
+      * Invalid display id.
+      */
+diff --git a/packages/SystemUI/src/com/android/systemui/wm/DisplayLayout.java b/packages/SystemUI/src/com/android/systemui/wm/DisplayLayout.java
+index a341f3050ea6..1ea4b99f1a16 100644
+--- a/packages/SystemUI/src/com/android/systemui/wm/DisplayLayout.java
++++ b/packages/SystemUI/src/com/android/systemui/wm/DisplayLayout.java
+@@ -446,6 +446,9 @@ public class DisplayLayout {
+                 return true;
+             }
+             return context.getResources().getBoolean(R.bool.config_showNavigationBar);
++        } else if (displayId == Display.SECONDARY_DISPLAY) {
++            final String navBarOverride = SystemProperties.get("persist.idt.secondary_display.navigation_bar.enable");
++            return ("0".equals(navBarOverride)? false: true);
+         } else {
+             boolean isUntrustedVirtualDisplay = info.type == Display.TYPE_VIRTUAL
+                     && info.ownerUid != SYSTEM_UID;
+diff --git a/services/core/java/com/android/server/wm/DisplayPolicy.java b/services/core/java/com/android/server/wm/DisplayPolicy.java
+index 29881cc761b2..eb7d383b35e8 100644
+--- a/services/core/java/com/android/server/wm/DisplayPolicy.java
++++ b/services/core/java/com/android/server/wm/DisplayPolicy.java
+@@ -161,6 +161,7 @@ import android.util.Pair;
+ import android.util.PrintWriterPrinter;
+ import android.util.Slog;
+ import android.util.SparseArray;
++import android.view.Display;
+ import android.view.DisplayCutout;
+ import android.view.Gravity;
+ import android.view.InputChannel;
+@@ -654,6 +655,10 @@ public class DisplayPolicy {
+             } else if ("0".equals(navBarOverride)) {
+                 mHasNavigationBar = true;
+             }
++        } else if (displayId == Display.SECONDARY_DISPLAY) {
++            mHasStatusBar = false;
++            final String navBarOverride = SystemProperties.get("persist.idt.secondary_display.navigation_bar.enable");
++            mHasNavigationBar = ("0".equals(navBarOverride)? false: true);
+         } else {
+             mHasStatusBar = false;
+             mHasNavigationBar = mDisplayContent.supportsSystemDecorations();

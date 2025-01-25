@@ -1,0 +1,55 @@
+eacbfbde George.Huang 2020-07-13
+
+AOS-178: imx8mq: write spl_tab_auxilious.img into spl and u-boot images
+
+- spl_tab_auxilious.img will help find out secondary hdmi firmware
+- it will be written at offset (0x1a000 - 0x200) = 0x19e00 = 105984 bytes of spl and u-boot images
+- check the page for reference:
+  https://atlassian.idtechproducts.com/confluence/display/EN/Dual+Bootloader#DualBootloader-PrimaryandSecondarySPLlayout
+
+Change-Id: I5a4d69e1118de86765714b73149eb5d028b6d42a
+
+diff --git a/common/prebuilts/spl_tab_auxiliary.img b/common/prebuilts/spl_tab_auxiliary.img
+new file mode 100644
+index 00000000..9acda181
+Binary files /dev/null and b/common/prebuilts/spl_tab_auxiliary.img differ
+diff --git a/imx8m/evk_a300/AndroidUboot.mk b/imx8m/evk_a300/AndroidUboot.mk
+index 9e1885f9..d58268f1 100644
+--- a/imx8m/evk_a300/AndroidUboot.mk
++++ b/imx8m/evk_a300/AndroidUboot.mk
+@@ -37,9 +37,15 @@ define build_imx_uboot
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	else \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/spl-$(strip $(2)).bin; \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/u-boot-ivt.itb $(UBOOT_COLLECTION)/bootloader-$(strip $(2)).img; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/spl-$(strip $(2)).bin bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	fi;
+ endef
+ 
+diff --git a/imx8m/vp6820_8mq/AndroidUboot.mk b/imx8m/vp6820_8mq/AndroidUboot.mk
+index 9e1885f9..d58268f1 100644
+--- a/imx8m/vp6820_8mq/AndroidUboot.mk
++++ b/imx8m/vp6820_8mq/AndroidUboot.mk
+@@ -37,9 +37,15 @@ define build_imx_uboot
+ 	fi; \
+ 	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	else \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/spl-$(strip $(2)).bin; \
+ 		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/u-boot-ivt.itb $(UBOOT_COLLECTION)/bootloader-$(strip $(2)).img; \
++		if [ -f device/idtech/common/prebuilts/spl_tab_auxiliary.img ]; then \
++			dd if=device/idtech/common/prebuilts/spl_tab_auxiliary.img of=$(UBOOT_COLLECTION)/spl-$(strip $(2)).bin bs=1 seek=105984 conv=notrunc; \
++		fi; \
+ 	fi;
+ endef
+ 

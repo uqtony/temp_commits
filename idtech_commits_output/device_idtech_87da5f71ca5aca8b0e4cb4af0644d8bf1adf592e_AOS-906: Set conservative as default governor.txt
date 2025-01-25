@@ -1,0 +1,25 @@
+87da5f71 Brian Lee 2022-03-04
+
+AOS-906: Set conservative as default governor
+
+When the CPU load is needed, slowly increases the frequency to maximum.
+When the CPU is no longer needed, immediately drops back to the minimum.
+
+The same below command
+$ echo conservative > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+
+Change-Id: Iccadcdc702b89b07af470507499159dc59a3395f
+
+diff --git a/imx8m/redwood_8mq/init.imx8mq.rc b/imx8m/redwood_8mq/init.imx8mq.rc
+index 108079ef..08e67e95 100755
+--- a/imx8m/redwood_8mq/init.imx8mq.rc
++++ b/imx8m/redwood_8mq/init.imx8mq.rc
+@@ -29,7 +29,7 @@ on early-boot
+ on property:sys.boot_completed=1
+     # Set default CPU frequency governor
+     # configure governor settings for little cluster
+-    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
++    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "conservative"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+     write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200

@@ -1,0 +1,163 @@
+fe8b38494e61 George.Huang 2021-10-14
+
+AOS-767: pcie: redwood: 1YM power on sequence adjustment
+
+Symptom: some redwood boards are failed to load 1YM module
+
+Root Cause: boards may not meet 1YM power on sequence
+
+Solution:
+- pcie driver needs to control regulator (WL_BT_PWR) and gpio (WIFI_BT_PM_ENn)
+  at the same time to meet the power on sequence requirement
+
+- Spec: https://www.murata.com/products/productdata/8813652246558/type1ym.pdf
+  10. Power Sequence requirement:
+  VBAT/VIO pull up first; PMIC_EN pull up later at least 100ms
+             _________________
+  __________|                  (WL_BT_PWR 3.8V) (VBAT/VIO)
+
+     |<50ms>|<  200ms   >|
+      ___________________
+  ___|                   |____ (WIFI_BT_PM_ENn 1.8V)
+
+                          ____
+  _______________________|     (PMIC_EN_1YM 3.3V) (PMIC_EN)
+
+- set BLE_RESET GPIO3_IO6 as a regulator and controlled by pcie
+  BLE_RESET will control WL_BT_PWR/VBAT/VIO
+  rename reg_wifi_bt_1v8_vdd to epdev_on to be recognized by pcie
+  define "reserved-time-before-reg-ms" as 50ms
+  define "reserved-time-after-reg-ms" as 200ms
+
+- set WIFI_BT_PM_ENn GPIO4_IO20 as disable-gpio and controlled by pcie
+  WIFI_BT_PM_ENn will control PMIC_EN_1YM
+  define "disable-gpio-active-high" to change disable-gpio behavior
+    from (Low > High) to (High > Low)
+
+Change-Id: I2270013b877e69a876dba39b96de7b35eb88aae1
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+index 668b5c055f1e..748031dd5a62 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mq_evt-0_redwood_evt-0.dtsi
+@@ -265,36 +265,15 @@ pcie0_refclk: pcie0-refclk {
+ 		clock-frequency = <100000000>;
+ 	};
+ 
+-	reg_pcie: regulator-pcie {
+-		compatible = "regulator-fixed";
+-		regulator-name = "VPCIE_1V8";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		regulator-always-on;
+-	};
+-
+-	reg_wifi_bt_pm_1v8_vdd: fixed-regulator-wifi-bt-pm-1v8-vdd {
+-		pinctrl-names = "default";
+-		compatible = "regulator-fixed";
+-		regulator-name = "WIFI_BT_PM_ENn";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <1800000>;
+-		gpio = <&gpio4 20 GPIO_ACTIVE_LOW>;
+-		regulator-boot-on;
+-		regulator-always-on;
+-	};
+-
+-	reg_wifi_bt_1v8_vdd: fixed-regulator-wifi-bt-1v8-vdd {
++	epdev_on: fixed-regulator-wifi-bt-1v8-vdd {
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_reg_wifi_bt>;
+ 		compatible = "regulator-fixed";
+-		regulator-name = "WL_BT_PWR";
++		regulator-name = "epdev_on";
+ 		regulator-min-microvolt = <1800000>;
+ 		regulator-max-microvolt = <1800000>;
+ 		gpio = <&gpio3 6 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+-		regulator-boot-on;
+-		regulator-always-on;
+ 	};
+ 
+ 	reg_vradio_1v8_vdd: fixed-regulator-vradio-1v8-vdd {
+@@ -791,8 +770,9 @@ opt3001: opt3001@45 {
+ &pcie0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pcie0>;
+-	disable-gpio = <&gpio3 23 GPIO_ACTIVE_LOW>;
++	disable-gpio = <&gpio4 20 GPIO_ACTIVE_LOW>;
+ 	reset-gpio = <&gpio3 22 GPIO_ACTIVE_LOW>;
++	disable-gpio-active-high;
+ 	clocks = <&clk IMX8MQ_CLK_PCIE1_ROOT>,
+ 		 <&clk IMX8MQ_CLK_PCIE1_AUX>,
+ 		 <&clk IMX8MQ_CLK_PCIE1_PHY>,
+@@ -805,7 +785,9 @@ &pcie0 {
+ 	assigned-clock-parents = <&clk IMX8MQ_SYS2_PLL_50M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_100M>,
+ 				 <&clk IMX8MQ_SYS2_PLL_250M>;
+-	vph-supply = <&reg_pcie>;
++	epdev_on-supply = <&epdev_on>;
++	reserved-time-before-reg-ms = <50>;
++	reserved-time-after-reg-ms = <200>;
+ 	l1ss-disabled;
+ 	status = "okay";
+ };
+diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+index 2cb12d776237..fc6a3c3f137c 100644
+--- a/drivers/pci/controller/dwc/pci-imx6.c
++++ b/drivers/pci/controller/dwc/pci-imx6.c
+@@ -117,6 +117,9 @@ struct imx6_pcie {
+ 	int			dis_gpio;
+ 	int			reset_gpio;
+ 	bool			gpio_active_high;
++	bool			dis_gpio_active_high;
++	unsigned int		reserved_time_before_reg;
++	unsigned int		reserved_time_after_reg;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
+ 	struct clk		*pcie_phy_pclk;
+@@ -2464,6 +2467,10 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->l1ss_clkreq = 0;
+ 	else
+ 		imx6_pcie->l1ss_clkreq = 1;
++	if (of_property_read_u32(node, "reserved-time-before-reg-ms", &imx6_pcie->reserved_time_before_reg))
++		imx6_pcie->reserved_time_before_reg = 0;
++	if (of_property_read_u32(node, "reserved-time-after-reg-ms", &imx6_pcie->reserved_time_after_reg))
++		imx6_pcie->reserved_time_after_reg = 0;
+ 
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->clkreq_gpio = of_get_named_gpio(node, "clkreq-gpio", 0);
+@@ -2475,9 +2482,14 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	imx6_pcie->dis_gpio = of_get_named_gpio(node, "disable-gpio", 0);
++	imx6_pcie->dis_gpio_active_high = of_property_read_bool(node,
++						"disable-gpio-active-high");
+ 	if (gpio_is_valid(imx6_pcie->dis_gpio)) {
+ 		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->dis_gpio,
+-					    GPIOF_OUT_INIT_HIGH, "PCIe DIS");
++				imx6_pcie->dis_gpio_active_high ?
++					GPIOF_OUT_INIT_HIGH :
++					GPIOF_OUT_INIT_LOW,
++				"PCIe DIS");
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "unable to get disable gpio
+");
+ 			return ret;
+@@ -2704,13 +2716,15 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	msleep(imx6_pcie->reserved_time_before_reg);
+ 	ret = regulator_enable(imx6_pcie->epdev_on);
+ 	if (ret) {
+ 		dev_err(dev, "failed to enable the epdev_on regulator
+");
+ 		goto err_ret;
+ 	}
++	msleep(imx6_pcie->reserved_time_after_reg);
+ 	if (gpio_is_valid(imx6_pcie->dis_gpio))
+-		gpio_set_value_cansleep(imx6_pcie->dis_gpio, 1);
++		gpio_set_value_cansleep(imx6_pcie->dis_gpio, !imx6_pcie->dis_gpio_active_high);
+ 
+ 	imx6_pcie_assert_core_reset(imx6_pcie);
+ 	imx6_pcie_init_phy(imx6_pcie);

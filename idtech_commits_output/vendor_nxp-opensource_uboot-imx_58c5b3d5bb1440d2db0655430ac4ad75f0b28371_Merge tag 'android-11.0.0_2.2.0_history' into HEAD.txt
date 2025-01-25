@@ -1,0 +1,2932 @@
+58c5b3d5bb George.Huang 2021-07-20
+
+Merge tag 'android-11.0.0_2.2.0_history' into HEAD
+
+android-11.0.0_2.2.0_history
+
+Change-Id: I333a1bacfe214b246230a2e6f5b9fa8d7d8fd322
+
+diff --cc arch/arm/dts/Makefile
+index 5777bcff82,aa0c6a75c3..e7871771ca
+--- a/arch/arm/dts/Makefile
++++ b/arch/arm/dts/Makefile
+@@@ -796,17 -869,16 +869,22 @@@ dtb-$(CONFIG_ARCH_IMX8M) += 
+  	imx8mq-ddr3l-val.dtb \
+  	imx8mq-ddr4-val.dtb \
+  	imx8mq-evk.dtb \
+++<<<<<<< HEAD
+ +	imx8mq-phanbell.dtb \
+ +	idt_a300_evt-0_devboard_evt-1.dtb \
+ +	idt_imx8mq_evt-0_ibr210_evt-0.dtb \
+++=======
++ 	imx8mm-beacon-kit.dtb \
++ 	imx8mn-beacon-kit.dtb \
++ 	imx8mq-phanbell.dtb \
+++>>>>>>> android-11.0.0_2.2.0_history
+  	imx8mp-ddr4-evk.dtb \
+  	imx8mp-evk.dtb \
+- 	imx8mm-ddr4-ab2.dtb \
+- 	imx8mm-ab2.dtb \
+- 	imx8mn-ddr4-ab2.dtb \
+- 	imx8mn-ab2.dtb
++ 	imx8mp-phyboard-pollux-rdk.dtb \
++ 	imx8mq-pico-pi.dtb
+  
+- dtb-$(CONFIG_ARCH_IMXRT) += imxrt1050-evk.dtb
++ dtb-$(CONFIG_ARCH_IMXRT) += imxrt1050-evk.dtb \
++ 	imxrt1020-evk.dtb
+  
+  dtb-$(CONFIG_RCAR_GEN2) += \
+  	r8a7790-lager-u-boot.dtb \
+diff --cc arch/arm/dts/imx8mn-evk.dts
+index 73b5f752ed,853c53f2ce..edb64be0bb
+--- a/arch/arm/dts/imx8mn-evk.dts
++++ b/arch/arm/dts/imx8mn-evk.dts
+@@@ -14,289 -15,23 +15,50 @@@
+  
+  	chosen {
+  		bootargs = "console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200";
+- 		stdout-path = &uart2;
+- 	};
+- 
+- 	reg_usdhc2_vmmc: regulator-usdhc2 {
+- 		compatible = "regulator-fixed";
+- 		pinctrl-names = "default";
+- 		pinctrl-0 = <&pinctrl_reg_usdhc2_vmmc>;
+- 		regulator-name = "VSD_3V3";
+- 		regulator-min-microvolt = <3300000>;
+- 		regulator-max-microvolt = <3300000>;
+- 		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+- 		enable-active-high;
+- 		startup-delay-us = <100>;
+- 		off-on-delay-us = <12000>;
+- 	};
+- 
+- 	dsi_host: dsi-host {
+- 		compatible = "samsung,sec-mipi-dsi";
+- 		status = "okay";
+- 	};
+- 
+- 	rm67191_panel {
+- 		compatible = "raydium,rm67191";
+- 		pinctrl-names = "default";
+- 		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+- 		reset-gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
+- 		dsi-lanes = <4>;
+- 		video-mode = <2>;	/* 0: burst mode
+- 					 * 1: non-burst mode with sync event
+- 					 * 2: non-burst mode with sync pulse
+- 					 */
+- 		panel-width-mm = <68>;
+- 		panel-height-mm = <121>;
+- 		status = "okay";
+- 
+- 		port {
+- 			rm67191_from_dsim: endpoint {
+- 				remote-endpoint = <&dsim_to_rm67191>;
+- 			};
+- 		};
+  	};
+ +
+ +	panel_backlight: backlight {
+ +		compatible = "gpio-backlight";
+ +		gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+ +	};
+ +
+ +	hx8394f_panel {
+ +		compatible = "himax,hx8394f";
+ +		pinctrl-names = "default";
+ +		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
+ +		reset-gpio = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+ +		backlight = <&panel_backlight>;
+ +		dsi-lanes = <4>;
+ +		video-mode = <2>;	/* 0: burst mode
+ +					 * 1: non-burst mode with sync event
+ +					 * 2: non-burst mode with sync pulse
+ +					 */
+ +		panel-width-mm = <68>;
+ +		panel-height-mm = <121>;
+ +		status = "okay";
+ +
+ +		port {
+ +			hx8394f_from_dsim: endpoint {
+ +				remote-endpoint = <&dsim_to_hx8394f>;
+ +			};
+ +		};
+ +	};
+  };
+  
+- &iomuxc {
+- 	pinctrl-names = "default";
+- 	pinctrl-0 = <&pinctrl_hog_1>;
+- 
+- 	imx8mn-evk {
+- 		pinctrl_hog_1: hoggrp-1 {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
+- 			>;
+- 		};
+- 
+- 		pinctrl_fec1: fec1grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_ENET_MDC_ENET1_MDC		0x3
+- 				MX8MN_IOMUXC_ENET_MDIO_ENET1_MDIO	0x3
+- 				MX8MN_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x1f
+- 				MX8MN_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x1f
+- 				MX8MN_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x1f
+- 				MX8MN_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x1f
+- 				MX8MN_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x91
+- 				MX8MN_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x91
+- 				MX8MN_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x91
+- 				MX8MN_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x91
+- 				MX8MN_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x1f
+- 				MX8MN_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x91
+- 				MX8MN_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
+- 				MX8MN_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
+- 				MX8MN_IOMUXC_SAI2_RXC_GPIO4_IO22	0x19
+- 			>;
+- 		};
+- 
+- 		pinctrl_flexspi0: flexspi0grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_NAND_ALE_QSPI_A_SCLK 0x1c4
+- 				MX8MN_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B 0x84
+- 
+- 				MX8MN_IOMUXC_NAND_DQS_QSPI_A_DQS 0x40000084
+- 				MX8MN_IOMUXC_NAND_DATA00_QSPI_A_DATA0 0x84
+- 				MX8MN_IOMUXC_NAND_DATA01_QSPI_A_DATA1 0x84
+- 				MX8MN_IOMUXC_NAND_DATA02_QSPI_A_DATA2 0x84
+- 				MX8MN_IOMUXC_NAND_DATA03_QSPI_A_DATA3 0x84
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c1: i2c1grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C1_SCL_I2C1_SCL			0x400001c3
+- 				MX8MN_IOMUXC_I2C1_SDA_I2C1_SDA			0x400001c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c2: i2c2grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C2_SCL_I2C2_SCL			0x400001c3
+- 				MX8MN_IOMUXC_I2C2_SDA_I2C2_SDA			0x400001c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c3: i2c3grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C3_SCL_I2C3_SCL			0x400001c3
+- 				MX8MN_IOMUXC_I2C3_SDA_I2C3_SDA			0x400001c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c1_gpio: i2c1grp-gpio {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C1_SCL_GPIO5_IO14		0x1c3
+- 				MX8MN_IOMUXC_I2C1_SDA_GPIO5_IO15		0x1c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c2_gpio: i2c2grp-gpio {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C2_SCL_GPIO5_IO16		0x1c3
+- 				MX8MN_IOMUXC_I2C2_SDA_GPIO5_IO17		0x1c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_i2c3_gpio: i2c3grp-gpio {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_I2C3_SCL_GPIO5_IO18		0x1c3
+- 				MX8MN_IOMUXC_I2C3_SDA_GPIO5_IO19		0x1c3
+- 			>;
+- 		};
+- 
+- 		pinctrl_pmic: pmicirq {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_GPIO1_IO03_GPIO1_IO3	0x41
+- 			>;
+- 		};
+- 		
+- 		pinctrl_reg_usdhc2_vmmc: regusdhc2vmmc {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_SD2_RESET_B_GPIO2_IO19	0x41
+- 			>;
+- 		};
+- 
+- 		pinctrl_uart2: uart1grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_UART2_RXD_UART2_DCE_RX	0x140
+- 				MX8MN_IOMUXC_UART2_TXD_UART2_DCE_TX	0x140
+- 			>;
+- 		};
+- 
+- 		pinctrl_typec1: typec1grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_SD1_STROBE_GPIO2_IO11		0x159
+- 			>;
+- 		};
+- 		
+- 		pinctrl_usdhc2_gpio: usdhc2grpgpio {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_GPIO1_IO15_GPIO1_IO15	0x1c4
+- 			>;
+- 		};
+- 
+- 		pinctrl_usdhc2: usdhc2grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_SD2_CLK_USDHC2_CLK		0x190
+- 				MX8MN_IOMUXC_SD2_CMD_USDHC2_CMD		0x1d0
+- 				MX8MN_IOMUXC_SD2_DATA0_USDHC2_DATA0	0x1d0
+- 				MX8MN_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d0
+- 				MX8MN_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d0
+- 				MX8MN_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d0
+- 				MX8MN_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+- 			>;
+- 		};
+- 
+- 		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_SD2_CLK_USDHC2_CLK		0x194
+- 				MX8MN_IOMUXC_SD2_CMD_USDHC2_CMD		0x1d4
+- 				MX8MN_IOMUXC_SD2_DATA0_USDHC2_DATA0	0x1d4
+- 				MX8MN_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d4
+- 				MX8MN_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d4
+- 				MX8MN_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d4
+- 				MX8MN_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+- 			>;
+- 		};
+- 
+- 		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_SD2_CLK_USDHC2_CLK		0x196
+- 				MX8MN_IOMUXC_SD2_CMD_USDHC2_CMD		0x1d6
+- 				MX8MN_IOMUXC_SD2_DATA0_USDHC2_DATA0	0x1d6
+- 				MX8MN_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x1d6
+- 				MX8MN_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x1d6
+- 				MX8MN_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x1d6
+- 				MX8MN_IOMUXC_GPIO1_IO04_USDHC2_VSELECT	0x1d0
+- 			>;
+- 		};
+- 
+- 		pinctrl_usdhc3: usdhc3grp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_NAND_WE_B_USDHC3_CLK		0x40000190
+- 				MX8MN_IOMUXC_NAND_WP_B_USDHC3_CMD		0x1d0
+- 				MX8MN_IOMUXC_NAND_DATA04_USDHC3_DATA0		0x1d0
+- 				MX8MN_IOMUXC_NAND_DATA05_USDHC3_DATA1		0x1d0
+- 				MX8MN_IOMUXC_NAND_DATA06_USDHC3_DATA2		0x1d0
+- 				MX8MN_IOMUXC_NAND_DATA07_USDHC3_DATA3		0x1d0
+- 				MX8MN_IOMUXC_NAND_RE_B_USDHC3_DATA4		0x1d0
+- 				MX8MN_IOMUXC_NAND_CE2_B_USDHC3_DATA5		0x1d0
+- 				MX8MN_IOMUXC_NAND_CE3_B_USDHC3_DATA6		0x1d0
+- 				MX8MN_IOMUXC_NAND_CLE_USDHC3_DATA7		0x1d0
+- 				MX8MN_IOMUXC_NAND_CE1_B_USDHC3_STROBE 		0x190
+- 			>;
+- 		};
+- 
+- 		pinctrl_usdhc3_100mhz: usdhc3grp100mhz {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_NAND_WE_B_USDHC3_CLK		0x40000194
+- 				MX8MN_IOMUXC_NAND_WP_B_USDHC3_CMD		0x1d4
+- 				MX8MN_IOMUXC_NAND_DATA04_USDHC3_DATA0		0x1d4
+- 				MX8MN_IOMUXC_NAND_DATA05_USDHC3_DATA1		0x1d4
+- 				MX8MN_IOMUXC_NAND_DATA06_USDHC3_DATA2		0x1d4
+- 				MX8MN_IOMUXC_NAND_DATA07_USDHC3_DATA3		0x1d4
+- 				MX8MN_IOMUXC_NAND_RE_B_USDHC3_DATA4		0x1d4
+- 				MX8MN_IOMUXC_NAND_CE2_B_USDHC3_DATA5		0x1d4
+- 				MX8MN_IOMUXC_NAND_CE3_B_USDHC3_DATA6		0x1d4
+- 				MX8MN_IOMUXC_NAND_CLE_USDHC3_DATA7		0x1d4
+- 				MX8MN_IOMUXC_NAND_CE1_B_USDHC3_STROBE 		0x194
+- 			>;
+- 		};
++ &A53_0 {
++ 	cpu-supply = <&buck2>;
++ };
+  
+- 		pinctrl_usdhc3_200mhz: usdhc3grp200mhz {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_NAND_WE_B_USDHC3_CLK		0x40000196
+- 				MX8MN_IOMUXC_NAND_WP_B_USDHC3_CMD		0x1d6
+- 				MX8MN_IOMUXC_NAND_DATA04_USDHC3_DATA0		0x1d6
+- 				MX8MN_IOMUXC_NAND_DATA05_USDHC3_DATA1		0x1d6
+- 				MX8MN_IOMUXC_NAND_DATA06_USDHC3_DATA2		0x1d6
+- 				MX8MN_IOMUXC_NAND_DATA07_USDHC3_DATA3		0x1d6
+- 				MX8MN_IOMUXC_NAND_RE_B_USDHC3_DATA4		0x1d6
+- 				MX8MN_IOMUXC_NAND_CE2_B_USDHC3_DATA5		0x1d6
+- 				MX8MN_IOMUXC_NAND_CE3_B_USDHC3_DATA6		0x1d6
+- 				MX8MN_IOMUXC_NAND_CLE_USDHC3_DATA7		0x1d6
+- 				MX8MN_IOMUXC_NAND_CE1_B_USDHC3_STROBE 		0x196
+- 			>;
+- 		};
++ &A53_1 {
++ 	cpu-supply = <&buck2>;
++ };
+  
+- 		pinctrl_wdog: wdoggrp {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B		0xc6
+- 			>;
+- 		};
++ &A53_2 {
++ 	cpu-supply = <&buck2>;
++ };
+  
+- 		pinctrl_mipi_dsi_en: mipi_dsi_en {
+- 			fsl,pins = <
+- 				MX8MN_IOMUXC_GPIO1_IO08_GPIO1_IO8		0x16
+- 			>;
+- 		};
+- 	};
++ &A53_3 {
++ 	cpu-supply = <&buck2>;
+  };
+  
+  &i2c1 {
+@@@ -424,203 -130,3 +157,139 @@@
+  		};
+  	};
+  };
+++<<<<<<< HEAD
+ +
+ +&i2c3 {
+ +	clock-frequency = <100000>;
+ +	pinctrl-names = "default", "gpio";
+ +	pinctrl-0 = <&pinctrl_i2c3>;
+ +	pinctrl-1 = <&pinctrl_i2c3_gpio>;
+ +	scl-gpios = <&gpio5 18 GPIO_ACTIVE_HIGH>;
+ +	sda-gpios = <&gpio5 19 GPIO_ACTIVE_HIGH>;
+ +	status = "okay";
+ +
+ +	pca6416: gpio@20 {
+ +		compatible = "ti,tca6416";
+ +		reg = <0x20>;
+ +		gpio-controller;
+ +		#gpio-cells = <2>;
+ +	};
+ +};
+ +
+ +&flexspi {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_flexspi0>;
+ +	status = "okay";
+ +
+ +	flash0: mt25qu256aba@0 {
+ +		reg = <0>;
+ +		compatible = "jedec,spi-nor";
+ +		spi-max-frequency = <80000000>;
+ +		spi-tx-bus-width = <4>;
+ +		spi-rx-bus-width = <4>;
+ +	};
+ +};
+ +
+ +&fec1 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_fec1>;
+ +	phy-mode = "rgmii-id";
+ +	phy-handle = <&ethphy0>;
+ +	fsl,magic-packet;
+ +	status = "okay";
+ +
+ +	mdio {
+ +		#address-cells = <1>;
+ +		#size-cells = <0>;
+ +
+ +		ethphy0: ethernet-phy@0 {
+ +			compatible = "ethernet-phy-ieee802.3-c22";
+ +			reg = <0>;
+ +			at803x,led-act-blind-workaround;
+ +			at803x,eee-disabled;
+ +			at803x,vddio-1p8v;
+ +		};
+ +	};
+ +};
+ +
+ +&lcdif {
+ +	display = <&display0>;
+ +	status = "okay";
+ +
+ +	display0: display@0 {
+ +		bits-per-pixel = <24>;
+ +		bus-width = <24>;
+ +	};
+ +};
+ +
+ +&mipi_dsi {
+ +	status = "okay";
+ +
+ +	port@1 {
+ +		dsim_to_adv7535: endpoint {
+ +			remote-endpoint = <&adv7535_from_dsim>;
+ +		};
+ +	};
+ +
+ +	port@2 {
+ +		dsim_to_rm67191: endpoint {
+ +			remote-endpoint = <&rm67191_from_dsim>;
+ +		};
+ +	};
+ +
+ +	port@3 {
+ +		dsim_to_hx8394f: endpoint {
+ +			remote-endpoint = <&hx8394f_from_dsim>;
+ +		};
+ +	};
+ +};
+ +
+ +&snvs_pwrkey {
+ +	status = "okay";
+ +};
+ +
+ +&uart2 { /* console */
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_uart2>;
+ +	status = "okay";
+ +};
+ +
+ +&usdhc2 {
+ +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ +	pinctrl-0 = <&pinctrl_usdhc2>, <&pinctrl_usdhc2_gpio>;
+ +	pinctrl-1 = <&pinctrl_usdhc2_100mhz>, <&pinctrl_usdhc2_gpio>;
+ +	pinctrl-2 = <&pinctrl_usdhc2_200mhz>, <&pinctrl_usdhc2_gpio>;
+ +	cd-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+ +	bus-width = <4>;
+ +	vmmc-supply = <&reg_usdhc2_vmmc>;
+ +	status = "okay";
+ +};
+ +
+ +&usdhc3 {
+ +	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ +	pinctrl-0 = <&pinctrl_usdhc3>;
+ +	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
+ +	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
+ +	bus-width = <8>;
+ +	non-removable;
+ +	status = "okay";
+ +};
+ +
+ +&wdog1 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_wdog>;
+ +	fsl,ext-reset-output;
+ +	status = "okay";
+ +};
+ +
+ +&usbotg1 {
+ +	status = "okay";
+ +	extcon = <&ptn5110>;
+ +};
+ +
+ +&usbotg2 {
+ +	status = "okay";
+ +	extcon = <&ptn5110_2>;
+ +};
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+diff --cc arch/arm/dts/imx8mq-phanbell.dts
+index 17bd586c76,4892ad5ee1..4ae9dab721
+--- a/arch/arm/dts/imx8mq-phanbell.dts
++++ b/arch/arm/dts/imx8mq-phanbell.dts
+@@@ -1,349 -1,197 +1,515 @@@
+++<<<<<<< HEAD
+ +/*
+ + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+ + * Copyright 2017 NXP
+ + *
+ + * This program is free software; you can redistribute it and/or
+ + * modify it under the terms of the GNU General Public License
+ + * as published by the Free Software Foundation; either version 2
+ + * of the License, or (at your option) any later version.
+ + *
+ + * This program is distributed in the hope that it will be useful,
+ + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ + * GNU General Public License for more details.
+++=======
++ // SPDX-License-Identifier: (GPL-2.0 OR MIT)
++ /*
++  * Copyright 2020 NXP
+++>>>>>>> android-11.0.0_2.2.0_history
+   */
+  
+  /dts-v1/;
+  
+++<<<<<<< HEAD
+ +/* First 128KB is for PSCI ATF. */
+ +/memreserve/ 0x40000000 0x00020000;
+ +
+ +#include "imx8mq.dtsi"
+ +
+ +/ {
+ +	model = "Freescale i.MX8MQ Phanbell";
+ +	compatible = "fsl,imx8mq-phanbell", "fsl,imx8mq";
+ +
+ +	bcmdhd_wlan_0: bcmdhd_wlan@0 {
+ +		compatible = "android,bcmdhd_wlan";
+ +		bcmdhd_fw = "/lib/firmware/bcm/1CX_BCM4356/fw_bcmdhd.bin";
+ +		bcmdhd_nv = "/lib/firmware/bcm/1CX_BCM4356/bcmdhd.cal";
+ +	};
+ +
+ +	firmware {
+ +		optee {
+ +			compatible = "linaro,optee-tz";
+ +			method = "smc";
+ +		};
+ +	};
+ +
+ +	chosen {
+ +		bootargs = "console=ttymxc0,115200 earlycon=ec_imx6q,0x30860000,115200";
+ +		stdout-path = &uart1;
+ +	};
+ +
+ +	regulators {
+ +		compatible = "simple-bus";
+ +		#address-cells = <1>;
+ +		#size-cells = <0>;
+ +
+ +		reg_usdhc2_vmmc: usdhc2_vmmc {
+ +			compatible = "regulator-fixed";
+ +			regulator-name = "VSD_3V3";
+ +			regulator-min-microvolt = <3300000>;
+ +			regulator-max-microvolt = <3300000>;
+ +			gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
+ +			enable-active-high;
+ +		};
+ +
+ +		reg_apex: apex_pmic {
+ +			compatible = "regulator-fixed";
+ +			regulator-name = "apex_regulators";
+ +			regulator-min-microvolt = <1000000>;
+ +			regulator-max-microvolt = <1000000>;
+ +			gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>;
+ +			gpio-open-drain;
+ +			enable-active-high;
+ +			regulator-boot-on;
+ +			startup-delay-us = <1000000>;
+ +		};
+ +	};
+ +
+ +	modem_reset: modem-reset {
+ +		compatible = "gpio-reset";
+ +		reset-gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+ +		reset-delay-us = <2000>;
+ +		reset-post-delay-ms = <40>;
+ +		#reset-cells = <0>;
+ +	};
+ +
+ +	wm8524: wm8524 {
+ +		compatible = "wlf,wm8524";
+ +		clocks = <&clk IMX8MQ_CLK_SAI2_ROOT>;
+ +		clock-names = "mclk";
+ +		wlf,mute-gpios = <&gpio1 8 GPIO_ACTIVE_LOW>;
+ +	};
+ +
+ +	pwmleds {
+ +		compatible = "pwm-leds";
+ +
+ +		ledpwm2 {
+ +			label = "PWM2";
+ +			pwms = <&pwm2 0 50000>;
+ +			max-brightness = <255>;
+ +		};
+ +	};
+ +	regulator-virtuals {
+ +		compatible = "simple-bus";
+ +
+ +		virt-buck1 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck1";
+ +		};
+ +		virt-buck2 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck2";
+ +		};
+ +		virt-buck3 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck3";
+ +		};
+ +		virt-buck4 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck4";
+ +		};
+ +		virt-buck5 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck5";
+ +		};
+ +		virt-buck6 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck6";
+ +		};
+ +		virt-buck7 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck7";
+ +		};
+ +		virt-buck8 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "buck8";
+ +		};
+ +		virt-ldo1 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo1";
+ +		};
+ +		virt-ldo2 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo2";
+ +		};
+ +		virt-ldo3 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo3";
+ +		};
+ +		virt-ldo4 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo4";
+ +		};
+ +		virt-ldo5 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo5";
+ +		};
+ +		virt-ldo6 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo6";
+ +		};
+ +		virt-ldo7 {
+ +			compatible = "regulator-virtual";
+ +			virtual-supply = "ldo7";
+ +		};
+ +	};
+ +};
+ +
+ +&fec1 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_fec1>;
+ +	phy-mode = "rgmii-id";
+ +	phy-handle = <&ethphy0>;
+ +	fsl,magic-packet;
+ +	status = "okay";
+ +
+ +	mdio {
+ +		#address-cells = <1>;
+ +		#size-cells = <0>;
+ +
+ +		ethphy0: ethernet-phy@0 {
+ +			compatible = "ethernet-phy-ieee802.3-c22";
+ +			reg = <0>;
+ +			at803x,led-act-blind-workaround;
+ +			at803x,eee-disabled;
+ +		};
+ +	};
+ +};
+ +
+ +&i2c1 {
+ +	clock-frequency = <100000>;
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_i2c1>;
+ +	scl-gpios = <&gpio5 14 GPIO_ACTIVE_HIGH>;
+ +	sda-gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
+ +	status = "okay";
+ +
+ +	pmic: bd71837@4b {
+ +		reg = <0x4b>;
+ +		compatible = "rohm,bd71837";
+ +		/* PMIC BD71837 PMIC_nINT GPIO1_IO12 */
+ +		pinctrl-0 = <&pinctrl_pmic>;
+ +		gpio_intr = <&gpio1 3 GPIO_ACTIVE_LOW>;
+ +
+ +		bd71837,pmic-buck1-uses-i2c-dvs;
+ +		bd71837,pmic-buck1-dvs-voltage = <900000>, <850000>, <800000>; /* VDD_SOC: Run-Idle-Suspend */
+ +		bd71837,pmic-buck2-uses-i2c-dvs;
+ +		bd71837,pmic-buck2-dvs-voltage = <1000000>, <900000>, <0>; /* VDD_ARM: Run-Idle */
+ +		bd71837,pmic-buck3-uses-i2c-dvs;
+ +		bd71837,pmic-buck3-dvs-voltage = <1000000>, <0>, <0>; /* VDD_GPU: Run */
+ +		bd71837,pmic-buck4-uses-i2c-dvs;
+ +		bd71837,pmic-buck4-dvs-voltage = <1000000>, <0>, <0>; /* VDD_VPU: Run */
+ +		
+ +		gpo {
+ +			rohm,drv = <0x0C>;	/* 0b0000_1100 all gpos with cmos output mode */
+ +		};
+ +
+ +		regulators {
+ +			#address-cells = <1>;
+ +			#size-cells = <0>;
+ +
+ +			buck1_reg: regulator@0 {
+ +				reg = <0>;
+ +				regulator-compatible = "buck1";
+++=======
++ #include "imx8mq.dtsi"
++ 
++ / {
++ 	model = "Google i.MX8MQ Phanbell";
++ 	compatible = "google,imx8mq-phanbell", "fsl,imx8mq";
++ 
++ 	chosen {
++ 		stdout-path = &uart1;
++ 	};
++ 
++ 	memory@40000000 {
++ 		device_type = "memory";
++ 		reg = <0x00000000 0x40000000 0 0x40000000>;
++ 	};
++ 
++ 	pmic_osc: clock-pmic {
++ 		compatible = "fixed-clock";
++ 		#clock-cells = <0>;
++ 		clock-frequency = <32768>;
++ 		clock-output-names = "pmic_osc";
++ 	};
++ 
++ 	reg_usdhc2_vmmc: regulator-usdhc2-vmmc {
++ 		compatible = "regulator-fixed";
++ 		regulator-name = "VSD_3V3";
++ 		regulator-min-microvolt = <3300000>;
++ 		regulator-max-microvolt = <3300000>;
++ 		gpio = <&gpio2 19 GPIO_ACTIVE_HIGH>;
++ 		enable-active-high;
++ 	};
++ };
++ 
++ &A53_0 {
++ 	cpu-supply = <&buck2>;
++ };
++ 
++ &A53_1 {
++ 	cpu-supply = <&buck2>;
++ };
++ 
++ &A53_2 {
++ 	cpu-supply = <&buck2>;
++ };
++ 
++ &A53_3 {
++ 	cpu-supply = <&buck2>;
++ };
++ 
++ &i2c1 {
++ 	clock-frequency = <400000>;
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_i2c1>;
++ 	status = "okay";
++ 
++ 	pmic: pmic@4b {
++ 		compatible = "rohm,bd71837";
++ 		reg = <0x4b>;
++ 		pinctrl-names = "default";
++ 		pinctrl-0 = <&pinctrl_pmic>;
++ 		#clock-cells = <0>;
++ 		clocks = <&pmic_osc>;
++ 		clock-output-names = "pmic_clk";
++ 		interrupt-parent = <&gpio1>;
++ 		interrupts = <3 GPIO_ACTIVE_LOW>;
++ 
++ 		regulators {
++ 			buck1: BUCK1 {
++ 				regulator-name = "buck1";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <700000>;
+  				regulator-max-microvolt = <1300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  				regulator-ramp-delay = <1250>;
+++<<<<<<< HEAD
+ +			};
+ +
+ +			buck2_reg: regulator@1 {
+ +				reg = <1>;
+ +				regulator-compatible = "buck2";
+ +				regulator-min-microvolt = <700000>;
+ +				regulator-max-microvolt = <1300000>;
+ +				regulator-boot-on;
+ +				regulator-always-on;
+ +				regulator-ramp-delay = <1250>;
+ +			};
+ +
+ +			buck3_reg: regulator@2 {
+ +				reg = <2>;
+ +				regulator-compatible = "buck3";
+ +				regulator-min-microvolt = <700000>;
+ +				regulator-max-microvolt = <1300000>;
+ +				regulator-boot-on;
+ +				regulator-always-on;
+ +			};
+ +
+ +			buck4_reg: regulator@3 {
+ +				reg = <3>;
+ +				regulator-compatible = "buck4";
+++=======
++ 				rohm,dvs-run-voltage = <900000>;
++ 				rohm,dvs-idle-voltage = <900000>;
++ 				rohm,dvs-suspend-voltage = <800000>;
++ 			};
++ 
++ 			buck2: BUCK2 {
++ 				regulator-name = "buck2";
++ 				regulator-min-microvolt = <850000>;
++ 				regulator-max-microvolt = <1000000>;
++ 				regulator-boot-on;
++ 				regulator-always-on;
++ 				rohm,dvs-run-voltage = <1000000>;
++ 				rohm,dvs-idle-voltage = <900000>;
++ 			};
++ 
++ 			buck3: BUCK3 {
++ 				regulator-name = "buck3";
++ 				regulator-min-microvolt = <700000>;
++ 				regulator-max-microvolt = <1300000>;
++ 				regulator-boot-on;
++ 				rohm,dvs-run-voltage = <900000>;
++ 			};
++ 
++ 			buck4: BUCK4 {
++ 				regulator-name = "buck4";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <700000>;
+  				regulator-max-microvolt = <1300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+++<<<<<<< HEAD
+ +			};
+ +
+ +			buck5_reg: regulator@4 {
+ +				reg = <4>;
+ +				regulator-compatible = "buck5";
+++=======
++ 				rohm,dvs-run-voltage = <900000>;
++ 			};
++ 
++ 			buck5: BUCK5 {
++ 				regulator-name = "buck5";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <700000>;
+  				regulator-max-microvolt = <1350000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			buck6_reg: regulator@5 {
+ +				reg = <5>;
+ +				regulator-compatible = "buck6";
+++=======
++ 			buck6: BUCK6 {
++ 				regulator-name = "buck6";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <3000000>;
+  				regulator-max-microvolt = <3300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+++<<<<<<< HEAD
+ +			
+ +			buck7_reg: regulator@6 {
+ +				reg = <6>;
+ +				regulator-compatible = "buck7";
+++=======
++ 
++ 			buck7: BUCK7 {
++ 				regulator-name = "buck7";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <1605000>;
+  				regulator-max-microvolt = <1995000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+++<<<<<<< HEAD
+ +			
+ +			buck8_reg: regulator@7 {
+ +				reg = <7>;
+ +				regulator-compatible = "buck8";
+++=======
++ 
++ 			buck8: BUCK8 {
++ 				regulator-name = "buck8";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <800000>;
+  				regulator-max-microvolt = <1400000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+++<<<<<<< HEAD
+ +			
+ +
+ +			ldo1_reg: regulator@8 {
+ +				reg = <8>;
+ +				regulator-compatible = "ldo1";
+++=======
++ 
++ 			ldo1: LDO1 {
++ 				regulator-name = "ldo1";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <3000000>;
+  				regulator-max-microvolt = <3300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo2_reg: regulator@9 {
+ +				reg = <9>;
+ +				regulator-compatible = "ldo2";
+++=======
++ 			ldo2: LDO2 {
++ 				regulator-name = "ldo2";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <900000>;
+  				regulator-max-microvolt = <900000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo3_reg: regulator@10 {
+ +				reg = <10>;
+ +				regulator-compatible = "ldo3";
+++=======
++ 			ldo3: LDO3 {
++ 				regulator-name = "ldo3";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <1800000>;
+  				regulator-max-microvolt = <3300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo4_reg: regulator@11 {
+ +				reg = <11>;
+ +				regulator-compatible = "ldo4";
+++=======
++ 			ldo4: LDO4 {
++ 				regulator-name = "ldo4";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <900000>;
+  				regulator-max-microvolt = <1800000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo5_reg: regulator@12 {
+ +				reg = <12>;
+ +				regulator-compatible = "ldo5";
+++=======
++ 			ldo5: LDO5 {
++ 				regulator-name = "ldo5";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <1800000>;
+  				regulator-max-microvolt = <3300000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo6_reg: regulator@13 {
+ +				reg = <13>;
+ +				regulator-compatible = "ldo6";
+++=======
++ 			ldo6: LDO6 {
++ 				regulator-name = "ldo6";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <900000>;
+  				regulator-max-microvolt = <1800000>;
+  				regulator-boot-on;
+  				regulator-always-on;
+  			};
+  
+++<<<<<<< HEAD
+ +			ldo7_reg: regulator@14 {
+ +				reg = <14>;
+ +				regulator-compatible = "ldo7";
+++=======
++ 			ldo7: LDO7 {
++ 				regulator-name = "ldo7";
+++>>>>>>> android-11.0.0_2.2.0_history
+  				regulator-min-microvolt = <1800000>;
+  				regulator-max-microvolt = <3300000>;
+  				regulator-boot-on;
+@@@ -351,73 -199,35 +517,105 @@@
+  			};
+  		};
+  	};
+++<<<<<<< HEAD
+ +
+ +};
+ +
+ +&i2c2 {
+ +	clock-frequency = <100000>;
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_i2c2>;
+ +	scl-gpios = <&gpio5 16 GPIO_ACTIVE_HIGH>;
+ +	sda-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;
+ +	status = "okay";
+ +};
+ +
+ +&i2c3 {
+ +	clock-frequency = <100000>;
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_i2c3>;
+ +	status = "okay";
+ +};
+ +
+ +&pwm2 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_pwm2>;
+ +	status = "okay";
+ +};
+ +
+ +&qspi0 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_qspi>;
+ +	status = "okay";
+ +
+ +	flash0: n25q256a@0 {
+ +		reg = <0>;
+ +		#address-cells = <1>;
+ +		#size-cells = <1>;
+ +		compatible = "micron,n25q256a";
+ +		spi-max-frequency = <29000000>;
+ +		spi-nor,ddr-quad-read-dummy = <6>;
+ +	};
+ +};
+ +
+ +&uart1 { /* console */
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_uart1>;
+ +	assigned-clocks = <&clk IMX8MQ_CLK_UART1>;
+ +	assigned-clock-parents = <&clk IMX8MQ_CLK_25M>;
+ +	status = "okay";
+ +};
+ +
+ +&usb3_phy0 {
+ +	status = "okay";
+ +};
+ +
+ +&usb_dwc3_0 {
+ +	status = "okay";
+ +	dr_mode = "peripheral";
+ +};
+ +
+ +&usb3_phy1 {
+ +	status = "okay";
+ +};
+ +
+ +
+ +&usb_dwc3_1 {
+ +	status = "okay";
+ +	dr_mode = "host";
+ +};
+ +
+++=======
++ };
++ 
++ &fec1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_fec1>;
++ 	phy-mode = "rgmii-id";
++ 	phy-handle = <&ethphy0>;
++ 	phy-reset-gpios = <&gpio1 9 GPIO_ACTIVE_LOW>;
++ 	phy-reset-duration = <10>;
++ 	phy-reset-post-delay = <50>;
++ 	fsl,magic-packet;
++ 	status = "okay";
++ 
++ 	mdio {
++ 		#address-cells = <1>;
++ 		#size-cells = <0>;
++ 		ethphy0: ethernet-phy@0 {
++ 			compatible = "ethernet-phy-ieee802.3-c22";
++ 			reg = <0>;
++ 		};
++ 	};
++ };
++ 
++ &uart1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_uart1>;
++ 	status = "okay";
++ };
++ 
+++>>>>>>> android-11.0.0_2.2.0_history
+  &usdhc1 {
+  	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+  	pinctrl-0 = <&pinctrl_usdhc1>;
+@@@ -439,251 -249,169 +637,420 @@@
+  	status = "okay";
+  };
+  
+++<<<<<<< HEAD
+ +&wdog1 {
+ +	pinctrl-names = "default";
+ +	pinctrl-0 = <&pinctrl_wdog>;
+ +	fsl,ext-reset-output;
+ +	status = "okay";
+ +};
+ +
+ +&dcss {
+ +	status = "okay";
+ +	port@0 {
+ +		dcss_out: endpoint {
+ +			remote-endpoint = <&hdmi_in>;
+ +		};
+ +	};
+ +};
+ +
+ +&hdmi {
+ +	compatible = "fsl,imx8mq-hdmi";
+ +	status = "okay";
+ +
+ +	display-timings {
+ +		native-mode = <&timing1>;
+ +
+ +		timing1: timing1 {
+ +			clock-frequency = <74250000>;
+ +			hactive = <1280>;
+ +			vactive = <720>;
+ +			hfront-porch = <220>;
+ +			hback-porch = <110>;
+ +			hsync-len = <40>;
+ +			vback-porch = <5>;
+ +			vfront-porch = <20>;
+ +			vsync-len = <5>;
+ +		};
+ +	};
+ +	
+ +	port@0 {
+ +		hdmi_in: endpoint {
+ +			remote-endpoint = <&dcss_out>;
+ +		};
+ +	};
+ +};
+ +
+ +
+ +&iomuxc {
+ +	pinctrl-names = "default";
+ +
+ +	imx8mq-evk {
+ +		pinctrl_fec1: fec1grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC		0x3
+ +				MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO	0x23
+ +				MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3	0x1f
+ +				MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2	0x1f
+ +				MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1	0x1f
+ +				MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0	0x1f
+ +				MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3	0x91
+ +				MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2	0x91
+ +				MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1	0x91
+ +				MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0	0x91
+ +				MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC	0x1f
+ +				MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC	0x91
+ +				MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
+ +				MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
+ +				MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9	0x19
+ +			>;
+ +		};
+ +
+ +		pinctrl_i2c1: i2c1grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
+ +				MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
+ +			>;
+ +		};
+ +
+ +		pinctrl_i2c2: i2c2grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_I2C2_SCL_I2C2_SCL			0x4000007f
+ +				MX8MQ_IOMUXC_I2C2_SDA_I2C2_SDA			0x4000007f
+ +			>;
+ +		};
+ +
+ +		pinctrl_i2c3: i2c3grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_I2C3_SCL_I2C3_SCL			0x4000007f
+ +				MX8MQ_IOMUXC_I2C3_SDA_I2C3_SDA			0x4000007f
+ +			>;
+ +		};
+ +
+ +		pinctrl_pcie0: pcie0grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_I2C4_SCL_GPIO5_IO20	0x16
+ +				MX8MQ_IOMUXC_UART4_TXD_GPIO5_IO29	0x16
+ +				MX8MQ_IOMUXC_UART4_RXD_GPIO5_IO28	0x16
+ +			>;
+ +		};
+ +
+ +		pinctrl_pcie1: pcie1grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_I2C4_SDA_GPIO5_IO21	0x16
+ +				MX8MQ_IOMUXC_ECSPI2_SCLK_GPIO5_IO10	0x16
+ +				MX8MQ_IOMUXC_ECSPI2_MISO_GPIO5_IO12	0x16
+ +			>;
+ +		};
+ +
+ +		pinctrl_pwm2: pwm2grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_GPIO1_IO13_PWM2_OUT	0x16
+ +			>;
+ +		};
+ +
+ +		pinctrl_qspi: qspigrp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_NAND_ALE_QSPI_A_SCLK	0x82
+ +				MX8MQ_IOMUXC_NAND_CE0_B_QSPI_A_SS0_B	0x82
+ +				MX8MQ_IOMUXC_NAND_DATA00_QSPI_A_DATA0	0x82
+ +				MX8MQ_IOMUXC_NAND_DATA01_QSPI_A_DATA1	0x82
+ +				MX8MQ_IOMUXC_NAND_DATA02_QSPI_A_DATA2	0x82
+ +				MX8MQ_IOMUXC_NAND_DATA03_QSPI_A_DATA3	0x82
+ +
+ +			>;
+ +		};
+ +
+ +		pinctrl_uart1: uart1grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX		0x79
+ +				MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX		0x79
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc1: usdhc1grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
+ +				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
+ +				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
+ +				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE 		0x83
+ +				MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x85
+ +				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc5
+ +				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc5
+ +				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE 		0x85
+ +				MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x87
+ +				MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc7
+ +				MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc7
+ +				MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE 		0x87
+ +				MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc2_gpio: usdhc2grpgpio {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12	0x41
+ +				MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19	0x41
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc2: usdhc2grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
+ +				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
+ +				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
+ +				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
+ +				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
+ +				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
+ +				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
+ +				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
+ +				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
+ +				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
+ +				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
+ +				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
+ +				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
+ +				MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
+ +				MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
+ +				MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
+ +				MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
+ +				MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
+ +				MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
+ +			>;
+ +		};
+ +
+ +		pinctrl_sai2: sai2grp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_SAI2_TXFS_SAI2_TX_SYNC	0xd6
+ +				MX8MQ_IOMUXC_SAI2_TXC_SAI2_TX_BCLK	0xd6
+ +				MX8MQ_IOMUXC_SAI2_MCLK_SAI2_MCLK	0xd6
+ +				MX8MQ_IOMUXC_SAI2_TXD0_SAI2_TX_DATA0	0xd6
+ +				MX8MQ_IOMUXC_GPIO1_IO08_GPIO1_IO8	0xd6
+ +			>;
+ +		};
+ +
+ +		pinctrl_wdog: wdoggrp {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B 0xc6
+ +			>;
+ +		};
+ +
+ +		pinctrl_pmic: pmicirq {
+ +			fsl,pins = <
+ +				MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3	0x41 /*0x17059*/
+ +			>;
+ +		};
+ +	};
+ +};
+ +
+++=======
++ &usb3_phy0 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_0 {
++ 	dr_mode = "otg";
++ 	status = "okay";
++ };
++ 
++ &usb3_phy1 {
++ 	status = "okay";
++ };
++ 
++ &usb_dwc3_1 {
++ 	dr_mode = "host";
++ 	status = "okay";
++ };
++ 
++ &wdog1 {
++ 	pinctrl-names = "default";
++ 	pinctrl-0 = <&pinctrl_wdog>;
++ 	fsl,ext-reset-output;
++ 	status = "okay";
++ };
++ 
++ &iomuxc {
++ 	pinctrl_fec1: fec1grp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_ENET_MDC_ENET1_MDC			0x3
++ 			MX8MQ_IOMUXC_ENET_MDIO_ENET1_MDIO		0x23
++ 			MX8MQ_IOMUXC_ENET_TD3_ENET1_RGMII_TD3		0x1f
++ 			MX8MQ_IOMUXC_ENET_TD2_ENET1_RGMII_TD2		0x1f
++ 			MX8MQ_IOMUXC_ENET_TD1_ENET1_RGMII_TD1		0x1f
++ 			MX8MQ_IOMUXC_ENET_TD0_ENET1_RGMII_TD0		0x1f
++ 			MX8MQ_IOMUXC_ENET_RD3_ENET1_RGMII_RD3		0x91
++ 			MX8MQ_IOMUXC_ENET_RD2_ENET1_RGMII_RD2		0x91
++ 			MX8MQ_IOMUXC_ENET_RD1_ENET1_RGMII_RD1		0x91
++ 			MX8MQ_IOMUXC_ENET_RD0_ENET1_RGMII_RD0		0x91
++ 			MX8MQ_IOMUXC_ENET_TXC_ENET1_RGMII_TXC		0x1f
++ 			MX8MQ_IOMUXC_ENET_RXC_ENET1_RGMII_RXC		0x91
++ 			MX8MQ_IOMUXC_ENET_RX_CTL_ENET1_RGMII_RX_CTL	0x91
++ 			MX8MQ_IOMUXC_ENET_TX_CTL_ENET1_RGMII_TX_CTL	0x1f
++ 			MX8MQ_IOMUXC_GPIO1_IO09_GPIO1_IO9		0x19
++ 		>;
++ 	};
++ 
++ 	pinctrl_i2c1: i2c1grp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_I2C1_SCL_I2C1_SCL			0x4000007f
++ 			MX8MQ_IOMUXC_I2C1_SDA_I2C1_SDA			0x4000007f
++ 		>;
++ 	};
++ 
++ 	pinctrl_pmic: pmicirq {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_GPIO1_IO03_GPIO1_IO3	0x41
++ 		>;
++ 	};
++ 
++ 	pinctrl_uart1: uart1grp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_UART1_RXD_UART1_DCE_RX		0x49
++ 			MX8MQ_IOMUXC_UART1_TXD_UART1_DCE_TX		0x49
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc1: usdhc1grp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x83
++ 			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc3
++ 			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc3
++ 			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x83
++ 			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x85
++ 			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc5
++ 			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc5
++ 			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x85
++ 			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD1_CLK_USDHC1_CLK			0x87
++ 			MX8MQ_IOMUXC_SD1_CMD_USDHC1_CMD			0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA0_USDHC1_DATA0		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA1_USDHC1_DATA1		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA2_USDHC1_DATA2		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA3_USDHC1_DATA3		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA4_USDHC1_DATA4		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA5_USDHC1_DATA5		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA6_USDHC1_DATA6		0xc7
++ 			MX8MQ_IOMUXC_SD1_DATA7_USDHC1_DATA7		0xc7
++ 			MX8MQ_IOMUXC_SD1_STROBE_USDHC1_STROBE		0x87
++ 			MX8MQ_IOMUXC_SD1_RESET_B_USDHC1_RESET_B		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc2_gpio: usdhc2grpgpio {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD2_CD_B_GPIO2_IO12	0x41
++ 			MX8MQ_IOMUXC_SD2_RESET_B_GPIO2_IO19	0x41
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc2: usdhc2grp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x83
++ 			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc3
++ 			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc3
++ 			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc3
++ 			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc3
++ 			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc3
++ 			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc2_100mhz: usdhc2grp100mhz {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x85
++ 			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc5
++ 			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc5
++ 			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc5
++ 			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc5
++ 			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc5
++ 			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_usdhc2_200mhz: usdhc2grp200mhz {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_SD2_CLK_USDHC2_CLK			0x87
++ 			MX8MQ_IOMUXC_SD2_CMD_USDHC2_CMD			0xc7
++ 			MX8MQ_IOMUXC_SD2_DATA0_USDHC2_DATA0		0xc7
++ 			MX8MQ_IOMUXC_SD2_DATA1_USDHC2_DATA1		0xc7
++ 			MX8MQ_IOMUXC_SD2_DATA2_USDHC2_DATA2		0xc7
++ 			MX8MQ_IOMUXC_SD2_DATA3_USDHC2_DATA3		0xc7
++ 			MX8MQ_IOMUXC_GPIO1_IO04_USDHC2_VSELECT		0xc1
++ 		>;
++ 	};
++ 
++ 	pinctrl_wdog: wdoggrp {
++ 		fsl,pins = <
++ 			MX8MQ_IOMUXC_GPIO1_IO02_WDOG1_WDOG_B 0xc6
++ 		>;
++ 	};
++ };
+++>>>>>>> android-11.0.0_2.2.0_history
+diff --cc arch/arm/mach-imx/cpu.c
+index 04c6ef148f,91419092c6..9b7c857188
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@@ -204,11 -208,9 +208,15 @@@ int print_cpuinfo(void
+  
+  	cpurev = get_cpu_rev();
+  
+++<<<<<<< HEAD
+ +#if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)
+ +#if !defined(CONFIG_TEMP_TCN75)
+++=======
++ #if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_IMX_TMU)
+++>>>>>>> android-11.0.0_2.2.0_history
+  	struct udevice *thermal_dev;
+  	int cpu_tmp, minc, maxc, ret;
+ +#endif
+  
+  	printf("CPU:   i.MX%s rev%d.%d",
+  	       get_imx_type((cpurev & 0x1FF000) >> 12),
+@@@ -229,12 -231,7 +237,16 @@@
+  		mxc_get_clock(MXC_ARM_CLK) / 1000000);
+  #endif
+  
+++<<<<<<< HEAD
+ +//#if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)
+ +#if (defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)) && !defined(CONFIG_TEMP_TCN75)
+ +    /*
+ +    If CONFIG_TEMP_TCN75 defined, disable cpu temp check, replaced by sensor tcn75. 
+ +    Modify by liuzhi,20190710
+ +    */
+++=======
++ #if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_IMX_TMU)
+++>>>>>>> android-11.0.0_2.2.0_history
+  	puts("CPU:   ");
+  	switch (get_cpu_temp_grade(&minc, &maxc)) {
+  	case TEMP_AUTOMOTIVE:
+diff --cc arch/arm/mach-imx/imx8m/Kconfig
+index 2fd77a057c,9e5b6d7ffa..665441666b
+--- a/arch/arm/mach-imx/imx8m/Kconfig
++++ b/arch/arm/mach-imx/imx8m/Kconfig
+@@@ -129,68 -152,70 +164,98 @@@ config TARGET_IMX8MP_EV
+  	select IMX8MP
+  	select SUPPORT_SPL
+  	select IMX8M_LPDDR4
++ 	select FSL_CAAM
++ 	select FSL_BLOB
++ 	select MISC
++ 	select SPL_CRYPTO_SUPPORT if SPL
++ 
++ config TARGET_PICO_IMX8MQ
++ 	bool "Support Technexion Pico iMX8MQ"
++ 	select IMX8MQ
++ 	select IMX8M_LPDDR4
+  
+ +config TARGET_IMX8MP_A200
+ +	bool "imx8mp_a200"
+ +	select IMX8MP
+ +	select SUPPORT_SPL
+ +	select IMX8M_LPDDR4
+ +
+  config TARGET_IMX8MP_DDR4_EVK
+  	bool "imx8mp DDR4 EVK board"
+  	select IMX8MP
+  	select SUPPORT_SPL
+  	select IMX8M_DDR4
++ 	select FSL_CAAM
++ 	select FSL_BLOB
++ 	select MISC
++ 	select SPL_CRYPTO_SUPPORT if SPL
+  
+- config TARGET_IMX8MM_AB2
+- 	bool "imx8mm LPDDR4 Audio board 2.0"
+- 	select IMX8MM
+- 	select SUPPORT_SPL
+- 	select IMX8M_LPDDR4
++ config TARGET_VERDIN_IMX8MM
++        bool "Support Toradex Verdin iMX8M Mini module"
++        select IMX8MM
++        select SUPPORT_SPL
++        select IMX8M_LPDDR4
+  
+- config TARGET_IMX8MM_DDR4_AB2
+- 	bool "imx8mm DDR4 Audio board 2.0"
++ config TARGET_IMX8MM_BEACON
++ 	bool "imx8mm Beacon Embedded devkit"
+  	select IMX8MM
+  	select SUPPORT_SPL
+- 	select IMX8M_DDR4
+- 
+- config TARGET_IMX8MN_AB2
+- 	bool "imx8mn LPDDR4 Audio board 2.0"
+- 	select IMX8MN
+- 	select SUPPORT_SPL
+  	select IMX8M_LPDDR4
+  
+++<<<<<<< HEAD
+ +config TARGET_IMX8MN_A100
+ +	bool "imx8mn_a100"
+ +	select IMX8MN
+ +	select SUPPORT_SPL
+ +	select IMX8M_LPDDR4
+ +
+ +config TARGET_IMX8MN_DDR4_AB2
+ +	bool "imx8mn DDR4 Audio board 2.0"
+++=======
++ config TARGET_IMX8MN_BEACON
++ 	bool "imx8mn Beacon Embedded devkit"
+++>>>>>>> android-11.0.0_2.2.0_history
+  	select IMX8MN
+  	select SUPPORT_SPL
+- 	select IMX8M_DDR4
++ 	select IMX8M_LPDDR4
+  
+- config TARGET_VERDIN_IMX8MM
+-        bool "Support Toradex Verdin iMX8M Mini module"
+-        select IMX8MM
+-        select SUPPORT_SPL
+-        select IMX8M_LPDDR4
++ config TARGET_PHYCORE_IMX8MM
++ 	bool "PHYTEC PHYCORE i.MX8MM"
++ 	select IMX8MM
++         select SUPPORT_SPL
++ 	select IMX8M_LPDDR4
+  
++ config TARGET_PHYCORE_IMX8MP
++ 	bool "PHYTEC PHYCORE i.MX8MP"
++ 	select IMX8MP
++         select SUPPORT_SPL
++ 	select IMX8M_LPDDR4
+  endchoice
+  
+  source "board/freescale/imx8mq_evk/Kconfig"
+  source "board/freescale/imx8mq_val/Kconfig"
+++<<<<<<< HEAD
+ +source "board/freescale/imx8mq_a300/Kconfig"
+ +source "board/freescale/imx8mq_phanbell/Kconfig"
+ +source "board/freescale/imx8mm_ab2/Kconfig"
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+  source "board/freescale/imx8mm_evk/Kconfig"
+  source "board/freescale/imx8mm_val/Kconfig"
+  source "board/freescale/imx8mn_evk/Kconfig"
+ +source "board/freescale/imx8mn_a100/Kconfig"
+  source "board/freescale/imx8mp_evk/Kconfig"
+++<<<<<<< HEAD
+ +source "board/freescale/imx8mp_a200/Kconfig"
+++=======
++ source "board/gateworks/venice/Kconfig"
++ source "board/google/imx8mq_phanbell/Kconfig"
++ source "board/technexion/pico-imx8mq/Kconfig"
+++>>>>>>> android-11.0.0_2.2.0_history
+  source "board/toradex/verdin-imx8mm/Kconfig"
++ source "board/beacon/imx8mm/Kconfig"
++ source "board/beacon/imx8mn/Kconfig"
++ source "board/phytec/phycore_imx8mm/Kconfig"
++ source "board/phytec/phycore_imx8mp/Kconfig"
+  
+  endif
+diff --cc arch/arm/mach-imx/imx8m/soc.c
+index 257d012777,95c23b0df4..2b78b773ae
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@@ -15,23 -18,23 +18,33 @@@
+  #include <asm/mach-imx/boot_mode.h>
+  #include <asm/mach-imx/optee.h>
+  #include <asm/mach-imx/syscounter.h>
++ #include <asm/ptrace.h>
+  #include <asm/armv8/mmu.h>
+  #include <dm/uclass.h>
++ #include <dm/platdata.h>
++ #include <dm/uclass-internal.h>
++ #include <dm/device-internal.h>
++ #include <efi_loader.h>
++ #include <env.h>
++ #include <env_internal.h>
+  #include <errno.h>
+  #include <fdt_support.h>
+- #include <fdtdec.h>
+  #include <fsl_wdog.h>
+  #include <imx_sip.h>
+- #include <generated/version_autogenerated.h>
++ #include <linux/arm-smccc.h>
++ #include <linux/bitops.h>
+  #include <asm/setup.h>
+  #include <asm/bootm.h>
+++<<<<<<< HEAD
+ +#ifdef CONFIG_IMX_SEC_INIT
+ +#include <fsl_caam.h>
+ +#endif
+ +#include <env.h>
+ +#include <env_internal.h>
+ +#include <efi_loader.h>
+ +#include <idt_ddr_select.h>
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  DECLARE_GLOBAL_DATA_PTR;
+  
+@@@ -231,10 -238,8 +257,15 @@@ int dram_init(void
+  	else
+  		gd->ram_size = sdram_size;
+  
+++<<<<<<< HEAD
+ +#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ +	gd->ram_size += idt_banksize_2nd(mem_map);
+ +	return 0;
+ +#endif
+++=======
++ 	/* also update the SDRAM size in the mem_map used externally */
++ 	imx8m_mem_map[entry].size = sdram_size;
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  #ifdef PHYS_SDRAM_2_SIZE
+  	gd->ram_size += PHYS_SDRAM_2_SIZE;
+diff --cc arch/arm/mach-imx/spl.c
+index 893fef9d67,9ca152a943..e1cc46a336
+--- a/arch/arm/mach-imx/spl.c
++++ b/arch/arm/mach-imx/spl.c
+@@@ -333,17 -319,15 +319,25 @@@ ulong board_spl_fit_size_align(ulong si
+  	return size;
+  }
+  
+++<<<<<<< HEAD
+ +int board_spl_fit_post_load(ulong load_addr, size_t length)
+++=======
++ void board_spl_fit_post_load(const void *fit)
+++>>>>>>> android-11.0.0_2.2.0_history
+  {
+- 	u32 offset = length - CONFIG_CSF_SIZE;
++ 	u32 offset = ALIGN(fdt_totalsize(fit), 0x1000);
+  
+- 	if (imx_hab_authenticate_image(load_addr,
++ 	if (imx_hab_authenticate_image((uintptr_t)fit,
+  				       offset + IVT_SIZE + CSF_PAD_SIZE,
+  				       offset)) {
+++<<<<<<< HEAD
+ +		puts("spl: ERROR:  image authentication unsuccessful
+");
+ +		return -1;
+++=======
++ 		panic("spl: ERROR:  image authentication unsuccessful
+");
+++>>>>>>> android-11.0.0_2.2.0_history
+  	}
+ +	return 0;
+  }
+  #endif
+  
+diff --cc cmd/bmp.c
+index 853677a91b,92fcbce611..e62c0b0818
+--- a/cmd/bmp.c
++++ b/cmd/bmp.c
+@@@ -141,10 -141,11 +144,10 @@@ static int do_bmp_display(struct cmd_tb
+  	default:
+  		return CMD_RET_USAGE;
+  	}
+ -
+ -	 return (bmp_display(addr, x, y));
+ +	return (bmp_display(addr, x, y));
+  }
+  
+- static cmd_tbl_t cmd_bmp_sub[] = {
++ static struct cmd_tbl cmd_bmp_sub[] = {
+  	U_BOOT_CMD_MKENT(info, 3, 0, do_bmp_info, "", ""),
+  	U_BOOT_CMD_MKENT(display, 5, 0, do_bmp_display, "", ""),
+  };
+diff --cc common/board_r.c
+index 51233c7cbf,aa0fe6b57d..3aaf1fbb95
+--- a/common/board_r.c
++++ b/common/board_r.c
+@@@ -857,13 -759,7 +779,17 @@@ static init_fnc_t init_sequence_r[] = 
+  	mac_read_from_eeprom,
+  #endif
+  	INIT_FUNC_WATCHDOG_RESET
+++<<<<<<< HEAD
+ +#ifdef CONFIG_FSL_FASTBOOT
+ +	initr_fastboot_setup,
+ +#endif
+ +#ifdef CONFIG_IDT_LINUX_DTB
+ +	initr_get_linux_dtb,
+ +#endif
+ +#if defined(CONFIG_PCI) && !defined(CONFIG_SYS_EARLY_PCI_INIT)
+++=======
++ #if defined(CONFIG_PCI_INIT_R) && !defined(CONFIG_SYS_EARLY_PCI_INIT)
+++>>>>>>> android-11.0.0_2.2.0_history
+  	/*
+  	 * Do pci configuration
+  	 */
+diff --cc common/image-android.c
+index 99584cc8b1,fb32c9482c..e8507143ee
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@@ -21,8 -22,8 +22,9 @@@
+  #include <fb_fsl.h>
+  #include <asm/setup.h>
+  #include <dm.h>
++ #include <init.h>
+  #include <mmc.h>
+ +#include <persist_idt.h>
+  
+  #define ANDROID_IMAGE_DEFAULT_KERNEL_ADDR	0x10008000
+  #define COMMANDLINE_LENGTH			2048
+diff --cc common/spl/spl_fit.c
+index ef7c9d57c4,1442e0e35d..5c79633fc8
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@@ -24,7 -27,14 +27,18 @@@ DECLARE_GLOBAL_DATA_PTR
+  #define CONFIG_SYS_BOOTM_LEN	(64 << 20)
+  #endif
+  
+++<<<<<<< HEAD
+ +__weak int board_spl_fit_post_load(ulong load_addr, size_t length)
+++=======
++ struct spl_fit_info {
++ 	const void *fit;	/* Pointer to a valid FIT blob */
++ 	size_t ext_data_offset;	/* Offset to FIT external data (end of FIT) */
++ 	int images_node;	/* FDT offset to "/images" node */
++ 	int conf_node;		/* FDT offset to selected configuration node */
++ };
++ 
++ __weak void board_spl_fit_post_load(const void *fit)
+++>>>>>>> android-11.0.0_2.2.0_history
+  {
+  }
+  
+@@@ -722,13 -780,8 +784,18 @@@ int spl_load_simple_fit(struct spl_imag
+  
+  	spl_image->flags |= SPL_FIT_FOUND;
+  
+++<<<<<<< HEAD
+ +#ifdef CONFIG_IMX_HAB
+ +	ret = 0;
+ +	if (!(spl_image->flags & SPL_FIT_BYPASS_POST_LOAD))
+ +		ret = board_spl_fit_post_load((ulong)fit, size);
+ +	if (ret < 0)
+ +		return ret;
+ +#endif
+++=======
++ 	if (IS_ENABLED(CONFIG_IMX_HAB) && !(spl_image->flags & SPL_FIT_BYPASS_POST_LOAD))
++ 		board_spl_fit_post_load(ctx.fit);
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  	return 0;
+  }
+diff --cc configs/imx8mn_ddr4_evk_android_defconfig
+index 031e6b72a0,c8c30730ba..6f1bffe215
+--- a/configs/imx8mn_ddr4_evk_android_defconfig
++++ b/configs/imx8mn_ddr4_evk_android_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_ddr4_evk_android_uuu_defconfig
+index e89431ba6c,9cbec2509b..420c98f4e9
+--- a/configs/imx8mn_ddr4_evk_android_uuu_defconfig
++++ b/configs/imx8mn_ddr4_evk_android_uuu_defconfig
+@@@ -116,9 -129,11 +129,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_defconfig
+index ecf600b8da,015c189eb6..0690b10968
+--- a/configs/imx8mn_evk_android_defconfig
++++ b/configs/imx8mn_evk_android_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_dual_defconfig
+index 53e5e2b0f7,861edca059..8632acc77f
+--- a/configs/imx8mn_evk_android_dual_defconfig
++++ b/configs/imx8mn_evk_android_dual_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_trusty_defconfig
+index a6fdd1e575,58b2d2d61b..29e00d1770
+--- a/configs/imx8mn_evk_android_trusty_defconfig
++++ b/configs/imx8mn_evk_android_trusty_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_trusty_dual_defconfig
+index 26ca022a06,76487ee1c2..812f93d1fe
+--- a/configs/imx8mn_evk_android_trusty_dual_defconfig
++++ b/configs/imx8mn_evk_android_trusty_dual_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_trusty_secure_unlock_defconfig
+index 30666f90ca,2305428783..e0f0ccfb8c
+--- a/configs/imx8mn_evk_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mn_evk_android_trusty_secure_unlock_defconfig
+@@@ -115,9 -128,11 +128,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mn_evk_android_uuu_defconfig
+index a9f5b89632,8370ab6ea9..cfa6d222e1
+--- a/configs/imx8mn_evk_android_uuu_defconfig
++++ b/configs/imx8mn_evk_android_uuu_defconfig
+@@@ -116,9 -129,11 +129,15 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_USB_GADGET=y
++ CONFIG_USB_STORAGE=y
+  CONFIG_DM_USB=y
+  CONFIG_CI_UDC=y
+  CONFIG_USB_EHCI_HCD=y
+diff --cc configs/imx8mq_evk_android_defconfig
+index a0c5d0514c,0c3d625aaa..a29133ca58
+--- a/configs/imx8mq_evk_android_defconfig
++++ b/configs/imx8mq_evk_android_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc configs/imx8mq_evk_android_dual_defconfig
+index 354f128fdd,d43e34b1cc..3369662ba2
+--- a/configs/imx8mq_evk_android_dual_defconfig
++++ b/configs/imx8mq_evk_android_dual_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc configs/imx8mq_evk_android_trusty_defconfig
+index 7fb0999e09,c6003adc05..a11d2a195d
+--- a/configs/imx8mq_evk_android_trusty_defconfig
++++ b/configs/imx8mq_evk_android_trusty_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc configs/imx8mq_evk_android_trusty_dual_defconfig
+index 7ff3d0c989,d69c4f92c6..13b928a3c0
+--- a/configs/imx8mq_evk_android_trusty_dual_defconfig
++++ b/configs/imx8mq_evk_android_trusty_dual_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc configs/imx8mq_evk_android_trusty_secure_unlock_defconfig
+index 8c7bb6b869,85aedf824f..7219e5dbda
+--- a/configs/imx8mq_evk_android_trusty_secure_unlock_defconfig
++++ b/configs/imx8mq_evk_android_trusty_secure_unlock_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc configs/imx8mq_evk_android_uuu_defconfig
+index f86b12c72c,8fccf6fac2..6af06ade72
+--- a/configs/imx8mq_evk_android_uuu_defconfig
++++ b/configs/imx8mq_evk_android_uuu_defconfig
+@@@ -98,7 -104,9 +104,13 @@@ CONFIG_MXC_UART=
+  CONFIG_SYSRESET=y
+  CONFIG_SYSRESET_PSCI=y
+  CONFIG_DM_THERMAL=y
+++<<<<<<< HEAD
+ +CONFIG_NXP_TMU=y
+++=======
++ CONFIG_IMX_TMU=y
++ CONFIG_USB_TCPC=y
++ CONFIG_USB_STORAGE=y
+++>>>>>>> android-11.0.0_2.2.0_history
+  CONFIG_USB=y
+  CONFIG_DM_USB=y
+  CONFIG_USB_GADGET=y
+diff --cc drivers/Kconfig
+index 88bf9833c9,b1ada1cb7f..be72f53639
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@@ -132,7 -138,7 +138,11 @@@ source "drivers/w1-eeprom/Kconfig
+  
+  source "drivers/watchdog/Kconfig"
+  
+++<<<<<<< HEAD
+ +source "drivers/idt/Kconfig"
+++=======
++ source "drivers/xen/Kconfig"
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  config PHYS_TO_BUS
+  	bool "Custom physical to bus address mapping"
+diff --cc drivers/Makefile
+index 13f6badc3d,c562a719f7..941d0dc36b
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@@ -25,11 -27,11 +27,17 @@@ obj-$(CONFIG_$(SPL_TPL_)TIMER) += timer
+  obj-$(CONFIG_$(SPL_TPL_)VIRTIO) += virtio/
+  obj-$(CONFIG_$(SPL_)DM_MAILBOX) += mailbox/
+  obj-$(CONFIG_$(SPL_)REMOTEPROC) += remoteproc/
++ obj-$(CONFIG_$(SPL_)SYSINFO) += sysinfo/
+  obj-$(CONFIG_$(SPL_TPL_)TPM) += tpm/
+  obj-$(CONFIG_$(SPL_TPL_)ACPI_PMC) += power/acpi_pmc/
+++<<<<<<< HEAD
+ +obj-$(CONFIG_$(SPL_)BOARD) += board/
+ +obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
+ +obj-$(CONFIG_IDT_BOARD_INFO_PARSER) += idt/bdinfo_parser/
+++=======
++ obj-$(CONFIG_XEN) += xen/
++ obj-$(CONFIG_$(SPL_)FPGA) += fpga/
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  ifndef CONFIG_TPL_BUILD
+  ifdef CONFIG_SPL_BUILD
+@@@ -60,10 -62,7 +68,9 @@@ obj-$(CONFIG_SPL_USB_HOST_SUPPORT) += u
+  obj-$(CONFIG_OMAP_USB_PHY) += usb/phy/
+  obj-$(CONFIG_SPL_SATA_SUPPORT) += ata/ scsi/
+  obj-$(CONFIG_HAVE_BLOCK_DEVICE) += block/
+- obj-$(CONFIG_SPL_FPGA_SUPPORT) += fpga/
+  obj-$(CONFIG_SPL_THERMAL) += thermal/
+ +obj-$(CONFIG_IDT_MULTIPLE_DDR) += idt/multiddr/
+ +obj-$(CONFIG_IDT_BOARD_INFO_PARSER) += idt/bdinfo_parser/
+  
+  endif
+  endif
+diff --cc drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index fed7f0252a,b73a7aa8f6..d4d936018d
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@@ -44,16 -50,9 +50,11 @@@
+  #endif
+  
+  #include "fb_fsl_common.h"
+ +#include <persist_idt.h>
+ +#include <idt_red_warning.h>
+  
+- /* max kernel image size */
+- #ifdef CONFIG_ARCH_IMX8
+- /* imx8q has more limitation so we assign less memory here. */
+- #define MAX_KERNEL_LEN (60 * 1024 * 1024)
+- #else
+- #define MAX_KERNEL_LEN (64 * 1024 * 1024)
+- #endif
++ /* max kernel image size, used for compressed kernel image */
++ #define MAX_KERNEL_LEN (96 * 1024 * 1024)
+  
+  /* Offset (in u32's) of start and end fields in the zImage header. */
+  #define ZIMAGE_START_ADDR	10
+@@@ -561,104 -564,13 +566,112 @@@ bool __weak is_power_key_pressed(void) 
+  	return false;
+  }
+  
+++<<<<<<< HEAD
+ +#define GET_BYTE(x, n)  ((x & (0xff << 8 * n)) >> 8 * n)
+ +#define FDT_ID_SIZE	128 /* the maximun size of idt,prod-id is 128 */
+ +
+ +int find_dtb_in_dtbo(struct dt_table_header *dt_img)
+ +{
+ +	int fdt_idx = 1;
+ +	u32 dtbo_id;
+ +	u32 fdt_size;
+ +	int len;
+ +	char *fdt_blob;
+ +	char *fdt_id;
+ +	struct dt_table_entry *dt_entry;
+ +	const struct fdt_property *fdt_prop;
+ +
+ +	fdt_id = malloc(sizeof(char) * FDT_ID_SIZE);
+ +	if (get_dtb_id(fdt_id, FDT_ID_SIZE)) {
+ +		printf("Selected ID: %s
+", fdt_id);
+ +	} else {
+ +		puts("Can't get ID from Board info partition
+");
+ +		fdt_idx = -1;
+ +		goto find_out;
+ +	}
+ +
+ +	while (fdt_idx < fdt32_to_cpu(dt_img->dt_entry_count) + 1) {
+ +		dt_entry = (struct dt_table_entry *)
+ +			   ((ulong)dt_img +
+ +			    fdt32_to_cpu(dt_img->dt_entries_offset) * fdt_idx);
+ +		fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+ +		dtbo_id = fdt32_to_cpu(dt_entry->id);
+ +		printf("DTBO ID: %lx (", (ulong)dtbo_id);
+ +		for (len = 3; len >= 0; len--) {
+ +			if ((GET_BYTE(dtbo_id, len) > 31) &&
+ +			    (GET_BYTE(dtbo_id, len) < 127))
+ +				printf("%c", GET_BYTE(dtbo_id, len));
+ +		}
+ +		printf(")	 @ %lx (%d)
+",
+ +		       ((ulong)dt_img +
+ +		        fdt32_to_cpu(dt_entry->dt_offset)),
+ +		       fdt_size);
+ +		fdt_blob = (void *)(ulong)dt_img + fdt32_to_cpu(dt_entry->dt_offset);
+ +		if (fdt_check_header(fdt_blob) != 0) {
+ +			puts("image is not a fdt
+");
+ +			fdt_idx = -1;
+ +			break;
+ +		}
+ +
+ +		if (fdt_totalsize(fdt_blob) != fdt_size) {
+ +			printf("fdt size != image size (%d)
+", fdt_size);
+ +			fdt_idx = -1;
+ +			break;
+ +		}
+ +
+ +		fdt_prop = fdt_get_property(fdt_blob,
+ +					    fdt_path_offset(fdt_blob,
+ +							    "/"),
+ +					    "compatible",
+ +					    &len);
+ +		if (len >= 0)
+ +			printf("FDT compatible: %s
+", fdt_prop->data);
+ +
+ +		fdt_prop = fdt_get_property(fdt_blob,
+ +		                            fdt_path_offset(fdt_blob,
+ +							    "/"),
+ +					    "idt,prod-id",
+ +					    &len);
+ +		if (len >= 0) {
+ +			printf("FDT idt,prod-id: %s
+", fdt_prop->data);
+ +			if (!strncmp(fdt_id, fdt_prop->data,
+ +				     strlen(fdt_prop->data))) {
+ +				printf("## Selected Flattened"
+ +				       " Device Tree: %s
+", fdt_prop->data);
+ +				break;
+ +			}
+ +		}
+ +		fdt_idx++;
+ +	}
+ +	if (fdt_idx > fdt32_to_cpu(dt_img->dt_entry_count)) {
+ +		puts("Can't find ID in DTBO
+");
+ +		fdt_idx = -1;
+ +	}
+ +
+ +find_out:
+ +	free(fdt_id);
+ +
+ +	return fdt_idx;
+ +}
+ +
+ +int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ +
+ +	ulong addr = 0;
+ +	u32 avb_metric;
+ +	int entry_idx;
+++=======
++ int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
++ 
++ 	ulong addr = 0;
++ 	u32 avb_metric;
++ 	u32 kernel_image_size = 0;
+++>>>>>>> android-11.0.0_2.2.0_history
+  	bool check_image_arm64 =  false;
+  	bool is_recovery_mode = false;
+ +	bool retry_boot =  false;
+ +#ifdef CONFIG_ANDROID_AB_SUPPORT
+ +	int retry_count_before_avb = -1, retry_count_after_avb = -1;
+ +#endif
+  	bool gki_is_supported = false;
+  
+  	/* 'hdr' should point to boot.img */
+diff --cc drivers/mmc/mmc.c
+index 6db78e3a62,785ebc0cd3..414fdcf423
+--- a/drivers/mmc/mmc.c
++++ b/drivers/mmc/mmc.c
+@@@ -3005,7 -3013,7 +3013,11 @@@ static int mmc_probe(struct bd_info *bi
+  	return 0;
+  }
+  #else
+++<<<<<<< HEAD
+ +int mmc_probe(bd_t *bis)
+++=======
++ static int mmc_probe(struct bd_info *bis)
+++>>>>>>> android-11.0.0_2.2.0_history
+  {
+  	if (board_mmc_init(bis) < 0)
+  		cpu_mmc_init(bis);
+diff --cc drivers/sysreset/sysreset-uclass.c
+index 63cc977672,6c9dc7a384..c4e5e3c1e0
+--- a/drivers/sysreset/sysreset-uclass.c
++++ b/drivers/sysreset/sysreset-uclass.c
+@@@ -119,8 -129,10 +129,14 @@@ int do_reset(struct cmd_tbl *cmdtp, in
+  
+  	return 0;
+  }
++ #endif
+  
+++<<<<<<< HEAD
+ +int do_poweroff(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+++=======
++ #if IS_ENABLED(CONFIG_SYSRESET_CMD_POWEROFF)
++ int do_poweroff(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
+++>>>>>>> android-11.0.0_2.2.0_history
+  {
+  	int ret;
+  
+diff --cc drivers/video/Makefile
+index 6b555ce242,bd6056ccf1..c1c5eed60e
+--- a/drivers/video/Makefile
++++ b/drivers/video/Makefile
+@@@ -55,10 -57,9 +57,10 @@@ obj-$(CONFIG_VIDEO_LCD_HITACHI_TX18D42V
+  obj-$(CONFIG_VIDEO_LCD_ORISETECH_OTM8009A) += orisetech_otm8009a.o
+  obj-$(CONFIG_VIDEO_LCD_RAYDIUM_RM68200) += raydium-rm68200.o
+  obj-$(CONFIG_VIDEO_LCD_RAYDIUM_RM67191) += raydium-rm67191.o
+ +obj-$(CONFIG_VIDEO_LCD_HIMAX_HX8394F) += himax-hx8394f.o
+  obj-$(CONFIG_VIDEO_LCD_SSD2828) += ssd2828.o
++ obj-$(CONFIG_VIDEO_LCD_TDO_TL070WSH30) += tdo-tl070wsh30.o
+  obj-$(CONFIG_VIDEO_ADV7535) += adv7535.o
+- obj-$(CONFIG_VIDEO_MB862xx) += mb862xx.o videomodes.o
+  obj-${CONFIG_VIDEO_MESON} += meson/
+  obj-${CONFIG_VIDEO_MIPI_DSI} += mipi_dsi.o
+  obj-$(CONFIG_VIDEO_IT6263_BRIDGE) += it6263_bridge.o
+diff --cc drivers/video/mxsfb.c
+index 488fe8d28c,4757f3ec75..06735c6ad9
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@@ -253,14 -177,11 +266,19 @@@ static void mxs_lcd_init(phys_addr_t re
+  	writel(LCDIF_CTRL_RUN, &regs->hw_lcdif_ctrl_set);
+  }
+  
+- static int mxs_probe_common(phys_addr_t reg_base, struct ctfb_res_modes *mode, int bpp, u32 fb, bool bridge, bool enable_pol)
++ static int mxs_probe_common(phys_addr_t reg_base, struct display_timing *timings,
++ 			    int bpp, u32 fb, bool bridge)
+  {
+  	/* Start framebuffer */
+++<<<<<<< HEAD
+ +#ifdef CONFIG_IMX8MQ
+ +	imx8mq_lcdif_init(reg_base, fb, mode, bpp, bridge, enable_pol);
+ +#else /* !CONFIG_IMX8MQ */
+ +	mxs_lcd_init(reg_base, fb, mode, bpp, bridge, enable_pol);
+ +#endif /* CONFIG_IMX8MQ */
+++=======
++ 	mxs_lcd_init(reg_base, fb, timings, bpp, bridge);
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  #ifdef CONFIG_VIDEO_MXS_MODE_SYSTEM
+  	/*
+diff --cc drivers/video/nxp/imx/mipi_dsi_northwest.c
+index 0c0e0aed7f,399fd8f9c8..b6fa90a445
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest.c
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+@@@ -22,23 -23,10 +23,24 @@@
+  #include <div64.h>
+  #include <asm/arch/imx-regs.h>
+  #include <dm/device-internal.h>
++ #include <dm/device_compat.h>
+  #include <regmap.h>
+  #include <syscon.h>
+ -#include <asm/arch/clock.h>
+ +
+ +#define CN_BUF	0xcb7a89c0
+ +#define CO_BUF	0x63
+ +#define CM(x)	( \
+ +		((x) <  32)?0xe0|((x)-16) : \
+ +		((x) <  64)?0xc0|((x)-32) : \
+ +		((x) < 128)?0x80|((x)-64) : \
+ +		((x) - 128))
+ +#define CN(x)	(((x) == 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
+ +#define CO(x)	((CO_BUF)>>(8-(x))&0x3)
+ +
+ +#define NWL_DSI_TX_PKT_DONE_MASK	BIT(1)
+ +#define NWL_DSI_TX_FIFO_OVFLW_MASK	BIT(3)
+ +#define NWL_DSI_RX_PKT_HDR_RCVD_MASK	BIT(7)
+ +#define NWL_DSI_HS_TX_TIMEOUT_MASK	BIT(31)
+  
+  #define MIPI_LCD_SLEEP_MODE_DELAY	(120)
+  #define MIPI_FIFO_TIMEOUT		250000 /* 250ms */
+diff --cc drivers/video/nxp/imx/sec_mipi_dsim.c
+index 5142907889,d30021e2cd..5783e241a3
+--- a/drivers/video/nxp/imx/sec_mipi_dsim.c
++++ b/drivers/video/nxp/imx/sec_mipi_dsim.c
+@@@ -6,9 -6,11 +6,15 @@@
+  
+  #include <common.h>
+  #include <dm.h>
++ #include <dm/device_compat.h>
+  #include <asm/io.h>
+  #include <linux/err.h>
+++<<<<<<< HEAD
+ +#include <linux/log2.h>
+++=======
++ #include <linux/bug.h>
++ #include <linux/delay.h>
+++>>>>>>> android-11.0.0_2.2.0_history
+  #include <asm/unaligned.h>
+  #include <asm/arch/clock.h>
+  #include <asm/arch/imx-regs.h>
+diff --cc drivers/video/video-uclass.c
+index 98e547954e,96ec6f80af..d5a06d733b
+--- a/drivers/video/video-uclass.c
++++ b/drivers/video/video-uclass.c
+@@@ -246,10 -340,10 +351,13 @@@ static int video_post_probe(struct udev
+  		priv->line_length = priv->xsize * VNBYTES(priv->bpix);
+  
+  	priv->fb_size = priv->line_length * priv->ysize;
+ +#ifdef CONFIG_IDT_ROTATION
+ +	ret = idt_fb_init(priv->fb_size);
+ +#endif /* CONFIG_IDT_ROTATION */
+  
++ 	if (IS_ENABLED(CONFIG_VIDEO_COPY) && plat->copy_base)
++ 		priv->copy_fb = map_sysmem(plat->copy_base, plat->size);
++ 
+  	/* Set up colors  */
+  	video_set_default_colors(dev, false);
+  
+diff --cc drivers/video/video_bmp.c
+index 3537a6bf16,66de22318f..3af36151b5
+--- a/drivers/video/video_bmp.c
++++ b/drivers/video/video_bmp.c
+@@@ -316,12 -304,17 +308,18 @@@ int video_bmp_display(struct udevice *d
+  					/* Only support big endian */
+  					cte = &palette[*bmap];
+  					bmap++;
+- 					*(fb++) = cte->blue;
+- 					*(fb++) = cte->green;
+- 					*(fb++) = cte->red;
+- 					*(fb++) = 0;
++ 					if (bpix == 24) {
++ 						*(fb++) = cte->red;
++ 						*(fb++) = cte->green;
++ 						*(fb++) = cte->blue;
++ 					} else {
++ 						*(fb++) = cte->blue;
++ 						*(fb++) = cte->green;
++ 						*(fb++) = cte->red;
++ 						*(fb++) = 0;
++ 					}
+  				}
+ +
+  			}
+  			bmap += (padded_width - width);
+  			fb -= byte_width + priv->line_length;
+diff --cc drivers/video/video_link.c
+index 349c2a2a5e,72ef1a0f64..210564b7ce
+--- a/drivers/video/video_link.c
++++ b/drivers/video/video_link.c
+@@@ -14,10 -15,7 +15,14 @@@
+  #include <dm/read.h>
+  #include <video.h>
+  #include <panel.h>
+++<<<<<<< HEAD
+ +#include <hdmi_timing_idt.h>
+ +#ifdef CONFIG_IDT_BOARD_INFO_PARSER
+ +#include <idt_bdinfo_parser.h>
+ +#endif /* CONFIG_IDT_BOARD_INFO_PARSER */
+++=======
++ #include <env.h>
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  struct of_endpoint {
+  	unsigned int port;
+diff --cc include/configs/imx8mn_evk.h
+index 05c394b530,ff65b80999..c6906eb430
+--- a/include/configs/imx8mn_evk.h
++++ b/include/configs/imx8mn_evk.h
+@@@ -199,12 -197,12 +197,9 @@@
+  #define CONFIG_SYS_SDRAM_BASE           0x40000000
+  #define PHYS_SDRAM                      0x40000000
+  
+ -#ifdef CONFIG_TARGET_IMX8MN_DDR3_EVK
+ -#define PHYS_SDRAM_SIZE			0x40000000 /* 1GB DDR */
+ -#else
+ -#define PHYS_SDRAM_SIZE			0x80000000 /* 2GB DDR */
+ -#endif
+ +/* IDT: default 1GB ddr, will dynamically get */
+ +#define PHYS_SDRAM_SIZE			0x40000000
+  
+- #define CONFIG_SYS_MEMTEST_START	0x60000000
+- #define CONFIG_SYS_MEMTEST_END      (CONFIG_SYS_MEMTEST_START + (PHYS_SDRAM_SIZE >> 2))
+- 
+  #define CONFIG_MXC_UART_BASE		UART2_BASE_ADDR
+  
+  /* Monitor Command Prompt */
+diff --cc include/configs/imx8mq_evk.h
+index e88d478c58,647850cd2e..1b32112a69
+--- a/include/configs/imx8mq_evk.h
++++ b/include/configs/imx8mq_evk.h
+@@@ -167,15 -179,8 +179,11 @@@
+  
+  #define CONFIG_SYS_SDRAM_BASE           0x40000000
+  #define PHYS_SDRAM                      0x40000000
+ -#define PHYS_SDRAM_SIZE			0xC0000000 /* 3GB DDR */
+ +#define PHYS_SDRAM_SIZE	                0x80000000 /* idt: default 2GB DDR for all product */
+ +/* IDT added SDRAM second bank */
+ +#define PHYS_SDRAM_2                    0x100000000
+ +#define PHYS_SDRAM_2_SIZE               0x0      /* IDT: init as 0, dynamically assign */
+  
+- #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
+- #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
+- 					(PHYS_SDRAM_SIZE >> 1))
+- 
+  #define CONFIG_MXC_UART_BASE		UART1_BASE_ADDR
+  
+  /* Monitor Command Prompt */
+diff --cc include/configs/imx8mq_phanbell.h
+index 44d74de21f,66c2c3a8d8..81acb5adad
+--- a/include/configs/imx8mq_phanbell.h
++++ b/include/configs/imx8mq_phanbell.h
+@@@ -1,25 -1,31 +1,54 @@@
+  /* SPDX-License-Identifier: GPL-2.0+ */
+  /*
+++<<<<<<< HEAD
+ + * Copyright 2018 NXP
+ + */
+ +
+ +#ifndef __IMX8M_PHANBELL_
+ +#define __IMX8M_PHANBELL_
+ +
+ +#include <linux/sizes.h>
+ +#include <asm/arch/imx-regs.h>
+ +#include "imx_env.h"
+ +
+ +#define CONFIG_SPL_MAX_SIZE		(148 * 1024)
+ +#define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
+ +#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
+ +#define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	(0x300 + CONFIG_SECONDARY_BOOT_SECTOR_OFFSET)
+ +#define CONFIG_SYS_MMCSD_FS_BOOT_PARTITION	1
+ +
+ +#ifdef CONFIG_SPL_BUILD
+ +/*#define CONFIG_ENABLE_DDR_TRAINING_DEBUG*/
+ +#define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv8/u-boot-spl.lds"
+ +#define CONFIG_SPL_STACK		0x187FF0
+++=======
++  * Copyright 2020 NXP
++  */
++ 
++ #ifndef __IMX8M_PHANBELL_H
++ #define __IMX8M_PHANBELL_H
++ 
++ #include <linux/sizes.h>
++ #include <asm/arch/imx-regs.h>
++ 
++ #define CONFIG_SPL_MAX_SIZE		(172 * 1024)
++ #define CONFIG_SYS_MONITOR_LEN		(512 * 1024)
++ #define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_USE_SECTOR
++ #define CONFIG_SYS_MMCSD_RAW_MODE_U_BOOT_SECTOR	0x300
++ 
++ #ifdef CONFIG_SPL_BUILD
++ /*#define CONFIG_ENABLE_DDR_TRAINING_DEBUG*/
++ #define CONFIG_SPL_WATCHDOG_SUPPORT
++ #define CONFIG_SPL_DRIVERS_MISC_SUPPORT
++ #define CONFIG_SPL_POWER_SUPPORT
++ #define CONFIG_SPL_I2C_SUPPORT
++ #define CONFIG_SPL_LDSCRIPT		"arch/arm/cpu/armv8/u-boot-spl.lds"
++ #define CONFIG_SPL_STACK		0x187FF0
++ #define CONFIG_SPL_LIBCOMMON_SUPPORT
++ #define CONFIG_SPL_LIBGENERIC_SUPPORT
++ #define CONFIG_SPL_GPIO_SUPPORT
++ #define CONFIG_SPL_MMC_SUPPORT
+++>>>>>>> android-11.0.0_2.2.0_history
+  #define CONFIG_SPL_BSS_START_ADDR      0x00180000
+  #define CONFIG_SPL_BSS_MAX_SIZE        0x2000	/* 8 KB */
+  #define CONFIG_SYS_SPL_MALLOC_START    0x42200000
+@@@ -36,66 -42,56 +65,110 @@@
+  #undef CONFIG_DM_PMIC_PFUZE100
+  
+  #define CONFIG_SYS_I2C
+++<<<<<<< HEAD
+ +
+ +#define CONFIG_POWER
+ +#define CONFIG_POWER_I2C
+ +#define CONFIG_POWER_BD71837
+++=======
++ #define CONFIG_SYS_I2C_MXC_I2C1		/* enable I2C bus 1 */
++ #define CONFIG_SYS_I2C_MXC_I2C2		/* enable I2C bus 2 */
++ #define CONFIG_SYS_I2C_MXC_I2C3		/* enable I2C bus 3 */
++ 
++ #define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++ 
++ #define CONFIG_POWER
++ #define CONFIG_POWER_I2C
+++>>>>>>> android-11.0.0_2.2.0_history
+  #endif
+  
+  #define CONFIG_REMAKE_ELF
+  
+  /* ENET Config */
+  /* ENET1 */
+++<<<<<<< HEAD
+ +#if defined(CONFIG_FEC_MXC)
+ +#define CONFIG_ETHPRIME                 "FEC"
+ +#define PHY_ANEG_TIMEOUT 20000
+ +
+++=======
++ #if defined(CONFIG_CMD_NET)
++ #define CONFIG_MII
++ #define CONFIG_ETHPRIME                 "FEC"
++ 
++ #define CONFIG_FEC_MXC
+++>>>>>>> android-11.0.0_2.2.0_history
+  #define CONFIG_FEC_XCV_TYPE             RGMII
+  #define CONFIG_FEC_MXC_PHYADDR          0
+  #define FEC_QUIRK_ENET_MAC
+  
+++<<<<<<< HEAD
+ +#define IMX_FEC_BASE			0x30BE0000
+ +#endif
+ +
+ +/*
+ + * Another approach is add the clocks for inmates into clks_init_on
+ + * in clk-imx8mq.c, then clk_ingore_unused could be removed.
+ + */
+ +#define JAILHOUSE_ENV \
+ +	"jh_clk=   " \
+ +	"jh_mmcboot=setenv fdt_file fsl-imx8mq-phanbell.dtb; " \
+ +		"setenv jh_clk clk_ignore_unused; " \
+ +			   "if run loadimage; then " \
+ +				   "run mmcboot; " \
+ +			   "else run jh_netboot; fi;  " \
+ +	"jh_netboot=setenv fdt_file fsl-imx8mq-phanbell.dtb; setenv jh_clk clk_ignore_unused; run netboot;   "
+ +
+ +#define CONFIG_MFG_ENV_SETTINGS \
+ +	CONFIG_MFG_ENV_SETTINGS_DEFAULT \
+ +	"initrd_addr=0x43800000 " \
+ +	"initrd_high=0xffffffffffffffff " \
+ +	"emmc_dev=0 "\
+ +	"sd_dev=1 " \
+++=======
++ #define CONFIG_PHY_GIGE
++ #define IMX_FEC_BASE			0x30BE0000
++ 
++ #define CONFIG_PHYLIB
++ #endif
++ 
++ #define CONFIG_MFG_ENV_SETTINGS \
++ 	"initrd_addr=0x43800000 " \
++ 	"initrd_high=0xffffffff " \
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  /* Initial environment variables */
+  #define CONFIG_EXTRA_ENV_SETTINGS		\
+  	CONFIG_MFG_ENV_SETTINGS \
+++<<<<<<< HEAD
+ +	JAILHOUSE_ENV \
+ +	"script=boot.scr " \
+ +	"image=Image " \
+ +	"splashimage=0x50000000 " \
+++=======
++ 	"script=boot.scr " \
++ 	"image=Image " \
+++>>>>>>> android-11.0.0_2.2.0_history
+  	"console=ttymxc0,115200 " \
+  	"fdt_addr=0x43000000 "			\
+  	"fdt_high=0xffffffffffffffff "		\
+  	"boot_fdt=try " \
+++<<<<<<< HEAD
+ +	"fdt_file=fsl-imx8mq-phanbell.dtb " \
+++=======
++ 	"fdt_file=imx8mq-phanbell.dtb " \
+++>>>>>>> android-11.0.0_2.2.0_history
+  	"initrd_addr=0x43800000 "		\
+  	"initrd_high=0xffffffffffffffff " \
+  	"mmcdev="__stringify(CONFIG_SYS_MMC_ENV_DEV)" " \
+  	"mmcpart=" __stringify(CONFIG_SYS_MMC_IMG_LOAD_PART) " " \
+  	"mmcroot=" CONFIG_MMCROOT " rootwait rw " \
+  	"mmcautodetect=yes " \
+++<<<<<<< HEAD
+ +	"mmcargs=setenv bootargs ${jh_clk} console=${console} root=${mmcroot}  " \
+++=======
++ 	"mmcargs=setenv bootargs console=${console} root=${mmcroot}  " \
+++>>>>>>> android-11.0.0_2.2.0_history
+  	"loadbootscript=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script}; " \
+  	"bootscript=echo Running bootscript from mmc ...; " \
+  		"source " \
+@@@ -112,7 -108,7 +185,11 @@@
+  		"else " \
+  			"echo wait for boot; " \
+  		"fi; " \
+++<<<<<<< HEAD
+ +	"netargs=setenv bootargs ${jh_clk} console=${console} " \
+++=======
++ 	"netargs=setenv bootargs console=${console} " \
+++>>>>>>> android-11.0.0_2.2.0_history
+  		"root=/dev/nfs " \
+  		"ip=dhcp nfsroot=${serverip}:${nfsroot},v3,tcp " \
+  	"netboot=echo Booting from net ...; " \
+@@@ -157,22 -153,14 +234,31 @@@
+  #define CONFIG_SYS_INIT_SP_ADDR \
+  	(CONFIG_SYS_INIT_RAM_ADDR + CONFIG_SYS_INIT_SP_OFFSET)
+  
+++<<<<<<< HEAD
+ +#define CONFIG_ENV_OVERWRITE
+ +#define CONFIG_SYS_MMC_ENV_DEV		1   /* USDHC2 */
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+  #define CONFIG_MMCROOT			"/dev/mmcblk1p2"  /* USDHC2 */
+  
+  /* Size of malloc() pool */
+  #define CONFIG_SYS_MALLOC_LEN		((CONFIG_ENV_SIZE + (2 * 1024)) * 1024)
+  
+++<<<<<<< HEAD
+ +/* For phanbell these settings are only used internally within u-boot,
+ + * so we're setting PHYS_SDRAM_SIZE to 3 GB so that it works on all of our
+ + * boards.
+ + */
+ +#define CONFIG_SYS_SDRAM_BASE           0x40000000
+ +#define PHYS_SDRAM                      0x40000000
+ +#define PHYS_SDRAM_SIZE                 0x100000000/* IDT added SDRAM second bank */
+ +#define PHYS_SDRAM_2                    0x100000000
+ +#define PHYS_SDRAM_2_SIZE               0x0      /* IDT: init as 0, dynamically assign */
+++=======
++ #define CONFIG_SYS_SDRAM_BASE           0x40000000
++ #define PHYS_SDRAM                      0x40000000
++ #define PHYS_SDRAM_SIZE			0x40000000 /* 1GB DDR */
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  #define CONFIG_SYS_MEMTEST_START	PHYS_SDRAM
+  #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + \
+@@@ -181,7 -169,6 +267,10 @@@
+  #define CONFIG_MXC_UART_BASE		UART1_BASE_ADDR
+  
+  /* Monitor Command Prompt */
+++<<<<<<< HEAD
+ +#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+  #define CONFIG_SYS_CBSIZE		1024
+  #define CONFIG_SYS_MAXARGS		64
+  #define CONFIG_SYS_BARGSIZE		CONFIG_SYS_CBSIZE
+@@@ -195,55 -182,15 +284,66 @@@
+  
+  #define CONFIG_SYS_MMC_IMG_LOAD_PART	1
+  
+++<<<<<<< HEAD
+ +#ifdef CONFIG_FSL_QSPI
+ +#define CONFIG_SYS_FSL_QSPI_AHB
+ +#define FSL_QSPI_FLASH_SIZE		(SZ_32M)
+ +#define FSL_QSPI_FLASH_NUM		1
+ +#endif
+++=======
++ #define CONFIG_MXC_GPIO
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  /* I2C Configs */
+  #define CONFIG_SYS_I2C_SPEED		  100000
+  
+++<<<<<<< HEAD
+ +/* USB configs */
+ +#ifndef CONFIG_SPL_BUILD
+ +#define CONFIG_CMD_USB
+ +#define CONFIG_USB_STORAGE
+ +
+ +#define CONFIG_CMD_USB_MASS_STORAGE
+ +#define CONFIG_USB_GADGET_MASS_STORAGE
+ +#define CONFIG_USB_FUNCTION_MASS_STORAGE
+ +
+ +#define CONFIG_CMD_READ
+ +
+ +#endif
+ +
+ +#define CONFIG_SERIAL_TAG
+ +#define CONFIG_FASTBOOT_USB_DEV 0
+ +
+ +
+ +#define CONFIG_USB_MAX_CONTROLLER_COUNT         2
+ +
+ +#define CONFIG_USBD_HS
+ +#define CONFIG_USB_GADGET_VBUS_DRAW 2
+++=======
++ #define CONFIG_OF_SYSTEM_SETUP
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  #ifndef CONFIG_SPL_BUILD
+  #define CONFIG_DM_PMIC
+  #endif
+  
+++<<<<<<< HEAD
+ +#ifdef CONFIG_DM_VIDEO
+ +#define CONFIG_VIDEO_LOGO
+ +#define CONFIG_SPLASH_SCREEN
+ +#define CONFIG_SPLASH_SCREEN_ALIGN
+ +#define CONFIG_CMD_BMP
+ +#define CONFIG_BMP_16BPP
+ +#define CONFIG_BMP_24BPP
+ +#define CONFIG_BMP_32BPP
+ +#define CONFIG_VIDEO_BMP_RLE8
+ +#define CONFIG_VIDEO_BMP_LOGO
+ +#endif
+ +
+ +#ifdef CONFIG_ANDROID_SUPPORT
+ +#include "imx8mq_phanbell_android.h"
+ +#endif
+ +
+++=======
+++>>>>>>> android-11.0.0_2.2.0_history
+  #endif
+diff --cc include/spl.h
+index 2129c5033d,02de1868ae..1408b78416
+--- a/include/spl.h
++++ b/include/spl.h
+@@@ -517,9 -705,9 +705,13 @@@ int board_return_to_bootrom(struct spl_
+  
+  /**
+   * board_spl_fit_post_load - allow process images after loading finished
+-  *
++  * @fit: Pointer to a valid Flattened Image Tree blob
+   */
+++<<<<<<< HEAD
+ +int board_spl_fit_post_load(ulong load_addr, size_t length);
+++=======
++ void board_spl_fit_post_load(const void *fit);
+++>>>>>>> android-11.0.0_2.2.0_history
+  
+  /**
+   * board_spl_fit_size_align - specific size align before processing payload
+diff --cc lib/Makefile
+index 769a83a62d,e20949b820..7f334cdcba
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@@ -59,12 -58,12 +58,15 @@@ obj-$(CONFIG_TPM_V1) += tpm-v1.
+  obj-$(CONFIG_TPM_V2) += tpm-v2.o
+  endif
+  
++ obj-$(CONFIG_$(SPL_)ACPIGEN) += acpi/
++ obj-$(CONFIG_$(SPL_)MD5) += md5.o
+  obj-$(CONFIG_$(SPL_)RSA) += rsa/
+ +obj-$(CONFIG_IDT_ROTATION) += image_idt/
+ +obj-y += persist_idt/
+ +obj-y += verifiedstate_idt/
+  obj-$(CONFIG_SHA1) += sha1.o
+  obj-$(CONFIG_SHA256) += sha256.o
++ obj-$(CONFIG_SHA512_ALGO) += sha512.o
+  
+  obj-$(CONFIG_$(SPL_)ZLIB) += zlib/
+  obj-$(CONFIG_$(SPL_)ZSTD) += zstd/
+diff --cc lib/libavb/avb_slot_verify.c
+index 143d280a41,436983771c..8ce008de5a
+--- a/lib/libavb/avb_slot_verify.c
++++ b/lib/libavb/avb_slot_verify.c
+@@@ -14,21 -14,13 +14,22 @@@
+  #include "avb_util.h"
+  #include "avb_vbmeta_image.h"
+  #include "avb_version.h"
++ #include <log.h>
+  #include <malloc.h>
+- #if defined(CONFIG_IMX_TRUSTY_OS) && !defined(CONFIG_AVB_ATX) && !defined(CONFIG_XEN)
+- #include "trusty/hwcrypto.h"
+  #include <memalign.h>
++ #if defined(CONFIG_IMX_TRUSTY_OS) && !defined(CONFIG_AVB_ATX)
++ #include "trusty/hwcrypto.h"
+  #endif
+  
+ +#if defined(CONFIG_IDT_VALID_AVBKEY)
+ +#include "idtech_public_key.h"
+ +uint8_t* expect_pubkey = idtech_public_key;
+ +size_t expect_pubkey_size = sizeof(idtech_public_key);
+ +#else
+ +uint8_t* expect_pubkey = NULL;
+ +size_t expect_pubkey_size = 0;
+ +#endif
+ +
+  /* Maximum number of partitions that can be loaded with avb_slot_verify(). */
+  #define MAX_NUMBER_OF_LOADED_PARTITIONS 32
+  

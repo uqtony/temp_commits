@@ -1,0 +1,359 @@
+469484c818 Arthur Chen 2020-06-01
+
+AOS-125: Read panel timings from DT of kernel.
+
+    - Include reading board info and finding DTB in DTBO logic.
+    - Create u-boot environment value in runtime with "idt,prod-id", "dtbo_slot"
+    and "entry_idx".
+    - Work after EMMC being initialized.
+    - parse boot slot info from misc partition.
+
+Change-Id: Iee58b46938b0f6fbddc16a31fba8d979b6f63d06
+
+diff --git a/board/freescale/imx8mq_a300/imx8mq_a300.c b/board/freescale/imx8mq_a300/imx8mq_a300.c
+index 941620eedf..69eb4b1be5 100644
+--- a/board/freescale/imx8mq_a300/imx8mq_a300.c
++++ b/board/freescale/imx8mq_a300/imx8mq_a300.c
+@@ -27,6 +27,9 @@
+ #include "../common/pfuze.h"
+ #include <usb.h>
+ #include <dwc3-uboot.h>
++#include <persist_idt.h>
++#include <fb_fsl.h>
++#include <dt_table.h>
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -259,6 +262,292 @@ int board_usb_cleanup(int index, enum usb_init_type init)
+ }
+ #endif
+ 
++static struct display_info_t mipi_displays[] = {{
++	.bus	= 0, /* Unused */
++	.addr	= 0, /* Unused */
++	.pixfmt	= GDF_32BIT_X888RGB,
++	.detect	= NULL,
++	.enable	= NULL,
++	.mode	= {
++		.name           = "PANEL", /* 720P60 */
++		.refresh        = 60,
++		.xres           = 1280,
++		.yres           = 720,
++		.pixclock       = 13468, /* 74250  kHz */
++		.left_margin    = 110,
++		.right_margin   = 220,
++		.upper_margin   = 5,
++		.lower_margin   = 20,
++		.hsync_len      = 40,
++		.vsync_len      = 5,
++		.sync           = FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
++		.vmode          = FB_VMODE_NONINTERLACED
++	}
++},};
++
++#define GET_BYTE(x, n)  ((x & (0xff << 8 * n)) >> 8 * n)
++#define FDT_ID_SIZE	128
++#define DTBO_ENTRIES	4
++#define SLOT_A_P_OFFSET	(2048 + 9)
++#define SLOT_B_P_OFFSET	(2048 + 13)
++#define PANEL_PATH "/mipi_dsi_bridge@30A00000/panel@0/display-timings/timing"
++static const char *dtbo_slot[2] = {"dtbo_a", "dtbo_b"};
++int entry_idx;
++
++int get_dtbo_mipi_dsi_timing(void)
++{
++	struct dt_table_header *dt_table;
++	struct dt_table_entry *dt_entry;
++	struct fastboot_ptentry *fpt_en_dtbo;
++	struct fastboot_ptentry *fpt_en_misc;
++	struct blk_desc *dev_desc;
++	const struct fdt_property *fdt_prop;
++	const u32 *value;
++	unsigned char *dt_img;
++	unsigned char *misc_img;
++	char *fdt_blob;
++	char *fdt_id;
++	void *blob;
++	AvbIOResult readret;
++	size_t num_bytes;
++	size_t dtbo_size;
++	size_t misc_size;
++	u32 dtbo_id;
++	u32 fdt_size;
++	u32 pinfo;
++	int len;
++	int slot;
++	int nodeoff;
++	int fdt_count;
++	int fdt_idx = 1;
++	char entry_num[DTBO_ENTRIES] = "";
++
++	fpt_en_misc = fastboot_flash_find_ptn("misc");
++	if (fpt_en_misc > 0) {
++		fdt_id = malloc(sizeof(char) * FDT_ID_SIZE);
++		if (fdt_id == NULL) {
++			puts("fdt_id init fail
+");
++			return -1;
++		}
++		if (get_dtb_id(fdt_id, FDT_ID_SIZE)) {
++			printf("Board ID: %s
+", fdt_id);
++			env_set("idt,prod-id", fdt_id);
++		} else {
++			puts("Get ID from Board info partition fail
+");
++			free(fdt_id);
++			return -1;
++		}
++		dev_desc = blk_get_dev("mmc", mmc_get_env_dev());
++		misc_size = (dev_desc->blksz)*(fpt_en_misc->length);
++		misc_img = malloc(misc_size);
++		if (misc_img == NULL) {
++			puts("dt_img init fail
+");
++			free(fdt_id);
++			return -1;
++		}
++		readret = fsl_read_from_partition_multi(NULL,
++							"misc",
++							0,
++							misc_size,
++							misc_img,
++							&num_bytes);
++		if (readret) {
++			printf("fsl_read_from_partition_multi read"
++			       " misc fail, return: %d
+", readret);
++			free(fdt_id);
++			free(misc_img);
++			return -1;
++		}
++		slot = (misc_img[SLOT_A_P_OFFSET] >
++			misc_img[SLOT_B_P_OFFSET]) ? 1 : 0;
++		free(misc_img);
++
++		fpt_en_dtbo = fastboot_flash_find_ptn(dtbo_slot[slot]);
++		if (fpt_en_dtbo <= 0) {
++			puts("Get dtbo partition fail
+");
++			free(fdt_id);
++			return -1;
++		}
++		dtbo_size = (dev_desc->blksz)*(fpt_en_dtbo->length);
++		dt_img = malloc(dtbo_size);
++		if (dt_img == NULL) {
++			puts("dt_img init fail
+");
++			free(fdt_id);
++			return -1;
++		}
++
++		readret = fsl_read_from_partition_multi(NULL,
++							dtbo_slot[slot],
++							0,
++							dtbo_size,
++							dt_img,
++							&num_bytes);
++		if (readret) {
++			printf("fsl_read_from_partition_multi read %s"
++			       " fail, return: %d
+", dtbo_slot[slot],
++			       readret);
++			free(fdt_id);
++			free(dt_img);
++			return -1;
++		}
++		dt_table = (struct dt_table_header *)dt_img;
++		fdt_count = fdt32_to_cpu(dt_table->dt_entry_count);
++		printf("
+Read %s...	%d dtbs in %s
+",
++		       dtbo_slot[slot], fdt_count, dtbo_slot[slot]);
++		while (fdt_idx < (fdt_count + 1)) {
++			dt_entry = (struct dt_table_entry *)
++				   ((ulong)dt_img +
++				    (fdt32_to_cpu(dt_table->
++						  dt_entries_offset) *
++				     fdt_idx));
++			fdt_size = fdt32_to_cpu(dt_entry->dt_size);
++			dtbo_id = fdt32_to_cpu(dt_entry->id);
++			printf("DTBO ID: %lx (", (ulong)dtbo_id);
++			for (len = 3; len >= 0; len--) {
++				if ((GET_BYTE(dtbo_id, len) > 31) &&
++				    (GET_BYTE(dtbo_id, len) < 127))
++					printf("%c",
++					       GET_BYTE(dtbo_id, len));
++			}
++			printf(")	 size (%d)
+", fdt_size);
++			fdt_blob = (void *)(ulong)dt_img +
++				   fdt32_to_cpu(dt_entry->dt_offset);
++			if (fdt_check_header(fdt_blob) != 0) {
++				puts("image is not a fdt
+");
++				fdt_idx = fdt_count + 1;
++				break;
++			}
++
++			if (fdt_totalsize(fdt_blob) != fdt_size) {
++				printf("fdt size != image size (%d)
+",
++				       fdt_size);
++				fdt_idx = fdt_count + 1;
++				break;
++			}
++
++			nodeoff = fdt_path_offset(fdt_blob, "/");
++			fdt_prop = fdt_get_property(fdt_blob,
++						    nodeoff,
++						    "compatible",
++						    &len);
++			if (len >= 0)
++				printf("FDT compatible: %s
+",
++				       fdt_prop->data);
++
++			fdt_prop = fdt_get_property(fdt_blob,
++						    nodeoff,
++						    "idt,prod-id",
++						    &len);
++			if (len >= 0) {
++				printf("FDT idt,prod-id: %s
+",
++				       fdt_prop->data);
++
++				if (!strncmp(fdt_id, fdt_prop->data,
++					     strlen(fdt_prop->data))) {
++					printf("## Selected Flattened"
++					       " Device Tree: %s
+",
++					       fdt_prop->data);
++					break;
++				}
++			}
++
++			fdt_idx++;
++		}
++		if (fdt_idx > fdt_count) {
++			printf("Can't find ID in %s
+", dtbo_slot[slot]);
++			fdt_idx = 1;
++			free(dt_img);
++			free(fdt_id);
++			return -1;
++		}
++
++		sprintf(entry_num, "%d", fdt_idx);
++		env_set("entry_idx", entry_num);
++		dt_entry = (struct dt_table_entry *)
++			   ((ulong)dt_img +
++			    (fdt32_to_cpu(dt_table->dt_entries_offset) *
++			     fdt_idx));
++
++		blob = (void *)(ulong)dt_img +
++		       fdt32_to_cpu(dt_entry->dt_offset);
++
++		nodeoff = fdt_path_offset(blob, PANEL_PATH);
++		if (nodeoff < 0 ||
++		    !fdtdec_get_is_enabled(blob, nodeoff)) {
++			printf("%s get fail
+", PANEL_PATH);
++			free(dt_img);
++			free(fdt_id);
++			return -1;
++		}
++
++		value = fdt_getprop(blob, nodeoff,
++				    "clock-frequency", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.pixclock = pinfo;
++		printf("clock-frequency: %d
+", mipi_displays[0].mode.pixclock);
++		value = fdt_getprop(blob, nodeoff, "hactive", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.xres = pinfo;
++		printf("hactive: %d
+", mipi_displays[0].mode.xres);
++		value = fdt_getprop(blob, nodeoff, "vactive", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.yres = pinfo;
++		printf("vactive: %d
+", mipi_displays[0].mode.yres);
++		value = fdt_getprop(blob, nodeoff,
++				    "hback-porch", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.left_margin = pinfo;
++		printf("hfront-porch: %d
+",
++		       mipi_displays[0].mode.left_margin);
++		value = fdt_getprop(blob, nodeoff,
++				    "hfront-porch", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.right_margin = pinfo;
++		printf("hback-porch: %d
+",
++		       mipi_displays[0].mode.right_margin);
++		value = fdt_getprop(blob, nodeoff,
++				    "hsync-len", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.hsync_len = pinfo;
++		printf("hsync-len: %d
+",
++		       mipi_displays[0].mode.hsync_len);
++		value = fdt_getprop(blob, nodeoff,
++				    "vfront-porch", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.upper_margin = pinfo;
++		printf("vfront-porch: %d
+",
++		       mipi_displays[0].mode.upper_margin);
++		value = fdt_getprop(blob, nodeoff,
++				    "vback-porch", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.lower_margin = pinfo;
++		printf("vback-porch: %d
+",
++		       mipi_displays[0].mode.lower_margin);
++		value = fdt_getprop(blob, nodeoff,
++				    "vsync-len", &len);
++		pinfo = fdt32_to_cpu(*value);
++		mipi_displays[0].mode.vsync_len = pinfo;
++		printf("vsync-len: %d
+",
++		       mipi_displays[0].mode.vsync_len);
++		printf("Parse %s panel timing finish
+
+",
++		       dtbo_slot[slot]);
++		free(dt_img);
++		free(fdt_id);
++
++		if (slot == 0)
++			env_set("dtbo_slot", "a");
++
++		if (slot == 1)
++			env_set("dtbo_slot", "b");
++
++	} else {
++		printf("fastboot_flash_find_ptn misc fail: %d
+
+",
++		       fpt_en_misc);
++	}
++
++	return fdt_idx;
++}
++
+ int board_init(void)
+ {
+ #ifdef CONFIG_FSL_QSPI
+@@ -289,6 +578,8 @@ int board_late_init(void)
+ #ifdef CONFIG_ENV_IS_IN_MMC
+ 	board_late_mmc_env_init();
+ #endif
++	fastboot_setup();
++	entry_idx = get_dtbo_mipi_dsi_timing();
+ 
+ 	return 0;
+ }

@@ -1,0 +1,237 @@
+0df6c317 George.Huang 2020-06-15
+
+AOS-214: imx8mn: porting idtech changes from imx8mq to imx8mn
+
+Change-Id: Ibfb222b2ee01a2775651d8614a3e85e9ae6c9f9c
+
+diff --git a/imx8m/evk_a100/BoardConfig.mk b/imx8m/evk_a100/BoardConfig.mk
+index 56707196..86fbedcc 100644
+--- a/imx8m/evk_a100/BoardConfig.mk
++++ b/imx8m/evk_a100/BoardConfig.mk
+@@ -4,7 +4,7 @@
+ 
+ BOARD_SOC_TYPE := IMX8MN
+ BOARD_SOM_TYPE := a100
+-BOARD_TYPE := EVK
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := false
+ HAVE_FSL_IMX_GPU2D := false
+ HAVE_FSL_IMX_GPU3D := true
+@@ -92,9 +92,8 @@ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ TARGET_USES_MKE2FS := true
+ 
+ # define frame buffer count
+@@ -109,7 +108,7 @@ BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardw
+ BOARD_KERNEL_CMDLINE += transparent_hugepage=never
+ 
+ # display config
+-BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=mxsfb-drm
+ 
+ # wifi config
+ BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+diff --git a/imx8m/evk_a100/UbootKernelBoardConfig.mk b/imx8m/evk_a100/UbootKernelBoardConfig.mk
+index d41cf59c..c5e552f2 100644
+--- a/imx8m/evk_a100/UbootKernelBoardConfig.mk
++++ b/imx8m/evk_a100/UbootKernelBoardConfig.mk
+@@ -2,7 +2,7 @@
+ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
+-# u-boot target for stand config and Trusty OS config
++# u-boot target for a100 devboard
+ TARGET_BOOTLOADER_CONFIG := imx8mn-devboard:imx8mn_a100_devboard_android_defconfig
+ TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-dual:imx8mn_a100_devboard_android_dual_defconfig
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+@@ -10,12 +10,13 @@ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-trusty-secure-unlock:imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
+   TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-trusty-dual:imx8mn_a100_devboard_android_trusty_dual_defconfig
+ endif
+-# u-boot target used by uuu for imx8mn_evk
++
++# u-boot target used by uuu for a100 devboard
+ TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-evk-uuu:imx8mn_a100_devboard_android_uuu_defconfig
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+-
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+diff --git a/imx8m/evk_a100/evk_a100.mk b/imx8m/evk_a100/evk_a100.mk
+index 0763d4b5..e00598bf 100644
+--- a/imx8m/evk_a100/evk_a100.mk
++++ b/imx8m/evk_a100/evk_a100.mk
+@@ -80,7 +80,8 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+diff --git a/imx8m/evk_a100/init.rc b/imx8m/evk_a100/init.rc
+index 4ce838ad..b5df1d27 100644
+--- a/imx8m/evk_a100/init.rc
++++ b/imx8m/evk_a100/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /init.idtech.rc
+ 
+ on early-init
+     # mount the debugfs
+diff --git a/imx8m/vp6820_8mn/BoardConfig.mk b/imx8m/vp6820_8mn/BoardConfig.mk
+index 7bb50d56..9d68524c 100644
+--- a/imx8m/vp6820_8mn/BoardConfig.mk
++++ b/imx8m/vp6820_8mn/BoardConfig.mk
+@@ -4,7 +4,7 @@
+ 
+ BOARD_SOC_TYPE := IMX8MN
+ BOARD_SOM_TYPE := a100
+-BOARD_TYPE := VP6820
++BOARD_TYPE := DEVBOARD
+ BOARD_HAVE_VPU := false
+ HAVE_FSL_IMX_GPU2D := false
+ HAVE_FSL_IMX_GPU3D := true
+@@ -92,9 +92,8 @@ USE_ION_ALLOCATOR := true
+ USE_GPU_ALLOCATOR := false
+ 
+ BOARD_AVB_ENABLE := true
+-BOARD_AVB_ALGORITHM := SHA256_RSA4096
+-# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
+-BOARD_AVB_KEY_PATH := device/idtech/common/security/testkey_rsa4096.pem
++BOARD_AVB_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_KEY_PATH := device/idtech/common/security/idt_testkey_rsa2048.pem
+ TARGET_USES_MKE2FS := true
+ 
+ # define frame buffer count
+@@ -109,7 +108,7 @@ BOARD_KERNEL_CMDLINE := init=/init androidboot.console=ttymxc1 androidboot.hardw
+ BOARD_KERNEL_CMDLINE += transparent_hugepage=never
+ 
+ # display config
+-BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
++BOARD_KERNEL_CMDLINE += androidboot.lcd_density=240 androidboot.primary_display=mxsfb-drm
+ 
+ # wifi config
+ BOARD_KERNEL_CMDLINE += androidboot.wificountrycode=CN
+@@ -158,3 +157,4 @@ TARGET_BOARD_KERNEL_HEADERS := device/idtech/common/kernel-headers
+ 
+ ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
+ 
++BOARD_PLAT_PRIVATE_SEPOLICY_DIR := device/idtech/imx8m/sepolicy_system/private
+diff --git a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+index 006e0963..651ffb59 100644
+--- a/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
++++ b/imx8m/vp6820_8mn/UbootKernelBoardConfig.mk
+@@ -2,20 +2,33 @@
+ TARGET_BOOTLOADER_POSTFIX := bin
+ UBOOT_POST_PROCESS := true
+ 
++# u-boot target for a100 devboard
++TARGET_BOOTLOADER_CONFIG := imx8mn-devboard:imx8mn_a100_devboard_android_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-dual:imx8mn_a100_devboard_android_dual_defconfig:signed
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++  TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-trusty:imx8mn_a100_devboard_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-trusty-secure-unlock:imx8mn_a100_devboard_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-trusty-dual:imx8mn_a100_devboard_android_trusty_dual_defconfig
++endif
++
++# u-boot target used by uuu for a100 devboard
++TARGET_BOOTLOADER_CONFIG += imx8mn-devboard-evk-uuu:imx8mn_a100_devboard_android_uuu_defconfig:signed
++
+ # u-boot target for stand config and Trusty OS config
+-TARGET_BOOTLOADER_CONFIG := imx8mn-evk:vp6820_8mn_evk_android_defconfig:signed
++TARGET_BOOTLOADER_CONFIG += imx8mn-evk:vp6820_8mn_evk_android_defconfig:signed
+ TARGET_BOOTLOADER_CONFIG += imx8mn-evk-dual:vp6820_8mn_evk_android_dual_defconfig:signed
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+   TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty:vp6820_8mn_evk_android_trusty_defconfig
+   TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty-secure-unlock:vp6820_8mn_evk_android_trusty_secure_unlock_defconfig
+   TARGET_BOOTLOADER_CONFIG += imx8mn-evk-trusty-dual:vp6820_8mn_evk_android_trusty_dual_defconfig
+ endif
++
+ # u-boot target used by uuu for imx8mn_evk
+ TARGET_BOOTLOADER_CONFIG += imx8mn-evk-evk-uuu:vp6820_8mn_evk_android_uuu_defconfig:signed
+ 
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+-
+ TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
++TARGET_KERNEL_SECURE_DEFCONF ?= android_secure_defconfig
+ 
+ 
+ # absolute path is used, not the same as relative path used in AOSP make
+diff --git a/imx8m/vp6820_8mn/vp6820_8mn.mk b/imx8m/vp6820_8mn/vp6820_8mn.mk
+index ba72dc32..e1e0e364 100644
+--- a/imx8m/vp6820_8mn/vp6820_8mn.mk
++++ b/imx8m/vp6820_8mn/vp6820_8mn.mk
+@@ -23,9 +23,6 @@ PRODUCT_FULL_TREBLE_OVERRIDE := true
+ #Enable this to choose 32 bit user space build
+ #IMX8_BUILD_32BIT_ROOTFS := true
+ 
+-#Enable this to config 1GB ddr on vp6820_8mn
+-#LOW_MEMORY := true
+-
+ TARGET_USE_DYNAMIC_PARTITIONS := false
+ #Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
+ TARGET_USE_DYNAMIC_PARTITIONS ?= true
+@@ -53,6 +50,9 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+   endif
+ endif
+ 
++#Enable this to config 1GB ddr on vp6820_8mn
++#LOW_MEMORY := true
++
+ # Include keystore attestation keys and certificates.
+ ifeq ($(PRODUCT_IMX_TRUSTY),true)
+ -include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
+@@ -80,7 +80,12 @@ PRODUCT_COPY_FILES += \
+     $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/imx/sdma/sdma-imx7d.bin \
+     device/idtech/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
+     device/idtech/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
+-    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++    device/idtech/common/wifi/bcm_wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf \
++    device/idtech/common/deviceowner/device_policies.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/device_policies.xml \
++    device/idtech/common/deviceowner/device_owner_2.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/device_owner_2.xml \
++    device/idtech/common/permissions/runtime_allowed.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/runtime_allowed.xml \
++    device/idtech/common/security/signature_of_signature.public.key:$(TARGET_COPY_OUT_PRODUCT)/etc/security/signature_of_signature.public.key \
++    device/idtech/common/prebuilts/spl_tab.img:$(PRODUCT_OUT)/spl_tab.img
+ 
+ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+ PRODUCT_COPY_FILES += \
+@@ -295,10 +300,11 @@ PRODUCT_PROPERTY_OVERRIDES += \
+ 
+ PRODUCT_PACKAGES += \
+     DirectAudioPlayer
+-
++ifneq (secure, $(findstring secure, $(TARGET_PRODUCT)))
+ # Tensorflow lite camera demo
+ PRODUCT_PACKAGES += \
+                     tflitecamerademo
++endif
+ 
+ # Add oem unlocking option in settings.
+ PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
+@@ -349,3 +355,12 @@ PRODUCT_PACKAGES += \
+     c2_component_register_ms \
+     c2_component_register_ra
+ 
++#AMS
++PRODUCT_PACKAGES += \
++    deviceadmin \
++    appmanager \
++    amsconnector \
++    amsclouddrive \
++    welcomeapp \
++    diagnosis \
++    videoplayer

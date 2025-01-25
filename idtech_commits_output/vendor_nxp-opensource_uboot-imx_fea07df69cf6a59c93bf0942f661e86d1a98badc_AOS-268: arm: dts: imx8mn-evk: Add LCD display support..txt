@@ -1,0 +1,57 @@
+fea07df69c Arthur Chen 2020-09-21
+
+AOS-268: arm: dts: imx8mn-evk: Add LCD display support.
+
+Change-Id: Ie5f938bdfda93d8abb1df1c502b552ed77033b78
+
+diff --git a/arch/arm/dts/imx8mn-evk.dts b/arch/arm/dts/imx8mn-evk.dts
+index 617c273f06..73b5f752ed 100644
+--- a/arch/arm/dts/imx8mn-evk.dts
++++ b/arch/arm/dts/imx8mn-evk.dts
+@@ -55,6 +55,33 @@
+ 			};
+ 		};
+ 	};
++
++	panel_backlight: backlight {
++		compatible = "gpio-backlight";
++		gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	hx8394f_panel {
++		compatible = "himax,hx8394f";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_mipi_dsi_en>;
++		reset-gpio = <&gpio1 8 GPIO_ACTIVE_HIGH>;
++		backlight = <&panel_backlight>;
++		dsi-lanes = <4>;
++		video-mode = <2>;	/* 0: burst mode
++					 * 1: non-burst mode with sync event
++					 * 2: non-burst mode with sync pulse
++					 */
++		panel-width-mm = <68>;
++		panel-height-mm = <121>;
++		status = "okay";
++
++		port {
++			hx8394f_from_dsim: endpoint {
++				remote-endpoint = <&dsim_to_hx8394f>;
++			};
++		};
++	};
+ };
+ 
+ &iomuxc {
+@@ -542,6 +569,12 @@
+ 			remote-endpoint = <&rm67191_from_dsim>;
+ 		};
+ 	};
++
++	port@3 {
++		dsim_to_hx8394f: endpoint {
++			remote-endpoint = <&hx8394f_from_dsim>;
++		};
++	};
+ };
+ 
+ &snvs_pwrkey {

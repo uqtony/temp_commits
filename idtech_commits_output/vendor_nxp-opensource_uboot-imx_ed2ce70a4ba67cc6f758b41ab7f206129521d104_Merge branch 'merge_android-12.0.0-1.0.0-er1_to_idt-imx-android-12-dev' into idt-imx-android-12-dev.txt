@@ -1,0 +1,982 @@
+ed2ce70a4b jenkins 2022-02-21
+
+Merge branch 'merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev' into idt-imx-android-12-dev
+
+Change-Id: Iaa7b5280f0ecd1acbb4c826d0ffc6d2ecf372399
+
+diff --cc arch/arm/mach-imx/imx8m/Kconfig
+index 7389b2ef7d,245b085499..8bafd8f3b4
+--- a/arch/arm/mach-imx/imx8m/Kconfig
++++ b/arch/arm/mach-imx/imx8m/Kconfig
+@@@ -229,8 -263,7 +287,12 @@@ endchoic
+  
+  source "board/freescale/imx8mq_evk/Kconfig"
+  source "board/freescale/imx8mq_val/Kconfig"
+++<<<<<<< HEAD
+ +source "board/freescale/imx8mq_a300/Kconfig"
+ +source "board/freescale/imx8mq_phanbell/Kconfig"
+++=======
++ source "board/freescale/imx8mm_ab2/Kconfig"
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  source "board/freescale/imx8mm_evk/Kconfig"
+  source "board/freescale/imx8mm_val/Kconfig"
+  source "board/freescale/imx8mn_evk/Kconfig"
+diff --cc arch/arm/mach-imx/imx8m/soc.c
+index 08934ee23d,2de7bf1c3b..f82c2a3195
+--- a/arch/arm/mach-imx/imx8m/soc.c
++++ b/arch/arm/mach-imx/imx8m/soc.c
+@@@ -219,13 -217,8 +216,18 @@@ __weak int board_phys_sdram_size(phys_s
+  
+  	*size = PHYS_SDRAM_SIZE;
+  
+++<<<<<<< HEAD
+ +#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ +	unsigned int mem_size = PHYS_SDRAM_SIZE;
+ +	memcpy((void *)&mem_size, (void *)DEV_MEM_SIZE_BASE, sizeof(unsigned int));
+ +	*size = (phys_size_t)mem_size * 1024;
+ +
+ +	idt_adjust_mem_map(mem_map, size);
+ +	*size = idt_banksize_1st(*size);
+++=======
++ #ifdef PHYS_SDRAM_2_SIZE
++ 	*size += PHYS_SDRAM_2_SIZE;
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  #endif
+  	return 0;
+  }
+@@@ -246,19 -238,6 +247,22 @@@ int dram_init(void
+  	else
+  		gd->ram_size = sdram_size;
+  
+++<<<<<<< HEAD
+ +	/* also update the SDRAM size in the mem_map used externally */
+ +	imx8m_mem_map[entry].size = sdram_size;
+ +
+ +#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ +	gd->ram_size = sdram_size + idt_banksize_2nd(mem_map);
+ +	imx8m_mem_map[entry].size = gd->ram_size;
+ +	return 0;
+ +#endif
+ +
+ +#ifdef PHYS_SDRAM_2_SIZE
+ +	gd->ram_size += PHYS_SDRAM_2_SIZE;
+ +#endif
+ +
+++=======
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  	return 0;
+  }
+  
+@@@ -286,41 -275,51 +300,71 @@@ int dram_init_banksize(void
+  
+  			gd->bd->bi_dram[bank].start = optee_start + optee_size;
+  			gd->bd->bi_dram[bank].size = PHYS_SDRAM +
+- 				sdram_size - gd->bd->bi_dram[bank].start;
++ 				sdram_b1_size - gd->bd->bi_dram[bank].start;
+  		}
+  	} else {
+- 		gd->bd->bi_dram[bank].size = sdram_size;
++ 		gd->bd->bi_dram[bank].size = sdram_b1_size;
+  	}
+  
+- #ifdef PHYS_SDRAM_2_SIZE
+- 	if (++bank >= CONFIG_NR_DRAM_BANKS) {
+- 		puts("CONFIG_NR_DRAM_BANKS is not enough for SDRAM_2
+");
+- 		return -1;
++ 	if (sdram_b2_size) {
++ 		if (++bank >= CONFIG_NR_DRAM_BANKS) {
++ 			puts("CONFIG_NR_DRAM_BANKS is not enough for SDRAM_2
+");
++ 			return -1;
++ 		}
++ 		gd->bd->bi_dram[bank].start = 0x100000000UL;
++ 		gd->bd->bi_dram[bank].size = sdram_b2_size;
+  	}
+++<<<<<<< HEAD
+ +	gd->bd->bi_dram[bank].start = PHYS_SDRAM_2;
+ +	gd->bd->bi_dram[bank].size = PHYS_SDRAM_2_SIZE;
+ +#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ +	gd->bd->bi_dram[bank].size = gd->ram_size - sdram_size;
+ +#endif
+ +#endif
+++=======
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	return 0;
+  }
+  
+  phys_size_t get_effective_memsize(void)
+  {
+- 	/* return the first bank as effective memory */
+- 	if (rom_pointer[1])
+- 		return ((phys_addr_t)rom_pointer[0] - PHYS_SDRAM);
++ 	int ret;
++ 	phys_size_t sdram_size;
++ 	phys_size_t sdram_b1_size;
++ 	ret = board_phys_sdram_size(&sdram_size);
++ 	if (!ret) {
++ 		/* Bank 1 can't cross over 4GB space */
++ 		if (sdram_size > 0xc0000000) {
++ 			sdram_b1_size = 0xc0000000;
++ 		} else {
++ 			sdram_b1_size = sdram_size;
++ 		}
+  
+++<<<<<<< HEAD
+ +#if defined(CONFIG_IDT_MULTIPLE_DDR)
+ +	return idt_banksize_1st(gd->ram_size);
+ +#endif
+ +#ifdef PHYS_SDRAM_2_SIZE
+ +	return gd->ram_size - PHYS_SDRAM_2_SIZE;
+ +#else
+ +	return gd->ram_size;
+ +#endif
+++=======
++ 		if (rom_pointer[1]) {
++ 			/* We will relocate u-boot to Top of dram1. Tee position has two cases:
++ 			 * 1. At the top of dram1,  Then return the size removed optee size.
++ 			 * 2. In the middle of dram1, return the size of dram1.
++ 			 */
++ 			if ((rom_pointer[0] + rom_pointer[1]) == (PHYS_SDRAM + sdram_b1_size))
++ 				return ((phys_addr_t)rom_pointer[0] - PHYS_SDRAM);
++ 		}
++ 
++ 		return sdram_b1_size;
++ 	} else {
++ 		return PHYS_SDRAM_SIZE;
++ 	}
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  }
+  
+  static u32 get_cpu_variant_type(u32 type)
+diff --cc arch/arm/mach-imx/spl.c
+index fc427ff42e,2977918dbd..95599d3f0c
+--- a/arch/arm/mach-imx/spl.c
++++ b/arch/arm/mach-imx/spl.c
+@@@ -319,18 -319,6 +319,21 @@@ ulong board_spl_fit_size_align(ulong si
+  	return size;
+  }
+  
+++<<<<<<< HEAD
+ +int board_spl_fit_post_load(const void *fit)
+ +{
+ +	u32 offset = ALIGN(fdt_totalsize(fit), 0x1000);
+ +
+ +	if (imx_hab_authenticate_image((uintptr_t)fit,
+ +				       offset + IVT_SIZE + CSF_PAD_SIZE,
+ +				       offset)) {
+ +		puts("spl: ERROR:  image authentication unsuccessful
+");
+ +		return -1;
+ +	}
+ +	return 0;
+ +}
+++=======
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  #endif
+  
+  void* board_spl_fit_buffer_addr(ulong fit_size, int sectors, int bl_len)
+diff --cc board/freescale/imx8mp_evk/Makefile
+index d5dadd72c1,1421e46628..26969c520b
+--- a/board/freescale/imx8mp_evk/Makefile
++++ b/board/freescale/imx8mp_evk/Makefile
+@@@ -8,10 -8,10 +8,17 @@@ obj-y += imx8mp_evk.
+  
+  ifdef CONFIG_SPL_BUILD
+  obj-y += spl.o
+++<<<<<<< HEAD
+ +ifdef CONFIG_IMX8M_LPDDR4_FREQ0_2400MTS
+++=======
++ ifdef CONFIG_IMX8M_LPDDR4_FREQ0_3200MTS
++ obj-y += lpddr4_timing_ndm.o
++ else
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing.o
+ +else
+ +obj-$(CONFIG_IMX8M_LPDDR4) += lpddr4_timing_4000mts.o
+ +endif
+  obj-$(CONFIG_IMX8M_DDR4) += ddr4_timing.o
+  endif
++ endif
+diff --cc common/image-android.c
+index f49bea93c0,e503d39fb0..d499bfbdfa
+--- a/common/image-android.c
++++ b/common/image-android.c
+@@@ -74,13 -141,8 +142,18 @@@ static void append_androidboot_args(cha
+  	struct tag_serialnr serialnr;
+  	get_board_serial(&serialnr);
+  
+++<<<<<<< HEAD
+ +	/* IDTech modified to pass idt serial number to kernel */
+ +	char idt_serial[BDINFO_DATA_SIZE] = "";
+ +	idt_get_board_serial(idt_serial);
+ +
+ +	sprintf(newbootargs, " androidboot.serialno=%s", idt_serial);
+ +
+ +	strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
+++=======
++ 	sprintf(args_buf, " androidboot.serialno=%08x%08x", serialnr.high, serialnr.low);
++ 	strncat(args, args_buf, *len - strlen(args));
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	if (serialnr.high + serialnr.low != 0) {
+  		char bd_addr[16]={0};
+@@@ -112,50 -174,15 +185,54 @@@
+  	/* append soc rev into bootargs */
+  	char *soc_rev = env_get("soc_rev");
+  	if (soc_rev) {
+- 		sprintf(newbootargs,
++ 		sprintf(args_buf,
+  			" androidboot.soc_rev=%s",
+  			soc_rev);
+- 		strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
++ 		strncat(args, args_buf, *len - strlen(args));
+  	}
+  
+++<<<<<<< HEAD
+ +	/* append board type into bootargs */
+ +	char idt_board_type[BDINFO_DATA_SIZE] = "";
+ +
+ +	if (idt_get_board_type(idt_board_type, BDINFO_DATA_SIZE)) {
+ +		sprintf(newbootargs, " androidboot.board_type=%s", idt_board_type);
+ +		strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ +	} else {
+ +		printf("WARN: failed to get idt_get_board_type
+");
+ +	}
+ +
+ +	/* append display rotation into bootargs */
+ +	char *idt_disp_rotation;
+ +	char append[BDINFO_DATA_SIZE];
+ +
+ +	memset(append, 0, BDINFO_DATA_SIZE);
+ +	for (int i=0;i<MAX_DISPLAY_COUNT;i++) {
+ +		if ((idt_disp_rotation = get_disp_rotation(i)) != NULL) {
+ +			if (i != DISPLAY_MAIN)
+ +				sprintf(append, "_disp_%d", (i+1));
+ +			sprintf(newbootargs, " androidboot.idt_orientation%s=%s",
+ +					(i == DISPLAY_MAIN)?"":append,
+ +					idt_disp_rotation);
+ +			strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ +		} else {
+ +			break;
+ +		}
+ +	}
+ +
+ +	char idt_display_id[BDINFO_DATA_SIZE] = "";
+ +
+ +	if (idt_get_board_display_id(idt_display_id, BDINFO_DATA_SIZE)) {
+ +		sprintf(newbootargs, " androidboot.idt_display_id=%s", idt_display_id);
+ +		strncat(commandline, newbootargs, sizeof(commandline) - strlen(commandline));
+ +	}
+ +
+ +	sprintf(newbootargs,
+++=======
++ 	sprintf(args_buf,
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  			" androidboot.boot_device_root=mmcblk%d", mmc_map_to_kernel_blk(mmc_get_env_dev()));
+- 	strncat(commandline, newbootargs, COMMANDLINE_LENGTH - strlen(commandline));
++ 	strncat(args, args_buf, *len - strlen(args));
+  
+  	/* boot metric variables */
+  	metrics.ble_1 = get_timer(0);
+diff --cc common/spl/spl_fit.c
+index fcd00819ec,24f1d52205..8f19851719
+--- a/common/spl/spl_fit.c
++++ b/common/spl/spl_fit.c
+@@@ -34,9 -34,8 +34,13 @@@ struct spl_fit_info 
+  	int conf_node;		/* FDT offset to selected configuration node */
+  };
+  
+++<<<<<<< HEAD
+ +__weak int board_spl_fit_post_load(const void *fit)
+++=======
++ __weak void board_spl_fit_post_load(const void *fit, struct spl_image_info *spl_image)
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  {
+ +	return 0;
+  }
+  
+  __weak ulong board_spl_fit_size_align(ulong size)
+@@@ -781,11 -780,7 +785,15 @@@ int spl_load_simple_fit(struct spl_imag
+  
+  	spl_image->flags |= SPL_FIT_FOUND;
+  
+++<<<<<<< HEAD
+ +	ret = 0;
+ +	if (IS_ENABLED(CONFIG_IMX_HAB) && !(spl_image->flags & SPL_FIT_BYPASS_POST_LOAD))
+ +		ret = board_spl_fit_post_load(ctx.fit);
+ +	if (ret < 0)
+ +		return ret;
+++=======
++ 	board_spl_fit_post_load(ctx.fit, spl_image);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	return 0;
+  }
+diff --cc drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 15c4629d75,5ee214f4a7..6afa6ee252
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@@ -566,106 -642,16 +644,114 @@@ bool __weak is_power_key_pressed(void) 
+  	return false;
+  }
+  
+ +#define GET_BYTE(x, n)  ((x & (0xff << 8 * n)) >> 8 * n)
+ +#define FDT_ID_SIZE	128 /* the maximun size of idt,prod-id is 128 */
+ +
+ +int find_dtb_in_dtbo(struct dt_table_header *dt_img)
+ +{
+ +	int fdt_idx = 1;
+ +	u32 dtbo_id;
+ +	u32 fdt_size;
+ +	int len;
+ +	char *fdt_blob;
+ +	char *fdt_id;
+ +	struct dt_table_entry *dt_entry;
+ +	const struct fdt_property *fdt_prop;
+ +
+ +	fdt_id = malloc(sizeof(char) * FDT_ID_SIZE);
+ +	if (get_dtb_id(fdt_id, FDT_ID_SIZE)) {
+ +		printf("Selected ID: %s
+", fdt_id);
+ +	} else {
+ +		puts("Can't get ID from Board info partition
+");
+ +		fdt_idx = -1;
+ +		goto find_out;
+ +	}
+ +
+ +	while (fdt_idx < fdt32_to_cpu(dt_img->dt_entry_count) + 1) {
+ +		dt_entry = (struct dt_table_entry *)
+ +			   ((ulong)dt_img +
+ +			    fdt32_to_cpu(dt_img->dt_entries_offset) * fdt_idx);
+ +		fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+ +		dtbo_id = fdt32_to_cpu(dt_entry->id);
+ +		printf("DTBO ID: %lx (", (ulong)dtbo_id);
+ +		for (len = 3; len >= 0; len--) {
+ +			if ((GET_BYTE(dtbo_id, len) > 31) &&
+ +			    (GET_BYTE(dtbo_id, len) < 127))
+ +				printf("%c", GET_BYTE(dtbo_id, len));
+ +		}
+ +		printf(")	 @ %lx (%d)
+",
+ +		       ((ulong)dt_img +
+ +		        fdt32_to_cpu(dt_entry->dt_offset)),
+ +		       fdt_size);
+ +		fdt_blob = (void *)(ulong)dt_img + fdt32_to_cpu(dt_entry->dt_offset);
+ +		if (fdt_check_header(fdt_blob) != 0) {
+ +			puts("image is not a fdt
+");
+ +			fdt_idx = -1;
+ +			break;
+ +		}
+ +
+ +		if (fdt_totalsize(fdt_blob) != fdt_size) {
+ +			printf("fdt size != image size (%d)
+", fdt_size);
+ +			fdt_idx = -1;
+ +			break;
+ +		}
+ +
+ +		fdt_prop = fdt_get_property(fdt_blob,
+ +					    fdt_path_offset(fdt_blob,
+ +							    "/"),
+ +					    "compatible",
+ +					    &len);
+ +		if (len >= 0)
+ +			printf("FDT compatible: %s
+", fdt_prop->data);
+ +
+ +		fdt_prop = fdt_get_property(fdt_blob,
+ +		                            fdt_path_offset(fdt_blob,
+ +							    "/"),
+ +					    "idt,prod-id",
+ +					    &len);
+ +		if (len >= 0) {
+ +			printf("FDT idt,prod-id: %s
+", fdt_prop->data);
+ +			if (!strncmp(fdt_id, fdt_prop->data,
+ +				     strlen(fdt_prop->data))) {
+ +				printf("## Selected Flattened"
+ +				       " Device Tree: %s
+", fdt_prop->data);
+ +				break;
+ +			}
+ +		}
+ +		fdt_idx++;
+ +	}
+ +	if (fdt_idx > fdt32_to_cpu(dt_img->dt_entry_count)) {
+ +		puts("Can't find ID in DTBO
+");
+ +		fdt_idx = -1;
+ +	}
+ +
+ +find_out:
+ +	free(fdt_id);
+ +
+ +	return fdt_idx;
+ +}
+ +
+  int do_boota(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[]) {
+  
+- 	ulong addr = 0;
+  	u32 avb_metric;
+  	u32 kernel_image_size = 0;
+++<<<<<<< HEAD
+ +	int entry_idx;
+ +	bool check_image_arm64 =  false;
+ +	bool is_recovery_mode = false;
+ +	bool retry_boot =  false;
+ +#ifdef CONFIG_ANDROID_AB_SUPPORT
+ +	int retry_count_before_avb = -1, retry_count_after_avb = -1;
+ +#endif
+ +	bool gki_is_supported = false;
+++=======
++ 	u32 ramdisk_size;
++ 	ulong kernel_addr;
++ 	ulong ramdisk_addr;
++ 	int boot_header_version = 0;
++ 	bool check_image_arm64 =  false;
++ 	bool is_recovery_mode = false;
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	/* 'hdr' should point to boot.img */
+  	struct andr_img_hdr *hdr = NULL;
+@@@ -775,13 -752,21 +868,22 @@@
+  		assert(avb_loadpart != NULL);
+  
+  		/* boot image is already read by avb */
+- 		if (gki_is_supported) {
++ 		if (boot_header_version == 4) {
++ 			assert(avb_vendorboot != NULL);
++ 			hdr_v4 = (struct boot_img_hdr_v4 *)avb_loadpart->data;
++ 			vendor_boot_hdr_v4 = (struct vendor_boot_img_hdr_v4 *)avb_vendorboot->data;
++ 			/* check the header magic, same for boot header v3 and v4 */
++ 			if (android_image_check_header_v3(hdr_v4->magic, vendor_boot_hdr_v4->magic)) {
++ 				printf("boota: bad boot/vendor_boot image magic
+");
++ 				goto fail;
++ 			}
++ 		} else if (boot_header_version == 3) {
+  			assert(avb_vendorboot != NULL);
+  			hdr_v3 = (struct boot_img_hdr_v3 *)avb_loadpart->data;
+- 			vendor_boot_hdr = (struct vendor_boot_img_hdr_v3 *)avb_vendorboot->data;
+- 			if (android_image_check_header_v3(hdr_v3, vendor_boot_hdr)) {
++ 			vendor_boot_hdr_v3 = (struct vendor_boot_img_hdr_v3 *)avb_vendorboot->data;
++ 			if (android_image_check_header_v3(hdr_v3->magic, vendor_boot_hdr_v3->magic)) {
+  				printf("boota: bad boot/vendor_boot image magic
+");
+ +				retry_boot = true;
+  				goto fail;
+  			}
+  		} else {
+@@@ -870,9 -879,8 +998,9 @@@
+  		} else if (IS_ENABLED(CONFIG_LZ4)) {
+  			size_t lz4_len = MAX_KERNEL_LEN;
+  			if (ulz4fn((void *)((ulong)hdr + hdr->page_size),
+- 						hdr->kernel_size, (void *)(ulong)hdr->kernel_addr, &lz4_len) != 0) {
++ 				hdr->kernel_size, (void *)kernel_addr, &lz4_len) != 0) {
+  				printf("Decompress kernel fail!
+");
+ +				retry_boot = true;
+  				goto fail;
+  			}
+  		} else {
+@@@ -979,52 -1015,18 +1138,51 @@@
+  	}
+  
+  	struct dt_table_entry *dt_entry;
+ -	dt_entry = (struct dt_table_entry *)((ulong)dt_img +
+ -			be32_to_cpu(dt_img->dt_entries_offset));
+ -	fdt_size = be32_to_cpu(dt_entry->dt_size);
+ +
+ +	printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
+ +						    dt_entry_count));
+ +#ifdef CONFIG_IDT_LINUX_DTB
+ +	env_value = env_get("idt,prod-id");
+ +	if (env_value == NULL) {
+ +		puts("boota: no IDTECH product ID in board_info
+");
+ +#ifdef CONFIG_IMX_HAB
+ +		retry_boot = true;
+ +		goto fail;
+ +#endif /* CONFIG_IMX_HAB */
+ +	}
+ +	env_value = env_get("entry_idx");
+ +	if (env_value != NULL) {
+ +		entry_idx = (int)simple_strtol(env_value, NULL, 10);
+ +	} else {
+ +		entry_idx = find_dtb_in_dtbo(dt_img);
+ +		if (entry_idx < 1) {
+ +			puts("boota: no avaliable dtb
+");
+ +			retry_boot = true;
+ +			goto fail;
+ +		}
+ +	}
+ +#else /* !CONFIG_IDT_LINUX_DTB */
+ +	entry_idx = find_dtb_in_dtbo(dt_img);
+ +	if (entry_idx < 1) {
+ +		puts("boota: no avaliable dtb
+");
+ +		retry_boot = true;
+ +		goto fail;
+ +	}
+ +#endif /* CONFIG_IDT_LINUX_DTB */
+ +	dt_entry = (struct dt_table_entry *)
+ +		   ((ulong)dt_img +
+ +		    fdt32_to_cpu(dt_img->dt_entries_offset) *
+ +		    entry_idx);
+ +	fdt_size = fdt32_to_cpu(dt_entry->dt_size);
+  	memcpy((void *)(ulong)fdt_addr, (void *)((ulong)dt_img +
+ -			be32_to_cpu(dt_entry->dt_offset)), fdt_size);
+ +			fdt32_to_cpu(dt_entry->dt_offset)), fdt_size);
+  
+- 	/* Combine cmdline and Print image info  */
+- 	if (gki_is_supported) {
+- 		android_image_get_kernel_v3(hdr_v3, vendor_boot_hdr);
+- 		addr = vendor_boot_hdr->kernel_addr;
+- 		printf("kernel   @ %08x (%d)
+", vendor_boot_hdr->kernel_addr, kernel_image_size);
+- 		printf("ramdisk  @ %08x (%d)
+", vendor_boot_hdr->ramdisk_addr,
+- 						vendor_boot_hdr->vendor_ramdisk_size + hdr_v3->ramdisk_size);
++ 	/* Combine cmdline */
++ 	if (boot_header_version == 4) {
++ 		android_image_get_kernel_v3((struct boot_img_hdr_v3 *)hdr_v4,
++ 						(struct vendor_boot_img_hdr_v3 *)vendor_boot_hdr_v4, true);
++ 	} else if (boot_header_version == 3) {
++ 		android_image_get_kernel_v3(hdr_v3, vendor_boot_hdr_v3, false);
+  	} else {
+  		if (check_image_arm64) {
+  			android_image_get_kernel(hdr, 0, NULL, NULL);
+diff --cc drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+index 9a30918c26,4f930ac19c..f975dfe26a
+--- a/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_partitions.c
+@@@ -238,15 -229,13 +241,23 @@@ static int _fastboot_parts_load_from_pt
+  	ptable[PTN_ALL_INDEX].partition_id = user_partition;
+  	strcpy(ptable[PTN_ALL_INDEX].fstype, "device");
+  
+ -	/* Bootloader */
+ +	unsigned int factor = (4096/512);
+ +	unsigned int spl_start = bootloader_mmc_offset() / dev_desc->blksz;
+ +	unsigned int spl_length = (ANDROID_BOOTLOADER_SIZE / dev_desc->blksz) / 2 - spl_start;
+ +	unsigned int spl_length_4k_aligned = (unsigned int)(spl_length / factor) * factor;
+ +
+ +	/* Bootloader aka spl_a */
+  	strcpy(ptable[PTN_BOOTLOADER_INDEX].name, FASTBOOT_PARTITION_BOOTLOADER);
+++<<<<<<< HEAD
+ +	ptable[PTN_BOOTLOADER_INDEX].start = spl_start;
+ +	ptable[PTN_BOOTLOADER_INDEX].length = spl_length_4k_aligned;
+++=======
++ 	ptable[PTN_BOOTLOADER_INDEX].start =
++ 				bootloader_mmc_offset() / dev_desc->blksz;
++ 	ptable[PTN_BOOTLOADER_INDEX].length =
++ 				 boot_loader_psize / dev_desc->blksz;
++ 
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  	ptable[PTN_BOOTLOADER_INDEX].partition_id = boot_partition;
+  	ptable[PTN_BOOTLOADER_INDEX].flags = FASTBOOT_PTENTRY_FLAGS_UNERASEABLE;
+  	strcpy(ptable[PTN_BOOTLOADER_INDEX].fstype, "raw");
+diff --cc drivers/video/nxp/imx/mipi_dsi_northwest.c
+index aec53ecb64,eacd8965bd..c6060f4bca
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest.c
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest.c
+@@@ -26,25 -26,10 +26,25 @@@
+  #include <dm/device_compat.h>
+  #include <regmap.h>
+  #include <syscon.h>
+ -#include <asm/arch/clock.h>
+ +#include <inttypes.h>
+ +
+ +#define CN_BUF	0xcb7a89c0
+ +#define CO_BUF	0x63
+ +#define CM(x)	( \
+ +		((x) <  32)?0xe0|((x)-16) : \
+ +		((x) <  64)?0xc0|((x)-32) : \
+ +		((x) < 128)?0x80|((x)-64) : \
+ +		((x) - 128))
+ +#define CN(x)	(((x) == 1)?0x1f : (((CN_BUF)>>((x)-1))&0x1f))
+ +#define CO(x)	((CO_BUF)>>(8-(x))&0x3)
+ +
+ +#define NWL_DSI_TX_PKT_DONE_MASK	BIT(1)
+ +#define NWL_DSI_TX_FIFO_OVFLW_MASK	BIT(3)
+ +#define NWL_DSI_RX_PKT_HDR_RCVD_MASK	BIT(7)
+ +#define NWL_DSI_HS_TX_TIMEOUT_MASK	BIT(31)
+  
+  #define MIPI_LCD_SLEEP_MODE_DELAY	(120)
+- #define MIPI_FIFO_TIMEOUT		250000 /* 250ms */
++ #define MIPI_FIFO_TIMEOUT		500000 /* 500ms */
+  #define	PS2KHZ(ps)	(1000000000UL / (ps))
+  
+  #define DIV_ROUND_CLOSEST_ULL(x, divisor)(		\
+@@@ -664,7 -691,7 +706,11 @@@ static int mipi_dsi_pkt_write(struct mi
+  	int ret = 0;
+  	const uint8_t *data = (const uint8_t *)buf;
+  
+++<<<<<<< HEAD
+ +	debug("mipi_dsi_pkt_write data_type 0x%x, buf 0x%x, len %u
+", data_type, (u32)(uintptr_t)buf, len);
+++=======
++ 	debug("mipi_dsi_pkt_write data_type 0x%x, buf 0x%lx, len %u
+", data_type, (ulong)buf, len);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	if (len == 0)
+  		/* handle generic long write command */
+@@@ -715,21 -742,14 +761,16 @@@ static int mipi_dsi_dcs_cmd(struct mipi
+  	return err;
+  }
+  
+ +#ifndef CONFIG_IMX8MQ
+  static void reset_dsi_domains(struct mipi_dsi_northwest_info *mipi_dsi, bool reset)
+  {
+- 	/* escape domain */
+- 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG,
+- 			DSI_RST_ESC_N, (reset ? 0 : DSI_RST_ESC_N));
+- 	/* byte domain */
+- 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG,
+- 			DSI_RST_BYTE_N, (reset ? 0 : DSI_RST_BYTE_N));
++ 	if (mipi_dsi->sim_ops->mipi_reset)
++ 		mipi_dsi->sim_ops->mipi_reset(mipi_dsi->sim, reset);
+  
+- 	/* dpi domain */
+- 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG,
+- 			DSI_RST_DPI_N, (reset ? 0 : DSI_RST_DPI_N));
++ 	if (mipi_dsi->sim_ops->dpi_reset)
++ 			mipi_dsi->sim_ops->dpi_reset(mipi_dsi->sim, reset);
+  }
+ +#endif /* !CONFIG_IMX8MQ */
+  
+  static void mipi_dsi_shutdown(struct mipi_dsi_northwest_info *mipi_dsi)
+  {
+@@@ -1092,16 -792,16 +1133,18 @@@ static int mipi_dsi_northwest_host_atta
+  	if (ret < 0)
+  		return ret;
+  
+ +#ifndef CONFIG_IMX8MQ
+  	/* Deassert resets */
+  	reset_dsi_domains(mipi_dsi, false);
+ +#endif /* !CONFIG_IMX8MQ */
+  
+  	/* display_en */
+- 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG, DSI_SD, 0);
++ 	if (mipi_dsi->sim_ops->shutdown)
++ 		mipi_dsi->sim_ops->shutdown(mipi_dsi->sim, false);
+  
+  	/* normal cm */
+- 	regmap_update_bits(mipi_dsi->sim, SIM_SOPT1CFG, DSI_CM, 0);
++ 	if (mipi_dsi->sim_ops->cm_set)
++ 		mipi_dsi->sim_ops->cm_set(mipi_dsi->sim, true);
+  	mdelay(20);
+  
+  	/* Disable all interrupts, since we use polling */
+@@@ -1168,25 -976,40 +1318,50 @@@ static int mipi_dsi_northwest_init(stru
+  		return -EINVAL;
+  	}
+  
+++<<<<<<< HEAD
+ +#ifndef CONFIG_IMX8MQ
+ +	int ret = dev_read_u32(device->dev, "max-data-rate", &dsi->max_data_rate);
+ +	if (ret) {
+ +		dev_err(device->dev, "fail to get max-data-rate
+");
+ +		return -EINVAL;
+ +	}
+++=======
++ 	if (device_is_compatible(device->dev, "fsl,imx7ulp-mipi-dsi")) {
++ 		ret = dev_read_u32(device->dev, "max-data-rate", &dsi->max_data_rate);
++ 		if (ret) {
++ 			dev_err(device->dev, "fail to get max-data-rate
+");
++ 			return -EINVAL;
++ 		}
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+- 	ret = dev_read_u32(device->dev, "phy-ref-clkfreq", &dsi->pll_ref);
+- 	if (ret) {
+- 		dev_err(device->dev, "fail to get phy-ref-clkfreq
+");
+- 		return -EINVAL;
+- 	}
++ 		ret = dev_read_u32(device->dev, "phy-ref-clkfreq", &dsi->pll_ref);
++ 		if (ret) {
++ 			dev_err(device->dev, "fail to get phy-ref-clkfreq
+");
++ 			return -EINVAL;
++ 		}
+  
+- 	dsi->sim = syscon_regmap_lookup_by_phandle(device->dev, "sim");
+- 	if (IS_ERR(dsi->sim)) {
+- 		dev_err(device->dev, "fail to get sim regmap
+");
+- 		return PTR_ERR(dsi->sim);
++ 		dsi->sim = syscon_regmap_lookup_by_phandle(device->dev, "sim");
++ 		if (IS_ERR(dsi->sim)) {
++ 			dev_err(device->dev, "fail to get sim regmap
+");
++ 			return PTR_ERR(dsi->sim);
++ 		}
++ 
++ 		dsi->sim_ops = &imx7ulp_sim_ops;
++ 	} else if (device_is_compatible(device->dev, "fsl,imx8ulp-nwl-dsi")) {
++ 		dsi->max_data_rate = 1500000000;
++ 		dsi->pll_ref = 24000000;
++ 		dsi->sim = syscon_regmap_lookup_by_phandle(device->dev, "csr");
++ 		if (IS_ERR(dsi->sim)) {
++ 			dev_err(device->dev, "fail to get csr regmap
+");
++ 			return PTR_ERR(dsi->sim);
++ 		}
++ 
++ 		dsi->sim_ops = &imx8ulp_sim_ops;
++ 	} else {
++ 		dev_err(device->dev, "Invalid compatible string
+");
++ 		return -EINVAL;
+  	}
+ +#endif /* !CONFIG_IMX8MQ */
+  
+  	return 0;
+  }
+diff --cc drivers/video/nxp/imx/mipi_dsi_northwest_regs.h
+index fcc92fa567,59c156e1e2..02d476c5ca
+--- a/drivers/video/nxp/imx/mipi_dsi_northwest_regs.h
++++ b/drivers/video/nxp/imx/mipi_dsi_northwest_regs.h
+@@@ -23,9 -23,12 +23,18 @@@
+  #define DSI_CM			0x100
+  #define DSI_PLL_EN		0x80
+  
+++<<<<<<< HEAD
+ +#define SRC_MIPIPHY_RCR		0x28
+ +#define SRC_DISP_RCR		0x34
+ +
+++=======
++ #define AVDSIM_SYSCTRL0		0x8
++ #define AVDSIM_DSI_RST_DPI_N		0x8
++ #define AVDSIM_DSI_RST_ESC_N		0x10
++ #define AVDSIM_DSI_RST_BYTE_N		0x20
++ #define AVDSIM_DSI_SD			0x4
++ #define AVDSIM_DSI_CM			0x2
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  /* dphy */
+  #define DPHY_PD_DPHY			0x300
+@@@ -46,9 -53,22 +59,28 @@@
+  #define DPHY_AUTO_PD_EN			0x33c
+  #define DPHY_RXLPRP			0x340
+  #define DPHY_RXCDRP			0x344
+++<<<<<<< HEAD
+ +#define DPHY_RXHS_SETTLE		0x348
+ +#define DPHY_BYPASS_PLL			0x34c
+ +
+++=======
++ #else
++ #define DPHY_RTERM_SEL_REG_NA
++ 
++ #define DPHY_MC_PRG_RXHS_SETTLE 0x31c
++ #define DPHY_M_PRG_RXHS_SETTLE 0x320
++ #define DPHY_PD_PLL			0x324
++ #define DPHY_TST			0x328
++ #define DPHY_CN				0x32c
++ #define DPHY_CM				0x330
++ #define DPHY_CO				0x334
++ #define DPHY_LOCK			0x338
++ #define DPHY_LOCK_BYP			0x33c
++ #define DPHY_AUTO_PD_EN			0x340
++ #define DPHY_RXLPRP			0x344
++ #define DPHY_RXCDRP			0x348
++ #endif
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  /* host */
+  #define HOST_CFG_NUM_LANES		0x0
+diff --cc drivers/video/nxp/imx/nw_dsi_imx.c
+index 7a38124821,8ac7cf8edd..dcb72550c6
+--- a/drivers/video/nxp/imx/nw_dsi_imx.c
++++ b/drivers/video/nxp/imx/nw_dsi_imx.c
+@@@ -142,7 -134,7 +142,11 @@@ struct video_bridge_ops nw_dsi_imx_ops 
+  
+  static const struct udevice_id nw_dsi_imx_ids[] = {
+  	{ .compatible = "fsl,imx7ulp-mipi-dsi" },
+++<<<<<<< HEAD
+ +	{ .compatible = "fsl,imx8mq-nwl-dsi" },
+++=======
++ 	{ .compatible = "fsl,imx8ulp-nwl-dsi" },
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  	{ }
+  };
+  
+diff --cc drivers/video/nxp/imx/sec_mipi_dsim.c
+index 7541074f5d,246e7f467d..9ae326ed57
+--- a/drivers/video/nxp/imx/sec_mipi_dsim.c
++++ b/drivers/video/nxp/imx/sec_mipi_dsim.c
+@@@ -9,9 -9,9 +9,10 @@@
+  #include <dm/device_compat.h>
+  #include <asm/io.h>
+  #include <linux/err.h>
+ +#include <linux/log2.h>
+  #include <linux/bug.h>
+  #include <linux/delay.h>
++ #include <linux/log2.h>
+  #include <asm/unaligned.h>
+  #include <asm/arch/clock.h>
+  #include <asm/arch/imx-regs.h>
+@@@ -830,22 -1200,8 +1234,22 @@@ static inline struct sec_mipi_dsim *hos
+  
+  static int sec_mipi_dsim_bridge_clk_set(struct sec_mipi_dsim *dsim_host)
+  {
+- 	int bpp;
++ 	int bpp, ret;
+  	uint64_t pix_clk, bit_clk;
+ +	uint32_t p, m, s;
+ +	uint32_t best_p = 0, best_m = 0, best_s = 0;
+ +	uint32_t fin, fout;
+ +	uint32_t s_pow_2, raw_s;
+ +	uint64_t mfin, pfvco, pfout, psfout;
+ +	uint32_t delta, best_delta = ~0U;
+ +	struct sec_mipi_dsim_range *prange = &pll_1432x.p;
+ +	struct sec_mipi_dsim_range *mrange = &pll_1432x.m;
+ +	struct sec_mipi_dsim_range *srange = &pll_1432x.s;
+ +	struct sec_mipi_dsim_range *krange = &pll_1432x.k;
+ +	struct sec_mipi_dsim_range *fvco_range  = &pll_1432x.fvco;
+ +	struct sec_mipi_dsim_range *fpref_range = &pll_1432x.fpref;
+ +	struct sec_mipi_dsim_range pr_new = *prange;
+ +	struct sec_mipi_dsim_range sr_new = *srange;
+  
+  	bpp = mipi_dsi_pixel_format_to_bpp(dsim_host->format);
+  	if (bpp < 0)
+@@@ -864,90 -1220,19 +1268,106 @@@
+  	dsim_host->pix_clk = DIV_ROUND_UP_ULL(pix_clk, 1000);
+  	dsim_host->bit_clk = DIV_ROUND_UP_ULL(bit_clk, 1000);
+  
+++<<<<<<< HEAD
+ +	fout = dsim_host->bit_clk;
+ +	fin = DIV_ROUND_UP_ULL(PHY_REF_CLK, 1000);  /* pref_clk */
+ +
+ +	krange->min = 0;
+ +	krange->max = 0;
+ +
+ +	prange->min = max(prange->min, DIV_ROUND_UP(fin, fpref_range->max));
+ +	prange->max = min(prange->max, fin / fpref_range->min);
+ +
+ +	pfvco = (uint64_t)fvco_range->min * prange->min;
+ +	mrange->min = max_t(uint32_t, mrange->min,
+ +			    DIV_ROUND_UP_ULL(pfvco, fin));
+ +	pfvco = (uint64_t)fvco_range->max * prange->max;
+ +	mrange->max = min_t(uint32_t, mrange->max,
+ +			    DIV_ROUND_UP_ULL(pfvco, fin));
+ +
+ +	debug("p: min = %u, max = %u, "
+ +		     "m: min = %u, max = %u, "
+ +		     "s: min = %u, max = %u
+",
+ +		prange->min, prange->max, mrange->min,
+ +		mrange->max, srange->min, srange->max);
+ +
+ +	for (m = mrange->min; m <= mrange->max; m++) {
+ +		/* p = m * Fin / Fvco */
+ +		mfin = (uint64_t)m * fin;
+ +		pr_new.min = max_t(uint32_t, prange->min,
+ +				   DIV_ROUND_UP_ULL(mfin, fvco_range->max));
+ +		pr_new.max = min_t(uint32_t, prange->max,
+ +				   (mfin / fvco_range->min));
+ +
+ +		if (pr_new.max < pr_new.min || pr_new.min < prange->min)
+ +			continue;
+ +
+ +		for (p = pr_new.min; p <= pr_new.max; p++) {
+ +			/* s = order_pow_of_two((m * Fin) / (p * Fout)) */
+ +			pfout = (uint64_t)p * fout;
+ +			raw_s = DIV_ROUND_CLOSEST_ULL(mfin, pfout);
+ +
+ +			s_pow_2 = rounddown_pow_of_two(raw_s);
+ +			sr_new.min = max_t(uint32_t, srange->min,
+ +					   order_base_2(s_pow_2));
+ +
+ +			s_pow_2 = roundup_pow_of_two(DIV_ROUND_CLOSEST_ULL(mfin, pfout));
+ +			sr_new.max = min_t(uint32_t, srange->max,
+ +					   order_base_2(s_pow_2));
+ +
+ +			if (sr_new.max < sr_new.min || sr_new.min < srange->min)
+ +				continue;
+ +
+ +			for (s = sr_new.min; s <= sr_new.max; s++) {
+ +				/* fout = m * Fin / (p * 2^s) */
+ +				psfout = pfout * (1 << s);
+ +				delta = abs(psfout - mfin);
+ +				if (delta < best_delta) {
+ +					best_p = p;
+ +					best_m = m;
+ +					best_s = s;
+ +					best_delta = delta;
+ +				}
+ +			}
+ +		}
+ +	}
+ +
+ +	if (best_delta == ~0U) {
+ +		printf("%s: Can't find out PMS using default
+", __func__);
+ +		dsim_host->pms = 0x4210;
+ +		return 0;
+ +	}
+ +
+ +	debug("%s: bitclk %llu pixclk %llu
+", __func__, dsim_host->bit_clk, dsim_host->pix_clk);
+ +	dsim_host->p = best_p;
+ +	dsim_host->m = best_m;
+ +	dsim_host->s = best_s;
+ +
+ +	if (dsim_host->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
+ +		dsim_host->pms = PLLCTRL_SET_P(dsim_host->p) |
+ +				 PLLCTRL_SET_M(dsim_host->m) |
+ +				 PLLCTRL_SET_S(dsim_host->s);
+ +
+ +	debug("%s: fout = %u, fin = %u, m = %u, "
+ +	      "p = %u, s = %u, best_delta = %u
+"
+ +	      " dsim_host->pms = 0x%x
+",
+ +	      __func__, fout, fin, dsim_host->m, dsim_host->p, dsim_host->s,
+ +	      best_delta, dsim_host->pms);
+++=======
++ 	ret = sec_mipi_dsim_calc_pmsk(dsim_host);
++ 	if (ret) {
++ 		printf("failed to get pmsk for: fout = %llu
+",
++ 			dsim_host->bit_clk);
++ 		return -EINVAL;
++ 	}
++ 
++ 	dsim_host->pms = PLLCTRL_SET_P(dsim_host->p) |
++ 		    PLLCTRL_SET_M(dsim_host->m) |
++ 		    PLLCTRL_SET_S(dsim_host->s);
++ 
++ 	debug("%s: bitclk %llu pixclk %llu pms 0x%x
+", __func__,
++ 		dsim_host->bit_clk, dsim_host->pix_clk, dsim_host->pms);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  	return 0;
+  }
+diff --cc include/spl.h
+index d250abc3ba,18a80a3121..6b2b48e05c
+--- a/include/spl.h
++++ b/include/spl.h
+@@@ -707,7 -707,7 +707,11 @@@ int board_return_to_bootrom(struct spl_
+   * board_spl_fit_post_load - allow process images after loading finished
+   * @fit: Pointer to a valid Flattened Image Tree blob
+   */
+++<<<<<<< HEAD
+ +int board_spl_fit_post_load(const void *fit);
+++=======
++ void board_spl_fit_post_load(const void *fit, struct spl_image_info *spl_image);
+++>>>>>>> merge_android-12.0.0-1.0.0-er1_to_idt-imx-android-12-dev
+  
+  /**
+   * board_spl_fit_size_align - specific size align before processing payload

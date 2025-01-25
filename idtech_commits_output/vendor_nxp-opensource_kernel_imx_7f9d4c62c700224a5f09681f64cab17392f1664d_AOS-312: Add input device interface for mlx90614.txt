@@ -1,0 +1,145 @@
+7f9d4c62c700 jay deng 2020-09-17
+
+AOS-312: Add input device interface for mlx90614
+
+System need input and event device to notify SensorEvent
+service of Android framework. So must add input device
+interface for mlx90614.
+
+Change-Id: Ief119b7f848c2098e8ffdbc6f4b9c7df8c605dad
+
+diff --git a/drivers/iio/temperature/mlx90614.c b/drivers/iio/temperature/mlx90614.c
+index b7c56ddf884f..35069c972e68 100644
+--- a/drivers/iio/temperature/mlx90614.c
++++ b/drivers/iio/temperature/mlx90614.c
+@@ -29,6 +29,7 @@
+ 
+ #include <linux/iio/iio.h>
+ #include <linux/iio/sysfs.h>
++#include <linux/input-polldev.h>
+ 
+ #define MLX90614_OP_RAM		0x00
+ #define MLX90614_OP_EEPROM	0x20
+@@ -70,10 +71,18 @@
+ #define MLX90614_CONST_EMISSIVITY_RESOLUTION 15259 /* 1/65535 ~ 0.000015259 */
+ #define MLX90614_CONST_FIR 0x7 /* Fixed value for FIR part of low pass filter */
+ 
++#define MLX90614_DRV_NAME			"mlx90614"
++#define MLX90614_PHY_NAME			"mlx90614/input0"
++
++#define POLL_INTERVAL_MAX			300
++#define POLL_INTERVAL				200
++#define POLL_INTERVAL_MIN			100
++
+ struct mlx90614_data {
+ 	struct i2c_client *client;
+ 	struct mutex lock; /* for EEPROM access only */
+ 	struct gpio_desc *wakeup_gpio; /* NULL to disable sleep/wake-up */
++	struct input_polled_dev *poll_dev;
+ 	unsigned long ready_timestamp; /* in jiffies */
+ };
+ 
+@@ -503,11 +512,44 @@ static int mlx90614_probe_num_ir_sensors(struct i2c_client *client)
+ 	return (ret & MLX90614_CONFIG_DUAL_MASK) ? 1 : 0;
+ }
+ 
++static void report_abs(struct mlx90614_data *pdata)
++{
++	struct input_dev *idev;
++	int temperature = 0, ret = 0;
++
++	idev = pdata->poll_dev->input;
++
++	ret = mlx90614_power_get(pdata, true);
++	if (ret < 0)
++		return;
++
++	ret = i2c_smbus_read_word_data(pdata->client, MLX90614_TOBJ1);
++	mlx90614_power_put(pdata);
++	if (ret < 0)
++		return;
++
++	/* MSB is an error flag */
++	if (ret & 0x8000)
++		return;
++	temperature = ret;
++	input_event(idev, EV_MSC, MSC_SERIAL, temperature);
++	input_sync(idev);
++}
++
++static void mlx90614_dev_poll(struct input_polled_dev *dev)
++{
++	struct mlx90614_data *pdata = (struct mlx90614_data *)dev->private;
++
++	report_abs(pdata);
++}
++
++
+ static int mlx90614_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *id)
+ {
+ 	struct iio_dev *indio_dev;
+ 	struct mlx90614_data *data;
++	struct input_dev *idev;
+ 	int ret;
+ 
+ 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_WORD_DATA))
+@@ -554,7 +596,44 @@ static int mlx90614_probe(struct i2c_client *client,
+ 		pm_runtime_enable(&client->dev);
+ 	}
+ 
++	data->poll_dev = input_allocate_polled_device();
++	if (!data->poll_dev) {
++		dev_err(&client->dev, "alloc poll device failed!
+");
++		ret = -ENOMEM;
++		goto err_alloc_data;
++	}
++
++	data->poll_dev->poll = mlx90614_dev_poll;
++	data->poll_dev->private = data;
++	data->poll_dev->poll_interval = POLL_INTERVAL;
++	data->poll_dev->poll_interval_min = POLL_INTERVAL_MIN;
++	data->poll_dev->poll_interval_max = POLL_INTERVAL_MAX;
++	idev = data->poll_dev->input;
++	idev->name = MLX90614_DRV_NAME;
++	idev->phys = MLX90614_PHY_NAME;
++	idev->id.bustype = BUS_I2C;
++	idev->evbit[0] = BIT_MASK(EV_MSC);
++	input_set_capability(idev, EV_MSC, MSC_SERIAL);
++	ret = input_register_polled_device(data->poll_dev);
++	if (ret) {
++		dev_err(&client->dev, "register poll device failed!
+");
++		goto error_free_poll_dev;
++	}
++	ret = sysfs_create_group(&idev->dev.kobj, &mlx90614_attr_group);
++	if (ret) {
++		dev_err(&client->dev, "create device file failed!
+");
++		ret = -EINVAL;
++		goto error_register_polled_device;
++	}
++
+ 	return iio_device_register(indio_dev);
++
++error_register_polled_device:
++	input_unregister_polled_device(data->poll_dev);
++error_free_poll_dev:
++	input_free_polled_device(data->poll_dev);
++err_alloc_data:
++	return ret;
+ }
+ 
+ static int mlx90614_remove(struct i2c_client *client)
+@@ -570,6 +649,10 @@ static int mlx90614_remove(struct i2c_client *client)
+ 			mlx90614_sleep(data);
+ 		pm_runtime_set_suspended(&client->dev);
+ 	}
++	if (data->poll_dev) {
++		input_unregister_polled_device(data->poll_dev);
++		input_free_polled_device(data->poll_dev);
++	}
+ 
+ 	return 0;
+ }

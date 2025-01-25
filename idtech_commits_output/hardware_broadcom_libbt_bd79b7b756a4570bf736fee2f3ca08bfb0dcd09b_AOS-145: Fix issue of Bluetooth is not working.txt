@@ -1,0 +1,47 @@
+bd79b7b George.Huang 2020-05-18
+
+AOS-145: Fix issue of Bluetooth is not working
+
+Success log:
+  I bt_vendor: init
+  I bt_vnd_conf: Attempt to load conf from /vendor/etc/bluetooth/bt_vendor.conf
+  D android.hardware.bluetooth@1.0-impl: Open vendor library loaded
+  W bt_vendor: NOTE: BT_VND_PWR_ON now forces power-off first
+  I rfkill  : BT RF going to : off
+  I rfkill  : BT RF going to : on
+  I         : mxc_bt_rfkill_reset
+  I bt_userial_vendor: userial vendor open: opening /dev/ttymxc1
+  I bt_userial_vendor: device fd = 6 open
+Fail log:
+  I bt_vendor: init
+  I bt_vnd_conf: Attempt to load conf from /etc/bluetooth/bt_vendor.conf
+  I bt_vnd_conf: vnd_load_conf file >/etc/bluetooth/bt_vendor.conf< not found
+  D android.hardware.bluetooth@1.0-impl: Open vendor library loaded
+  W bt_vendor: NOTE: BT_VND_PWR_ON now forces power-off first
+  I rfkill  : BT RF going to : off
+  I rfkill  : BT RF going to : on
+  I         : mxc_bt_rfkill_reset
+  I bt_userial_vendor: userial vendor open: opening /dev/ttyO1
+  E bt_userial_vendor: userial vendor open: unable to open /dev/ttyO1
+  E android.hardware.bluetooth@1.0-impl: Open: fd_count 0 is invalid!
+  E display : threadLoop invalid uevent change@/devices/platform/bt_rfkill/rfkill/rfkill0
+
+Symptom:
+  Failed to turn on BT
+Root Cause:
+  Can't find correct config file hardware/broadcom/libbt/vnd_vp6820_8mq.txt during build time
+  Then cause device got the wrong path:
+    bt_vnd_conf: vnd_load_conf file >/etc/bluetooth/bt_vendor.conf< not found
+Solution:
+  Create config file for vp6820_8mq: hardware/broadcom/libbt/vnd_vp6820_8mq.txt
+
+Change-Id: I908d50a8bad12eac568cae4df51bcce7dafe8da9
+
+diff --git a/include/vnd_vp6820_8mq.txt b/include/vnd_vp6820_8mq.txt
+new file mode 120000
+index 0000000..d3d99ae
+--- /dev/null
++++ b/include/vnd_vp6820_8mq.txt
+@@ -0,0 +1 @@
++vnd_evk_a300.txt
+\ No newline at end of file

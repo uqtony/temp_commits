@@ -1,0 +1,252 @@
+08baee79 George.Huang 2022-02-22
+
+AOS-864: bringup_test: refine script
+
+- example: bringup_test_stageall.sh 0 99 150K100038
+
+- Usage:   bringup_test_stageall.sh [test_group] [repeat_time] [SN]
+  test_group: 0: all / 1: stage1 / 2: stage2 / 3: k81 / 4: full-load
+
+- by default:
+  test_idx=0
+  repeat_time=1
+  SN=
+
+Change-Id: I59986d6bc13a4ef435fe9a0186b2278e5fe9df9e
+
+diff --git a/imx8m/bringup_test.sh b/imx8m/bringup_test.sh
+index 381fb6ef..9bea746b 100644
+--- a/imx8m/bringup_test.sh
++++ b/imx8m/bringup_test.sh
+@@ -714,12 +714,11 @@ check_bringup_stage1_if() {
+ check_bringup_stage1_func() {
+   log_rst "==== STAGE1_FUNC =============" "======"
+   check_light_sensor "input"
+-  check_idg_version
+-  check_func_lte
++  check_func_lte_operator
+   check_func_lte_signal
+ # check_func_bt
+ # check_audio
+-# check_func_rs232
++  check_func_rs232
+   check_func_eth 0 2          # eth0 / delay 2sec
+   check_func_wlan 0 2         # wlan0 / delay 2sec
+   check_sdcard 100000 2       # write 100MB / delay 2sec
+@@ -750,8 +749,17 @@ check_bringup_stage2_func() {
+ }
+ 
+ check_bringup_stage3_func() {
+-  # assume device is rooted/enforce 0/boot_completed
+   log_rst "==== STAGE3_FUNC =============" "======"
++  check_idg_version
++  check_idg_nfc
++  check_idg_icc
++  check_idg_msr
++  log_rst "==============================" "======"
++}
++
++check_bringup_stage4_func() {
++  # assume device is rooted/enforce 0/boot_completed
++  log_rst "==== STAGE4_FUNC =============" "======"
+   check_dev_info
+   check_led_status 255
+   check_func_provision
+@@ -761,10 +769,7 @@ check_bringup_stage3_func() {
+   check_func_camera 0         # display_id
+ #  check_func_youtube_video 1  # display_id
+ #  check_func_occupy_cpu 3     # num of cpu threads
+-  check_idg_nfc
+-  check_idg_icc
+-  check_idg_msr
+-  sleep 600                   # assume stage3 needs 10min/round
++  sleep 600                   # assume stage4 needs 10min/round
+   log_rst "==============================" "======"
+ }
+ 
+@@ -779,14 +784,18 @@ check_bringup() {
+     check_bringup_stage2_if
+     check_bringup_stage2_func
+   elif [ $test_idx -eq 3 ]; then
++    check_bringup_stage3_func
++  elif [ $test_idx -eq 4 ]; then
+     check_bringup_stage1_func
+     check_bringup_stage2_func
+     check_bringup_stage3_func
++    check_bringup_stage4_func
+   else
+     check_bringup_stage1_if
+     check_bringup_stage1_func
+     check_bringup_stage2_if
+     check_bringup_stage2_func
++    check_bringup_stage3_func
+   fi
+   echo -e "
+
+
+
+
+
+
+
+
+
+" >> $RST_PATH
+ }
+@@ -846,11 +855,11 @@ check_idg_version() {
+   logi ""
+ }
+ 
+-check_func_lte() {
+-  logi "== check_func_lte"
++check_func_lte_operator() {
++  logi "== check_func_lte_operator"
+   unset_test_array
+ 
+-  test_key="lte"
++  test_key="func_lte_operator"
+   logi "getprop gsm.sim.operator.alpha" # get carrier name
+   logi "`getprop gsm.sim.operator.alpha`"
+   operator=`getprop gsm.sim.operator.alpha`
+@@ -866,7 +875,7 @@ check_func_lte_signal() {
+   logi "== check_func_lte_signal"
+   unset_test_array
+ 
+-  test_key="lte_signal"
++  test_key="func_lte_signal"
+   logi "dumpsys telephony.registry | grep mSignalStrength="
+   logi "`dumpsys telephony.registry | grep mSignalStrength=`"
+   string=`dumpsys telephony.registry | grep mSignalStrength=`
+@@ -881,6 +890,7 @@ check_func_lte_signal() {
+ 
+ check_idg_nfc() {
+   logi "== check idg nfc"
++  unset_test_array
+ 
+   test_key="idg_nfc"
+   logi "idg_console_tool 2 2C01000101" # enable passthrough mode
+@@ -1006,6 +1016,7 @@ check_idg_sam4() {
+ #[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 02 83 3F 93 DB
+ check_idg_msr() {
+   logi "== check idg msr"
++  unset_test_array
+ 
+   test_key="idg_msr"
+   logi "idg_console_tool 2 2C200000 20" # MSR swipe, K91 2C20 command 20s timeout
+@@ -1026,6 +1037,7 @@ check_idg_msr() {
+ #[RX] - 56 69 56 4F 74 65 63 68 32 00 2C 00 00 17 3B EE 00 00 81 31 80 42 80 31 80 66 B0 84 0C 01 6E 01 83 00 90 00 8E 75 55
+ check_idg_icc() {
+   logi "== check idg icc"
++  unset_test_array
+ 
+   test_key="idg_icc"
+   logi "idg_console_tool 2 2C01000101" # enable passthrough mode
+diff --git a/imx8m/bringup_test_stageall.bat b/imx8m/bringup_test_stageall.bat
+index 1bfcf64a..a8f39e86 100644
+--- a/imx8m/bringup_test_stageall.bat
++++ b/imx8m/bringup_test_stageall.bat
+@@ -1,21 +1,46 @@
+ 
+ ::@echo off
+ 
+-set /A test_idx=0
+-::set test_script=/data/local/tmp/bringup_test.sh
+ set test_script=/product/bin/bringup_test.sh
+ set adb_tool=adb.exe
+ 
+-%adb_tool% wait-for-device
++set script_path=%cd%\%0
++for %%F in (%script_path%) do set base_path=%%~dpF
++cd %base_path%
++
++:: test_idx: 0: all / 1: stage1 / 2: stage2 / 3: k81 / 4: full-load
++set /A test_idx=0
++if not [%1] == [] set /A test_idx=%1
++
++:: idt.repeat_times
++set /A repeat_time=1
++if not [%2] == [] set /A repeat_time=%2
++
++:: SN
++if not [%3] == [] set adb_opt=-s %3
++%adb_tool% %adb_opt% wait-for-device
+ timeout /t 1 >nul
++FOR /F "tokens=*" %%a in ('%adb_tool% %adb_opt% shell getprop ro.serialno') DO set SN=%%a
++if not [%SN%] == [] set adb_opt=-s %SN%
++
++%adb_tool% %adb_opt% root
++%adb_tool% %adb_opt% shell setenforce 0
++%adb_tool% %adb_opt% shell setprop idt.repeat_times %repeat_time%
+ 
+-%adb_tool% root
+-%adb_tool% shell setenforce 0
+-FOR /F "tokens=*" %%a in ('%adb_tool% shell getprop ro.serialno') DO set SN=%%a
++IF EXIST %base_path%bringup_test.sh set test_script=/data/local/tmp/bringup_test.sh
++IF EXIST %base_path%bringup_test.sh (
++  %adb_tool% %adb_opt% push %base_path%bringup_test.sh %test_script%
++  %adb_tool% %adb_opt% shell chmod +x %test_script%
++)
+ 
+-%adb_tool% shell %test_script% check_bringup %test_idx%
+-%adb_tool% pull /data/local/tmp/%SN%_bringup_test_%test_idx%.txt
+-%adb_tool% pull /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
+-%adb_tool% shell tail -n54 /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++%adb_tool% %adb_opt% shell touch /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++START /B %adb_tool% %adb_opt% shell tail -f /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++%adb_tool% %adb_opt% shell "%test_script% check_bringup %test_idx% &"
++%adb_tool% %adb_opt% pull /data/local/tmp/%SN%_bringup_test_%test_idx%.txt
++%adb_tool% %adb_opt% pull /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++%adb_tool% %adb_opt% pull /data/local/tmp/%SN%_bringup_rs232_%test_idx%.txt
++::%adb_tool% %adb_opt% shell tail -n54 /data/local/tmp/%SN%_bringup_result_%test_idx%.txt
++%adb_tool% %adb_opt% reconnect
++%adb_tool% %adb_opt% wait-for-device
+ 
+ PAUSE
+diff --git a/imx8m/bringup_test_stageall.sh b/imx8m/bringup_test_stageall.sh
+index 8ef4b46c..1dc00333 100755
+--- a/imx8m/bringup_test_stageall.sh
++++ b/imx8m/bringup_test_stageall.sh
+@@ -1,18 +1,28 @@
+ #!/bin/bash
+ 
+-# test_idx: 0: all / 1: stage1 / 2: stage2 / 3: full-load
+-test_idx=0
+-[ ! -z $1 ] && test_idx=$1
+ test_script="/product/bin/bringup_test.sh"
+ base_path=$(dirname $(pwd $0)/$0)
+ cd ${base_path}
+ 
+-adb wait-for-device
++# test_idx: 0: all / 1: stage1 / 2: stage2 / 3: k81 / 4: full-load
++test_idx=0
++[ ! -z $1 ] && test_idx=$1
++
++# idt.repeat_times
++repeat_times=1
++[ ! -z $2 ] && repeat_times=$2
++
++# SN
++[ ! -z $3 ] && SN=$3
++[ ! -z ${SN} ] && adb_opt="-s ${SN}"
++adb ${adb_opt} wait-for-device
+ sleep 1
+-SN=`adb shell getprop ro.serialno`
+-[ ! -z ] && adb_opt="-s ${SN}"
++SN=`adb ${adb_opt} shell getprop ro.serialno`
++[ ! -z ${SN} ] && adb_opt="-s ${SN}"
++
+ adb ${adb_opt} root
+ adb ${adb_opt} shell setenforce 0
++adb ${adb_opt} shell setprop idt.repeat_times ${repeat_times}
+ 
+ if [ -f "${base_path}/bringup_test.sh" ]; then
+   test_script="/data/local/tmp/bringup_test.sh"
+@@ -23,7 +33,7 @@ fi
+ 
+ adb ${adb_opt} shell touch /data/local/tmp/${SN}_bringup_result_${test_idx}.txt
+ adb ${adb_opt} shell tail -f /data/local/tmp/${SN}_bringup_result_${test_idx}.txt &
+-adb ${adb_opt} shell ${test_script} check_bringup ${test_idx}
++adb ${adb_opt} shell "${test_script} check_bringup ${test_idx} &"
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_test_${test_idx}.txt 2>&1 > /dev/null
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_result_${test_idx}.txt 2>&1 > /dev/null
+ adb ${adb_opt} pull /data/local/tmp/${SN}_bringup_rs232_${test_idx}.txt 2>&1 > /dev/null

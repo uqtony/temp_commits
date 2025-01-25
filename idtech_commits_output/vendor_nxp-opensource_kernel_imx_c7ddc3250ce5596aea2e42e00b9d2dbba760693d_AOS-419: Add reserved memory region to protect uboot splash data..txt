@@ -1,0 +1,89 @@
+c7ddc3250ce5 jay deng 2020-12-17
+
+AOS-419: Add reserved memory region to protect uboot splash data.
+
+Add reserved memory node into device tree to keep uboot splash
+framebuffer data and avoid linux kernel to access it.
+
+Primary display size of A100 and A300 is 1280 x 720.
+So A100 and A300 reserved memory size is 1280 x 720 x 4 = 0x384000.
+Primary display size of A200 is 1920 x 1080.
+So A200 reserved memory size is 1920 x 1080 x 4 = 0x7e9000.
+
+Change-Id: I6a33474b768f8a3002e5a2f675c7dd57ed199468
+
+diff --git a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+index 33564515117c..499816afb81b 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a100_evt-0_devboard_evt-0.dtsi
+@@ -1167,3 +1167,20 @@ &pwm4 {
+ 	pinctrl-0 = <&pinctrl_pwm4>;
+ 	status = "okay";
+ };
++
++/ {
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		lcdif_reserved: lcdif@7f000000 {
++			reg = <0x0 0x7f000000 0x0 0x384000>;
++			no-map;
++		};
++	};
++};
++
++&lcdif {
++	memory-region = <&lcdif_reserved>;
++};
+diff --git a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+index d9d6a8c2af68..252f9c1cdf22 100644
+--- a/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
++++ b/arch/arm64/boot/dts/freescale/idt_a300_evt-0_devboard_evt-0.dtsi
+@@ -1336,3 +1336,20 @@ map1 {
+ &clk {
+ 	display-pre-enable;
+ };
++
++/ {
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		lcdif_reserved: lcdif@7f000000 {
++			reg = <0x0 0x7f000000 0x0 0x384000>;
++			no-map;
++		};
++	};
++};
++
++&lcdif {
++	memory-region = <&lcdif_reserved>;
++};
+diff --git a/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts b/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
+index a3f56ed22e72..ad52d1b44505 100644
+--- a/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
++++ b/arch/arm64/boot/dts/freescale/idt_imx8mp_evt-0_evk_evk-0_mic6g.dts
+@@ -12,3 +12,20 @@
+ / {
+ 	idt,prod-id = "idt_imx8mp_evt-0_evk_evk-0_mic6g";
+ };
++
++/ {
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		lcdif_reserved: lcdif@7f000000 {
++			reg = <0x0 0x7f000000 0x0 0x7e9000>;
++			no-map;
++		};
++	};
++};
++
++&lcdif1 {
++	memory-region = <&lcdif_reserved>;
++};

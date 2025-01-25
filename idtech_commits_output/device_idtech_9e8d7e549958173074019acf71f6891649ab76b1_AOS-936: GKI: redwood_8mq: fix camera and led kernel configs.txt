@@ -1,0 +1,56 @@
+9e8d7e54 George.Huang 2022-05-11
+
+AOS-936: GKI: redwood_8mq: fix camera and led kernel configs
+
+- Set camera configs to modules
+  CONFIG_MXC_DUAL_MIPI_CAMERA=m
+  CONFIG_MXC_CAMERA_GC02M2_MIPI=m
+
+- Add missing led configs
+  CONFIG_LEDS_GPIO=y
+  CONFIG_LEDS_PWM=y
+
+Change-Id: I22329f25f2cbe01d6d543a0ac07f299f01356fc0
+
+diff --git a/imx8m/redwood_8mq/SharedBoardConfig.mk b/imx8m/redwood_8mq/SharedBoardConfig.mk
+index 7e44915b..8128087e 100644
+--- a/imx8m/redwood_8mq/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mq/SharedBoardConfig.mk
+@@ -72,11 +72,13 @@ BOARD_VENDOR_KERNEL_MODULES += \
+ endif
+ 
+ # kernel modules add by IDTECH
++# CONFIG_MXC_CAMERA_GC02M2_MIPI: gc02m2_camera_mipi.ko, sensor gc02m2 driver
+ # CONFIG_SND_SOC_IMX_TLV320AIC31XX: snd-soc-imx-tlv320aic31xx.ko, snd-soc-tlv320aic31xx.ko, audio codec
+ # CONFIG_I2C_CHARDEV: i2c-dev.ko, for userspace(i2cdetect) to access /dev/i2c*
+ # CONFIG_DP83822_PHY: dp83822.ko, ethernet phy driver
+ ifeq ($(IMX8MQ_USES_GKI),true)
+ BOARD_VENDOR_KERNEL_MODULES += \
++    $(KERNEL_OUT)/drivers/media/platform/mxc/capture/gc02m2_camera_mipi.ko \
+     $(KERNEL_OUT)/drivers/i2c/i2c-dev.ko \
+     $(KERNEL_OUT)/drivers/net/phy/dp83822.ko \
+     $(KERNEL_OUT)/sound/soc/codecs/snd-soc-tlv320aic31xx.ko \
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index 08223f58..318be1c3 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -7,8 +7,8 @@ CONFIG_USB_SERIAL_OPTION=y
+ CONFIG_SND_SOC_IMX_TLV320AIC31XX=m
+ CONFIG_SND_SOC_TLV320AIC31XX=m
+ CONFIG_KEYBOARD_MATRIX=y
+-CONFIG_MXC_DUAL_MIPI_CAMERA=y
+-CONFIG_MXC_CAMERA_GC02M2_MIPI=y
++CONFIG_MXC_DUAL_MIPI_CAMERA=m
++CONFIG_MXC_CAMERA_GC02M2_MIPI=m
+ CONFIG_INPUT_ST=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_PPP=y
+@@ -32,6 +32,8 @@ CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100
+ CONFIG_DP83822_PHY=m
+ CONFIG_OPT3001=y
+ CONFIG_I2C_CHARDEV=m
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_PWM=y
+ 
+ CONFIG_I2C_SLAVE=y
+ CONFIG_GPIOLIB=y

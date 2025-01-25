@@ -1,0 +1,111 @@
+387a58a77e Arthur Chen 2020-10-19
+
+AOS-338: Enable BD info parser in early stage.
+
+    - move target linux dtb in dtbo finding feature next fastboot_init.
+    - for future design, synchronize the device settings between Linux
+    and U-boot based on Linux dtb.
+
+Change-Id: I070768ce456f0acbf90dd0a90d3a640d3786f903
+
+diff --git a/common/board_r.c b/common/board_r.c
+index 4399f2b6dc..33167448e8 100644
+--- a/common/board_r.c
++++ b/common/board_r.c
+@@ -67,6 +67,9 @@
+ #ifdef CONFIG_FSL_FASTBOOT
+ #include <fb_fsl.h>
+ #endif
++#ifdef CONFIG_IDT_BOARD_INFO_PARSER
++#include <idt_bdinfo_parser.h>
++#endif
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -680,6 +683,22 @@ static int initr_check_fastboot(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_IDT_LINUX_DTB
++static int initr_get_linux_dtb(void)
++{
++	char kfdt_id[BOARD_ID] = "";
++
++	if (get_dtb_id(kfdt_id, BOARD_ID))
++		env_set("idt,prod-id", kfdt_id);
++	else
++		puts("Get ID from Board info partition fail
+");
++
++	get_target_dtb_index(get_ab_slot_index(), kfdt_id);
++
++	return 0;
++}
++#endif
++
+ #ifdef CONFIG_IMX_TRUSTY_OS
+ extern void tee_setup(void);
+ static int initr_tee_setup(void)
+@@ -832,6 +851,9 @@ static init_fnc_t init_sequence_r[] = {
+ #ifdef CONFIG_FSL_FASTBOOT
+ 	initr_fastboot_setup,
+ #endif
++#ifdef CONFIG_IDT_LINUX_DTB
++	initr_get_linux_dtb,
++#endif
+ #if defined(CONFIG_PCI) && !defined(CONFIG_SYS_EARLY_PCI_INIT)
+ 	/*
+ 	 * Do pci configuration
+diff --git a/drivers/fastboot/fb_fsl/fb_fsl_boot.c b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+index 7a4dcd8674..d65358d6da 100644
+--- a/drivers/fastboot/fb_fsl/fb_fsl_boot.c
++++ b/drivers/fastboot/fb_fsl/fb_fsl_boot.c
+@@ -654,6 +654,9 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 	AvbABFlowResult avb_result;
+ 	AvbSlotVerifyData *avb_out_data = NULL;
+ 	AvbPartitionData *avb_loadpart = NULL;
++#ifdef CONFIG_IDT_LINUX_DTB
++	char *env_value;
++#endif /* CONFIG_IDT_LINUX_DTB */
+ 
+ 	if (!is_bdinfo_som_set()) {
+ 		goto fail;
+@@ -920,12 +923,34 @@ int do_boota(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[]) {
+ 
+ 		printf(" %d DTB(s) in DTBO
+", fdt32_to_cpu(dt_img->
+ 							    dt_entry_count));
++#ifdef CONFIG_IDT_LINUX_DTB
++		env_value = env_get("idt,prod-id");
++		if (env_value == NULL) {
++			puts("boota: no IDTECH product ID in board_info
+");
++#ifdef CONFIG_IMX_HAB
++			retry_boot = true;
++			goto fail;
++#endif /* CONFIG_IMX_HAB */
++		}
++		env_value = env_get("entry_idx");
++		if (env_value != NULL) {
++			entry_idx = (int)simple_strtol(env_value, NULL, 10);
++		} else {
++			entry_idx = find_dtb_in_dtbo(dt_img);
++			if (entry_idx < 1) {
++				puts("boota: no avaliable dtb
+");
++				retry_boot = true;
++				goto fail;
++			}
++		}
++#else /* !CONFIG_IDT_LINUX_DTB */
+ 		entry_idx = find_dtb_in_dtbo(dt_img);
+ 		if (entry_idx < 1) {
+ 			puts("boota: no avaliable dtb
+");
+ 			retry_boot = true;
+ 			goto fail;
+ 		}
++#endif /* CONFIG_IDT_LINUX_DTB */
+ 		dt_entry = (struct dt_table_entry *)
+ 			   ((ulong)dt_img +
+ 			    fdt32_to_cpu(dt_img->dt_entries_offset) *

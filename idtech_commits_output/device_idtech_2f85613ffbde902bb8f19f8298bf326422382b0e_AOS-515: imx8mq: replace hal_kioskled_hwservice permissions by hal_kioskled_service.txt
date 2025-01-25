@@ -1,0 +1,150 @@
+2f85613f George.Huang 2021-03-22
+
+AOS-515: imx8mq: replace hal_kioskled_hwservice permissions by hal_kioskled_service
+
+Error Log:
+avc: denied { call } for comm="android.hardwar" scontext=u:r:hal_kioskled_default:s0 tcontext=u:r:servicemanager:s0 tclass=binder permissive=1
+avc: denied { transfer } for comm="android.hardwar" scontext=u:r:hal_kioskled_default:s0 tcontext=u:r:servicemanager:s0 tclass=binder permissive=1
+avc: denied { add } for pid=1826 uid=1000 name=android.hardware.kioskled.IKioskled/default scontext=u:r:hal_kioskled_default:s0
+    tcontext=u:object_r:hal_kioskled_service:s0 tclass=service_manager permissive=1
+
+Change-Id: Ie9d9ca9468a3f918554014fff3059c888f4eb7a3
+
+diff --git a/imx8m/bigcypress_8mq/sepolicy/file_contexts b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+index 9e184d62..2f71ac36 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/file_contexts
++++ b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+@@ -52,3 +52,4 @@
+ #Kiosk Led file node
+ /sys/devices/platform/leds/leds/LED_KIOSK_[0-9]/brightness     u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
++/vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
+diff --git a/imx8m/bigcypress_8mq/sepolicy/hal_kioskled.te b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled.te
+new file mode 100644
+index 00000000..0d96991d
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled.te
+@@ -0,0 +1,11 @@
++# HwBinder IPC from client to server, and callbacks
++binder_call(hal_kioskled_client, hal_kioskled_server)
++binder_call(hal_kioskled_server, hal_kioskled_client)
++
++hal_attribute_hwservice(hal_kioskled, hal_kioskled_hwservice)
++
++add_service(hal_kioskled_server, hal_kioskled_service)
++binder_call(hal_kioskled_server, servicemanager)
++binder_call(hal_kioskled_client, servicemanager)
++allow hal_kioskled_client hal_kioskled_service:service_manager find;
++
+diff --git a/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
+index b6561eeb..21fc1603 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
++++ b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
+@@ -4,13 +4,6 @@ type hal_kioskled_default_exec, exec_type, vendor_file_type, file_type;
+ init_daemon_domain(hal_kioskled_default)
+ hal_server_domain(hal_kioskled_default, hal_kioskled)
+ 
+-# HwBinder IPC from client to server, and callbacks
+-binder_call(hal_kioskled_client, hal_kioskled_server)
+-binder_call(hal_kioskled_server, hal_kioskled_client)
+-
+-add_hwservice(hal_kioskled_server, hal_kioskled_hwservice)
+-allow hal_kioskled_client hal_kioskled_hwservice:hwservice_manager find;
+-
+-
+ allow hal_kioskled_default sysfs_idtech_kioskleds:file rw_file_perms;
+ allow hal_kioskled_default sysfs_leds:dir search;
++
+diff --git a/imx8m/bigcypress_8mq/sepolicy/platform_app.te b/imx8m/bigcypress_8mq/sepolicy/platform_app.te
+index 3d928234..19224520 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/platform_app.te
++++ b/imx8m/bigcypress_8mq/sepolicy/platform_app.te
+@@ -1,4 +1,4 @@
+ allow platform_app sysfs_idtech_kioskleds:file { rw_file_perms };
+ allow platform_app sysfs_leds:dir { search };
+-allow platform_app hal_kioskled_hwservice:hwservice_manager { find };
++allow platform_app hal_kioskled_service:service_manager { find };
+ allow platform_app hal_kioskled_default:binder { call };
+diff --git a/imx8m/bigcypress_8mq/sepolicy/service.te b/imx8m/bigcypress_8mq/sepolicy/service.te
+new file mode 100644
+index 00000000..935b5ea1
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/sepolicy/service.te
+@@ -0,0 +1 @@
++type hal_kioskled_service, vendor_service, service_manager_type;
+diff --git a/imx8m/bigcypress_8mq/sepolicy/service_contexts b/imx8m/bigcypress_8mq/sepolicy/service_contexts
+new file mode 100644
+index 00000000..24764b3d
+--- /dev/null
++++ b/imx8m/bigcypress_8mq/sepolicy/service_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled.IKioskled/default                        u:object_r:hal_kioskled_service:s0
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/file_contexts b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+index 952d7ec5..f91a72cc 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/file_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+@@ -52,3 +52,4 @@
+ #Kiosk Led file node
+ /sys/devices/platform/leds/leds/LED_KIOSK_[0-9]/brightness     u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
++/vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled.te b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled.te
+new file mode 100644
+index 00000000..0d96991d
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled.te
+@@ -0,0 +1,11 @@
++# HwBinder IPC from client to server, and callbacks
++binder_call(hal_kioskled_client, hal_kioskled_server)
++binder_call(hal_kioskled_server, hal_kioskled_client)
++
++hal_attribute_hwservice(hal_kioskled, hal_kioskled_hwservice)
++
++add_service(hal_kioskled_server, hal_kioskled_service)
++binder_call(hal_kioskled_server, servicemanager)
++binder_call(hal_kioskled_client, servicemanager)
++allow hal_kioskled_client hal_kioskled_service:service_manager find;
++
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+index b6561eeb..21fc1603 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
++++ b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+@@ -4,13 +4,6 @@ type hal_kioskled_default_exec, exec_type, vendor_file_type, file_type;
+ init_daemon_domain(hal_kioskled_default)
+ hal_server_domain(hal_kioskled_default, hal_kioskled)
+ 
+-# HwBinder IPC from client to server, and callbacks
+-binder_call(hal_kioskled_client, hal_kioskled_server)
+-binder_call(hal_kioskled_server, hal_kioskled_client)
+-
+-add_hwservice(hal_kioskled_server, hal_kioskled_hwservice)
+-allow hal_kioskled_client hal_kioskled_hwservice:hwservice_manager find;
+-
+-
+ allow hal_kioskled_default sysfs_idtech_kioskleds:file rw_file_perms;
+ allow hal_kioskled_default sysfs_leds:dir search;
++
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/platform_app.te b/imx8m/kingscanyon_8mq/sepolicy/platform_app.te
+index 3d928234..19224520 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/platform_app.te
++++ b/imx8m/kingscanyon_8mq/sepolicy/platform_app.te
+@@ -1,4 +1,4 @@
+ allow platform_app sysfs_idtech_kioskleds:file { rw_file_perms };
+ allow platform_app sysfs_leds:dir { search };
+-allow platform_app hal_kioskled_hwservice:hwservice_manager { find };
++allow platform_app hal_kioskled_service:service_manager { find };
+ allow platform_app hal_kioskled_default:binder { call };
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/service.te b/imx8m/kingscanyon_8mq/sepolicy/service.te
+new file mode 100644
+index 00000000..935b5ea1
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/service.te
+@@ -0,0 +1 @@
++type hal_kioskled_service, vendor_service, service_manager_type;
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/service_contexts b/imx8m/kingscanyon_8mq/sepolicy/service_contexts
+new file mode 100644
+index 00000000..24764b3d
+--- /dev/null
++++ b/imx8m/kingscanyon_8mq/sepolicy/service_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled.IKioskled/default                        u:object_r:hal_kioskled_service:s0

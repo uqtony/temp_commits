@@ -1,0 +1,300 @@
+1640489835 jay deng 2021-01-26
+
+AOS-490: ibr210: Add tcn75 sensor for temperature detect
+
+Support tcn75 temperature sensor.
+
+Cherry-pick change 9dce6258e9 and change file
+fsl-imx8mq-evk.dts > idt_imx8mq_evt-0_ibr210_evt-0.dts
+imx8mq_evk_android_defconfig > kingscanyon_8mq_ibr210_android_defconfig
+imx8mq_evk_android_dual_defconfig > kingscanyon_8mq_ibr210_android_dual_defconfig
+
+Change-Id: I11947fcb9a855e4d8c5c007925db14772ff46ba3
+
+diff --git a/arch/arm/dts/idt_imx8mq_evt-0_ibr210_evt-0.dts b/arch/arm/dts/idt_imx8mq_evt-0_ibr210_evt-0.dts
+index 78562cde47..158df441dc 100644
+--- a/arch/arm/dts/idt_imx8mq_evt-0_ibr210_evt-0.dts
++++ b/arch/arm/dts/idt_imx8mq_evt-0_ibr210_evt-0.dts
+@@ -156,6 +156,21 @@
+ 	sda-gpios = <&gpio5 15 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+ 
++	temp@48 {
++		compatible = "microchip,tcn75";
++		reg = <0x48>;
++	};
++
++	rtc@68 {
++		compatible = "dallas,ds1337";
++		reg = <0x68>;
++	};
++
++	eeprom@54 {
++		compatible = "atmel,24c08";
++		reg = <0x54>;
++	};
++
+ 	pmic@8 {
+ 		compatible = "fsl,pfuze100";
+ 		fsl,pfuze-support-disable-sw;
+diff --git a/arch/arm/mach-imx/cpu.c b/arch/arm/mach-imx/cpu.c
+index bed3fb7c3c..abcf8ac803 100644
+--- a/arch/arm/mach-imx/cpu.c
++++ b/arch/arm/mach-imx/cpu.c
+@@ -199,8 +199,10 @@ int print_cpuinfo(void)
+ 	cpurev = get_cpu_rev();
+ 
+ #if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)
++#if !defined(CONFIG_TEMP_TCN75)
+ 	struct udevice *thermal_dev;
+ 	int cpu_tmp, minc, maxc, ret;
++#endif
+ 
+ 	printf("CPU:   i.MX%s rev%d.%d",
+ 	       get_imx_type((cpurev & 0x1FF000) >> 12),
+@@ -221,7 +223,12 @@ int print_cpuinfo(void)
+ 		mxc_get_clock(MXC_ARM_CLK) / 1000000);
+ #endif
+ 
+-#if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)
++//#if defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)
++#if (defined(CONFIG_IMX_THERMAL) || defined(CONFIG_NXP_TMU)) && !defined(CONFIG_TEMP_TCN75)
++    /*
++    If CONFIG_TEMP_TCN75 defined, disable cpu temp check, replaced by sensor tcn75. 
++    Modify by liuzhi,20190710
++    */
+ 	puts("CPU:   ");
+ 	switch (get_cpu_temp_grade(&minc, &maxc)) {
+ 	case TEMP_AUTOMOTIVE:
+diff --git a/board/freescale/common/Kconfig b/board/freescale/common/Kconfig
+index eccfc12bfc..81978516ae 100644
+--- a/board/freescale/common/Kconfig
++++ b/board/freescale/common/Kconfig
+@@ -42,3 +42,9 @@ config USB_TCPC
+ 	default n
+ 	help
+ 	  Enable USB type-c port controller (TCPC) driver
++
++config TEMP_TCN75
++    bool "External Temperature sensor TCN75 controller simple driver"
++	default n
++	help
++	  Enable tcn75 controller driver
+diff --git a/board/freescale/common/Makefile b/board/freescale/common/Makefile
+index 13922fc522..b725f75cfd 100644
+--- a/board/freescale/common/Makefile
++++ b/board/freescale/common/Makefile
+@@ -89,4 +89,5 @@ ifndef CONFIG_SPL_BUILD
+ obj-$(CONFIG_USB_TCPC) += tcpc.o
+ endif
+ 
++obj-$(CONFIG_TEMP_TCN75) += tcn75.o
+ endif
+diff --git a/board/freescale/common/tcn75.c b/board/freescale/common/tcn75.c
+new file mode 100644
+index 0000000000..9f4dcdfa3f
+--- /dev/null
++++ b/board/freescale/common/tcn75.c
+@@ -0,0 +1,119 @@
++/*
++ * Copyright 2019 HMS
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++#include <common.h>
++#include <i2c.h>
++#include <time.h>
++#include <asm/arch/sys_proto.h>
++#include "tcn75.h"
++
++static struct tcn75_port *port;
++
++struct tcn75_port_config config = {
++	.i2c_bus = 0,
++	.addr = 0x48,
++};
++
++static int tcn75_init(void)
++{
++	int ret;
++	struct udevice *bus;
++
++	memset(port, 0, sizeof(struct tcn75_port));
++
++    port->cfg = config;
++
++	ret = uclass_get_device_by_seq(UCLASS_I2C, port->cfg.i2c_bus, &bus);
++	if (ret) {
++		printf("%s: Can't find bus
+", __func__);
++		return -EINVAL;
++	}
++
++	ret = dm_i2c_probe(bus, port->cfg.addr, 0, &port->i2c_dev);
++	if (ret) {
++		printf("%s: Can't find device id=0x%x
+", __func__, port->cfg.addr);
++		return -ENODEV;
++	}
++
++	return 0;
++}
++
++static int read_temp_tcn75(int *tcn75_temp)
++{
++	uint8_t valb;
++	char cmd;
++	uint8_t value[2];
++	int data;
++    int err=0;
++
++	cmd = 0x00;
++	err = dm_i2c_write(port->i2c_dev, cmd, &valb, 1);
++	if (err)
++    {
++		printf("%s dm_i2c_write failed, err %d
+", __func__, err);
++        return err;
++    }
++	//mdelay(1000);
++	dm_i2c_read(port->i2c_dev, 0x00, (uint8_t *)&value, 2);
++	if (err)
++    {
++		printf("%s dm_i2c_read failed, err %d
+", __func__, err);
++        return err;
++    }
++	//mdelay(1000);
++
++	data=(value[0] << 8) | value[1];
++
++	if((data&0x8000)) //check negative bit
++    {
++        //change to negative : ~x+1
++        //printf("~(data>>4) = [%04x]
+", ((~(data>>4))&0x0FFF)+1);
++        *tcn75_temp=(((~(data>>4))&0x0FFF)+1)/16*(-1);
++    }
++    else
++    {
++	    *tcn75_temp = ((data&0x7FF0) >> 4)/16;
++    }
++	//printf("%s:value[0]=0x%02x,value[1]=0x%02x
+",__func__,value[0],value[1]);
++	printf(" at %dC
+", *tcn75_temp);
++    return 0;
++}
++
++int check_board_temp(int at_key)
++{
++    int ret = 0;
++    int board_temp = 0;
++    int min=-45;
++    int max=105;
++    
++    get_cpu_temp_grade(&min,&max);
++    printf("tcn75sensor CPU:   Temperature grade (%dC to %dC)", min, max);
++    ret = tcn75_init();     
++    if(ret)
++        return ret;
++
++    ret = read_temp_tcn75(&board_temp); 
++    if(ret)
++        return ret;
++
++    //printf("%s:at_key = %d
+", __func__, at_key);
++    //test
++#if 0
++    if ((board_temp >max || board_temp < min) && !at_key)
++    {
++        printf("Board Temperature (%dC) has beyond alert (-40~85C)!
+", board_temp);
++    }
++#else
++    while ((board_temp >max || board_temp < min) && !at_key)
++    {
++        printf("Board Temperature (%dC) has beyond alert (-40~85C)!
+", board_temp);
++        mdelay(1000);
++        ret = read_temp_tcn75(&board_temp); 
++        if(ret)
++            return ret;
++    } 
++#endif
++    return ret;
++}
+diff --git a/board/freescale/common/tcn75.h b/board/freescale/common/tcn75.h
+new file mode 100644
+index 0000000000..aad6801c36
+--- /dev/null
++++ b/board/freescale/common/tcn75.h
+@@ -0,0 +1,18 @@
++#ifndef __TNC75_H
++#define __TNC75_H
++
++#include <dm.h>
++
++struct tcn75_port_config {
++	uint8_t i2c_bus;
++	uint8_t addr;
++};
++
++struct tcn75_port {
++	struct tcn75_port_config cfg;
++	struct udevice *i2c_dev;
++};
++
++int check_board_temp(int at_key);
++
++#endif /* __TCN75_H */
+diff --git a/board/freescale/imx8mq_evk/imx8mq_evk.c b/board/freescale/imx8mq_evk/imx8mq_evk.c
+index fe569eebd2..085fa2b55b 100644
+--- a/board/freescale/imx8mq_evk/imx8mq_evk.c
++++ b/board/freescale/imx8mq_evk/imx8mq_evk.c
+@@ -28,6 +28,10 @@
+ #include <usb.h>
+ #include <dwc3-uboot.h>
+ #include <idt_ddr_select.h>
++#ifdef CONFIG_TEMP_TCN75
++#include "../common/tcn75.h"
++#endif
++
+ 
+ DECLARE_GLOBAL_DATA_PTR;
+ 
+@@ -244,6 +248,9 @@ int board_usb_cleanup(int index, enum usb_init_type init)
+ 
+ int board_init(void)
+ {
++#ifdef CONFIG_TEMP_TCN75
++    check_board_temp(0);
++#endif
+ #ifdef CONFIG_FSL_QSPI
+ 	board_qspi_init();
+ #endif
+diff --git a/configs/kingscanyon_8mq_ibr210_android_defconfig b/configs/kingscanyon_8mq_ibr210_android_defconfig
+index f6395ea3fe..38755d3585 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_defconfig
+@@ -134,6 +134,7 @@ CONFIG_BCB_SUPPORT=y
+ CONFIG_ANDROID_RECOVERY=y
+ CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_TEMP_TCN75=y
+ CONFIG_FSL_FASTBOOT=y
+ CONFIG_FASTBOOT_LOCK=y
+ CONFIG_CMD_BOOTA=y
+diff --git a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+index 2e33133732..5a9b49aab8 100644
+--- a/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
++++ b/configs/kingscanyon_8mq_ibr210_android_dual_defconfig
+@@ -134,6 +134,7 @@ CONFIG_BCB_SUPPORT=y
+ CONFIG_ANDROID_RECOVERY=y
+ CONFIG_SUPPORT_RAW_INITRD=y
+ CONFIG_FLASH_MCUFIRMWARE_SUPPORT=y
++CONFIG_TEMP_TCN75=y
+ CONFIG_FSL_FASTBOOT=y
+ CONFIG_FASTBOOT_LOCK=y
+ CONFIG_CMD_BOOTA=y

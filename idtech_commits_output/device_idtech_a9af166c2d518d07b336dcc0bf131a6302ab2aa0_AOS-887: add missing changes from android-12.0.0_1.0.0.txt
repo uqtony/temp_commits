@@ -1,0 +1,512 @@
+a9af166c George.Huang 2022-03-31
+
+AOS-887: add missing changes from android-12.0.0_1.0.0
+
+Change-Id: Ib59b17367bbd14b5dc759742ef147cced8312145
+
+diff --git a/imx8m/bigcypress_8mp/AndroidUboot.mk b/imx8m/bigcypress_8mp/AndroidUboot.mk
+index 7807db83..754b22e4 100644
+--- a/imx8m/bigcypress_8mp/AndroidUboot.mk
++++ b/imx8m/bigcypress_8mp/AndroidUboot.mk
+@@ -11,6 +11,42 @@ ifeq ($(POWERSAVE),true)
+   POWERSAVE_STATE = ENABLE
+ endif
+ 
++MCU_SDK_IMX8MP_DEMO_PATH := $(IMX_MCU_SDK_PATH)/mcu-sdk/imx8mp/boards/evkmimx8mp/demo_apps/sai_low_power_audio_low_ddr/armgcc
++MCU_SDK_IMX8MP_CMAKE_FILE := ../../../../../tools/cmake_toolchain_files/armgcc.cmake
++
++UBOOT_MCU_OUT := $(TARGET_OUT_INTERMEDIATES)/MCU_OBJ
++UBOOT_MCU_BUILD_TYPE := release
++
++define build_mcu_image_core
++	mkdir -p $(UBOOT_MCU_OUT)/$2; \
++	/usr/local/bin/cmake -DCMAKE_TOOLCHAIN_FILE="$4" -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=$3 -S $1 -B $(UBOOT_MCU_OUT)/$2 1>/dev/null; \
++	$(MAKE) -C $(UBOOT_MCU_OUT)/$2 1>/dev/null
++endef
++
++ifeq ($(POWERSAVE),true)
++ifeq ($(ARMGCC_DIR),)
++$(error please install arm-none-eabi-gcc toolchain and set the installed path to ARMGCC_DIR)
++endif
++
++define build_m4_image
++	rm -rf $(UBOOT_MCU_OUT); \
++	mkdir -p $(UBOOT_MCU_OUT); \
++	cmake_version=$(shell /usr/local/bin/cmake --version | head -n 1 | tr " " "
+" | tail -n 1); \
++	req_version="3.13.0"; \
++	if [ "`echo "$$cmake_version $$req_version" | tr " " "
+" | sort -V | head -n 1`" != "$$req_version" ]; then \
++		echo "please upgrade cmake version to 3.13.0 or newer"; \
++		exit 1; \
++	fi; \
++	$(call build_mcu_image_core,$(MCU_SDK_IMX8MP_DEMO_PATH),MIMX8MP,$(UBOOT_MCU_BUILD_TYPE),$(MCU_SDK_IMX8MP_CMAKE_FILE)); \
++	cp $(MCU_SDK_IMX8MP_DEMO_PATH)/$(UBOOT_MCU_BUILD_TYPE)/*.bin $(PRODUCT_OUT)/imx8mp_mcu_demo.bin
++endef
++else # POWERSAVE != true
++define build_m4_image
++	echo "android build without building MCU image"
++endef
++
++endif # POWERSAVE
++
+ define build_imx_uboot
+ 	$(hide) echo Building i.MX U-Boot with firmware; \
+ 	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
+diff --git a/imx8m/bigcypress_8mp/BoardConfig.mk b/imx8m/bigcypress_8mp/BoardConfig.mk
+index 49b6bc95..2059556e 100644
+--- a/imx8m/bigcypress_8mp/BoardConfig.mk
++++ b/imx8m/bigcypress_8mp/BoardConfig.mk
+@@ -123,7 +123,7 @@ BOARD_USE_ST_SENSOR_INPUT := true
+ # -------@block_kernel_bootimg-------
+ BOARD_KERNEL_BASE := 0x40400000
+ 
+-CMASIZE=960M
++CMASIZE=1184M
+ # NXP default config
+ BOARD_KERNEL_CMDLINE := init=/init firmware_class.path=/vendor/firmware loop.max_part=7 bootconfig
+ BOARD_BOOTCONFIG += androidboot.console=ttymxc1 androidboot.hardware=nxp
+@@ -184,10 +184,12 @@ ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
+     TARGET_BOARD_DTS_CONFIG += imx8mp-lvds-panel:imx8mp-evk-jdi-wuxga-lvds-panel.dtb
+     # Support MIPI panel
+     TARGET_BOARD_DTS_CONFIG += imx8mp-mipi-panel:imx8mp-evk-rm67191.dtb
++    ifeq ($(POWERSAVE),true)
+     #Used to support powersave
+     TARGET_BOARD_DTS_CONFIG += imx8mp-powersave:imx8mp-evk-powersave.dtb
+     #Used to support powersave and mcu image
+     TARGET_BOARD_DTS_CONFIG += imx8mp-powersave-non-rpmsg:imx8mp-evk-powersave-non-rpmsg.dtb
++    endif
+   endif
+ else # no dynamic parition feature
+   ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
+diff --git a/imx8m/bigcypress_8mp/SharedBoardConfig.mk b/imx8m/bigcypress_8mp/SharedBoardConfig.mk
+index 6464b2f6..e75608f5 100644
+--- a/imx8m/bigcypress_8mp/SharedBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/SharedBoardConfig.mk
+@@ -33,6 +33,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+ ifeq ($(IMX8MP_USES_GKI),true)
+ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/drivers/mxc/gpu-viv/galcore.ko \
++    $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/dma/imx-sdma.ko \
+     $(KERNEL_OUT)/sound/soc/fsl/imx-pcm-dma.ko \
+     $(KERNEL_OUT)/sound/soc/fsl/imx-pcm-dma-v2.ko \
+@@ -68,6 +69,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/sound/soc/fsl/imx-audio-rpmsg.ko \
+     $(KERNEL_OUT)/sound/soc/codecs/snd-soc-rpmsg-wm8960.ko \
+     $(KERNEL_OUT)/sound/soc/codecs/snd-soc-rpmsg-wm8960-i2c.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-pcm512x-rpmsg.ko \
+     $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-rpmsg.ko \
+     $(KERNEL_OUT)/drivers/rtc/rtc-snvs.ko \
+     $(KERNEL_OUT)/drivers/pci/controller/dwc/pci-imx6.ko \
+@@ -85,8 +87,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/drivers/soc/imx/lpa_ctrl.ko \
+     $(KERNEL_OUT)/sound/soc/codecs/snd-soc-rpmsg-pcm512x.ko \
+     $(KERNEL_OUT)/sound/soc/codecs/snd-soc-rpmsg-pcm512x-i2c.ko \
+-    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-tpa6130a2.ko \
+-    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-pcm512x-rpmsg.ko
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-tpa6130a2.ko
+ endif
+ 
+ # CONFIG_ZRAM: zram.ko, lzo.ko, lzo-rle.ko compressed ram using LZ coding.
+@@ -205,7 +206,6 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
+     $(KERNEL_OUT)/drivers/power/supply/dummy_battery.ko \
+     $(KERNEL_OUT)/drivers/nvmem/nvmem-imx-ocotp.ko \
+     $(KERNEL_OUT)/drivers/thermal/device_cooling.ko \
+-    $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/cpufreq-dt.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/imx-cpufreq-dt.ko \
+     $(KERNEL_OUT)/drivers/media/v4l2-core/v4l2-fwnode.ko \
+diff --git a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+index 2136d6b0..67a11e91 100644
+--- a/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
++++ b/imx8m/bigcypress_8mp/UbootKernelBoardConfig.mk
+@@ -14,7 +14,11 @@ TARGET_BOOTLOADER_CONFIG += imx8mp-lpddr4-evk-uuu-mic6g:bigcypress_8mp_evk_andro
+ 
+ ifeq ($(IMX8MP_USES_GKI),true)
+ TARGET_KERNEL_DEFCONFIG := gki_defconfig
+-TARGET_KERNEL_GKI_DEFCONF:= imx8mp_gki.fragment
++  ifeq ($(POWERSAVE),true)
++    TARGET_KERNEL_GKI_DEFCONF:= imx8mp_powersave_gki.fragment
++  else
++    TARGET_KERNEL_GKI_DEFCONF:= imx8mp_gki.fragment
++  endif
+ else
+ TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
+ endif
+diff --git a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+index 7807e2b9..a1fe8675 100644
+--- a/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
++++ b/imx8m/bigcypress_8mp/bigcypress_8mp_common.mk
+@@ -3,6 +3,8 @@ CONFIG_REPO_PATH := device/idtech
+ CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
+ IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
+ 
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
+ # configs shared between uboot, kernel and Android rootfs
+ include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
+ 
+diff --git a/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json b/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
+index 1abc85ec..9efcb3a5 100644
+--- a/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
++++ b/imx8m/bigcypress_8mp/camera_config_imx8mp-basler-ov5640.json
+@@ -29,7 +29,7 @@
+       "ae_comp_step_nummerator": "1",
+       "ae_comp_step_denominator": "2",
+       "exposure_ns_min": "68000",
+-      "exposure_ns_max": "33360000"
++      "exposure_ns_max": "16632000"
+     },
+     {
+       "camera_type": "front",
+diff --git a/imx8m/bigcypress_8mp/camera_config_imx8mp.json b/imx8m/bigcypress_8mp/camera_config_imx8mp.json
+index 7b59a320..bcc93739 100644
+--- a/imx8m/bigcypress_8mp/camera_config_imx8mp.json
++++ b/imx8m/bigcypress_8mp/camera_config_imx8mp.json
+@@ -29,7 +29,7 @@
+       "ae_comp_step_nummerator": "1",
+       "ae_comp_step_denominator": "2",
+       "exposure_ns_min": "68000",
+-      "exposure_ns_max": "33360000",
++      "exposure_ns_max": "16632000",
+       "MaxWidth": "1920",
+       "MaxHeight": "1080",
+       "OmitFrame": [
+@@ -66,7 +66,7 @@
+       "ae_comp_step_nummerator": "1",
+       "ae_comp_step_denominator": "2",
+       "exposure_ns_min": "68000",
+-      "exposure_ns_max": "33360000",
++      "exposure_ns_max": "16632000",
+       "MaxWidth": "1920",
+       "MaxHeight": "1080",
+       "OmitFrame": [
+diff --git a/imx8m/bigcypress_8mp/init.imx8mp.rc b/imx8m/bigcypress_8mp/init.imx8mp.rc
+index 82c63ed3..0bfcbbdd 100644
+--- a/imx8m/bigcypress_8mp/init.imx8mp.rc
++++ b/imx8m/bigcypress_8mp/init.imx8mp.rc
+@@ -27,8 +27,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+     write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+     write /sys/devices/platform/soc@0/30c00000.bus/30e20000.audio-blk-ctrl/power/control auto
+     write /sys/devices/platform/soc@0/32c00000.bus/32ec0000.media-blk-ctrl/power/control auto
+diff --git a/imx8m/bigcypress_8mp/init.rc b/imx8m/bigcypress_8mp/init.rc
+index 942c3a9c..f1030620 100644
+--- a/imx8m/bigcypress_8mp/init.rc
++++ b/imx8m/bigcypress_8mp/init.rc
+@@ -79,6 +79,11 @@ on init && property:vendor.skip.charger_not_need=0 && property:ro.boot.powersave
+     write /dev/cpuctl/rt/cpu.uclamp.min 0
+     write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 0
+ 
++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start storageproxyd
++    start vendor.oemlock-1-0
++    start confirmationui-1-0
++
+ on late-fs && property:vendor.skip.charger_not_need=0
+     # Start keymaster/gatekeeper service
+     start vendor.gatekeeper-1-0-${ro.boot.keystore}
+@@ -90,10 +95,6 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+     mount_all /vendor/etc/fstab.nxp --late
+ 
+-on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-    start vendor.oemlock-1-0
+-    start confirmationui-1-0
+-
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For bigcypress_8mp, when swap used about 400M, upgrade the level.
+     setprop ro.lmk.upgrade_pressure 93
+@@ -240,7 +241,7 @@ service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vend
+ on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     # create temp node for secure storage proxy
+     mkdir /data/vendor/ss 0700 system system
+-    start storageproxyd
++    restart storageproxyd
+ 
+ service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk2rpmb -d /dev/trusty-ipc-dev0
+    group system
+diff --git a/imx8m/bigcypress_8mq/BoardConfig.mk b/imx8m/bigcypress_8mq/BoardConfig.mk
+index e3f0b494..4b502d0d 100644
+--- a/imx8m/bigcypress_8mq/BoardConfig.mk
++++ b/imx8m/bigcypress_8mq/BoardConfig.mk
+@@ -121,7 +121,7 @@ BOARD_KERNEL_BASE := 0x40400000
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+ else
+-CMASIZE=800M
++CMASIZE=1280M
+ endif
+ 
+ # NXP default config
+diff --git a/imx8m/bigcypress_8mq/init.rc b/imx8m/bigcypress_8mq/init.rc
+index d4d4e715..233427c3 100644
+--- a/imx8m/bigcypress_8mq/init.rc
++++ b/imx8m/bigcypress_8mq/init.rc
+@@ -70,6 +70,10 @@ on init && property:vendor.skip.charger_not_need=0
+     write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 1
+     write /dev/cpuctl/background/cpu.uclamp.max 50
+ 
++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start storageproxyd
++    start vendor.oemlock-1-0
++
+ on late-fs && property:vendor.skip.charger_not_need=0
+     # Start keymaster/gatekeeper service
+     start vendor.gatekeeper-1-0-${ro.boot.keystore}
+@@ -81,9 +85,6 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+     mount_all /vendor/etc/fstab.nxp --late
+ 
+-on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-    start vendor.oemlock-1-0
+-
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For bigcypress_8mq, when swap used about 400M, upgrade the level.
+     setprop ro.lmk.upgrade_pressure 87
+@@ -155,6 +156,9 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     # Enlarge limition of audio buffer allocation
+     setprop ro.af.client_heap_size_kbyte 32768
+ 
++    # Set external camera mjpeg decoder type
++    setprop vendor.camera.mjpg.decoder hardware
++
+     setprop wifi.direct.interface p2p-dev-wlan0
+     start vendor.wifi_hal_legacy
+ 
+@@ -247,7 +251,7 @@ service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vend
+ on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     # create temp node for secure storage proxy
+     mkdir /data/vendor/ss 0700 system system
+-    start storageproxyd
++    restart storageproxyd
+ 
+ service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk0rpmb -d /dev/trusty-ipc-dev0
+    group system
+diff --git a/imx8m/bigcypress_8mq/thermal_info_config_imx8mq.json b/imx8m/bigcypress_8mq/thermal_info_config_imx8mq.json
+index 32aec548..3e8b013d 100755
+--- a/imx8m/bigcypress_8mq/thermal_info_config_imx8mq.json
++++ b/imx8m/bigcypress_8mq/thermal_info_config_imx8mq.json
+@@ -48,7 +48,7 @@
+     ],
+     "CoolingDevices":[
+         {
+-            "Name":"thermal-devfreq-0",
++            "Name":"thermal-gpufreq-0",
+             "Type":"GPU"
+         },
+         {
+diff --git a/imx8m/redwood_8mq/BoardConfig.mk b/imx8m/redwood_8mq/BoardConfig.mk
+index 230f7c86..31a97825 100644
+--- a/imx8m/redwood_8mq/BoardConfig.mk
++++ b/imx8m/redwood_8mq/BoardConfig.mk
+@@ -126,7 +126,7 @@ BOARD_KERNEL_BASE := 0x40400000
+ ifeq ($(PRODUCT_IMX_DRM),true)
+ CMASIZE=736M
+ else
+-CMASIZE=800M
++CMASIZE=1280M
+ endif
+ 
+ # NXP default config
+diff --git a/imx8m/redwood_8mq/init.imx8mq.rc b/imx8m/redwood_8mq/init.imx8mq.rc
+index 08e67e95..09e0354a 100755
+--- a/imx8m/redwood_8mq/init.imx8mq.rc
++++ b/imx8m/redwood_8mq/init.imx8mq.rc
+@@ -32,8 +32,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "conservative"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+     write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+ 
+ on property:sys.boot_completed=1
+diff --git a/imx8m/redwood_8mq/init.rc b/imx8m/redwood_8mq/init.rc
+index fe815f8c..dd584775 100644
+--- a/imx8m/redwood_8mq/init.rc
++++ b/imx8m/redwood_8mq/init.rc
+@@ -154,6 +154,9 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     # Enlarge limition of audio buffer allocation
+     setprop ro.af.client_heap_size_kbyte 32768
+ 
++    # Set external camera mjpeg decoder type
++    setprop vendor.camera.mjpg.decoder hardware
++
+ service vsidaemon /vendor/bin/vsidaemon
+     class main
+     user root
+diff --git a/imx8m/redwood_8mq/thermal_info_config_imx8mq.json b/imx8m/redwood_8mq/thermal_info_config_imx8mq.json
+index 32aec548..3e8b013d 100755
+--- a/imx8m/redwood_8mq/thermal_info_config_imx8mq.json
++++ b/imx8m/redwood_8mq/thermal_info_config_imx8mq.json
+@@ -48,7 +48,7 @@
+     ],
+     "CoolingDevices":[
+         {
+-            "Name":"thermal-devfreq-0",
++            "Name":"thermal-gpufreq-0",
+             "Type":"GPU"
+         },
+         {
+diff --git a/imx8m/vp6820_8mn/SharedBoardConfig.mk b/imx8m/vp6820_8mn/SharedBoardConfig.mk
+index 69814f32..fb379acd 100644
+--- a/imx8m/vp6820_8mn/SharedBoardConfig.mk
++++ b/imx8m/vp6820_8mn/SharedBoardConfig.mk
+@@ -32,6 +32,7 @@ BOARD_VENDOR_KERNEL_MODULES += \
+ ifeq ($(IMX8MN_USES_GKI),true)
+ BOARD_VENDOR_KERNEL_MODULES += \
+     $(KERNEL_OUT)/drivers/mxc/gpu-viv/galcore.ko \
++    $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/leds/leds-gpio.ko \
+     $(KERNEL_OUT)/drivers/media/platform/mxc/capture/mx6s_capture.ko \
+     $(KERNEL_OUT)/drivers/media/platform/mxc/capture/mxc_mipi_csi.ko \
+@@ -117,7 +118,6 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES += \
+     $(KERNEL_OUT)/drivers/gpio/gpio-mxc.ko \
+     $(KERNEL_OUT)/drivers/gpio/gpio-pca953x.ko \
+     $(KERNEL_OUT)/drivers/thermal/device_cooling.ko \
+-    $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
+     $(KERNEL_OUT)/drivers/perf/fsl_imx8_ddr_perf.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/cpufreq-dt.ko \
+     $(KERNEL_OUT)/drivers/cpufreq/imx-cpufreq-dt.ko \
+diff --git a/imx8m/vp6820_8mn/init.imx8mn.rc b/imx8m/vp6820_8mn/init.imx8mn.rc
+index 834e5745..6de729b1 100755
+--- a/imx8m/vp6820_8mn/init.imx8mn.rc
++++ b/imx8m/vp6820_8mn/init.imx8mn.rc
+@@ -30,8 +30,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+     write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+ 
+ on property:sys.boot_completed=1
+diff --git a/imx8m/vp6820_8mn/init.rc b/imx8m/vp6820_8mn/init.rc
+index eae34823..50748e82 100644
+--- a/imx8m/vp6820_8mn/init.rc
++++ b/imx8m/vp6820_8mn/init.rc
+@@ -70,6 +70,11 @@ on init && property:vendor.skip.charger_not_need=0
+     write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 1
+     write /dev/cpuctl/background/cpu.uclamp.max 50
+ 
++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start storageproxyd
++    start vendor.oemlock-1-0
++    start confirmationui-1-0
++
+ on late-fs && property:vendor.skip.charger_not_need=0
+     # Start keymaster/gatekeeper service
+     start vendor.gatekeeper-1-0-${ro.boot.keystore}
+@@ -81,10 +86,6 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+     mount_all /vendor/etc/fstab.nxp --late
+ 
+-on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-    start vendor.oemlock-1-0
+-    start confirmationui-1-0
+-
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For vp6820_8mn, when swap used about 400M, upgrade the level.
+     setprop ro.lmk.upgrade_pressure 80
+@@ -243,7 +244,7 @@ service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vend
+ on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     # create temp node for secure storage proxy
+     mkdir /data/vendor/ss 0700 system system
+-    start storageproxyd
++    restart storageproxyd
+ 
+ service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk2rpmb -d /dev/trusty-ipc-dev0
+    group system
+diff --git a/imx8m/vp6820_8mn/thermal_info_config_imx8mn.json b/imx8m/vp6820_8mn/thermal_info_config_imx8mn.json
+index 32aec548..3e8b013d 100755
+--- a/imx8m/vp6820_8mn/thermal_info_config_imx8mn.json
++++ b/imx8m/vp6820_8mn/thermal_info_config_imx8mn.json
+@@ -48,7 +48,7 @@
+     ],
+     "CoolingDevices":[
+         {
+-            "Name":"thermal-devfreq-0",
++            "Name":"thermal-gpufreq-0",
+             "Type":"GPU"
+         },
+         {
+diff --git a/imx8m/vp6820_8mq/init.imx8mq.rc b/imx8m/vp6820_8mq/init.imx8mq.rc
+index 86286707..6b2b0a78 100755
+--- a/imx8m/vp6820_8mq/init.imx8mq.rc
++++ b/imx8m/vp6820_8mq/init.imx8mq.rc
+@@ -30,8 +30,7 @@ on property:sys.boot_completed=1
+     write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
+     # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
+     # Set up and down limit to 200us/200us
+-    write /sys/devices/system/cpu/cpufreq/schedutil/up_rate_limit_us 200
+-    write /sys/devices/system/cpu/cpufreq/schedutil/down_rate_limit_us 200
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
+     write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
+ 
+ on property:sys.boot_completed=1
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index 1afc0282..c4c9c752 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -70,6 +70,10 @@ on init && property:vendor.skip.charger_not_need=0
+     write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 1
+     write /dev/cpuctl/background/cpu.uclamp.max 50
+ 
++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start storageproxyd
++    start vendor.oemlock-1-0
++
+ on late-fs && property:vendor.skip.charger_not_need=0
+     # Start keymaster/gatekeeper service
+     start vendor.gatekeeper-1-0-${ro.boot.keystore}
+@@ -81,9 +85,6 @@ on late-fs && property:vendor.skip.charger_not_need=0
+ 
+     mount_all /vendor/etc/fstab.nxp --late
+ 
+-on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+-    start vendor.oemlock-1-0
+-
+ on early-boot && property:vendor.skip.charger_not_need=0
+     # For vp6820_8mq, when swap used about 400M, upgrade the level.
+     setprop ro.lmk.upgrade_pressure 87
+@@ -159,6 +160,9 @@ on early-boot && property:vendor.skip.charger_not_need=0
+     # Enlarge limition of audio buffer allocation
+     setprop ro.af.client_heap_size_kbyte 32768
+ 
++    # Set external camera mjpeg decoder type
++    setprop vendor.camera.mjpg.decoder hardware
++
+     setprop wifi.direct.interface p2p-dev-wlan0
+     start vendor.wifi_hal_legacy
+ 
+@@ -257,7 +261,7 @@ service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vend
+ on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
+     # create temp node for secure storage proxy
+     mkdir /data/vendor/ss 0700 system system
+-    start storageproxyd
++    restart storageproxyd
+ 
+ service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk0rpmb -d /dev/trusty-ipc-dev0
+    group system
+diff --git a/imx8m/vp6820_8mq/thermal_info_config_imx8mq.json b/imx8m/vp6820_8mq/thermal_info_config_imx8mq.json
+index 32aec548..3e8b013d 100755
+--- a/imx8m/vp6820_8mq/thermal_info_config_imx8mq.json
++++ b/imx8m/vp6820_8mq/thermal_info_config_imx8mq.json
+@@ -48,7 +48,7 @@
+     ],
+     "CoolingDevices":[
+         {
+-            "Name":"thermal-devfreq-0",
++            "Name":"thermal-gpufreq-0",
+             "Type":"GPU"
+         },
+         {

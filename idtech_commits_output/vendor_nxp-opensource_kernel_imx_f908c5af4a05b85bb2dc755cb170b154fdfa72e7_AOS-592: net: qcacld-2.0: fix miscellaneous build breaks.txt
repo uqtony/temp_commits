@@ -1,0 +1,206 @@
+f908c5af4a05 George.Huang 2021-05-11
+
+AOS-592: net: qcacld-2.0: fix miscellaneous build breaks
+
+Change-Id: I58e943c3e0ba650572c4e69ef50eab0c98bd1284
+
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+index d20654972041..754d73b3242b 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_cfg80211.c
+@@ -1609,7 +1609,7 @@ static int __is_driver_dfs_capable(struct wiphy *wiphy,
+         return -EPERM;
+     }
+ 
+-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)) || \
+     defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+     dfs_capability = !!(wiphy->flags & WIPHY_FLAG_DFS_OFFLOAD);
+ #endif
+@@ -16712,7 +16712,7 @@ int wlan_hdd_cfg80211_init(struct device *dev,
+     wiphy->vendor_events = wlan_hdd_cfg80211_vendor_events;
+     wiphy->n_vendor_events = ARRAY_SIZE(wlan_hdd_cfg80211_vendor_events);
+ 
+-#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,4,0)) || \
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,10,0)) || \
+     defined (DFS_MASTER_OFFLOAD_IND_SUPPORT) || defined(WITH_BACKPORTS)
+     if (pCfg->enableDFSMasterCap) {
+         wiphy->flags |= WIPHY_FLAG_DFS_OFFLOAD;
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_main.c b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_main.c
+index a7227ce83e43..c5ec60443ec8 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_main.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/HDD/src/wlan_hdd_main.c
+@@ -15425,8 +15425,7 @@ void hdd_cnss_request_bus_bandwidth(hdd_context_t *pHddCtx,
+                 hddLog(LOGE, FL("low bandwidth set rx affinity fail"));
+         } else {
+             if (!pHddCtx->hbw_requested) {
+-                vos_request_pm_qos_type(PM_QOS_CPU_DMA_LATENCY,
+-                                      DISABLE_KRAIT_IDLE_PS_VAL);
++                vos_request_pm_qos(DISABLE_KRAIT_IDLE_PS_VAL);
+                 pHddCtx->hbw_requested = true;
+             }
+             if (vos_sched_handle_throughput_req(true))
+@@ -17870,7 +17869,7 @@ static int hdd_driver_init( void)
+     * load for reducing interrupt latency.
+     */
+ 
+-   vos_request_pm_qos_type(PM_QOS_CPU_DMA_LATENCY, DISABLE_KRAIT_IDLE_PS_VAL);
++   vos_request_pm_qos(DISABLE_KRAIT_IDLE_PS_VAL);
+ 
+    vos_ssr_protect_init();
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/adf_nbuf.c b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/adf_nbuf.c
+index 6f45f72687f1..d483c3086a31 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/adf_nbuf.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SERVICES/COMMON/adf/adf_nbuf.c
+@@ -1917,25 +1917,6 @@ uint16_t adf_nbuf_construct_radiotap(
+ 	return rthdr->it_len;
+ }
+ 
+-/**
+- * __adf_nbuf_validate_skb_cb() - validate skb CB
+- *
+- * SKB control block size limit is 48 byte, add compile time
+- * assert if SKB control block is exceeding 48 byte.
+- *
+- * Return: none
+- */
+-void
+-__adf_nbuf_validate_skb_cb(void)
+-{
+-	/*
+-	 * Add compile time assert if SKB control block is exceeding
+-	 * 48 byte.
+-	 */
+-	BUILD_BUG_ON(sizeof(struct cvg_nbuf_cb) >
+-		FIELD_SIZEOF(struct sk_buff, cb));
+-}
+-
+ /**
+  * __adf_nbuf_is_wai() - Check if frame is WAI
+  * @data: pointer to skb data buffer
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/SVC/src/logging/wlan_logging_sock_svc.c b/drivers/net/wireless/qcacld-2.0/CORE/SVC/src/logging/wlan_logging_sock_svc.c
+index b9b289534366..80d0e16463e7 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/SVC/src/logging/wlan_logging_sock_svc.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/SVC/src/logging/wlan_logging_sock_svc.c
+@@ -314,7 +314,7 @@ int wlan_log_to_user(VOS_TRACE_LEVEL log_level, char *to_be_sent, int length)
+ 		ktime_get_real_ts64(&tv);
+ 		/* Convert rtc to local time */
+ 		local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
+-		rtc_time_to_tm(local_time, &tm);
++		rtc_time64_to_tm(local_time, &tm);
+ 		tlen = snprintf(tbuf, sizeof(tbuf),
+ 				"R%d: [%s][%02d:%02d:%02d.%06lu] ",
+ 				radio, current->comm, tm.tm_hour,
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
+index 4db8852195c0..d20d833c524b 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/inc/vos_cnss.h
+@@ -154,7 +154,7 @@ static inline int vos_set_cpus_allowed_ptr(struct task_struct *task, ulong cpu)
+ #endif
+ 
+ static inline void vos_device_self_recovery(struct device *dev) { return; }
+-static inline void vos_request_pm_qos_type(int latency_type, u32 qos_val)
++static inline void vos_request_pm_qos(u32 qos_val)
+ {
+ 	return;
+ }
+@@ -358,14 +358,14 @@ static inline enum cnss_cc_src vos_get_cc_source(void)
+ }
+ 
+ #ifdef HIF_SDIO
+-static inline void vos_request_pm_qos_type(int latency_type, u32 qos_val)
++static inline void vos_request_pm_qos(u32 qos_val)
+ {
+-	cnss_sdio_request_pm_qos_type(latency_type, qos_val);
++	cnss_sdio_request_pm_qos(qos_val);
+ }
+ #elif defined(HIF_PCI)
+-static inline void vos_request_pm_qos_type(int latency_type, u32 qos_val)
++static inline void vos_request_pm_qos(u32 qos_val)
+ {
+-	cnss_pci_request_pm_qos_type(latency_type, qos_val);
++	cnss_pci_request_pm_qose(qos_val);
+ }
+ #endif
+ 
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_api.c b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_api.c
+index b1b2c388954c..eb478c26136a 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_api.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_api.c
+@@ -2598,7 +2598,7 @@ void vos_trigger_recovery(bool skip_crash_inject)
+ v_U64_t vos_get_monotonic_boottime(void)
+ {
+ #ifdef CONFIG_CNSS
+-   struct timespec ts;
++   struct timespec64 ts;
+ 
+    vos_get_monotonic_boottime_ts(&ts);
+    return (((v_U64_t)ts.tv_sec * 1000000) + (ts.tv_nsec / 1000));
+@@ -3209,10 +3209,10 @@ void vos_svc_fw_shutdown_ind(struct device *dev)
+ 
+ v_U64_t vos_get_monotonic_boottime_ns(void)
+ {
+-	struct timespec ts;
++	struct timespec64 ts;
+ 
+-	ktime_get_ts(&ts);
+-	return timespec_to_ns(&ts);
++	ktime_get_ts64(&ts);
++	return timespec64_to_ns(&ts);
+ }
+ 
+ #if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 10, 0))
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_packet.c b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_packet.c
+index d8f954538404..cfea1df9a77f 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_packet.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_packet.c
+@@ -331,7 +331,7 @@ void vos_pkt_trace_buf_update
+ )
+ {
+    v_U32_t slot;
+-   struct timeval tv;
++   struct timespec64 tv;
+ 
+    VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_INFO,
+              "%s %d, %s", __func__, __LINE__, event_string);
+@@ -349,7 +349,7 @@ void vos_pkt_trace_buf_update
+    spin_unlock_bh(&trace_buffer_lock);
+    ktime_get_real_ts64(&tv);
+    trace_buffer[slot].event_sec_time = tv.tv_sec;
+-   trace_buffer[slot].event_msec_time = tv.tv_usec;
++   trace_buffer[slot].event_msec_time = tv.tv_nsec/1000;
+    strlcpy(trace_buffer[slot].event_string, event_string,
+           sizeof(trace_buffer[slot].event_string));
+ 
+@@ -369,7 +369,7 @@ void vos_pkt_trace_dump_slot_buf(int slot)
+ 
+ 	local_time = (u32)(trace_buffer[slot].event_sec_time -
+ 		(sys_tz.tz_minuteswest * 60));
+-	rtc_time_to_tm(local_time, &tm);
++	rtc_time64_to_tm(local_time, &tm);
+ 	VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+ 		"%5d : [%02d:%02d:%02d.%06lu] : %s",
+ 		trace_buffer[slot].order,
+diff --git a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
+index de4248955bc2..90c23699adab 100644
+--- a/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
++++ b/drivers/net/wireless/qcacld-2.0/CORE/VOSS/src/vos_timer.c
+@@ -887,7 +887,7 @@ unsigned long vos_get_time_of_the_day_ms(void)
+ 
+ 	local_time = (uint32_t)(tv.tv_sec -
+ 		(sys_tz.tz_minuteswest * 60));
+-	rtc_time_to_tm(local_time, &tm);
++	rtc_time64_to_tm(local_time, &tm);
+ 	return ((tm.tm_hour * 60 * 60 * 1000) +
+ 		(tm.tm_min *60 * 1000) + (tm.tm_sec * 1000)+
+ 		(tv.tv_nsec/1000000));
+@@ -903,7 +903,7 @@ void vos_get_time_of_the_day_in_hr_min_sec_usec(char *tbuf, int len)
+        ktime_get_real_ts64(&tv);
+        /* Convert rtc to local time */
+        local_time = (u32)(tv.tv_sec - (sys_tz.tz_minuteswest * 60));
+-       rtc_time_to_tm(local_time, &tm);
++       rtc_time64_to_tm(local_time, &tm);
+        snprintf(tbuf, len,
+                "[%02d:%02d:%02d.%06lu] ",
+                tm.tm_hour, tm.tm_min, tm.tm_sec, tv.tv_nsec/1000);

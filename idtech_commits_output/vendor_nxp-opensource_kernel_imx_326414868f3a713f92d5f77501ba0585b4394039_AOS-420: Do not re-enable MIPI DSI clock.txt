@@ -1,0 +1,84 @@
+326414868f3a jay deng 2021-01-07
+
+AOS-420: Do not re-enable MIPI DSI clock
+
+Dot not re-enable MIPI DSI clock when device is pre-enable.
+
+Change-Id: Ic7a1056780c49cc37bd0b06b2ffc538ad48b3525
+
+diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+index 604a461848c9..1d4ed0ec918e 100644
+--- a/drivers/base/platform.c
++++ b/drivers/base/platform.c
+@@ -684,8 +684,10 @@ static int platform_drv_probe(struct device *_dev)
+ 
+ 	if (drv->probe) {
+ 		ret = drv->probe(dev);
+-		if (ret)
+-			dev_pm_domain_detach(_dev, true);
++		if (ret) {
++			if (!of_get_property(_dev->of_node, "pre-enable", NULL))
++				dev_pm_domain_detach(_dev, true);
++		}
+ 	}
+ 
+ out:
+diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
+index 2ef819606c41..40625dfee312 100644
+--- a/drivers/clk/clk-conf.c
++++ b/drivers/clk/clk-conf.c
+@@ -130,7 +130,7 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
+  */
+ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
+ {
+-	int rc;
++	int rc = 0;
+ 
+ 	if (!node)
+ 		return 0;
+@@ -139,6 +139,9 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
+ 	if (rc < 0)
+ 		return rc;
+ 
+-	return __set_clk_rates(node, clk_supplier);
++	if (!of_get_property(node, "pre-enable", NULL))
++		rc = __set_clk_rates(node, clk_supplier);
++
++	return rc;
+ }
+ EXPORT_SYMBOL_GPL(of_clk_set_defaults);
+diff --git a/drivers/gpu/drm/bridge/nwl-dsi/nwl-drv.c b/drivers/gpu/drm/bridge/nwl-dsi/nwl-drv.c
+index f3a33d8e7364..19c7fc40dad9 100644
+--- a/drivers/gpu/drm/bridge/nwl-dsi/nwl-drv.c
++++ b/drivers/gpu/drm/bridge/nwl-dsi/nwl-drv.c
+@@ -244,8 +244,10 @@ static struct mode_config *nwl_dsi_mode_probe(struct nwl_dsi *dsi,
+ 
+ 		bit_clk = nwl_dsi_get_bit_clock(dsi, clock, lanes);
+ 
+-		clk_set_rate(dsi->pll_clk, phyref_rates[i] * 32);
+-		clk_set_rate(dsi->phy_ref_clk, phyref_rates[i]);
++		if (!of_get_property(dsi->dev->of_node, "pre-enable", NULL)) {
++			clk_set_rate(dsi->pll_clk, phyref_rates[i] * 32);
++			clk_set_rate(dsi->phy_ref_clk, phyref_rates[i]);
++		}
+ 		ret = phy_validate(dsi->phy, PHY_MODE_MIPI_DPHY, 0, &phy_opts);
+ 
+ 		/* Pick the non-failing rate, and search for more */
+@@ -634,11 +636,13 @@ static int nwl_dsi_bridge_attach(struct drm_bridge *bridge)
+ 			return ret;
+ 		}
+ 
+-		if (dsi->pdata->tx_clk_rate)
+-			clk_set_rate(dsi->tx_esc_clk, dsi->pdata->tx_clk_rate);
++		if (!of_get_property(dsi->dev->of_node, "pre-enable", NULL)) {
++			if (dsi->pdata->tx_clk_rate)
++				clk_set_rate(dsi->tx_esc_clk, dsi->pdata->tx_clk_rate);
+ 
+-		if (dsi->pdata->rx_clk_rate)
+-			clk_set_rate(dsi->rx_esc_clk, dsi->pdata->rx_clk_rate);
++			if (dsi->pdata->rx_clk_rate)
++				clk_set_rate(dsi->rx_esc_clk, dsi->pdata->rx_clk_rate);
++		}
+ 	}
+ 
+ 	return drm_bridge_attach(bridge->encoder, dsi->panel_bridge, bridge);

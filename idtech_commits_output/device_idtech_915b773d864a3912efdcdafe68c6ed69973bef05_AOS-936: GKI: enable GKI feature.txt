@@ -1,0 +1,51 @@
+915b773d owen.wen 2022-03-24
+
+AOS-936: GKI: enable GKI feature
+
+set CONFIG_INPUT_POLLDEV=y to fix below build break
+
+ld.lld: error: undefined symbol: input_allocate_polled_device
+>>> referenced by vcnl4000.c:1117 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1117)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+>>> referenced by vcnl4000.c:1123 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1123)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+
+ld.lld: error: undefined symbol: input_register_polled_device
+>>> referenced by vcnl4000.c:1140 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1140)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+>>> referenced by vcnl4000.c:1157 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1157)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+
+ld.lld: error: undefined symbol: input_unregister_polled_device
+>>> referenced by vcnl4000.c:1216 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1216)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+>>> referenced by vcnl4000.c:1218 (/disk2/Android12/vendor/nxp-opensource/kernel_imx/drivers/iio/light/vcnl4000.c:1218)
+>>>               vmlinux.o:(vcnl4000_probe$b90c58e5cf4b47842d1f46c5f01e0686)
+
+Change-Id: I5639c80ae21270a6e8ef571788a0e284791d0b03
+
+diff --git a/imx8m/redwood_8mq/SharedBoardConfig.mk b/imx8m/redwood_8mq/SharedBoardConfig.mk
+index 4c1535df..c632f1d3 100644
+--- a/imx8m/redwood_8mq/SharedBoardConfig.mk
++++ b/imx8m/redwood_8mq/SharedBoardConfig.mk
+@@ -2,7 +2,7 @@
+ 
+ KERNEL_NAME := Image.lz4
+ TARGET_KERNEL_ARCH := arm64
+-IMX8MQ_USES_GKI := false
++IMX8MQ_USES_GKI := true
+ 
+ #NXP 8997 wifi driver module
+ BOARD_VENDOR_KERNEL_MODULES += \
+diff --git a/imx8m/redwood_8mq/android_addition_defconfig b/imx8m/redwood_8mq/android_addition_defconfig
+index 1874a390..b60b1803 100644
+--- a/imx8m/redwood_8mq/android_addition_defconfig
++++ b/imx8m/redwood_8mq/android_addition_defconfig
+@@ -25,6 +25,7 @@ CONFIG_TOUCHSCREEN_ST_FW_UPDATE=y
+ CONFIG_VIDEO_S5K5E9=y
+ CONFIG_BACKLIGHT_LED=y
+ CONFIG_VCNL4000=y
++CONFIG_INPUT_POLLDEV=y
+ CONFIG_VIDEO_DW9714=y
+ CONFIG_TYPEC_TPS65994=y
+ CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=100

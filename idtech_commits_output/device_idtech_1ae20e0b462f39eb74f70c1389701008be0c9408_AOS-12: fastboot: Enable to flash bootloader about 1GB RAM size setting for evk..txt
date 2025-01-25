@@ -1,0 +1,56 @@
+1ae20e0b Arthur Chen 2019-11-28
+
+AOS-12: fastboot: Enable to flash bootloader about 1GB RAM size setting for evk.
+
+Change-Id: I1616e6ad3a411e4d7809d101d7e7bcff87b66d01
+
+diff --git a/common/tools/fastboot_imx_flashall.sh b/common/tools/fastboot_imx_flashall.sh
+index 8ff8ffdc..1ee00b94 100755
+--- a/common/tools/fastboot_imx_flashall.sh
++++ b/common/tools/fastboot_imx_flashall.sh
+@@ -72,6 +72,7 @@ options:
+                         No need to use this option if images are in current working directory
+   -s ser_num        the serial number of board
+                         If only one board connected to computer, no need to use this option
++  -R                with this option used, choose the u-boot about 1GB RAM setting.
+ EOF
+ 
+ }
+@@ -177,7 +178,7 @@ function flash_android
+         bootloader_flashed_to_board="spl-${soc_name}${uboot_feature}.bin"
+         uboot_proper_to_be_flashed="bootloader-${soc_name}${uboot_feature}.img"
+     else
+-        bootloader_flashed_to_board="u-boot-${soc_name}${uboot_feature}.imx"
++        bootloader_flashed_to_board="u-boot-${soc_name}${ramsize}${uboot_feature}.imx"
+     fi
+ 
+     # in the source code, if AB slot feature is supported, uboot partition name is bootloader0, otherwise it's bootloader
+@@ -270,6 +271,8 @@ fastboot_tool="fastboot"
+ RED='[0;31m'
+ STD='[0;0m'
+ GREEN='[0;32m'
++ramsize=""
++ramsizetest=0
+ 
+ # We want to detect illegal feature input to some extent. Here it's based on SoC names. Since an SoC may be on a
+ # board running different set of images(android and automative for a example), so misuse the features of one set of
+@@ -309,6 +312,7 @@ while [ $# -gt 0 ]; do
+         -l) lock=1 ;;
+         -D) image_directory=$2; shift;;
+         -s) ser_num=$2; shift;;
++        -R) ramsizetest=1 ;;
+         *)  echo -e ${RED}$1${STD} is not an illegal option
+             help; exit;;
+     esac
+@@ -363,6 +367,11 @@ if [[ "${ser_num}" != "" ]]; then
+     fastboot_tool="fastboot -s ${ser_num}"
+ fi
+ 
++# if ramsizetest is specified, assign 1GB RAM size
++if [ ${ramsizetest} -eq 1 ] ; then
++    ramsize="-ram1GB"
++fi
++
+ # check whether provided spl/bootloader/uboot feature is legal
+ if [ -n "${uboot_feature}" ]; then
+     uboot_feature_no_pre_hyphen=${uboot_feature#-}

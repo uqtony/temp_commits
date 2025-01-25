@@ -1,0 +1,97 @@
+7ed6dd9 jenkins 2020-07-17
+
+Download imx-android-10.0.0_2.3.0.tar.gz from nxp.com
+
+Change-Id: Ic3ec45204133c75a34ff27ba163b7a97885089a0
+
+diff --git a/ghdr/common/fsl_media_types.h b/ghdr/common/fsl_media_types.h
+index 99b9cdc..6e7f4f7 100644
+--- a/ghdr/common/fsl_media_types.h
++++ b/ghdr/common/fsl_media_types.h
+@@ -95,6 +95,7 @@ typedef enum
+     AUDIO_WMS,  /* Windows Media Voice */
+     AUDIO_DSD,
+     AUDIO_AC4,
++    AUDIO_ALAC, /* Apple lossless audio codec */
+ }AudioCodecType;
+ 
+ 
+diff --git a/ghdr/common/fsl_parser.h b/ghdr/common/fsl_parser.h
+index 67d4a18..3215912 100644
+--- a/ghdr/common/fsl_parser.h
++++ b/ghdr/common/fsl_parser.h
+@@ -576,7 +576,10 @@ enum{
+     FSL_PARSER_TRACKEXTTAG_CRPYTOKEY = 0,
+     FSL_PARSER_TRACKEXTTAG_TX3G,
+     FSL_PARSER_TRACKEXTTAG_CRPYTOMODE,
+-    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE
++    FSL_PARSER_TRACKEXTTAG_CRPYTODEFAULTIVSIZE,
++    FSL_PARSER_TRACKEXTTAG_CRYPTO_ENCRYPTED_BYTE_BLOCK,
++    FSL_PARSER_TRACKEXTTAG_CRYPTO_SKIP_BYTE_BLOCK,
++    FSL_PARSER_TRACKEXTTAG_CRYPTO_IV,
+ }TrackExtTagIndex;
+ 
+ typedef struct _SeiPosition
+@@ -747,8 +750,8 @@ typedef    int32 (*FslParserGetVideoHDRColorInfo)(FslParserHandle parserHandle,
+ typedef    int32 (*FslParserGetVideoDisplayWidth)(FslParserHandle parserHandle, uint32 trackNum, uint32 *width);
+ 
+ typedef    int32 (*FslParserGetVideoDisplayHeight)(FslParserHandle parserHandle, uint32 trackNum, uint32 *height);
+-
+-typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
++
++typedef    int32 (*FslParserGetVideoFrameCount)(FslParserHandle parserHandle, uint32 trackNum, uint32 *count);
+ 
+ 
+ /************************************************************************************************************
+diff --git a/lib/lib_aac_parser_arm11_elinux.3.0.so b/lib/lib_aac_parser_arm11_elinux.3.0.so
+index da09dc7..d15fd15 100755
+Binary files a/lib/lib_aac_parser_arm11_elinux.3.0.so and b/lib/lib_aac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mkv_parser_arm11_elinux.3.0.so b/lib/lib_mkv_parser_arm11_elinux.3.0.so
+index 823e605..47a7e21 100755
+Binary files a/lib/lib_mkv_parser_arm11_elinux.3.0.so and b/lib/lib_mkv_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mp3_dec_v2_arm12_elinux.so b/lib/lib_mp3_dec_v2_arm12_elinux.so
+index 5bc7ace..3335507 100755
+Binary files a/lib/lib_mp3_dec_v2_arm12_elinux.so and b/lib/lib_mp3_dec_v2_arm12_elinux.so differ
+diff --git a/lib/lib_mp3_parser_arm11_elinux.3.0.so b/lib/lib_mp3_parser_arm11_elinux.3.0.so
+index 425e000..15fe475 100755
+Binary files a/lib/lib_mp3_parser_arm11_elinux.3.0.so and b/lib/lib_mp3_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mp4_parser_arm11_elinux.3.0.so b/lib/lib_mp4_parser_arm11_elinux.3.0.so
+index 374ae35..fc92a2a 100755
+Binary files a/lib/lib_mp4_parser_arm11_elinux.3.0.so and b/lib/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib/lib_mpg2_parser_arm11_elinux.3.0.so b/lib/lib_mpg2_parser_arm11_elinux.3.0.so
+index e3e0b4c..0497a12 100755
+Binary files a/lib/lib_mpg2_parser_arm11_elinux.3.0.so and b/lib/lib_mpg2_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_aac_parser_arm11_elinux.3.0.so b/lib64/lib_aac_parser_arm11_elinux.3.0.so
+index f07d943..7ef7046 100755
+Binary files a/lib64/lib_aac_parser_arm11_elinux.3.0.so and b/lib64/lib_aac_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mkv_parser_arm11_elinux.3.0.so b/lib64/lib_mkv_parser_arm11_elinux.3.0.so
+index 7602954..a87ae9a 100755
+Binary files a/lib64/lib_mkv_parser_arm11_elinux.3.0.so and b/lib64/lib_mkv_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mp3_dec_arm_android.so b/lib64/lib_mp3_dec_arm_android.so
+index 68053c6..f9634c2 100755
+Binary files a/lib64/lib_mp3_dec_arm_android.so and b/lib64/lib_mp3_dec_arm_android.so differ
+diff --git a/lib64/lib_mp3_parser_arm11_elinux.3.0.so b/lib64/lib_mp3_parser_arm11_elinux.3.0.so
+index 1c459e2..2cdc880 100755
+Binary files a/lib64/lib_mp3_parser_arm11_elinux.3.0.so and b/lib64/lib_mp3_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mp4_parser_arm11_elinux.3.0.so b/lib64/lib_mp4_parser_arm11_elinux.3.0.so
+index b9754ac..6e9132a 100755
+Binary files a/lib64/lib_mp4_parser_arm11_elinux.3.0.so and b/lib64/lib_mp4_parser_arm11_elinux.3.0.so differ
+diff --git a/lib64/lib_mpg2_parser_arm11_elinux.3.0.so b/lib64/lib_mpg2_parser_arm11_elinux.3.0.so
+index d140cb6..6d32269 100755
+Binary files a/lib64/lib_mpg2_parser_arm11_elinux.3.0.so and b/lib64/lib_mpg2_parser_arm11_elinux.3.0.so differ
+diff --git a/release_branch_info.txt b/release_branch_info.txt
+index f92edd0..4162ddd 100644
+--- a/release_branch_info.txt
++++ b/release_branch_info.txt
+@@ -1,5 +1,7 @@
+ master : master
+-P9.0.0_2.3.1_GA : MM_04.05.00_1908_L4.14.98 
+-P9.0.0_2.3.2_GA : MM_04.05.02_1911_L4.14.98
+-imx_android-10.0_2.0.0 : MM_04.05.03_1911_L5.4.0
+-imx_android-10.0_2.1.0 : MM_04.05.04_2002_L5.4.3
++#P9.0.0_2.3.1_GA : MM_04.05.00_1908_L4.14.98 
++#P9.0.0_2.3.2_GA : MM_04.05.02_1911_L4.14.98
++#imx_android-10.0_2.0.0 : MM_04.05.03_1911_L5.4.0
++#imx_android-10.0_2.1.0 : MM_04.05.04_2002_L5.4.3
++#automotive-10.0.0_2.2.0: MM_04.05.04_2002_L5.4.3
++imx_android-10.0_2.3.0 : MM_04.05.05_2005_L5.4.24

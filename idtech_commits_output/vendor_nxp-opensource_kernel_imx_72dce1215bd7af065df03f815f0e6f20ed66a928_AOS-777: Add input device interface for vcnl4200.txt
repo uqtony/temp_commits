@@ -1,0 +1,176 @@
+72dce1215bd7 Jay 2021-11-22
+
+AOS-777: Add input device interface for vcnl4200
+
+System need input and event device to notify SensorEvent
+service of Android framework. So must add input device
+interface for vcnl4200
+
+Change-Id: Ic0c0d468d0b1eddf8205082999df5bfe03e0d9f8
+
+diff --git a/drivers/iio/light/vcnl4000.c b/drivers/iio/light/vcnl4000.c
+index fff4b36b8b58..34e2b054bb03 100644
+--- a/drivers/iio/light/vcnl4000.c
++++ b/drivers/iio/light/vcnl4000.c
+@@ -31,8 +31,13 @@
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/trigger_consumer.h>
+ #include <linux/iio/triggered_buffer.h>
++#include <linux/input-polldev.h>
+ 
+ #define VCNL4000_DRV_NAME "vcnl4000"
++#define VCNL4000_LIGHT_NAME "vcnl4000-light"
++#define VCNL4000_LIGHT_PHY_NAME "vcnl4000/input0"
++#define VCNL4000_PROXIMITY_NAME "vcnl4000-proximity"
++#define VCNL4000_PROXIMITY_PHY_NAME "vcnl4000/input1"
+ #define VCNL4000_PROD_ID	0x01
+ #define VCNL4010_PROD_ID	0x02 /* for VCNL4020, VCNL4010 */
+ #define VCNL4040_PROD_ID	0x86
+@@ -90,6 +95,10 @@
+ #define VCNL4010_INT_DRDY \
+ 	(BIT(VCNL4010_INT_PROXIMITY) | BIT(VCNL4010_INT_ALS))
+ 
++#define POLL_INTERVAL_MAX			1000
++#define POLL_INTERVAL				1000
++#define POLL_INTERVAL_MIN			500
++
+ static const int vcnl4010_prox_sampling_frequency[][2] = {
+ 	{1, 950000},
+ 	{3, 906250},
+@@ -127,6 +136,8 @@ struct vcnl4000_data {
+ 	struct vcnl4200_channel vcnl4200_al;
+ 	struct vcnl4200_channel vcnl4200_ps;
+ 	uint32_t near_level;
++	struct input_polled_dev *poll_light_dev;
++	struct input_polled_dev *poll_proximity_dev;
+ };
+ 
+ struct vcnl4000_chip_spec {
+@@ -1009,11 +1020,55 @@ static int vcnl4010_probe_trigger(struct iio_dev *indio_dev)
+ 	return devm_iio_trigger_register(&client->dev, trigger);
+ }
+ 
++static void report_light(struct vcnl4000_data *pdata)
++{
++	struct input_dev *idev;
++	int light = 0;
++
++	idev = pdata->poll_light_dev->input;
++	vcnl4000_set_pm_runtime_state(pdata, true);
++	vcnl4200_measure_light(pdata, &light);
++	vcnl4000_set_pm_runtime_state(pdata, false);
++
++	input_event(idev, EV_MSC, MSC_SERIAL, light);
++	input_sync(idev);
++}
++
++static void report_proximity(struct vcnl4000_data *pdata)
++{
++	struct input_dev *idev;
++	int proximity = 0;
++
++	idev = pdata->poll_proximity_dev->input;
++	vcnl4000_set_pm_runtime_state(pdata, true);
++	vcnl4200_measure_proximity(pdata, &proximity);
++	vcnl4000_set_pm_runtime_state(pdata, false);
++
++	input_event(idev, EV_MSC, MSC_SERIAL, proximity);
++	input_sync(idev);
++}
++
++static void vcnl4000_light_poll(struct input_polled_dev *dev)
++{
++	struct vcnl4000_data *pdata = (struct vcnl4000_data *)dev->private;
++
++	report_light(pdata);
++}
++
++static void vcnl4000_proximity_poll(struct input_polled_dev *dev)
++{
++	struct vcnl4000_data *pdata = (struct vcnl4000_data *)dev->private;
++
++	report_proximity(pdata);
++}
++
+ static int vcnl4000_probe(struct i2c_client *client,
+ 			  const struct i2c_device_id *id)
+ {
+ 	struct vcnl4000_data *data;
+ 	struct iio_dev *indio_dev;
++	struct input_dev *light_idev;
++	struct input_dev *proximity_idev;
+ 	int ret;
+ 
+ 	indio_dev = devm_iio_device_alloc(&client->dev, sizeof(*data));
+@@ -1033,6 +1088,54 @@ static int vcnl4000_probe(struct i2c_client *client,
+ 	dev_dbg(&client->dev, "%s Ambient light/proximity sensor, Rev: %02x
+",
+ 		data->chip_spec->prod, data->rev);
+ 
++	if (!strcmp(data->chip_spec->prod, "VCNL4200")) {
++		data->poll_light_dev = input_allocate_polled_device();
++		if (!data->poll_light_dev) {
++			dev_err(&client->dev, "alloc light poll device failed!
+");
++			return-ENOMEM;
++		}
++
++		data->poll_proximity_dev = input_allocate_polled_device();
++		if (!data->poll_proximity_dev) {
++			dev_err(&client->dev, "alloc proximity poll device failed!
+");
++			return -ENOMEM;
++		}
++
++		data->poll_light_dev->poll = vcnl4000_light_poll;
++		data->poll_light_dev->private = data;
++		data->poll_light_dev->poll_interval = POLL_INTERVAL;
++		data->poll_light_dev->poll_interval_min = POLL_INTERVAL_MIN;
++		data->poll_light_dev->poll_interval_max = POLL_INTERVAL_MAX;
++		light_idev = data->poll_light_dev->input;
++		light_idev->name = VCNL4000_LIGHT_NAME;
++		light_idev->phys = VCNL4000_LIGHT_PHY_NAME;
++		light_idev->id.bustype = BUS_I2C;
++		light_idev->evbit[0] = BIT_MASK(EV_MSC);
++		input_set_capability(light_idev, EV_MSC, MSC_SERIAL);
++		ret = input_register_polled_device(data->poll_light_dev);
++		if (ret) {
++			dev_err(&client->dev, "register light poll device failed!
+");
++			goto error_free_poll_dev;
++		}
++
++		data->poll_proximity_dev->poll = vcnl4000_proximity_poll;
++		data->poll_proximity_dev->private = data;
++		data->poll_proximity_dev->poll_interval = POLL_INTERVAL;
++		data->poll_proximity_dev->poll_interval_min = POLL_INTERVAL_MIN;
++		data->poll_proximity_dev->poll_interval_max = POLL_INTERVAL_MAX;
++		proximity_idev = data->poll_proximity_dev->input;
++		proximity_idev->name = VCNL4000_PROXIMITY_NAME;
++		proximity_idev->phys = VCNL4000_PROXIMITY_PHY_NAME;
++		proximity_idev->id.bustype = BUS_I2C;
++		proximity_idev->evbit[0] = BIT_MASK(EV_MSC);
++		input_set_capability(proximity_idev, EV_MSC, MSC_SERIAL);
++		ret = input_register_polled_device(data->poll_proximity_dev);
++		if (ret) {
++			dev_err(&client->dev, "register proximity poll device failed!
+");
++			goto error_free_poll_dev;
++		}
++	}
++
+ 	if (device_property_read_u32(&client->dev, "proximity-near-level",
+ 				     &data->near_level))
+ 		data->near_level = 0;
+@@ -1083,6 +1186,11 @@ static int vcnl4000_probe(struct i2c_client *client,
+ 	pm_runtime_use_autosuspend(&client->dev);
+ 
+ 	return 0;
++error_free_poll_dev:
++	if (data->poll_light_dev)
++		input_unregister_polled_device(data->poll_light_dev);
++	if (data->poll_proximity_dev)
++		input_unregister_polled_device(data->poll_proximity_dev);
+ fail_poweroff:
+ 	data->chip_spec->set_power_state(data, false);
+ 	return ret;

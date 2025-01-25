@@ -1,0 +1,131 @@
+22cf2cb09167 Arthur Chen 2020-03-23
+
+drivers: misc: idg_spi: Patch for C-SDK.
+
+    Add option for write data without idg header & CRC to match C-SDK design.
+    Switched by "#define IDG_INPUT_HEX_NUMBER".
+
+Change-Id: I252a430db0d2a162ad39e1b52a916795b840f330
+
+diff --git a/drivers/misc/idg_spi.c b/drivers/misc/idg_spi.c
+index 00b6327a5c90..08568f9804cc 100644
+--- a/drivers/misc/idg_spi.c
++++ b/drivers/misc/idg_spi.c
+@@ -39,6 +39,8 @@
+ /* to fix v5 read issue */
+ #define IDG_V5_ISSUE_RECOVERY	1  /* enable: 1, disable: 0 */
+ 
++#define IDG_INPUT_HEX_NUMBER	0  /* enable: 1, disable: 0 */
++
+ #define IDG_DEBUG_INFO		0  /* enable: 1, disable: 0 */
+ 
+ static struct spi_device *idg_spi_tty;
+@@ -211,7 +213,7 @@ static int idgv5_spi_tty_release(struct inode *inode, struct file *file)
+ }
+ 
+ static ssize_t idgv5_spi_tty_read(struct file *file, char __user *user_buffer,
+-				size_t count, loff_t *ppos)
++				  size_t count, loff_t *ppos)
+ {
+ 	struct spi_device *idg_tty;
+ 	struct idg_spi_device *idg_dev;
+@@ -235,12 +237,18 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_message m;
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
++	int status;
++#if IDG_DEBUG_INFO
++	int i;
++#endif /* IDG_DEBUG_INFO */
++#if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+-	int ch4msb, ch4lsb, status, i;
++	int ch4msb, ch4lsb;
+ 	int cmdcheck = 0;
++	char user_buf[MAX_BUFFER_SIZE] = "";
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 	char idg_tx[MAX_BUFFER_SIZE] = "";
+ 	char idg_rx[MAX_BUFFER_SIZE] = "";
+-	char user_buf[MAX_BUFFER_SIZE] = "";
+ 
+ 	spi_message_init(&m);
+ 	idg_tty = (struct spi_device *)file->private_data;
+@@ -252,6 +260,7 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 		goto ttyv5_write_out;
+ 	}
+ 	x = x_init;
++#if IDG_INPUT_HEX_NUMBER
+ 	memcpy(idg_tx, CLIENT_NEOII_Header_V5, IDG_HEADER_LEN);
+ 	if (copy_from_user(user_buf, buffer, count)) {
+ 		status = -EIO;
+@@ -282,6 +291,19 @@ static ssize_t idgv5_spi_tty_write(struct file *file, const char __user *buffer,
+ 			   (IDG_HEADER_LEN + (count/2)));
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
++#else
++	if (copy_from_user(idg_tx, buffer, count)) {
++		status = -EIO;
++		goto ttyv5_write_out;
++	}
++#if IDG_DEBUG_INFO
++	dev_info(&idg_tty->dev, "idg v5 entry from user data (%d bytes):
+",
++		 count);
++	for (i = 0; i < count; i++)
++		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
++
++#endif /* IDG_DEBUG_INFO */
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+ 	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;
+@@ -403,12 +425,18 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 	struct spi_message m;
+ 	struct spi_transfer *x_init;
+ 	struct spi_transfer *x;
++	int status;
++#if IDG_DEBUG_INFO
++	int i;
++#endif /* IDG_DEBUG_INFO */
++#if IDG_INPUT_HEX_NUMBER
+ 	unsigned short crc;
+-	int ch4msb, ch4lsb, status, i;
++	int ch4msb, ch4lsb;
+ 	int cmdcheck = 0;
++	char user_buf[MAX_BUFFER_SIZE] = "";
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 	char idg_tx[MAX_BUFFER_SIZE] = "";
+ 	char idg_rx[MAX_BUFFER_SIZE] = "";
+-	char user_buf[MAX_BUFFER_SIZE] = "";
+ 
+ 	spi_message_init(&m);
+ 	idg_tty = (struct spi_device *)file->private_data;
+@@ -420,6 +448,7 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 		goto tty_write_out;
+ 	}
+ 	x = x_init;
++#if IDG_INPUT_HEX_NUMBER
+ 	memcpy(idg_tx, CLIENT_NEOII_Header_V2, IDG_HEADER_LEN);
+ 	if (copy_from_user(user_buf, buffer, count)) {
+ 		status = -EIO;
+@@ -450,6 +479,19 @@ static ssize_t idg_spi_tty_write(struct file *file, const char __user *buffer,
+ 			   (IDG_HEADER_LEN + (count/2)));
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2)] = (char) (crc & 0xFF);
+ 	idg_tx[IDG_HEADER_LEN + ((count)/2) + 1] = (char) (crc >> 8);
++#else
++	if (copy_from_user(idg_tx, buffer, count)) {
++		status = -EIO;
++		goto tty_write_out;
++	}
++#if IDG_DEBUG_INFO
++	dev_info(&idg_tty->dev, "idg v2 entry from user data (%d bytes):
+",
++		 count);
++	for (i = 0; i < count; i++)
++		dev_info(&idg_tty->dev, "0x%.2X ", idg_tx[i]);
++
++#endif /* IDG_DEBUG_INFO */
++#endif /* IDG_INPUT_HEX_NUMBER */
+ 	mutex_lock(&idg_dev->lock);
+ 	gpiod_set_value_cansleep(idg_dev->spi_cs, CS_SET);
+ 	x->tx_buf = idg_tx;

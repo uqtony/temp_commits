@@ -1,0 +1,127 @@
+76282f34 Jay 2022-02-09
+
+AOS-885: redwood: add permission for kioskled AIDL service
+
+Change-Id: I4121177612df99dcab41b48f278a9c4b2aa00648
+
+diff --git a/imx8m/redwood_8mq/sepolicy/attributes b/imx8m/redwood_8mq/sepolicy/attributes
+new file mode 100644
+index 00000000..4f651be6
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/attributes
+@@ -0,0 +1,3 @@
++attribute hal_kioskled;
++attribute hal_kioskled_client;
++attribute hal_kioskled_server;
+diff --git a/imx8m/redwood_8mq/sepolicy/file.te b/imx8m/redwood_8mq/sepolicy/file.te
+new file mode 100644
+index 00000000..13d940a6
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/file.te
+@@ -0,0 +1 @@
++type sysfs_idtech_kioskleds, fs_type, sysfs_type;
+diff --git a/imx8m/redwood_8mq/sepolicy/file_contexts b/imx8m/redwood_8mq/sepolicy/file_contexts
+index f4c92491..a4bd94b8 100644
+--- a/imx8m/redwood_8mq/sepolicy/file_contexts
++++ b/imx8m/redwood_8mq/sepolicy/file_contexts
+@@ -15,6 +15,10 @@
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+ /vendor/bin/init\.usbhid\.sh                u:object_r:init-insmod-sh_exec:s0
+ 
++#Kiosk Led file node
++/vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
++/vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
++
+ # android.system.suspend@1.0-service
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                      u:object_r:sysfs_wakeup:s0
+ /sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                        u:object_r:sysfs_wakeup:s0
+diff --git a/imx8m/redwood_8mq/sepolicy/hal_kioskled.te b/imx8m/redwood_8mq/sepolicy/hal_kioskled.te
+new file mode 100644
+index 00000000..0d96991d
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/hal_kioskled.te
+@@ -0,0 +1,11 @@
++# HwBinder IPC from client to server, and callbacks
++binder_call(hal_kioskled_client, hal_kioskled_server)
++binder_call(hal_kioskled_server, hal_kioskled_client)
++
++hal_attribute_hwservice(hal_kioskled, hal_kioskled_hwservice)
++
++add_service(hal_kioskled_server, hal_kioskled_service)
++binder_call(hal_kioskled_server, servicemanager)
++binder_call(hal_kioskled_client, servicemanager)
++allow hal_kioskled_client hal_kioskled_service:service_manager find;
++
+diff --git a/imx8m/redwood_8mq/sepolicy/hal_kioskled_default.te b/imx8m/redwood_8mq/sepolicy/hal_kioskled_default.te
+new file mode 100644
+index 00000000..07cbddc4
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/hal_kioskled_default.te
+@@ -0,0 +1,9 @@
++type hal_kioskled_default, domain, mlstrustedsubject;
++type hal_kioskled_default_exec, exec_type, vendor_file_type, file_type;
++
++init_daemon_domain(hal_kioskled_default)
++hal_server_domain(hal_kioskled_default, hal_kioskled)
++
++allow hal_kioskled_default sysfs_leds:dir { search read open };
++allow hal_kioskled_default sysfs:file { getattr open read write };
++
+diff --git a/imx8m/redwood_8mq/sepolicy/hwservice.te b/imx8m/redwood_8mq/sepolicy/hwservice.te
+new file mode 100644
+index 00000000..560c4b41
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/hwservice.te
+@@ -0,0 +1 @@
++type hal_kioskled_hwservice, hwservice_manager_type;
+diff --git a/imx8m/redwood_8mq/sepolicy/hwservice_contexts b/imx8m/redwood_8mq/sepolicy/hwservice_contexts
+new file mode 100644
+index 00000000..cfc3211d
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/hwservice_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled::IKioskled      u:object_r:hal_kioskled_hwservice:s0
+diff --git a/imx8m/redwood_8mq/sepolicy/platform_app.te b/imx8m/redwood_8mq/sepolicy/platform_app.te
+new file mode 100644
+index 00000000..956c73b0
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/platform_app.te
+@@ -0,0 +1,3 @@
++allow platform_app sysfs_leds:dir { search };
++allow platform_app hal_kioskled_service:service_manager { find };
++allow platform_app hal_kioskled_default:binder { call };
+diff --git a/imx8m/redwood_8mq/sepolicy/service.te b/imx8m/redwood_8mq/sepolicy/service.te
+new file mode 100644
+index 00000000..935b5ea1
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/service.te
+@@ -0,0 +1 @@
++type hal_kioskled_service, vendor_service, service_manager_type;
+diff --git a/imx8m/redwood_8mq/sepolicy/service_contexts b/imx8m/redwood_8mq/sepolicy/service_contexts
+new file mode 100644
+index 00000000..24764b3d
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/service_contexts
+@@ -0,0 +1 @@
++android.hardware.kioskled.IKioskled/default                        u:object_r:hal_kioskled_service:s0
+diff --git a/imx8m/redwood_8mq/sepolicy/system_server.te b/imx8m/redwood_8mq/sepolicy/system_server.te
+new file mode 100644
+index 00000000..dc511380
+--- /dev/null
++++ b/imx8m/redwood_8mq/sepolicy/system_server.te
+@@ -0,0 +1 @@
++hal_client_domain(system_server, hal_kioskled)
+diff --git a/imx8m/redwood_8mq/ueventd.nxp.rc b/imx8m/redwood_8mq/ueventd.nxp.rc
+index cfd1df9b..777dcbcd 100644
+--- a/imx8m/redwood_8mq/ueventd.nxp.rc
++++ b/imx8m/redwood_8mq/ueventd.nxp.rc
+@@ -33,3 +33,9 @@
+ 
+ # K81 IDG SPI
+ /dev/ttyIDG*              0660   system       root
++
++#KIOSK LED
++/sys/class/leds/* brightness 0660 system root
++/sys/class/leds/* trigger 0660 system root
++/sys/class/leds/* delay_on 0660 system root
++/sys/class/leds/* delay_off 0660 system root

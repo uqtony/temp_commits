@@ -1,0 +1,156 @@
+ed03c52 Arthur Chen 2019-12-12
+
+AOS-34: idg_spi_tool: Add operation modes of receive-only and send-only.
+
+Change-Id: I92bcf82f327ed212403c5e5a1ffc6f6a83701e8e
+
+diff --git a/main.c b/main.c
+index 2b2b57b..c6ef1b1 100644
+--- a/main.c
++++ b/main.c
+@@ -14,6 +14,7 @@
+ 
+ static const char *device = "/dev/spidev1.0";
+ static uint8_t mode = 0;
++static uint8_t op_mode = Transaction;
+ static uint8_t bits = 8;
+ static uint32_t speed = SET_4MHZ;
+ static uint32_t wait = DELAY_5MS;
+@@ -22,7 +23,7 @@ static int read_times = 1;
+ 
+ static void print_usage(const char *prog)
+ {
+-	printf("Usage: %s [-DIcsdhbrlvHOLC3]
+", prog);
++	printf("Usage: %s [-DIcsdhbrlvWGHOLC3]
+", prog);
+ 	puts("  -D --device   device to use (default /dev/spidev1.0)
+"
+ 	     "  -I --idgcmd   send neoii idg command
+"
+ 	     "  -c --crc      CRC-16/CCTT caculator
+"
+@@ -34,6 +35,8 @@ static void print_usage(const char *prog)
+ 	     "  -b --bpw      bits per word (default 8 bits)
+"
+ 	     "  -r --raw      raw data for sending
+"
+ 	     "  -l --loop     loopback
+"
++	     "  -W --Send-only  send once
+"
++	     "  -G --Receive-only  Keep receive IDG data
+"
+ 	     "  -v --version  print version & author
+"
+ 	     "  -H --cpha     clock phase
+"
+ 	     "  -O --cpol     clock polarity
+"
+@@ -63,9 +66,11 @@ static int parse_opts(int argc, char *argv[], uint8_t *buf)
+ 			{ "speed",   1, 0, 's' },
+ 			{ "wait",    1, 0, 'w' },
+ 			{ "delay",   1, 0, 'd' },
+-			{ "help",    0, 0, 'h' },
+ 			{ "bpw",     1, 0, 'b' },
+ 			{ "raw",     1, 0, 'r' },
++			{ "Send-only", 0, 0, 'W' },
++			{ "Receive-only", 0, 0, 'G' },
++			{ "help",    0, 0, 'h' },
+ 			{ "loop",    0, 0, 'l' },
+ 			{ "version", 0, 0, 'v' },
+ 			{ "cpha",    0, 0, 'H' },
+@@ -79,7 +84,7 @@ static int parse_opts(int argc, char *argv[], uint8_t *buf)
+ 		};
+ 		int c;
+ 
+-		c = getopt_long(argc, argv, "D:I:c:s:w:d:h:b:r:l:vHOLC3NR",
++		c = getopt_long(argc, argv, "D:I:c:s:w:d:h:b:r:l:vWGHOLC3NR",
+ 				lopts, NULL);
+ 
+ 		if (c == -1)
+@@ -168,6 +173,12 @@ static int parse_opts(int argc, char *argv[], uint8_t *buf)
+ 		case 'v':
+ 			print_version(argv[0]);
+ 			break;
++		case 'W':
++			op_mode = Send_only;
++			break;
++		case 'G':
++			op_mode = Receive_only;
++			break;
+ 		case 'H':
+ 			mode |= SPI_CPHA;
+ 			break;
+@@ -269,9 +280,15 @@ int main(int argc, char *argv[])
+ 	if (size <= 0)
+ 		goto IOerror;
+ 
++	if (op_mode == Receive_only)
++		keep_receive(fd, MAX_BUFFER_SIZE, speed, delay, bits);
++
+ 	if (os_idg_spi_send(fd, buffer, size, speed, delay, bits) < 1)
+ 		goto IOerror;
+ 
++	if (op_mode == Send_only)
++		goto IOerror;
++
+ 	do {
+ 		printf("retry %d times
+"
+ 		       "============================================
+"
+diff --git a/os_idg_spi.c b/os_idg_spi.c
+index 38f9673..1614971 100644
+--- a/os_idg_spi.c
++++ b/os_idg_spi.c
+@@ -725,6 +725,7 @@ int os_idg4receive(int index)
+ 
+ 	return times;
+ }
++
+ void print_idg_support()
+ {
+ 	puts("  Supported IDG commands table:
+"
+@@ -743,3 +744,13 @@ void print_idg_support()
+ 	     "  	  12			Contact_Transaction_Power_Off
+"
+ 	     "  	  TBD			TBD
+");
+ }
++
++void keep_receive(int fd, int data_size, int speed, int delay, int bits)
++{
++	puts("Keep receiving...
+");
++	while (1)
++	{
++		usleep(DELAY_5MS);
++		os_idg_spi_receive(fd, MAX_BUFFER_SIZE, speed, delay, bits);
++	}
++}
+diff --git a/os_idg_spi.h b/os_idg_spi.h
+index cc9d5ae..9e90e99 100644
+--- a/os_idg_spi.h
++++ b/os_idg_spi.h
+@@ -32,6 +32,12 @@
+ #define IDG_SIZE_LSB		13
+ #define IDG_FIRST_DATA		14
+ 
++enum {
++	Transaction = 0,
++	Receive_only = 1,
++	Send_only = 2
++};
++
+ /* calculate CRC-16/CCTT */
+ unsigned short CalculateCRC(unsigned char *Buffer, unsigned int Len);
+ /* print CRC-16/CCTT result in console */
+@@ -48,4 +54,6 @@ int os_idg4send(int index, uint8_t *buf);
+ int os_idg4receive(int index);
+ /* print idg commands embedded in this program */
+ void print_idg_support();
++/* receive only usage per 5ms */
++void keep_receive(int fd, int data_size, int speed, int delay, int bits);
+ #endif /* _OS_IDG_SPI_H_ */

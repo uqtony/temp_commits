@@ -1,0 +1,51 @@
+39a875fb George.Huang 2021-03-17
+
+AOS-548: fix: Failed to flash ROM with -u signed
+
+Symptom: flash failed
+$ ./fastboot_imx_flashall.sh -a -e -f imx8mq -bdinfo board_info-a300_evt-0_devboard_evt-1_ktc2g.img -u signed
+  flash the file of partition-table.img to the partition of gpt
+  Sending 'gpt' (33 KB) OKAY [ 0.017s]
+  Writing 'gpt' OKAY [ 1.832s]
+  Finished. Total time: 1.863s
+  flash the file of u-boot-imx8mq-lpddr4-signed.imx to the partition of bootloader0
+  Sending 'bootloader0' (4060 KB) OKAY [ 0.164s]
+  Writing 'bootloader0' FAILED (remote: 'image too large for partition')
+  fastboot: error: Command failed
+
+Root Cause:
+  current bootloader0 (4MB) is split into spl_a (2MB) and spl_bak_a (2MB).
+  So the 4MB aligned u-boot image is too large for current spl_a in bootloader0.
+
+Solution:
+  Pad below u-boot images size as 2MB and align them as 4K alignment:
+  1.1M Mar 16 16:15 u-boot.imx
+  1.1M Mar 16 16:18 u-boot-imx8mq-lpddr4-evk-uuu-ktc2g.imx
+  1.1M Mar 16 16:14 u-boot-imx8mq-lpddr4-evk-uuu-ktc2g-signed.imx
+  1.4M Mar 16 16:18 u-boot-imx8mq-lpddr4.imx
+  1.4M Mar 16 16:13 u-boot-imx8mq-lpddr4-signed.imx
+
+  But trusty u-boot images are over 2MB, need to come out other solution if trusty feature is used.
+  2.8M Mar 16 16:18 u-boot-imx8mq-lpddr4-trusty.imx
+  2.8M Mar 16 16:18 u-boot-imx8mq-lpddr4-trusty-secure-unlock.imx
+
+Change-Id: I41edaf19ca486998e2ae8caac68208d43f5afa62
+
+diff --git a/common/build/uboot.mk b/common/build/uboot.mk
+index c514a417..b179d4c9 100644
+--- a/common/build/uboot.mk
++++ b/common/build/uboot.mk
+@@ -133,11 +133,11 @@ define pad_imx_uboot
+         if [ "$$PLATFORM" = "imx8mq" ]; then \
+             SPL_PARTITION_SIZE=2060288; \
+             BOOTLOADER_PARTITION_SIZE=4194304; \
+-            UBOOT_PARTITION_SIZE=4157440; \
++            UBOOT_PARTITION_SIZE=2060288; \
+         else \
+             SPL_PARTITION_SIZE=2097152; \
+             BOOTLOADER_PARTITION_SIZE=4194304; \
+-            UBOOT_PARTITION_SIZE=4194304; \
++            UBOOT_PARTITION_SIZE=2097152; \
+         fi; \
+         if [ $(2) = "dual" ]; then \
+             PAD_IMG=$(UBOOT_COLLECTION)/spl-$(strip $(1)).bin; \

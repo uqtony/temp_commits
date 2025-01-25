@@ -1,0 +1,3909 @@
+bc49259d AndrewS 2022-04-13
+
+AOS-975: switch redwood_8mm symlinks to regular files
+
+Change-Id: I493e6ce626b702fa80d02f2c4c7449774dace2d8
+
+diff --git a/imx8m/redwood_8mm/AndroidBoard.mk b/imx8m/redwood_8mm/AndroidBoard.mk
+deleted file mode 120000
+index 592859f6..00000000
+--- a/imx8m/redwood_8mm/AndroidBoard.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/AndroidBoard.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/AndroidBoard.mk b/imx8m/redwood_8mm/AndroidBoard.mk
+new file mode 100644
+index 00000000..75defabe
+--- /dev/null
++++ b/imx8m/redwood_8mm/AndroidBoard.mk
+@@ -0,0 +1,8 @@
++LOCAL_PATH := $(call my-dir)
++
++include $(CONFIG_REPO_PATH)/common/build/dtbo.mk
++include $(CONFIG_REPO_PATH)/common/build/imx-recovery.mk
++include $(CONFIG_REPO_PATH)/common/build/gpt.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/media-profile/media-profile.mk
++include $(FSL_PROPRIETARY_PATH)/fsl-proprietary/sensor/fsl-sensor.mk
++-include $(IMX_MEDIA_CODEC_XML_PATH)/mediacodec-profile/mediacodec-profile.mk
+diff --git a/imx8m/redwood_8mm/AndroidTee.mk b/imx8m/redwood_8mm/AndroidTee.mk
+deleted file mode 120000
+index 39eb7ac6..00000000
+--- a/imx8m/redwood_8mm/AndroidTee.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/AndroidTee.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/AndroidTee.mk b/imx8m/redwood_8mm/AndroidTee.mk
+new file mode 100644
+index 00000000..90fac6bb
+--- /dev/null
++++ b/imx8m/redwood_8mm/AndroidTee.mk
+@@ -0,0 +1,12 @@
++# uboot.imx in android combine scfw.bin and uboot.bin
++MAKE += SHELL=/bin/bash
++
++define build_uboot_w_tee
++	$(MAKE) -C bootable/bootloader/arm-trusted-firmware/ -B CROSS_COMPILE=aarch64-linux-android- PLAT=imx8mm V=1 SPD=opteed DECRYPTED_BUFFER_START=$(DECRYPTED_BUFFER_START) DECRYPTED_BUFFER_LEN=$(DECRYPTED_BUFFER_LEN) DECODED_BUFFER_START=$(DECODED_BUFFER_START) DECODED_BUFFER_LEN=$(DECODED_BUFFER_LEN) bl31; \
++	cp bootable/bootloader/arm-trusted-firmware/build/imx8mm/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.;\
++	aarch64-linux-android-objcopy -O binary out/target/product/evk_8mm/optee/arm-plat-imx/core/tee.elf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
++	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM  flash_spl_uboot; \
++	cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(PRODUCT_OUT)/u-boot-$(strip $(2)).imx;
++endef
++
+diff --git a/imx8m/redwood_8mm/AndroidUboot.mk b/imx8m/redwood_8mm/AndroidUboot.mk
+deleted file mode 120000
+index fc1f139d..00000000
+--- a/imx8m/redwood_8mm/AndroidUboot.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/AndroidUboot.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/AndroidUboot.mk b/imx8m/redwood_8mm/AndroidUboot.mk
+new file mode 100644
+index 00000000..708c6970
+--- /dev/null
++++ b/imx8m/redwood_8mm/AndroidUboot.mk
+@@ -0,0 +1,59 @@
++# uboot.imx in android combine scfw.bin and uboot.bin
++MAKE += SHELL=/bin/bash
++
++ifneq ($(AARCH64_GCC_CROSS_COMPILE),)
++  ATF_CROSS_COMPILE := $(strip $(AARCH64_GCC_CROSS_COMPILE))
++else
++  $(error shell env AARCH64_GCC_CROSS_COMPILE is not set)
++endif
++
++define build_imx_uboot
++	$(hide) echo Building i.MX U-Boot with firmware; \
++	cp $(UBOOT_OUT)/u-boot-nodtb.$(strip $(1)) $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/spl/u-boot-spl.bin  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	cp $(UBOOT_OUT)/tools/mkimage  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/mkimage_uboot; \
++	if [ `echo $(2) | cut -d '-' -f2` = "ddr4" ]; then \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mm-ddr4-evk.dtb $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/ddr4* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	else \
++		cp $(UBOOT_OUT)/arch/arm/dts/imx8mm-evk.dtb  $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++		cp $(FSL_PROPRIETARY_PATH)/linux-firmware-imx/firmware/ddr/synopsys/lpddr4_pmu_train* $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/.; \
++	fi; \
++	$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ PLAT=`echo $(2) | cut -d '-' -f1` clean; \
++	if [ `echo $(2) | cut -d '-' -f2` = "trusty" ] && [ `echo $(2) | rev | cut -d '-' -f1` != "uuu" ]; then \
++		cp $(FSL_PROPRIETARY_PATH)/fsl-proprietary/uboot-firmware/imx8m/tee-imx8mm.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++		if [ `echo $(2) | cut -d '-' -f3` = "4g" ]; then \
++			$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B BL32_BASE=0xfe000000 SPD=trusty 1>/dev/null || exit 1; \
++		else \
++			$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B SPD=trusty 1>/dev/null || exit 1; \
++		fi; \
++	else \
++		if [ -f $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin ] ; then \
++			rm -rf $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/tee.bin; \
++		fi; \
++		$(MAKE) -C $(IMX_PATH)/arm-trusted-firmware/ CROSS_COMPILE="$(ATF_CROSS_COMPILE)" PLAT=`echo $(2) | cut -d '-' -f1` bl31 -B 1>/dev/null || exit 1; \
++	fi; \
++	cp $(IMX_PATH)/arm-trusted-firmware/build/`echo $(2) | cut -d '-' -f1`/release/bl31.bin $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/bl31.bin; \
++	$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ clean; \
++	if [ `echo $(2) | cut -d '-' -f2` = "ddr4" ]; then \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM  flash_ddr4_evk || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM print_fit_hab_ddr4 || exit 1; \
++	elif [ `echo $(2) | cut -d '-' -f2` = "4g" ] || [ `echo $(2) | cut -d '-' -f3` = "4g" ] || [ `echo $(2) | rev | cut -d '-' -f1` = "uuu" ]; then \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM TEE_LOAD_ADDR=0xfe000000 flash_spl_uboot || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM print_fit_hab || exit 1; \
++	elif [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM flash_spl_uboot || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM print_fit_hab || exit 1; \
++	else \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM flash_evk_no_hdmi_dual_bootloader || exit 1; \
++		$(MAKE) -C $(IMX_MKIMAGE_PATH)/imx-mkimage/ SOC=iMX8MM PRINT_FIT_HAB_OFFSET=0x0 print_fit_hab || exit 1; \
++	fi; \
++	if [ `echo $(2) | rev | cut -d '-' -f1 | rev` != "dual" ]; then \
++		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/u-boot-$(strip $(2)).imx; \
++	else \
++		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/flash.bin $(UBOOT_COLLECTION)/spl-$(strip $(2)).bin; \
++		cp $(IMX_MKIMAGE_PATH)/imx-mkimage/iMX8M/u-boot-ivt.itb $(UBOOT_COLLECTION)/bootloader-$(strip $(2)).img; \
++	fi;
++endef
++
++
+diff --git a/imx8m/redwood_8mm/BoardConfig.mk b/imx8m/redwood_8mm/BoardConfig.mk
+deleted file mode 120000
+index 591b9636..00000000
+--- a/imx8m/redwood_8mm/BoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/BoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/BoardConfig.mk b/imx8m/redwood_8mm/BoardConfig.mk
+new file mode 100644
+index 00000000..9458eaf6
+--- /dev/null
++++ b/imx8m/redwood_8mm/BoardConfig.mk
+@@ -0,0 +1,189 @@
++# -------@block_infrastructure-------
++#
++# Product-specific compile-time definitions.
++#
++
++include $(CONFIG_REPO_PATH)/imx8m/BoardConfigCommon.mk
++
++# -------@block_common_config-------
++#
++# SoC-specific compile-time definitions.
++#
++
++# value assigned in this part should be fixed for an SoC, right?
++
++BOARD_SOC_TYPE := IMX8MM
++BOARD_HAVE_VPU := true
++BOARD_VPU_TYPE := hantro
++FSL_VPU_OMX_ONLY := true
++HAVE_FSL_IMX_GPU2D := true
++HAVE_FSL_IMX_GPU3D := true
++HAVE_FSL_IMX_PXP := false
++TARGET_USES_HWC2 := true
++TARGET_HAVE_VULKAN := true
++
++SOONG_CONFIG_IMXPLUGIN += \
++                          BOARD_VPU_TYPE
++
++SOONG_CONFIG_IMXPLUGIN_BOARD_SOC_TYPE = IMX8MM
++SOONG_CONFIG_IMXPLUGIN_BOARD_HAVE_VPU = true
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_TYPE = hantro
++SOONG_CONFIG_IMXPLUGIN_BOARD_VPU_ONLY = false
++SOONG_CONFIG_IMXPLUGIN_PREBUILT_FSL_IMX_CODEC = true
++SOONG_CONFIG_IMXPLUGIN_POWERSAVE = false
++
++# -------@block_memory-------
++USE_ION_ALLOCATOR := true
++USE_GPU_ALLOCATOR := false
++
++# -------@block_storage-------
++TARGET_USERIMAGES_USE_EXT4 := true
++
++# use sparse image
++TARGET_USERIMAGES_SPARSE_EXT_DISABLED := false
++
++# Support gpt
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab_super.bpt
++  ADDITION_BPT_PARTITION = partition-table-28GB:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab_super.bpt \
++                           partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader_super.bpt \
++                           partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader_super.bpt
++else
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-no-product.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-no-product.bpt \
++                             partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader-no-product.bpt \
++                             partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader-no-product.bpt
++  else
++    BOARD_BPT_INPUT_FILES += $(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab.bpt
++    ADDITION_BPT_PARTITION = partition-table-28GB:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab.bpt \
++                             partition-table-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-13GB-ab-dual-bootloader.bpt \
++                             partition-table-28GB-dual:$(CONFIG_REPO_PATH)/common/partition/device-partitions-28GB-ab-dual-bootloader.bpt
++  endif
++endif
++
++BOARD_PREBUILT_DTBOIMAGE := $(OUT_DIR)/target/product/$(PRODUCT_DEVICE)/dtbo-imx8mm.img
++
++BOARD_USES_METADATA_PARTITION := true
++BOARD_ROOT_EXTRA_FOLDERS += metadata
++
++# -------@block_security-------
++ENABLE_CFI=false
++
++BOARD_AVB_ENABLE := true
++BOARD_AVB_ALGORITHM := SHA256_RSA4096
++# The testkey_rsa4096.pem is copied from external/avb/test/data/testkey_rsa4096.pem
++BOARD_AVB_KEY_PATH := $(CONFIG_REPO_PATH)/common/security/testkey_rsa4096.pem
++
++BOARD_AVB_BOOT_KEY_PATH := external/avb/test/data/testkey_rsa2048.pem
++BOARD_AVB_BOOT_ALGORITHM := SHA256_RSA2048
++BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 2
++
++# -------@block_treble-------
++# Vendor Interface manifest and compatibility
++DEVICE_MANIFEST_FILE := $(IMX_DEVICE_PATH)/manifest.xml
++DEVICE_MATRIX_FILE := $(IMX_DEVICE_PATH)/compatibility_matrix.xml
++DEVICE_FRAMEWORK_COMPATIBILITY_MATRIX_FILE := $(IMX_DEVICE_PATH)/device_framework_matrix.xml
++
++
++# -------@block_wifi-------
++# 8mm LPDDR4 board use NXP 8987 wifi
++BOARD_WLAN_DEVICE            := nxp
++WPA_SUPPLICANT_VERSION       := VER_0_8_X
++BOARD_WPA_SUPPLICANT_DRIVER  := NL80211
++BOARD_HOSTAPD_DRIVER         := NL80211
++BOARD_HOSTAPD_PRIVATE_LIB               := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++BOARD_WPA_SUPPLICANT_PRIVATE_LIB        := lib_driver_cmd_$(BOARD_WLAN_DEVICE)
++
++# NXP 8987 wifi support dual interface
++WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
++
++# NXP 8987 wifi driver module
++BOARD_VENDOR_KERNEL_MODULES += \
++    $(TARGET_OUT_INTERMEDIATES)/MXMWIFI_OBJ/mlan.ko \
++    $(TARGET_OUT_INTERMEDIATES)/MXMWIFI_OBJ/moal.ko
++
++# -------@block_bluetooth-------
++# NXP 8987 bluetooth
++BOARD_HAVE_BLUETOOTH_NXP := true
++BOARD_BLUETOOTH_BDROID_BUILDCFG_INCLUDE_DIR := $(IMX_DEVICE_PATH)/bluetooth
++
++# -------@block_sensor-------
++BOARD_USE_SENSOR_FUSION := true
++
++
++# -------@block_kernel_bootimg-------
++BOARD_KERNEL_BASE := 0x40400000
++
++ifeq ($(PRODUCT_IMX_DRM),true)
++CMASIZE=736M
++else
++CMASIZE=800M
++endif
++
++# NXP default config
++BOARD_KERNEL_CMDLINE := init=/init firmware_class.path=/vendor/firmware loop.max_part=7 bootconfig
++BOARD_BOOTCONFIG += androidboot.console=ttymxc1 androidboot.hardware=nxp
++
++# memory config
++BOARD_KERNEL_CMDLINE += transparent_hugepage=never
++
++# display config
++BOARD_BOOTCONFIG += androidboot.lcd_density=240 androidboot.primary_display=imx-drm
++
++# wifi config
++BOARD_BOOTCONFIG += androidboot.wificountrycode=CN
++BOARD_KERNEL_CMDLINE += moal.mod_para=wifi_mod_para_sd8987.conf
++
++# low memory device build config
++ifeq ($(LOW_MEMORY),true)
++BOARD_KERNEL_CMDLINE += cma=320M@0x400M-0xb80M galcore.contiguousSize=33554432
++BOARD_BOOTCONFIG += androidboot.displaymode=720p
++else
++BOARD_KERNEL_CMDLINE += cma=$(CMASIZE)@0x400M-0xb80M
++endif
++
++ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
++BOARD_BOOTCONFIG += androidboot.vendor.sysrq=1
++endif
++
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  # dts target for imx8mm_evk with DDR4 on board
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    # dts without product partition
++    TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-product.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mm-ddr4:imx8mm-ddr4-evk-no-product.dtb
++  else
++    TARGET_BOARD_DTS_CONFIG ?= imx8mm-ddr4:imx8mm-ddr4-evk.dtb
++    # imx8mm with MIPI-HDMI display and NXP wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mm:imx8mm-evk.dtb
++    # imx8mm with MIPI panel display and NXP wifi
++    TARGET_BOARD_DTS_CONFIG += imx8mm-mipi-panel:imx8mm-evk-rm67191.dtb
++    # imx8mm with MIPI-HDMI display, NXP wifi and m4 image to support LPA
++    TARGET_BOARD_DTS_CONFIG += imx8mm-m4:imx8mm-evk-rpmsg.dtb
++  endif
++else
++  ifeq ($(IMX_NO_PRODUCT_PARTITION),true)
++    TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-product-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mm-ddr4:imx8mm-ddr4-evk-no-product-no-dynamic_partition.dtb
++  else
++    TARGET_BOARD_DTS_CONFIG ?= imx8mm:imx8mm-evk-no-dynamic_partition.dtb
++    TARGET_BOARD_DTS_CONFIG += imx8mm-ddr4:imx8mm-ddr4-evk-no-dynamic_partition.dtb
++  endif
++endif
++
++ALL_DEFAULT_INSTALLED_MODULES += $(BOARD_VENDOR_KERNEL_MODULES)
++
++# -------@block_sepolicy-------
++SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += \
++    $(CONFIG_REPO_PATH)/imx8m/system_ext_pri_sepolicy
++
++BOARD_SEPOLICY_DIRS := \
++       $(CONFIG_REPO_PATH)/imx8m/sepolicy \
++       $(IMX_DEVICE_PATH)/sepolicy
++
++ifeq ($(PRODUCT_IMX_DRM),true)
++BOARD_SEPOLICY_DIRS += \
++       $(IMX_DEVICE_PATH)/sepolicy_drm
++endif
++
+diff --git a/imx8m/redwood_8mm/SharedBoardConfig.mk b/imx8m/redwood_8mm/SharedBoardConfig.mk
+deleted file mode 120000
+index 2246e0ed..00000000
+--- a/imx8m/redwood_8mm/SharedBoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/SharedBoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/SharedBoardConfig.mk b/imx8m/redwood_8mm/SharedBoardConfig.mk
+new file mode 100644
+index 00000000..0415d634
+--- /dev/null
++++ b/imx8m/redwood_8mm/SharedBoardConfig.mk
+@@ -0,0 +1,177 @@
++# -------@block_kernel_bootimg-------
++
++KERNEL_NAME := Image.lz4
++TARGET_KERNEL_ARCH := arm64
++
++IMX8MM_USES_GKI ?= true
++
++# CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_I2C: synaptics_dsx_i2c.ko, mipi-panel touch driver module
++# CONFIG_VIDEO_MXC_CSI_CAMERA: mx6s_capture.ko, it's csi adapt driver which is the input of v4l2 framework
++# CONFIG_MXC_CAMERA_OV5640_MIPI_V2: ov5640_camera_mipi_v2.ko, sensor ov5640 driver, the input of mipi
++# CONFIG_MXC_MIPI_CSI: mxc_mipi_csi.ko, mipi driver which get the sensor data and send data to csi
++# CONFIG_VIDEO_MXC_CAPTURE: only enable compile dir drivers/media/platform/mxc/capture/, no need mxc_v4l2_capture.c which used in imx6/7
++# linux bsp team will add new configure for mxc_v4l2_capture.c in lf-5.4 branch.
++# CONFIG_SND_SOC_WM8524: snd-soc-wm8524.ko, wm8524 audio codec
++# CONFIG_SND_IMX_SOC: SoC Audio for Freescale i.MX CPUs
++# CONFIG_SND_SIMPLE_CARD: snd-soc-simple-card.ko snd-soc-simple-card-utils.ko, connect cpu and codec
++# CONFIG_SND_SOC_FSL_SAI: snd-soc-fsl-sai.ko, audio cpu, privide i2s
++# CONFIG_IMX_SDMA: imx-sdma.ko, sdma used for audio
++# CONFIG_SND_SOC_FSL_MICFIL: snd-soc-fsl-micfil.ko, used in audio mic
++# CONFIG_SND_SOC_IMX_MICFIL: snd-soc-imx-micfil.ko, used in audio mic
++# CONFIG_SND_SOC_IMX_PCM_DMA: imx-pcm-dma-common.ko, used in fsl_micfil
++# CONFIG_MXC_HANTRO_845: hantrodec_845s.ko vpu decodder
++# CONFIG_MXC_HANTRO_845_H1: hx280enc.ko vpu encoder
++# CONFIG_MXC_HANTRO_V4L2: vsiv4l2.ko  vpu v4l2 driver
++# CONFIG_RTC_DRV_SNVS: rtc-snvs.ko, snvs driver
++# CONFIG_FEC: fec.ko which depend on pps_core.ko and ptp.ko
++# CONFIG_AT803X_PHY: ethernet phy driver at803x.ko
++
++ifeq ($(IMX8MM_USES_GKI),true)
++BOARD_VENDOR_KERNEL_MODULES += \
++    $(KERNEL_OUT)/drivers/mxc/gpu-viv/galcore.ko \
++    $(KERNEL_OUT)/drivers/thermal/imx8mm_thermal.ko \
++    $(KERNEL_OUT)/drivers/media/platform/mxc/capture/mx6s_capture.ko \
++    $(KERNEL_OUT)/drivers/media/platform/mxc/capture/mxc_mipi_csi.ko \
++    $(KERNEL_OUT)/drivers/media/platform/mxc/capture/ov5640_camera_mipi_v2.ko \
++    $(KERNEL_OUT)/drivers/gpio/gpio-pca953x.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/imx-pcm-dma.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/imx-pcm-dma-v2.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-micfil.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-micfil.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-asrc.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-easrc.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-sai.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-spdif.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-spdif.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-wm8524.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-ak4458.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-ak5558.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-bt-sco.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-hdmi-codec.ko \
++    $(KERNEL_OUT)/sound/soc/generic/snd-soc-simple-card.ko \
++    $(KERNEL_OUT)/sound/soc/generic/snd-soc-simple-card-utils.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-ak4458.ko \
++    $(KERNEL_OUT)/drivers/rpmsg/virtio_rpmsg_bus.ko \
++    $(KERNEL_OUT)/drivers/remoteproc/imx_rproc.ko \
++    $(KERNEL_OUT)/drivers/i2c/busses/i2c-rpmsg-imx.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/imx-pcm-rpmsg.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-fsl-rpmsg.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/imx-audio-rpmsg.ko \
++    $(KERNEL_OUT)/sound/soc/codecs/snd-soc-rpmsg-ak4497.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-rpmsg.ko \
++    $(KERNEL_OUT)/sound/soc/fsl/snd-soc-imx-ak4497.ko \
++    $(KERNEL_OUT)/drivers/mxc/hantro_845/hantrodec_845s.ko \
++    $(KERNEL_OUT)/drivers/mxc/hantro_845_h1/hx280enc.ko \
++    $(KERNEL_OUT)/drivers/mxc/hantro_v4l2/vsiv4l2.ko \
++    $(KERNEL_OUT)/drivers/rtc/rtc-snvs.ko \
++    $(KERNEL_OUT)/drivers/pps/pps_core.ko \
++    $(KERNEL_OUT)/drivers/ptp/ptp.ko \
++    $(KERNEL_OUT)/drivers/net/phy/at803x.ko \
++    $(KERNEL_OUT)/drivers/net/ethernet/freescale/fec.ko
++else
++BOARD_VENDOR_KERNEL_MODULES +=     \
++    $(KERNEL_OUT)/drivers/input/touchscreen/synaptics_dsx/synaptics_dsx_i2c.ko
++endif
++
++# CONFIG_ZRAM: zram.ko, lzo.ko, lzo-rle.ko compressed ram using LZ coding.
++# CONFIG_ZSMALLOC: zsmalloc.ko
++# CONFIG_CLK_IMX8MM: clk-imx8mm.ko
++# CONFIG_IMX8M_PM_DOMAINS: imx8m_pm_domains.ko, this driver still not upstream
++# CONFIG_TIMER_IMX_SYS_CTR: timer-imx-sysctr.ko
++# CONFIG_PINCTRL_IMX8MM: pinctrl-imx8mm.ko
++# CONFIG_SERIAL_IMX: imx.ko
++# CONFIG_IMX2_WDT: imx2_wdt.ko
++# CONFIG_MFD_ROHM_BD718XX: rohm-bd718x7.ko
++# CONFIG_GPIO_MXC: gpio-generic.ko gpio-mxc.ko
++# CONFIG_MMC_SDHCI_ESDHC_IMX: sdhci-esdhc-imx.ko cqhci.ko
++# CONFIG_I2C_IMX:i2c-imx.ko
++# CONFIG_DMABUF_HEAPS_SYSTEM: system_heap.ko
++# CONFIG_DMABUF_HEAPS_CMA: cma_heap.ko
++# CONFIG_DMABUF_IMX: dma-buf-imx.ko
++# depend on clk module: reset-dispmix.ko, it will been select as m if clk build as m.
++# CONFIG_KEYBOARD_SNVS_PWRKEY: snvs_pwrkey.ko, snvs power key driver
++# CONFIG_IMX_LCDIF_CORE: imx-lcdif-core.ko
++# CONFIG_DRM_IMX: imxdrm.ko imx-lcdif-crtc.ko
++# CONFIG_DRM_SEC_MIPI_DSIM: sec-dsim.ko
++# CONFIG_DRM_IMX_SEC_DSIM: sec_mipi_dsim-imx.ko
++# CONFIG_DRM_I2C_ADV7511: adv7511.ko
++# CONFIG_USB_CHIPIDEA_OF: usbmisc_imx.ko ci_hdrc_imx.ko
++# CONFIG_USB_CHIPIDEA: ci_hdrc.ko
++# CONFIG_NOP_USB_XCEIV: phy-generic.ko
++# CONFIG_TYPEC_TCPCI: tcpci.ko
++# CONFIG_USB_EHCI_HCD: ehci-hcd.ko
++# CONFIG_CFG80211: cfg80211.ko, cfg80211 - wireless configuration API
++# CONFIG_MAC80211: mac80211.ko, Generic IEEE 802.11 Networking Stack
++
++ifeq ($(IMX8MM_USES_GKI),true)
++BOARD_VENDOR_RAMDISK_KERNEL_MODULES +=     \
++    $(KERNEL_OUT)/mm/zsmalloc.ko \
++    $(KERNEL_OUT)/crypto/lzo.ko \
++    $(KERNEL_OUT)/crypto/lzo-rle.ko \
++    $(KERNEL_OUT)/drivers/block/zram/zram.ko \
++    $(KERNEL_OUT)/drivers/soc/imx/soc-imx8m.ko \
++    $(KERNEL_OUT)/drivers/clk/imx/mxc-clk.ko \
++    $(KERNEL_OUT)/drivers/clk/imx/clk-imx8mm.ko \
++    $(KERNEL_OUT)/drivers/soc/imx/imx8m_pm_domains.ko \
++    $(KERNEL_OUT)/drivers/clocksource/timer-imx-sysctr.ko \
++    $(KERNEL_OUT)/drivers/soc/imx/busfreq-imx8mq.ko \
++    $(KERNEL_OUT)/drivers/pinctrl/freescale/pinctrl-imx.ko \
++    $(KERNEL_OUT)/drivers/pinctrl/freescale/pinctrl-imx8mm.ko \
++    $(KERNEL_OUT)/drivers/tty/serial/imx.ko \
++    $(KERNEL_OUT)/drivers/watchdog/imx2_wdt.ko \
++    $(KERNEL_OUT)/drivers/regulator/pca9450-regulator.ko \
++    $(KERNEL_OUT)/drivers/gpio/gpio-mxc.ko \
++    $(KERNEL_OUT)/drivers/thermal/device_cooling.ko \
++    $(KERNEL_OUT)/drivers/perf/fsl_imx8_ddr_perf.ko \
++    $(KERNEL_OUT)/drivers/cpufreq/cpufreq-dt.ko \
++    $(KERNEL_OUT)/drivers/cpufreq/imx-cpufreq-dt.ko \
++    $(KERNEL_OUT)/drivers/nvmem/nvmem-imx-ocotp.ko \
++    $(KERNEL_OUT)/drivers/mmc/host/sdhci-esdhc-imx.ko \
++    $(KERNEL_OUT)/drivers/mmc/host/cqhci.ko \
++    $(KERNEL_OUT)/drivers/i2c/busses/i2c-imx.ko \
++    $(KERNEL_OUT)/drivers/spi/spidev.ko \
++    $(KERNEL_OUT)/drivers/spi/spi-bitbang.ko \
++    $(KERNEL_OUT)/drivers/spi/spi-nxp-fspi.ko \
++    $(KERNEL_OUT)/drivers/spi/spi-imx.ko \
++    $(KERNEL_OUT)/lib/stmp_device.ko \
++    $(KERNEL_OUT)/drivers/dma/mxs-dma.ko \
++    $(KERNEL_OUT)/drivers/mmc/core/pwrseq_simple.ko \
++    $(KERNEL_OUT)/drivers/mailbox/imx-mailbox.ko \
++    $(KERNEL_OUT)/drivers/dma-buf/heaps/system_heap.ko \
++    $(KERNEL_OUT)/drivers/dma-buf/heaps/cma_heap.ko \
++    $(KERNEL_OUT)/drivers/dma-buf/dma-buf-imx.ko \
++    $(KERNEL_OUT)/drivers/input/keyboard/snvs_pwrkey.ko \
++    $(KERNEL_OUT)/drivers/input/touchscreen/synaptics_dsx/synaptics_dsx_i2c.ko \
++    $(KERNEL_OUT)/drivers/reset/reset-dispmix.ko \
++    $(KERNEL_OUT)/drivers/reset/reset-imx7.ko \
++    $(KERNEL_OUT)/drivers/gpu/imx/lcdif/imx-lcdif-core.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/bridge/adv7511/adv7511.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/bridge/sec-dsim.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/imx/imxdrm.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/imx/lcdif/imx-lcdif-crtc.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/panel/panel-raydium-rm67191.ko \
++    $(KERNEL_OUT)/drivers/gpu/drm/imx/sec_mipi_dsim-imx.ko \
++    $(KERNEL_OUT)/drivers/usb/chipidea/usbmisc_imx.ko \
++    $(KERNEL_OUT)/drivers/usb/common/ulpi.ko \
++    $(KERNEL_OUT)/drivers/usb/chipidea/ci_hdrc_imx.ko \
++    $(KERNEL_OUT)/drivers/usb/chipidea/ci_hdrc.ko \
++    $(KERNEL_OUT)/drivers/usb/phy/phy-generic.ko \
++    $(KERNEL_OUT)/drivers/power/supply/dummy_battery.ko \
++    $(KERNEL_OUT)/drivers/dma/imx-sdma.ko \
++    $(KERNEL_OUT)/drivers/trusty/trusty-ipc.ko \
++    $(KERNEL_OUT)/drivers/trusty/trusty-core.ko \
++    $(KERNEL_OUT)/drivers/trusty/trusty-irq.ko \
++    $(KERNEL_OUT)/drivers/trusty/trusty-log.ko \
++    $(KERNEL_OUT)/drivers/trusty/trusty-virtio.ko \
++    $(KERNEL_OUT)/net/wireless/cfg80211.ko \
++    $(KERNEL_OUT)/net/mac80211/mac80211.ko
++endif
++
++
++# -------@block_memory-------
++#Enable this to config 1GB ddr on evk_imx8mm
++LOW_MEMORY := false
++
++# -------@block_security-------
++#Enable this to include trusty support
++PRODUCT_IMX_TRUSTY := true
+diff --git a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+deleted file mode 120000
+index 72973b16..00000000
+--- a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/UbootKernelBoardConfig.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/UbootKernelBoardConfig.mk b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+new file mode 100644
+index 00000000..7973c12d
+--- /dev/null
++++ b/imx8m/redwood_8mm/UbootKernelBoardConfig.mk
+@@ -0,0 +1,41 @@
++TARGET_BOOTLOADER_POSTFIX := bin
++UBOOT_POST_PROCESS := true
++
++# u-boot target for imx8mm_evk with DDR4 on board
++TARGET_BOOTLOADER_CONFIG := imx8mm-ddr4:imx8mm_ddr4_evk_android_defconfig
++# u-boot target for imx8mm_evk with LPDDR4 on board
++ifeq ($(LOW_MEMORY),true)
++  TARGET_BOOTLOADER_CONFIG += imx8mm:imx8mm_evk_1g_ddr_android_defconfig
++else
++  TARGET_BOOTLOADER_CONFIG += imx8mm:imx8mm_evk_android_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-dual:imx8mm_evk_android_dual_defconfig
++endif
++TARGET_BOOTLOADER_CONFIG += imx8mm-4g:imx8mm_evk_4g_android_defconfig
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty:imx8mm_evk_android_trusty_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-secure-unlock:imx8mm_evk_android_trusty_secure_unlock_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-dual:imx8mm_evk_android_trusty_dual_defconfig
++  TARGET_BOOTLOADER_CONFIG += imx8mm-trusty-4g:imx8mm_evk_4g_android_trusty_defconfig
++endif
++
++# u-boot target used by uuu for imx8mm_evk with DDR4 on board
++TARGET_BOOTLOADER_CONFIG += imx8mm-ddr4-evk-uuu:imx8mm_ddr4_evk_android_uuu_defconfig
++# u-boot target used by uuu for imx8mm_evk with LPDDR4 on board
++TARGET_BOOTLOADER_CONFIG += imx8mm-evk-uuu:imx8mm_evk_android_uuu_defconfig
++TARGET_BOOTLOADER_CONFIG += imx8mm-4g-evk-uuu:imx8mm_evk_4g_android_uuu_defconfig
++
++# imx8mm kernel defconfig
++ifeq ($(IMX8MM_USES_GKI),true)
++TARGET_KERNEL_DEFCONFIG := gki_defconfig
++TARGET_KERNEL_GKI_DEFCONF:= imx8mm_gki.fragment
++else
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
++endif
++TARGET_KERNEL_ADDITION_DEFCONF := android_addition_defconfig
++
++# absolute path is used, not the same as relative path used in AOSP make
++TARGET_DEVICE_DIR := $(patsubst %/, %, $(dir $(realpath $(lastword $(MAKEFILE_LIST)))))
++
++# define bootloader rollback index
++BOOTLOADER_RBINDEX ?= 0
++
+diff --git a/imx8m/redwood_8mm/android_addition_defconfig b/imx8m/redwood_8mm/android_addition_defconfig
+deleted file mode 120000
+index 30a92b3f..00000000
+--- a/imx8m/redwood_8mm/android_addition_defconfig
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/android_addition_defconfig
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/android_addition_defconfig b/imx8m/redwood_8mm/android_addition_defconfig
+new file mode 100644
+index 00000000..e69de29b
+diff --git a/imx8m/redwood_8mm/app_whitelist.xml b/imx8m/redwood_8mm/app_whitelist.xml
+deleted file mode 120000
+index f9c723ea..00000000
+--- a/imx8m/redwood_8mm/app_whitelist.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/app_whitelist.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/app_whitelist.xml b/imx8m/redwood_8mm/app_whitelist.xml
+new file mode 100644
+index 00000000..0084b334
+--- /dev/null
++++ b/imx8m/redwood_8mm/app_whitelist.xml
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
++
++<!--
++/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *     * Redistributions of source code must retain the above copyright
++ *       notice, this list of conditions and the following disclaimer.
++ *     * Redistributions in binary form must reproduce the above
++ *       copyright notice, this list of conditions and the following
++ *       disclaimer in the documentation and/or other materials provided
++ *       with the distribution.
++ *     * Neither the name of The Linux Foundation nor the names of its
++ *       contributors may be used to endorse or promote products derived
++ *       from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++-->
++
++<config>
++    <!-- deskclock need to freely run in the background -->
++    <allow-in-power-save package="com.android.deskclock" />
++</config>
+diff --git a/imx8m/redwood_8mm/audio_effects.xml b/imx8m/redwood_8mm/audio_effects.xml
+deleted file mode 120000
+index 4d5a5e58..00000000
+--- a/imx8m/redwood_8mm/audio_effects.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/audio_effects.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/audio_effects.xml b/imx8m/redwood_8mm/audio_effects.xml
+new file mode 100644
+index 00000000..a1c1fc2a
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_effects.xml
+@@ -0,0 +1,26 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<audio_effects_conf version="2.0" xmlns="http://schemas.android.com/audio/audio_effects_conf/v2_0">
++    <libraries>
++        <library name="bundle" path="libbundlewrapper.so"/>
++        <library name="reverb" path="libreverbwrapper.so"/>
++        <library name="visualizer" path="libvisualizer.so"/>
++        <library name="downmix" path="libdownmix.so"/>
++        <library name="loudness_enhancer" path="libldnhncr.so"/>
++        <library name="dynamics_processing" path="libdynproc.so"/>
++    </libraries>
++
++    <effects>
++        <effect name="bassboost" library="bundle" uuid="8631f300-72e2-11df-b57e-0002a5d5c51b"/>
++        <effect name="virtualizer" library="bundle" uuid="1d4033c0-8557-11df-9f2d-0002a5d5c51b"/>
++        <effect name="equalizer" library="bundle" uuid="ce772f20-847d-11df-bb17-0002a5d5c51b"/>
++        <effect name="volume" library="bundle" uuid="119341a0-8469-11df-81f9-0002a5d5c51b"/>
++        <effect name="reverb_env_aux" library="reverb" uuid="4a387fc0-8ab3-11df-8bad-0002a5d5c51b"/>
++        <effect name="reverb_env_ins" library="reverb" uuid="c7a511a0-a3bb-11df-860e-0002a5d5c51b"/>
++        <effect name="reverb_pre_aux" library="reverb" uuid="f29a1400-a3bb-11df-8ddc-0002a5d5c51b"/>
++        <effect name="reverb_pre_ins" library="reverb" uuid="172cdf00-a3bc-11df-a72f-0002a5d5c51b"/>
++        <effect name="visualizer" library="visualizer" uuid="d069d9e0-8329-11df-9168-0002a5d5c51b"/>
++        <effect name="downmix" library="downmix" uuid="93f04452-e4fe-41cc-91f9-e475b6d1d69f"/>
++        <effect name="loudness_enhancer" library="loudness_enhancer" uuid="fa415329-2034-4bea-b5dc-5b381c8d1e2c"/>
++        <effect name="dynamics_processing" library="dynamics_processing" uuid="e0e6539b-1781-7261-676f-6d7573696340"/>
++    </effects>
++</audio_effects_conf>
+diff --git a/imx8m/redwood_8mm/audio_policy_configuration.xml b/imx8m/redwood_8mm/audio_policy_configuration.xml
+deleted file mode 120000
+index 00491269..00000000
+--- a/imx8m/redwood_8mm/audio_policy_configuration.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/audio_policy_configuration.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/audio_policy_configuration.xml b/imx8m/redwood_8mm/audio_policy_configuration.xml
+new file mode 100644
+index 00000000..e86bb1ad
+--- /dev/null
++++ b/imx8m/redwood_8mm/audio_policy_configuration.xml
+@@ -0,0 +1,117 @@
++<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
++<!-- Copyright (C) 2017 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<audioPolicyConfiguration version="7.0" xmlns:xi="http://www.w3.org/2001/XInclude">
++    <globalConfiguration speaker_drc_enabled="true"/>
++
++    <modules>
++        <module name="primary" halVersion="2.0">
++            <attachedDevices>
++                <item>Speaker</item>
++                <item>Built-In Mic</item>
++            </attachedDevices>
++            <defaultOutputDevice>Speaker</defaultOutputDevice>
++            <mixPorts>
++                <mixPort name="primary output" role="source" flags="AUDIO_OUTPUT_FLAG_PRIMARY">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="direct output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000 96000 192000 384000 768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO AUDIO_CHANNEL_OUT_QUAD AUDIO_CHANNEL_OUT_5POINT1 AUDIO_CHANNEL_OUT_7POINT1"/>
++                </mixPort>
++                <mixPort name="lpa output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="48000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="hi-res output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT AUDIO_OUTPUT_FLAG_HW_AV_SYNC">
++                    <profile name="" format="AUDIO_FORMAT_PCM_FLOAT"
++                             samplingRates="48000 96000 192000 384000 768000"
++                             channelMasks="AUDIO_CHANNEL_OUT_STEREO AUDIO_CHANNEL_OUT_QUAD AUDIO_CHANNEL_OUT_5POINT1 AUDIO_CHANNEL_OUT_7POINT1"/>
++                </mixPort>
++                <mixPort name="dsd output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD">
++                    <profile name="" format="AUDIO_FORMAT_DSD"
++                             samplingRates="2822400 5644800 11289600 22579200" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++                <mixPort name="bt sco output" role="source">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="16000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++                </mixPort>
++
++                <mixPort name="primary input" role="sink">
++                    <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                             samplingRates="8000 11025 16000 22050 24000 32000 44100 48000"
++                             channelMasks="AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO"/>
++                </mixPort>
++            </mixPorts>
++            <devicePorts>
++                <devicePort tagName="Speaker" type="AUDIO_DEVICE_OUT_SPEAKER" role="sink" >
++                </devicePort>
++                <devicePort tagName="Wired Headphones" type="AUDIO_DEVICE_OUT_WIRED_HEADPHONE" role="sink">
++                </devicePort>
++                <devicePort tagName="Line-Out" type="AUDIO_DEVICE_OUT_LINE" role="sink">
++                </devicePort>
++                <devicePort tagName="BT SCO Headset" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET" role="sink">
++                </devicePort>
++                <devicePort tagName="BT SCO CarKit" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT" role="sink">
++                </devicePort>
++                <devicePort tagName="BT SCO" type="AUDIO_DEVICE_OUT_BLUETOOTH_SCO" role="sink">
++                </devicePort>
++
++                <devicePort tagName="Built-In Mic" type="AUDIO_DEVICE_IN_BUILTIN_MIC" role="source">
++                </devicePort>
++                <devicePort tagName="Spdif-In" type="AUDIO_DEVICE_IN_AUX_DIGITAL" role="source">
++                </devicePort>
++                <devicePort tagName="BT SCO Headset Mic" type="AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET" role="source">
++                </devicePort>
++            </devicePorts>
++            <routes>
++                <route type="mix" sink="Speaker"
++                       sources="primary output"/>
++                <route type="mix" sink="Wired Headphones"
++                       sources="dsd output,hi-res output,direct output,primary output"/>
++                <route type="mix" sink="Line-Out"
++                       sources="dsd output,lpa output,primary output"/>
++                 <route type="mix" sink="BT SCO Headset"
++                        sources="bt sco output"/>
++                <route type="mix" sink="BT SCO CarKit"
++                       sources="bt sco output"/>
++                <route type="mix" sink="BT SCO"
++                       sources="bt sco output"/>
++
++                <route type="mix" sink="primary input"
++                       sources="Built-In Mic,Spdif-In,BT SCO Headset Mic"/>
++            </routes>
++        </module>
++
++        <!-- A2dp Audio HAL -->
++        <xi:include href="a2dp_audio_policy_configuration_7_0.xml"/>
++
++        <!-- Usb Audio HAL -->
++        <xi:include href="usb_audio_policy_configuration.xml"/>
++
++        <!-- Remote Submix Audio HAL -->
++        <xi:include href="r_submix_audio_policy_configuration.xml"/>
++
++    </modules>
++
++    <!-- Volume section -->
++    <xi:include href="audio_policy_volumes.xml"/>
++    <xi:include href="default_volume_tables.xml"/>
++
++</audioPolicyConfiguration>
+diff --git a/imx8m/redwood_8mm/bluetooth b/imx8m/redwood_8mm/bluetooth
+deleted file mode 120000
+index f8810feb..00000000
+--- a/imx8m/redwood_8mm/bluetooth
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/bluetooth
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/bluetooth/bdroid_buildcfg.h b/imx8m/redwood_8mm/bluetooth/bdroid_buildcfg.h
+new file mode 100644
+index 00000000..606e9abb
+--- /dev/null
++++ b/imx8m/redwood_8mm/bluetooth/bdroid_buildcfg.h
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (C) 2012 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++/* Copyright (C) 2015-2016 Freescale Semiconductor, Inc. */
++/* Copyright 2017-2018 NXP */
++
++#ifndef _BDROID_BUILDCFG_H
++#define _BDROID_BUILDCFG_H
++
++#define BTM_DEF_LOCAL_NAME "iMX8"
++
++// Disables Interleave scan
++#define BTA_HOST_INTERLEAVE_SEARCH  FALSE
++// skips conn update at conn completion
++#define BTA_BLE_SKIP_CONN_UPD  TRUE
++// Disables read remote device feature
++#define BTA_SKIP_BLE_READ_REMOTE_FEAT TRUE
++
++//Enable A2DPSink AVRCPController
++#define BTA_AV_SINK_INCLUDED TRUE
++#endif
+diff --git a/imx8m/redwood_8mm/camera_config_imx8mm.json b/imx8m/redwood_8mm/camera_config_imx8mm.json
+deleted file mode 120000
+index 8425c459..00000000
+--- a/imx8m/redwood_8mm/camera_config_imx8mm.json
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/camera_config_imx8mm.json
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/camera_config_imx8mm.json b/imx8m/redwood_8mm/camera_config_imx8mm.json
+new file mode 100644
+index 00000000..ffc5857e
+--- /dev/null
++++ b/imx8m/redwood_8mm/camera_config_imx8mm.json
+@@ -0,0 +1,37 @@
++{
++  "__readme": [
++    "Basic Camera HAL v3 configuration."
++  ],
++
++  "hal_version": "3",
++  "cam_blit_copy": "GPU_2D",
++  "cam_blit_csc": "GPU_2D",
++
++  "camera_metadata": [
++    {
++      "camera_type": "back",
++      "camera_name": "mx6s-csi",
++      "bus_info": "platform:32e20000.csi1_bridge",
++      "orientation": "0",
++      "buffer_type": "mmap",
++      "ActiveArrayWidth": "2592",
++      "ActiveArrayHeight": "1944",
++      "PixelArrayWidth": "2592",
++      "PixelArrayHeight": "1944",
++      "PhysicalWidth": "3.6288",
++      "PhysicalHeight": "2.7216",
++      "FocalLength": "3.37",
++      "MaxJpegSize": "8388608",
++      "MinFrameDuration": "33333333",
++      "MaxFrameDuration": "300000000",
++      "MinFrameDurationBlob5M": "600000000",
++      "OmitFrame": [
++          {
++              "width": "2592",
++              "height": "1944",
++              "omit_num": "2"
++          }
++      ]
++    }
++  ]
++}
+diff --git a/imx8m/redwood_8mm/compatibility_matrix.xml b/imx8m/redwood_8mm/compatibility_matrix.xml
+deleted file mode 120000
+index 583efad7..00000000
+--- a/imx8m/redwood_8mm/compatibility_matrix.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/compatibility_matrix.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/compatibility_matrix.xml b/imx8m/redwood_8mm/compatibility_matrix.xml
+new file mode 100644
+index 00000000..67ab2209
+--- /dev/null
++++ b/imx8m/redwood_8mm/compatibility_matrix.xml
+@@ -0,0 +1,62 @@
++<compatibility-matrix version="1.0" type="device">
++    <hal format="hidl" optional="false">
++        <name>android.frameworks.schedulerservice</name>
++        <version>1.0</version>
++        <interface>
++            <name>ISchedulingPolicyService</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.frameworks.sensorservice</name>
++        <version>1.0</version>
++        <interface>
++            <name>ISensorManager</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.hidl.allocator</name>
++        <version>1.0</version>
++        <interface>
++            <name>IAllocator</name>
++            <instance>ashmem</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.hidl.manager</name>
++        <version>1.0</version>
++        <interface>
++            <name>IServiceManager</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.hidl.memory</name>
++        <version>1.0</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>ashmem</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.hidl.token</name>
++        <version>1.0</version>
++        <interface>
++            <name>ITokenManager</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl" optional="false">
++        <name>android.system.wifi.keystore</name>
++        <version>1.0</version>
++        <interface>
++            <name>IKeystore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="native" optional="false">
++        <name>netutils-wrapper</name>
++        <version>1.0</version>
++    </hal>
++</compatibility-matrix>
+diff --git a/imx8m/redwood_8mm/device_framework_matrix.xml b/imx8m/redwood_8mm/device_framework_matrix.xml
+deleted file mode 120000
+index e54a3908..00000000
+--- a/imx8m/redwood_8mm/device_framework_matrix.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/device_framework_matrix.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/device_framework_matrix.xml b/imx8m/redwood_8mm/device_framework_matrix.xml
+new file mode 100644
+index 00000000..c8b5825c
+--- /dev/null
++++ b/imx8m/redwood_8mm/device_framework_matrix.xml
+@@ -0,0 +1,10 @@
++<compatibility-matrix version="1.0" type="framework">
++    <hal format="hidl" optional="true">
++        <name>nxp.hardware.display</name>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++</compatibility-matrix>
+diff --git a/imx8m/redwood_8mm/early.init.cfg b/imx8m/redwood_8mm/early.init.cfg
+deleted file mode 120000
+index 2c5fa398..00000000
+--- a/imx8m/redwood_8mm/early.init.cfg
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/early.init.cfg
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/early.init.cfg b/imx8m/redwood_8mm/early.init.cfg
+new file mode 100644
+index 00000000..9dd16032
+--- /dev/null
++++ b/imx8m/redwood_8mm/early.init.cfg
+@@ -0,0 +1,2 @@
++# support insmod xx.ko; setprop xx xx; modeprobe
++modprobe
+diff --git a/imx8m/redwood_8mm/external_camera_config.xml b/imx8m/redwood_8mm/external_camera_config.xml
+deleted file mode 120000
+index d7ec4f3f..00000000
+--- a/imx8m/redwood_8mm/external_camera_config.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/external_camera_config.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/external_camera_config.xml b/imx8m/redwood_8mm/external_camera_config.xml
+new file mode 100644
+index 00000000..81fe3e88
+--- /dev/null
++++ b/imx8m/redwood_8mm/external_camera_config.xml
+@@ -0,0 +1,31 @@
++<ExternalCamera>
++    <Provider>
++        <ignore>
++            <!-- Internal video devices to be ignored by external camera HAL -->
++            <!-- No leading/trailing spaces -->
++            <!-- <id>0</id>  -->
++        </ignore>
++    </Provider>
++    <!-- See ExternalCameraUtils.cpp for default values of Device configurations below -->
++    <Device>
++        <!-- Max JPEG buffer size in bytes-->
++        <MaxJpegBufferSize bytes="3145728"/>
++        <!-- Size of v4l2 buffer queue when streaming >= 30fps -->
++        <!-- Larger value: more request can be cached pipeline (less janky)  -->
++        <!-- Smaller value: use less memory -->
++        <NumVideoBuffers count="4"/>
++        <!-- Size of v4l2 buffer queue when streaming < 30fps -->
++        <NumStillBuffers count="2"/>
++
++        <!-- List of maximum fps for various output sizes -->
++        <!-- Any image size smaller than the size listed in Limit row will report
++            fps (as minimum frame duration) up to the fpsBound value. -->
++        <FpsList>
++            <!-- width/height must be increasing, fpsBound must be decreasing-->
++            <Limit width="640" height="480" fpsBound="60.0"/>
++            <Limit width="1280" height="720" fpsBound="30.0"/>
++            <Limit width="1920" height="1080" fpsBound="30.0"/>
++            <!-- image size larger than the last entry will not be supported-->
++        </FpsList>
++    </Device>
++</ExternalCamera>
+diff --git a/imx8m/redwood_8mm/fstab.nxp b/imx8m/redwood_8mm/fstab.nxp
+deleted file mode 120000
+index c6c2b5ff..00000000
+--- a/imx8m/redwood_8mm/fstab.nxp
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/fstab.nxp
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/fstab.nxp b/imx8m/redwood_8mm/fstab.nxp
+new file mode 100644
+index 00000000..049b689a
+--- /dev/null
++++ b/imx8m/redwood_8mm/fstab.nxp
+@@ -0,0 +1,11 @@
++# Android fstab file.
++#<src>                                                  <mnt_point>         <type>    <mnt_flags and options>                       <fs_mgr_flags>
++# The filesystem that contains the filesystem checker binary (typically /system) cannot
++# specify MF_CHECK, and must come before any filesystems that do specify MF_CHECK
++
++/devices/platform/soc@0/32c00000.bus/32e40000.usb/* auto auto defaults voldmanaged=usb:auto
++/dev/block/by-name/userdata    /data        ext4    nosuid,nodev,nodiratime,noatime,noauto_da_alloc,errors=panic    latemount,wait,formattable,quota,fileencryption=aes-256-xts:aes-256-cts:v2,keydirectory=/metadata/vold/metadata_encryption,reservedsize=128M,checkpoint=block
++/dev/block/by-name/metadata    /metadata    ext4    noatime,nosuid,nodev,discard,sync                                                wait,formattable,first_stage_mount,check
++/dev/block/by-name/misc        /misc        emmc    defaults                                                                         defaults
++/dev/block/zram0 none swap defaults zramsize=629145600
++
+diff --git a/imx8m/redwood_8mm/init.imx8mm.ddr4.rc b/imx8m/redwood_8mm/init.imx8mm.ddr4.rc
+deleted file mode 120000
+index ca2f0126..00000000
+--- a/imx8m/redwood_8mm/init.imx8mm.ddr4.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.imx8mm.ddr4.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.imx8mm.ddr4.rc b/imx8m/redwood_8mm/init.imx8mm.ddr4.rc
+new file mode 100644
+index 00000000..de486360
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.imx8mm.ddr4.rc
+@@ -0,0 +1,7 @@
++on early-boot
++    # Wifi firmware reload path
++    chown wifi wifi /sys/module/brcmfmac/parameters/alternative_fw_path
++
++    # Prepare for wifi
++    setprop wifi.interface wlan0
++    setprop wifi.direct.interface p2p-dev-wlan0
+diff --git a/imx8m/redwood_8mm/init.imx8mm.drm.rc b/imx8m/redwood_8mm/init.imx8mm.drm.rc
+deleted file mode 120000
+index e672f89c..00000000
+--- a/imx8m/redwood_8mm/init.imx8mm.drm.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.imx8mm.drm.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.imx8mm.drm.rc b/imx8m/redwood_8mm/init.imx8mm.drm.rc
+new file mode 100644
+index 00000000..46710838
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.imx8mm.drm.rc
+@@ -0,0 +1,19 @@
++import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.main.rc
++
++on property:init.svc.mediadrm=running
++    mkdir /data/vendor/mediadrm 0770 media mediadrm
++
++on post-fs-data
++    # create for OP-TEE test
++    mkdir /data/vendor/tee 0660 media media
++    mkdir /data/vendor/tee/optee_armtz 0660 media media
++    restorecon_recursive /data/vendor/tee
++
++
++on boot
++    # optee device
++    chmod 0660 /dev/tee0
++    chown media media /dev/tee0
++
++    chmod 0660 /dev/teepriv0
++    chown media media /dev/teepriv0
+diff --git a/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc b/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc
+deleted file mode 120000
+index b47d2e62..00000000
+--- a/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.imx8mm.lpddr4.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc b/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc
+new file mode 100644
+index 00000000..5e095e66
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.imx8mm.lpddr4.rc
+@@ -0,0 +1,5 @@
++on early-boot
++    # Prepare for wifi
++    setprop wifi.interface wlan0
++    setprop wifi.direct.interface p2p0
++    setprop wifi.concurrent.interface wlan1
+diff --git a/imx8m/redwood_8mm/init.imx8mm.rc b/imx8m/redwood_8mm/init.imx8mm.rc
+deleted file mode 120000
+index 57374821..00000000
+--- a/imx8m/redwood_8mm/init.imx8mm.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.imx8mm.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.imx8mm.rc b/imx8m/redwood_8mm/init.imx8mm.rc
+new file mode 100755
+index 00000000..3d0b476a
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.imx8mm.rc
+@@ -0,0 +1,47 @@
++on early-boot
++
++    # Set OpenGLES version
++    setprop ro.opengles.version 131072
++
++    # Set GPU 3D minimum clock to 3/64
++    write /sys/bus/platform/drivers/galcore/gpu3DMinClock 3
++
++    # change for FSL specific service
++    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
++    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
++    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
++    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
++    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
++    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
++    chown root system /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
++    chmod 0440 /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
++    chown root system /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
++    chown root system /sys/devices/system/cpu/cpu2/online
++    chmod 0664 /sys/devices/system/cpu/cpu2/online
++    chown root system /sys/devices/system/cpu/cpu3/online
++    chmod 0664 /sys/devices/system/cpu/cpu3/online
++
++on property:sys.boot_completed=1
++    # Set default CPU frequency governor
++    # configure governor settings for little cluster
++    write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "schedutil"
++    # The rate-limit tunable in the schedutil governor applies to transitions to both lower and higher frequencies
++    # Set up and down limit to 200us/200us
++    write /sys/devices/system/cpu/cpufreq/schedutil/rate_limit_us 200
++    write /proc/sys/kernel/sched_util_clamp_min_rt_default 512
++
++on property:sys.boot_completed=1
++    # update cpuset now that processors are up
++    write /dev/cpuset/foreground/cpus 0-3
++
++    # top-app gets all cpus
++    write /dev/cpuset/top-app/cpus 0-3
++
++    #background contains a small subset (generally one little core)
++    write /dev/cpuset/background/cpus 0
++
++    # add system-background cpuset, a new cpuset for system services
++    # that should not run on larger cores
++    # system-background is for system tasks that should only run on
++    # little cores, not on bigs to be used only by init
++    write /dev/cpuset/system-background/cpus 0-2
+diff --git a/imx8m/redwood_8mm/init.rc b/imx8m/redwood_8mm/init.rc
+deleted file mode 120000
+index 2f6ba267..00000000
+--- a/imx8m/redwood_8mm/init.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.rc b/imx8m/redwood_8mm/init.rc
+new file mode 100644
+index 00000000..89374597
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.rc
+@@ -0,0 +1,246 @@
++import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
++import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /vendor/etc/init/hw/init.${ro.hardware}.additional.rc
++
++service vendor.charger /system/bin/charger
++    class charger
++    user system
++    group system wakelock input
++    capabilities SYS_BOOT
++    file /dev/kmsg w
++    file /sys/fs/pstore/console-ramoops-0 r
++    file /sys/fs/pstore/console-ramoops r
++    file /proc/last_kmsg r
++
++on charger
++    start vendor.charger
++
++on early-init
++    # mount the debugfs
++    mount debugfs none /sys/kernel/debug/ mode=0755
++
++on early-init
++    start early_init_sh
++    # Set the host name which used in console
++    export HOSTNAME evk_8mm
++
++    # Due keymaster start very early so set prop here
++    # Also gatekeeper share same role for keymaster
++    setprop ro.hardware.keystore ${ro.boot.keystore}
++    setprop ro.hardware.gatekeeper ${ro.boot.keystore}
++    setprop vendor.storageproxyd ${ro.boot.keystore}
++
++    # Use ro.boot.lcd_density to override ro.sf.lcd_density
++    setprop ro.sf.lcd_density ${ro.boot.lcd_density}
++
++# Skip charger_not_need trigger for charger mode
++on early-init && property:ro.boot.mode=charger
++    setprop vendor.skip.charger_not_need 1
++
++on init && property:vendor.skip.charger_not_need=0
++    start watchdogd
++
++    # disable cursor blink for fbcon, if no splash screen support
++    write /sys/class/graphics/fbcon/cursor_blink 0
++
++    # deattch the fbcon as hdmi hotplug conflict with fbcon
++    write /sys/class/vtconsole/vtcon1/bind 0
++
++    chown system system /dev/cpuctl/top-app/cpu.uclamp.min
++    chmod 664 /dev/cpuctl/top-app/cpu.uclamp.min
++    chown system system /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive
++    chmod 664 /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive
++    chown system system /dev/cpuctl/foreground/cpu.uclamp.min
++    chmod 664 /dev/cpuctl/foreground/cpu.uclamp.min
++    chown system system /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive
++    chmod 664 /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive
++    chown system system /dev/cpuctl/rt/cpu.uclamp.min
++    chmod 664 /dev/cpuctl/rt/cpu.uclamp.min
++    chown system system /dev/cpuctl/rt/cpu.uclamp.latency_sensitive
++    chmod 664 /dev/cpuctl/rt/cpu.uclamp.latency_sensitive
++    chown system system /dev/cpuctl/background/cpu.uclamp.max
++    chmod 664 /dev/cpuctl/background/cpu.uclamp.max
++
++    # set default uclamp value for foreground/top-app/rt/background (only affects EAS)
++    write /dev/cpuctl/foreground/cpu.uclamp.min 20
++    write /dev/cpuctl/foreground/cpu.uclamp.latency_sensitive 1
++    write /dev/cpuctl/top-app/cpu.uclamp.min 50
++    write /dev/cpuctl/top-app/cpu.uclamp.latency_sensitive 1
++    write /dev/cpuctl/rt/cpu.uclamp.min 60
++    write /dev/cpuctl/rt/cpu.uclamp.latency_sensitive 1
++    write /dev/cpuctl/background/cpu.uclamp.max 50
++
++on late-fs && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start storageproxyd
++    start vendor.oemlock-1-0
++    start confirmationui-1-0
++
++on late-fs && property:vendor.skip.charger_not_need=0
++    # Start keymaster/gatekeeper service
++    start vendor.gatekeeper-1-0-${ro.boot.keystore}
++    start vendor.keymint-${ro.boot.keystore}
++    setprop vendor.powerhal.init 1
++
++    # Wait for keymaster
++    exec_start wait_for_keymaster
++
++    mount_all /vendor/etc/fstab.nxp --late
++
++on early-boot && property:vendor.skip.charger_not_need=0
++    # For evk_8mm, when swap used about 400M, upgrade the level.
++    setprop ro.lmk.upgrade_pressure 80
++    setprop ro.lmk.downgrade_pressure 95
++    setprop ro.lmk.critical_upgrade true
++
++    setprop vendor.hwc.stretch.filter  1
++
++    # Default g2d [dpu|pxp|viv] lib to be used
++    setprop vendor.imx.default-g2d viv
++
++    # fsl omx graphic manager media framework property
++    setprop vendor.rw.VIDEO_RENDER_NAME video_render.surface
++    setprop vendor.media.fsl_codec.flag 7
++
++    setprop camera.disable_zsl_mode 1
++
++   # Tweak the mmc device read ahead buffer size
++    write /sys/block/mmcblk1/queue/read_ahead_kb 2048
++    write /sys/block/mmcblk2/queue/read_ahead_kb 2048
++
++    # Set tracefs permission to 755
++    chmod 0755 /sys/kernel/debug/tracing
++
++    # Set sw_sync group to graphics and set permission to 664
++    chown root graphics /sys/kernel/debug/sync/sw_sync
++    chmod 0664 /sys/kernel/debug/sync/sw_sync
++
++    # Default backlight device
++    setprop vendor.hw.backlight.dev "32e10000.mipi_dsi.0"
++    # Chmod/chown FSL specific sys entry
++    chown system system /sys/class/backlight/32e10000.mipi_dsi.0/brightness
++    chmod 0660 /sys/class/backlight/32e10000.mipi_dsi.0/brightness
++
++    # Set light sensor sysfs path and light sensor threshold lux value
++    setprop ro.hardware.lightsensor "/sys/class/i2c-dev/i2c-0/device/0-0044/"
++    setprop vendor.ro.lightsensor.threshold  20
++
++    # Allow DSD file(duration larger than 10s) can play
++    setprop audio.offload.min.duration.secs 10
++
++    # Enlarge limition of audio buffer allocation
++    setprop ro.af.client_heap_size_kbyte 32768
++
++    start vendor.wifi_hal_legacy
++
++
++service wpa_supplicant /vendor/bin/hw/wpa_supplicant \
++    -O/data/vendor/wifi/wpa/sockets -puse_p2p_group_interface=1 \
++    -g@android:wpa_wlan0
++    interface android.hardware.wifi.supplicant@1.0::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.1::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.2::ISupplicant default
++    interface android.hardware.wifi.supplicant@1.3::ISupplicant default
++    class main
++    socket wpa_wlan0 dgram 660 wifi wifi
++    disabled
++    oneshot
++
++service sensor_fusion /vendor/bin/fsl_sensor_fusion
++    class late_start
++    seclabel u:r:sensors:s0
++    user system
++    group system uhid
++    oneshot
++
++# Set watchdog timer to 30 seconds and pet it every 10 seconds to get a 20 second margin
++service watchdogd /system/bin/watchdogd 10 20
++    class core
++    seclabel u:r:watchdogd:s0
++
++# bugreport is triggered by holding down volume down, volume up and power
++service bugreport /system/bin/dumpstate -d -p -z
++    class main
++    disabled
++    oneshot
++    keycodes 114 115 116
++
++service vsidaemon /vendor/bin/vsidaemon
++    class main
++    user root
++
++on boot && property:vendor.skip.charger_not_need=0
++    start audioserver
++    start mediadrm
++    start media
++    start drm
++
++on fs && property:vendor.skip.charger_not_need=0
++# mount ext4 partitions
++    mount_all /vendor/etc/fstab.nxp --early
++
++    # Adjust parameters for dm-verity device
++    write /sys/block/dm-0/queue/read_ahead_kb 4096
++
++    # Update dm-verity state and set partition.*.verified properties
++    verity_update_state
++
++on post-fs && property:vendor.skip.charger_not_need=0
++    # Set netd memlock rlimit to 8MB
++    setrlimit 8 8388608 8388608
++
++    # Turn on swap
++    swapon_all /vendor/etc/fstab.nxp
++
++    # Swap in only 1 page at a time
++    write /proc/sys/vm/page-cluster 0
++
++    # Grant permission for fetching available_pages info of statsd
++    chown system system /proc/pagetypeinfo
++    chmod 0440 /proc/pagetypeinfo
++
++on post-fs-data && property:vendor.skip.charger_not_need=0
++    setprop vold.post_fs_data_done 1
++
++on zygote-start && property:vendor.skip.charger_not_need=0
++    # Create the directories used by the Wireless subsystem
++    mkdir /data/vendor/wifi 0771 wifi wifi
++    mkdir /data/vendor/wifi/wifi_dumps 0770 wifi wifi
++    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
++    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
++
++service early_init_sh /vendor/bin/init.insmod.sh /vendor/etc/early.init.cfg vendor.all.early_init.ready
++    class main
++    user root
++    group root system
++    disabled
++    oneshot
++
++on post-fs-data && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    # create temp node for secure storage proxy
++    mkdir /data/vendor/ss 0700 system system
++    restart storageproxyd
++
++service storageproxyd /vendor/bin/storageproxyd -p /data/vendor/ss -r /dev/mmcblk2rpmb -d /dev/trusty-ipc-dev0
++   group system
++
++on property:ro.boot.vendor.sysrq=1 && property:vendor.skip.charger_not_need=0
++    write /proc/sys/kernel/sysrq 1
++
++# setenv append_bootargs androidboot.usb.debugging=1
++on property:ro.boot.usb.debugging=1
++    setprop persist.sys.usb.config adb
++
++# setenv append_bootargs androidboot.lpa.enable=1
++on property:ro.boot.lpa.enable=1
++    setprop vendor.audio.lpa.hold_second 20
++    setprop vendor.audio.lpa.period_ms 500
++    setprop vendor.audio.lpa.enable 1
++
++service confirmationui_ta_load /vendor/bin/trusty_apploader /vendor/firmware/tee/confirmationui.app
++    user root
++    group root system
++    disabled
++    oneshot
++
++on property:sys.boot_completed=1 && property:vendor.storageproxyd=trusty && property:vendor.skip.charger_not_need=0
++    start confirmationui_ta_load
+diff --git a/imx8m/redwood_8mm/init.recovery.nxp.rc b/imx8m/redwood_8mm/init.recovery.nxp.rc
+deleted file mode 120000
+index 36a105c3..00000000
+--- a/imx8m/redwood_8mm/init.recovery.nxp.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.recovery.nxp.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.recovery.nxp.rc b/imx8m/redwood_8mm/init.recovery.nxp.rc
+new file mode 100644
+index 00000000..9a595c06
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.recovery.nxp.rc
+@@ -0,0 +1,8 @@
++on init
++    # disable cursor blink for fbcon, if no splash screen support
++    write /sys/class/graphics/fbcon/cursor_blink 0
++
++    setprop sys.usb.configfs 1
++
++on post-fs-data
++    setprop sys.usb.controller "ci_hdrc.0"
+diff --git a/imx8m/redwood_8mm/init.usb.rc b/imx8m/redwood_8mm/init.usb.rc
+deleted file mode 120000
+index 989940e0..00000000
+--- a/imx8m/redwood_8mm/init.usb.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/init.usb.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/init.usb.rc b/imx8m/redwood_8mm/init.usb.rc
+new file mode 100644
+index 00000000..f65b8c81
+--- /dev/null
++++ b/imx8m/redwood_8mm/init.usb.rc
+@@ -0,0 +1,55 @@
++#
++# Copyright (C) 2016 The Android Open-Source Project
++# Copyright 2018 NXP
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++#      http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++
++on early-boot
++    mount configfs none /config
++    mkdir /config/usb_gadget/g1 0770
++    mkdir /config/usb_gadget/g1/strings/0x409 0770
++    write /config/usb_gadget/g1/bcdUSB 0x0200
++    write /config/usb_gadget/g1/idVendor 0x18d1
++    write /config/usb_gadget/g1/bcdDevice 0x0440
++    write /config/usb_gadget/g1/strings/0x409/serialnumber ${ro.serialno}
++    write /config/usb_gadget/g1/strings/0x409/manufacturer ${ro.product.manufacturer}
++    write /config/usb_gadget/g1/strings/0x409/product ${ro.product.model}
++    mkdir /config/usb_gadget/g1/functions/mass_storage.0
++    mkdir /config/usb_gadget/g1/functions/accessory.gs2
++    mkdir /config/usb_gadget/g1/functions/audio_source.gs3
++    mkdir /config/usb_gadget/g1/functions/rndis.gs4
++    mkdir /config/usb_gadget/g1/functions/midi.gs5
++    mkdir /config/usb_gadget/g1/functions/ffs.adb
++    mkdir /config/usb_gadget/g1/functions/ffs.mtp
++    mkdir /config/usb_gadget/g1/functions/ffs.ptp
++    mkdir /config/usb_gadget/g1/configs/b.1 0770
++    mkdir /config/usb_gadget/g1/configs/b.1/strings/0x409 0770
++    write /config/usb_gadget/g1/os_desc/b_vendor_code 0x1
++    write /config/usb_gadget/g1/os_desc/qw_sign "MSFT100"
++    mkdir /dev/usb-ffs 0775 shell shell
++    mkdir /dev/usb-ffs/adb 0770 shell shell
++    mount functionfs adb /dev/usb-ffs/adb rmode=0770,fmode=0660,uid=2000,gid=2000
++    mkdir /dev/usb-ffs/mtp 0770 mtp mtp
++    mkdir /dev/usb-ffs/ptp 0770 mtp mtp
++    mount functionfs mtp /dev/usb-ffs/mtp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
++    mount functionfs ptp /dev/usb-ffs/ptp rmode=0770,fmode=0660,uid=1024,gid=1024,no_disconnect=1
++    setprop sys.usb.mtp.device_type 3
++    setprop vendor.usb.config "ci_hdrc.0"
++    write /sys/module/libcomposite/parameters/disable_l1_for_hs "y"
++    symlink /config/usb_gadget/g1/configs/b.1 /config/usb_gadget/g1/os_desc/b.1
++
++on boot
++    setprop sys.usb.configfs 2
++
++on post-fs-data && property:vendor.gki.enable=true
++    setprop sys.usb.controller "ci_hdrc.0"
+diff --git a/imx8m/redwood_8mm/manifest.xml b/imx8m/redwood_8mm/manifest.xml
+deleted file mode 120000
+index 161c2b2f..00000000
+--- a/imx8m/redwood_8mm/manifest.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/manifest.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/manifest.xml b/imx8m/redwood_8mm/manifest.xml
+new file mode 100644
+index 00000000..bcb87ee9
+--- /dev/null
++++ b/imx8m/redwood_8mm/manifest.xml
+@@ -0,0 +1,147 @@
++<manifest version="1.0" type="device" target-level="5">
++    <kernel  target-level="6" />
++    <hal format="hidl">
++	<name>android.hardware.graphics.allocator</name>
++        <transport>hwbinder</transport>
++	<impl level="generic"></impl>
++	<version>4.0</version>
++	<interface>
++	    <name>IAllocator</name>
++	    <instance>default</instance>
++	</interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.composer</name>
++        <transport>hwbinder</transport>
++        <version>2.4</version>
++        <interface>
++            <name>IComposer</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.gatekeeper</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IGatekeeper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.graphics.mapper</name>
++        <transport arch="32+64">passthrough</transport>
++        <impl level="generic"></impl>
++        <version>4.0</version>
++        <interface>
++            <name>IMapper</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.renderscript</name>
++        <transport arch="32+64">passthrough</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.c2</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IComponentStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.media.omx</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IOmx</name>
++            <instance>default</instance>
++        </interface>
++        <interface>
++            <name>IOmxStore</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.memtrack</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IMemtrack</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio</name>
++        <transport>hwbinder</transport>
++        <version>7.0</version>
++        <interface>
++            <name>IDevicesFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.audio.effect</name>
++        <transport>hwbinder</transport>
++        <version>7.0</version>
++        <interface>
++            <name>IEffectsFactory</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.bluetooth</name>
++        <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IBluetoothHci</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>android.hardware.dumpstate</name>
++        <transport>hwbinder</transport>
++        <version>1.1</version>
++        <interface>
++            <name>IDumpstateDevice</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++        <name>nxp.hardware.display</name>
++            <transport>hwbinder</transport>
++        <version>1.0</version>
++        <interface>
++            <name>IDisplay</name>
++            <instance>default</instance>
++        </interface>
++    </hal>
++    <hal format="hidl">
++       <name>android.hardware.camera.provider</name>
++       <transport>hwbinder</transport>
++       <fqname>@2.4::ICameraProvider/external/0</fqname>
++    </hal>
++    <hal format="aidl">
++       <name>android.hardware.security.keymint</name>
++       <fqname>IKeyMintDevice/default</fqname>
++    </hal>
++    <hal format="aidl">
++       <name>android.hardware.security.keymint</name>
++       <fqname>IRemotelyProvisionedComponent/default</fqname>
++    </hal>
++    <hal format="aidl">
++       <name>android.hardware.security.secureclock</name>
++       <fqname>ISecureClock/default</fqname>
++    </hal>
++    <hal format="aidl">
++       <name>android.hardware.security.sharedsecret</name>
++       <fqname>ISharedSecret/default</fqname>
++    </hal>
++</manifest>
+diff --git a/imx8m/redwood_8mm/overlay b/imx8m/redwood_8mm/overlay
+deleted file mode 120000
+index d3aef1bb..00000000
+--- a/imx8m/redwood_8mm/overlay
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/overlay
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-nodpi/default_wallpaper.png b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-nodpi/default_wallpaper.png
+new file mode 100644
+index 00000000..9c41bcba
+Binary files /dev/null and b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-nodpi/default_wallpaper.png differ
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw600dp-nodpi/default_wallpaper.png b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw600dp-nodpi/default_wallpaper.png
+new file mode 100644
+index 00000000..9c41bcba
+Binary files /dev/null and b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw600dp-nodpi/default_wallpaper.png differ
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw720dp-nodpi/default_wallpaper.png b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw720dp-nodpi/default_wallpaper.png
+new file mode 100644
+index 00000000..9c41bcba
+Binary files /dev/null and b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/drawable-sw720dp-nodpi/default_wallpaper.png differ
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml
+new file mode 100644
+index 00000000..e8ae7457
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/values/config.xml
+@@ -0,0 +1,196 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++/*
++** Copyright 2011, The Android Open Source Project
++**
++** Licensed under the Apache License, Version 2.0 (the "License");
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++
++<!-- These resources are around just to allow their values to be customized
++     for different hardware and product builds. -->
++<resources>
++
++    <!--For Android we support eth0 now -->
++    <string translatable="false" name="config_ethernet_iface_regex">eth0</string>
++
++    <!-- List of regexpressions describing the interface (if any) that represent tetherable
++         USB interfaces.  If the device doesn't want to support tething over USB this should
++         be empty.  An example would be "usb.*" -->
++     <string-array translatable="false" name="config_tether_usb_regexs">
++       <item>usb0</item>
++     </string-array>
++
++    <!-- List of regexpressions describing the interface (if any) that represent tetherable
++         Wifi interfaces.  If the device doesn't want to support tethering over Wifi this
++         should be empty.  An example would be "softap.*" -->
++    <string-array translatable="false" name="config_tether_wifi_regexs">
++      <item>"wlan0"</item>
++    </string-array>
++
++    <!-- List of regexpressions describing the interface (if any) that represent tetherable
++         bluetooth interfaces.  If the device doesn't want to support tethering over bluetooth this
++         should be empty. -->
++    <string-array translatable="false" name="config_tether_bluetooth_regexs">
++        <item>"bt-pan"</item>
++        </string-array>
++
++    <!-- Array of ConnectivityManager.TYPE_xxxx values allowable for tethering -->
++    <!-- Common options are [1, 4] for TYPE_WIFI and TYPE_MOBILE_DUN or
++    <!== [0,1,5,7,9] for TYPE_MOBILE, TYPE_WIFI, TYPE_MOBILE_HIPRI, TYPE_BLUETOOTH and TYPE_ETHERNET -->
++    <integer-array translatable="false" name="config_tether_upstream_types">
++        <item>0</item>
++        <item>1</item>
++        <item>5</item>
++        <item>9</item>
++    </integer-array>
++
++    <!-- Flag indicating whether we should enable the automatic brightness in Settings.
++         config_hardware_automatic_brightness_available is not set, so we will use software implementation -->
++    <bool name="config_automatic_brightness_available">true</bool>
++
++    <!-- An Array of "[ConnectivityManager connectionType],
++                      [# simultaneous connection types]"  -->
++    <string-array translatable="false" name="radioAttributes">
++        <item>"1,1"</item>
++        <item>"9,1"</item>
++    </string-array>
++
++    <!-- An Array of "[Connection name],[ConnectivityManager.TYPE_xxxx],
++         [associated radio-type],[priority],[restoral-timer(ms)],[dependencyMet]  -->
++    <!-- the 5th element "resore-time" indicates the number of milliseconds to delay
++         before automatically restore the default connection.  Set -1 if the connection
++         does not require auto-restore. -->
++    <!-- the 6th element indicates boot-time dependency-met value. -->
++    <string-array translatable="false" name="networkAttributes">
++        <item>"wifi,1,1,1,-1,true"</item>
++        <item>"bluetooth,7,7,2,-1,true"</item>
++        <item>"ethernet,9,9,2,-1,true"</item>
++    </string-array>
++
++    <!-- Array of light sensor LUX values to define our levels for auto backlight brightness support.
++         The N entries of this array define N + 1 zones as follows:
++
++         Zone 0:        0 <= LUX < array[0]
++         Zone 1:        array[0] <= LUX < array[1]
++         ...
++         Zone N:        array[N - 1] <= LUX < array[N]
++         Zone N + 1:    array[N] <= LUX < infinity
++
++         Must be overridden in platform specific overlays -->
++    <integer-array name="config_autoBrightnessLevels">
++        <item>5</item>
++        <item>15</item>
++        <item>50</item>
++        <item>100</item>
++        <item>200</item>
++        <item>400</item>
++        <item>1000</item>
++        <item>2000</item>
++        <item>3000</item>
++        <item>5000</item>
++        <item>10000</item>
++        <item>30000</item>
++    </integer-array>
++
++    <!-- Array of output values for LCD backlight corresponding to the LUX values
++         in the config_autoBrightnessLevels array.  This array should have size one greater
++         than the size of the config_autoBrightnessLevels array.
++         This must be overridden in platform specific overlays -->
++    <integer-array name="config_autoBrightnessLcdBacklightValues">
++        <item>5</item>    <!-- 0-5 -->
++        <item>20</item>   <!-- 5-15 -->
++        <item>30</item>   <!-- 15-50 -->
++        <item>40</item>   <!-- 50-100 -->
++        <item>50</item>   <!-- 100-200 -->
++        <item>60</item>   <!-- 200-400 -->
++        <item>70</item>   <!-- 400-1000 -->
++        <item>80</item>   <!-- 1000-2000 -->
++        <item>130</item>  <!-- 2000-3000 -->
++        <item>180</item>  <!-- 3000-5000 -->
++        <item>255</item>  <!-- 5000-10000 -->
++        <item>255</item>  <!-- 10000-30000 -->
++        <item>255</item>  <!-- 30000+ -->
++    </integer-array>
++
++    <!-- Array of output values for button backlight corresponding to the LUX values
++         in the config_autoBrightnessLevels array.  This array should have size one greater
++         than the size of the config_autoBrightnessLevels array.
++         This must be overridden in platform specific overlays -->
++    <integer-array name="config_autoBrightnessButtonBacklightValues">
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++    </integer-array>
++
++    <!-- Array of output values for keyboard backlight corresponding to the LUX values
++         in the config_autoBrightnessLevels array.  This array should have size one greater
++         than the size of the config_autoBrightnessLevels array.
++         This must be overridden in platform specific overlays -->
++    <integer-array name="config_autoBrightnessKeyboardBacklightValues">
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++        <item>0</item>
++    </integer-array>
++
++    <integer name="config_screenBrightnessDim">5</integer>
++
++    <!--  Maximum number of supported users -->
++    <integer name="config_multiuserMaximumUsers">8</integer>
++    <!--  Whether Multiuser UI should be shown -->
++    <bool name="config_enableMultiUserUI">true</bool>
++
++    <!-- Whether a software navigation bar should be shown. NOTE: in the future this may be
++         autodetected from the Configuration. -->
++    <bool name="config_showNavigationBar">true</bool>
++
++    <!-- This device is not "voice capable"; it's data-only. -->
++    <bool name="config_voice_capable">false</bool>
++
++    <!-- Flag indicating whether the current device allows data.
++        If true, this means that the device supports data connectivity through
++        the telephony network.
++        This can be overridden to false for devices that support voice and/or sms . -->
++    <bool name="config_mobile_data_capable">false</bool>
++
++    <!-- Boolean indicating whether system support sustained performance mode. -->
++    <bool name="config_sustainedPerformanceModeSupported">true</bool>
++</resources>
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/xml/power_profile.xml b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/xml/power_profile.xml
+new file mode 100644
+index 00000000..2104fe62
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/core/res/res/xml/power_profile.xml
+@@ -0,0 +1,27 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++**
++** Copyright 2009, The Android Open Source Project
++*  Copyright (C) 2016 Freescale Semiconductor, Inc.
++**
++** Licensed under the Apache License, Version 2.0 (the "License")
++** you may not use this file except in compliance with the License.
++** You may obtain a copy of the License at
++**
++**     http://www.apache.org/licenses/LICENSE-2.0
++**
++** Unless required by applicable law or agreed to in writing, software
++** distributed under the License is distributed on an "AS IS" BASIS,
++** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++** See the License for the specific language governing permissions and
++** limitations under the License.
++*/
++-->
++
++<device name="Android">
++  <array name="cpu.active">
++      <value>0.1</value>
++  </array>
++  <!-- This is the battery capacity in mAh -->
++  <item name="battery.capacity">4800</item>
++</device>
+diff --git a/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+new file mode 100644
+index 00000000..660abbe5
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml
+@@ -0,0 +1,24 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++/**
++ * Copyright (c) 2009, The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *     http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++-->
++<resources>
++    <!-- Default for Settings.Secure.USER_SETUP_COMPLETE -->
++    <bool name="def_user_setup_complete">true</bool>
++    <bool name="def_bluetooth_on">false</bool>
++    <bool name="def_stay_on_while_plugged_in">true</bool>
++</resources>
+diff --git a/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/bools.xml b/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/bools.xml
+new file mode 100644
+index 00000000..e9f565d3
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/bools.xml
+@@ -0,0 +1,19 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2009 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++  
++          http://www.apache.org/licenses/LICENSE-2.0
++  
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<resources>
++    <bool name="config_additional_system_update_setting_enable">true</bool>
++</resources>
+diff --git a/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/config.xml b/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/config.xml
+new file mode 100644
+index 00000000..dbf188dc
+--- /dev/null
++++ b/imx8m/redwood_8mm/overlay/packages/apps/Settings/res/values/config.xml
+@@ -0,0 +1,22 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2007 The Android Open Source Project
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
++    <string name="additional_system_update" translatable="false">com.example.android.systemupdatersample</string>
++    <string name="additional_system_update_menu" translatable="false">com.example.android.systemupdatersample.ui.MainActivity</string>
++    <string name="config_work_policy_info_intent_action" translatable="false">com.google.android.settings.privacy.ACTION_SHOW_WORK_POLICY_INFO</string>
++
++</resources>
+diff --git a/imx8m/redwood_8mm/powerhint_imx8mm.json b/imx8m/redwood_8mm/powerhint_imx8mm.json
+deleted file mode 120000
+index bbab9ebc..00000000
+--- a/imx8m/redwood_8mm/powerhint_imx8mm.json
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/powerhint_imx8mm.json
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/powerhint_imx8mm.json b/imx8m/redwood_8mm/powerhint_imx8mm.json
+new file mode 100644
+index 00000000..c788c745
+--- /dev/null
++++ b/imx8m/redwood_8mm/powerhint_imx8mm.json
+@@ -0,0 +1,200 @@
++{
++  "Nodes": [
++    {
++      "Name": "CPULittleClusterMaxFreq",
++      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
++      "Values": [
++        "1800000",
++        "1600000",
++        "1200000"
++      ],
++      "DefaultIndex": 0,
++      "ResetOnInit": true
++    },
++    {
++      "Name": "CPULittleClusterMinFreq",
++      "Path": "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq",
++      "Values": [
++        "1800000",
++        "1600000",
++        "1200000"
++      ],
++      "ResetOnInit": true
++    },
++    {
++      "Name": "TASchedtuneBoost",
++      "Path": "/dev/cpuctl/top-app/cpu.uclamp.min",
++      "Values": [
++        "60",
++        "10"
++      ],
++      "DefaultIndex": 1,
++      "ResetOnInit": true
++    },
++    {
++      "Name": "PMQoSCpuDmaLatency",
++      "Path": "/dev/cpu_dma_latency",
++      "Values": [
++        "0",
++        "3000"
++      ],
++      "DefaultIndex": 1,
++      "HoldFd": true
++    },
++    {
++      "Name": "PowerHALMainState",
++      "Path": "vendor.powerhal.camera",
++      "Values": [
++        "CAMERA_STREAMING_MID",
++        ""
++      ],
++      "Type": "Property"
++    },
++    {
++      "Name": "PowerHALAudioState",
++      "Path": "vendor.powerhal.audio",
++      "Values": [
++        "AUDIO_STREAMING_LOW_LATENCY",
++        ""
++      ],
++      "Type": "Property"
++    },
++    {
++      "Name": "PowerHALRenderingState",
++      "Path": "vendor.powerhal.rendering",
++      "Values": [
++        "EXPENSIVE_RENDERING",
++        ""
++      ],
++      "Type": "Property"
++    }
++  ],
++  "Actions": [
++    {
++      "PowerHint": "SUSTAINED_PERFORMANCE",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "INTERACTION",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 0,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "INTERACTION",
++      "Node": "TASchedtuneBoost",
++      "Duration": 0,
++      "Value": "60"
++    },
++    {
++      "PowerHint": "INTERACTION",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 500,
++      "Value": "0"
++    },
++    {
++      "PowerHint": "LAUNCH",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "LAUNCH",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "LAUNCH",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 5000,
++      "Value": "0"
++    },
++    {
++      "PowerHint": "CAMERA_LAUNCH",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_LAUNCH",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_LAUNCH",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 1000,
++      "Value": "0"
++    },
++    {
++      "PowerHint": "CAMERA_STREAMING_MID",
++      "Node": "PowerHALMainState",
++      "Duration": 0,
++      "Value": "CAMERA_STREAMING_MID"
++    },
++    {
++      "PowerHint": "CAMERA_STREAMING_MID",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "CAMERA_SHOT",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_SHOT",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 5000,
++      "Value": "1800000"
++    },
++    {
++      "PowerHint": "CAMERA_SHOT",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 1000,
++      "Value": "0"
++    },
++    {
++      "PowerHint": "LOW_POWER",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 0,
++      "Value": "1200000"
++    },
++    {
++      "PowerHint": "LOW_POWER",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PowerHALAudioState",
++      "Duration": 0,
++      "Value": "AUDIO_STREAMING_LOW_LATENCY"
++    },
++    {
++      "PowerHint": "AUDIO_STREAMING_LOW_LATENCY",
++      "Node": "PMQoSCpuDmaLatency",
++      "Duration": 0,
++      "Value": "0"
++    },
++    {
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMaxFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    },
++    {
++      "PowerHint": "FIXED_PERFORMANCE",
++      "Node": "CPULittleClusterMinFreq",
++      "Duration": 0,
++      "Value": "1600000"
++    }
++  ]
++}
+diff --git a/imx8m/redwood_8mm/redwood_8mm.mk b/imx8m/redwood_8mm/redwood_8mm.mk
+deleted file mode 120000
+index 528268ae..00000000
+--- a/imx8m/redwood_8mm/redwood_8mm.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/evk_8mm.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/redwood_8mm.mk b/imx8m/redwood_8mm/redwood_8mm.mk
+new file mode 100644
+index 00000000..b9048fa5
+--- /dev/null
++++ b/imx8m/redwood_8mm/redwood_8mm.mk
+@@ -0,0 +1,457 @@
++# -------@block_infrastructure-------
++
++CONFIG_REPO_PATH := device/nxp
++CURRENT_FILE_PATH :=  $(lastword $(MAKEFILE_LIST))
++IMX_DEVICE_PATH := $(strip $(patsubst %/, %, $(dir $(CURRENT_FILE_PATH))))
++
++PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS := true
++
++# configs shared between uboot, kernel and Android rootfs
++include $(IMX_DEVICE_PATH)/SharedBoardConfig.mk
++
++-include $(CONFIG_REPO_PATH)/common/imx_path/ImxPathConfig.mk
++include $(CONFIG_REPO_PATH)/imx8m/ProductConfigCommon.mk
++
++# -------@block_common_config-------
++
++# Overrides
++PRODUCT_NAME := evk_8mm
++PRODUCT_DEVICE := evk_8mm
++PRODUCT_MODEL := EVK_8MM
++
++TARGET_BOOTLOADER_BOARD_NAME := EVK
++
++PRODUCT_CHARACTERISTICS := tablet
++
++DEVICE_PACKAGE_OVERLAYS := $(IMX_DEVICE_PATH)/overlay
++
++PRODUCT_COMPATIBLE_PROPERTY_OVERRIDE := true
++
++PRODUCT_VENDOR_PROPERTIES += ro.soc.manufacturer=nxp
++PRODUCT_VENDOR_PROPERTIES += ro.soc.model=IMX8MM
++# -------@block_treble-------
++PRODUCT_FULL_TREBLE_OVERRIDE := true
++
++# -------@block_power-------
++PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/power
++PRODUCT_SOONG_NAMESPACES += hardware/google/pixel
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/powerhint_imx8mm.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/powerhint_imx8mm.json
++
++# Charger Mode
++PRODUCT_PRODUCT_PROPERTIES += \
++    ro.charger.no_ui=false
++
++# Do not skip charger_not_need trigger by default
++PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
++    vendor.skip.charger_not_need=0
++
++PRODUCT_PACKAGES += \
++    android.hardware.power-service.imx
++
++# Thermal HAL
++PRODUCT_PACKAGES += \
++    android.hardware.thermal@2.0-service.imx
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/thermal_info_config_imx8mm.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/thermal_info_config_imx8mm.json
++
++
++# Task Profiles
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/task_profiles.json:$(TARGET_COPY_OUT_VENDOR)/etc/task_profiles.json
++
++
++# -------@block_app-------
++
++#Enable this to choose 32 bit user space build
++IMX8_BUILD_32BIT_ROOTFS := false
++
++# Set permission for GMS packages
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/imx8m/permissions/privapp-permissions-imx.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/permissions/privapp.permissions-imx.xml
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/app_whitelist.xml:system/etc/sysconfig/app_whitelist.xml
++
++# -------@block_kernel_bootimg-------
++
++# Enable this to support vendor boot and boot header v3, this would be a MUST for GKI
++TARGET_USE_VENDOR_BOOT ?= true
++
++ifeq ($(IMX8MM_USES_GKI),true)
++PRODUCT_PROPERTY_OVERRIDES += \
++    vendor.gki.enable=true
++
++BOARD_RAMDISK_USE_LZ4 := true
++
++BOARD_USES_GENERIC_KERNEL_IMAGE := true
++$(call inherit-product, $(SRC_TARGET_DIR)/product/generic_ramdisk.mk)
++endif
++
++# We load the fstab from device tree so this is not needed, but since no kernel modules are installed to vendor
++# boot ramdisk so far, we need this step to generate the vendor-ramdisk folder or build process would fail. This
++# can be deleted once we figure out what kernel modules should be put into the vendor boot ramdisk.
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/first_stage_ramdisk/fstab.nxp
++endif
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/early.init.cfg:$(TARGET_COPY_OUT_VENDOR)/etc/early.init.cfg \
++    $(LINUX_FIRMWARE_IMX_PATH)/linux-firmware-imx/firmware/sdma/sdma-imx7d.bin:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/imx/sdma/sdma-imx7d.bin \
++    $(CONFIG_REPO_PATH)/common/init/init.insmod.sh:$(TARGET_COPY_OUT_VENDOR)/bin/init.insmod.sh \
++    $(IMX_DEVICE_PATH)/ueventd.nxp.rc:$(TARGET_COPY_OUT_VENDOR)/ueventd.rc
++
++# -------@block_storage-------
++
++# support metadata checksum during first stage mount
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++PRODUCT_PACKAGES += \
++    linker.vendor_ramdisk \
++    resizefs.vendor_ramdisk \
++    tune2fs.vendor_ramdisk
++endif
++
++#Enable this to use dynamic partitions for the readonly partitions not touched by bootloader
++TARGET_USE_DYNAMIC_PARTITIONS ?= true
++
++ifeq ($(TARGET_USE_DYNAMIC_PARTITIONS),true)
++  ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++    $(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota/compression.mk)
++  else
++    $(call inherit-product, $(SRC_TARGET_DIR)/product/virtual_ab_ota.mk)
++  endif
++  PRODUCT_USE_DYNAMIC_PARTITIONS := true
++  BOARD_BUILD_SUPER_IMAGE_BY_DEFAULT := true
++  BOARD_SUPER_IMAGE_IN_UPDATE_PACKAGE := true
++endif
++
++#Enable this to disable product partition build.
++IMX_NO_PRODUCT_PARTITION := false
++
++$(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
++
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/fstab.nxp:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.nxp
++
++TARGET_RECOVERY_FSTAB = $(IMX_DEVICE_PATH)/fstab.nxp
++
++ifneq ($(filter TRUE true 1,$(IMX_OTA_POSTINSTALL)),)
++  PRODUCT_PACKAGES += imx_ota_postinstall
++
++  AB_OTA_POSTINSTALL_CONFIG += \
++    RUN_POSTINSTALL_vendor=true \
++    POSTINSTALL_PATH_vendor=bin/imx_ota_postinstall \
++    FILESYSTEM_TYPE_vendor=ext4 \
++    POSTINSTALL_OPTIONAL_vendor=false
++
++  PRODUCT_COPY_FILES += \
++    $(OUT_DIR)/target/product/$(firstword $(PRODUCT_DEVICE))/obj/UBOOT_COLLECTION/u-boot-imx8mm-trusty.imx:$(TARGET_COPY_OUT_VENDOR)/etc/bootloader0.img
++endif
++
++# fastboot_imx_flashall scripts, imx-sdcard-partition script uuu_imx_android_flash scripts
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/common/tools/fastboot_imx_flashall.bat:fastboot_imx_flashall.bat \
++    $(CONFIG_REPO_PATH)/common/tools/fastboot_imx_flashall.sh:fastboot_imx_flashall.sh \
++    $(CONFIG_REPO_PATH)/common/tools/imx-sdcard-partition.sh:imx-sdcard-partition.sh \
++    $(CONFIG_REPO_PATH)/common/tools/uuu_imx_android_flash.bat:uuu_imx_android_flash.bat \
++    $(CONFIG_REPO_PATH)/common/tools/uuu_imx_android_flash.sh:uuu_imx_android_flash.sh
++
++# -------@block_security-------
++
++# Include keystore attestation keys and certificates.
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++-include $(IMX_SECURITY_PATH)/attestation/imx_attestation.mk
++endif
++
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/common/security/rpmb_key_test.bin:rpmb_key_test.bin \
++    $(CONFIG_REPO_PATH)/common/security/testkey_public_rsa4096.bin:testkey_public_rsa4096.bin
++endif
++
++# Keymaster HAL
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.security.keymint-service.trusty
++endif
++
++PRODUCT_PACKAGES += \
++    android.hardware.security.keymint-service-imx
++
++# Confirmation UI
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.confirmationui@1.0-service.trusty
++endif
++
++# new gatekeeper HAL
++PRODUCT_PACKAGES += \
++    android.hardware.gatekeeper@1.0-service.software-imx
++
++# Add Trusty OS backed gatekeeper and secure storage proxy
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++PRODUCT_PACKAGES += \
++    android.hardware.gatekeeper@1.0-service.trusty \
++    storageproxyd
++endif
++
++# Add oem unlocking option in settings.
++PRODUCT_PROPERTY_OVERRIDES += ro.frp.pst=/dev/block/by-name/presistdata
++
++ifeq ($(PRODUCT_IMX_TRUSTY),true)
++#Oemlock HAL 1.0 support
++PRODUCT_PACKAGES += \
++    android.hardware.oemlock@1.0-service.imx
++endif
++
++# Specify rollback index for boot and vbmeta partition
++ifneq ($(AVB_RBINDEX),)
++BOARD_AVB_ROLLBACK_INDEX := $(AVB_RBINDEX)
++else
++BOARD_AVB_ROLLBACK_INDEX := 0
++endif
++
++ifneq ($(AVB_BOOT_RBINDEX),)
++BOARD_AVB_BOOT_ROLLBACK_INDEX := $(AVB_BOOT_RBINDEX)
++else
++BOARD_AVB_BOOT_ROLLBACK_INDEX := 0
++endif
++
++$(call  inherit-product-if-exists, vendor/nxp-private/security/nxp_security.mk)
++
++# Resume on Reboot support
++PRODUCT_PACKAGES += \
++    android.hardware.rebootescrow-service.default
++
++PRODUCT_PROPERTY_OVERRIDES += \
++    ro.rebootescrow.device=/dev/block/pmem0
++
++#DRM Widevine 1.4 L3 support
++PRODUCT_PACKAGES += \
++    android.hardware.drm@1.4-service.widevine \
++    android.hardware.drm@1.4-service.clearkey \
++    libwvdrmcryptoplugin \
++    libwvhidl \
++    libwvdrmengine
++
++# -------@block_audio-------
++
++# Audio card json
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/common/audio-json/wm8524_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/wm8524_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/spdif_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/spdif_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/micfil_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/micfil_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/ak4458_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4458_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/ak4497_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/ak4497_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/btsco_config.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/btsco_config.json \
++    $(CONFIG_REPO_PATH)/common/audio-json/readme.txt:$(TARGET_COPY_OUT_VENDOR)/etc/configs/audio/readme.txt
++
++PRODUCT_COPY_FILES += \
++    $(FSL_PROPRIETARY_PATH)/fsl-proprietary/mcu-sdk/imx8mm/imx8mm_mcu_demo.img:imx8mm_mcu_demo.img \
++    $(IMX_DEVICE_PATH)/audio_effects.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_effects.xml \
++    $(IMX_DEVICE_PATH)/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
++    $(IMX_DEVICE_PATH)/usb_audio_policy_configuration-direct-output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration-direct-output.xml
++
++
++# -------@block_camera-------
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/camera_config_imx8mm.json:$(TARGET_COPY_OUT_VENDOR)/etc/configs/camera_config_imx8mm.json \
++    $(IMX_DEVICE_PATH)/external_camera_config.xml:$(TARGET_COPY_OUT_VENDOR)/etc/external_camera_config.xml
++
++PRODUCT_SOONG_NAMESPACES += hardware/google/camera
++PRODUCT_SOONG_NAMESPACES += vendor/nxp-opensource/imx/camera
++
++# -------@block_display-------
++
++PRODUCT_AAPT_CONFIG += xlarge large tvdpi hdpi xhdpi xxhdpi
++
++# HWC2 HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.composer@2.4-service
++
++# define frame buffer count
++PRODUCT_DEFAULT_PROPERTY_OVERRIDES += \
++    ro.surface_flinger.max_frame_buffer_acquired_buffers=3
++
++# Gralloc HAL
++PRODUCT_PACKAGES += \
++    android.hardware.graphics.mapper@4.0-impl.imx \
++    android.hardware.graphics.allocator@4.0-service.imx
++
++# RenderScript HAL
++PRODUCT_PACKAGES += \
++    android.hardware.renderscript@1.0-impl
++
++# -------@block_gpu-------
++
++PRODUCT_PACKAGES += \
++    libEGL_VIVANTE \
++    libGLESv1_CM_VIVANTE \
++    libGLESv2_VIVANTE \
++    gralloc_viv.$(TARGET_BOARD_PLATFORM) \
++    libGAL \
++    libGLSLC \
++    libVSC \
++    libCLC \
++    libLLVM_viv \
++    libOpenCL \
++    libg2d-viv \
++    libgpuhelper \
++
++
++# -------@block_wifi-------
++
++#LPDDR4 board, NXP wifi supplicant overlay
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.imx8mm.lpddr4.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.additional.rc \
++    $(CONFIG_REPO_PATH)/common/wifi/wpa_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant_overlay.conf
++
++PRODUCT_COPY_FILES += \
++    $(CONFIG_REPO_PATH)/common/wifi/p2p_supplicant_overlay.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/p2p_supplicant_overlay.conf \
++
++# WiFi HAL
++PRODUCT_PACKAGES += \
++    android.hardware.wifi@1.0-service \
++    wificond
++
++# WiFi RRO
++PRODUCT_PACKAGES += \
++    WifiOverlay
++
++# NXP 8987 WiFi Firmware
++PRODUCT_COPY_FILES += \
++    vendor/nxp/imx-firmware/nxp/FwImage_8987/sdiouart8987_combo_v0.bin:vendor/firmware/sdiouart8987_combo_v0.bin \
++    vendor/nxp/imx-firmware/nxp/android_wifi_mod_para.conf:vendor/firmware/wifi_mod_para_sd8987.conf
++
++# Wifi regulatory
++PRODUCT_COPY_FILES += \
++    external/wireless-regdb/regulatory.db:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db \
++    external/wireless-regdb/regulatory.db.p7s:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/lib/firmware/regulatory.db.p7s
++
++# -------@block_bluetooth-------
++
++# Bluetooth HAL
++PRODUCT_PACKAGES += \
++    android.hardware.bluetooth@1.0-impl \
++    android.hardware.bluetooth@1.0-service
++
++# NXP 8987 Bluetooth vendor config
++PRODUCT_PACKAGES += \
++    bt_vendor.conf
++
++# -------@block_usb-------
++
++# Usb HAL
++PRODUCT_PACKAGES += \
++    android.hardware.usb@1.1-service.imx
++
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.usb.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.usb.rc
++
++# -------@block_multimedia_codec-------
++
++# Vendor seccomp policy files for media components:
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/seccomp/mediacodec-seccomp.policy:vendor/etc/seccomp_policy/mediacodec.policy \
++    $(IMX_DEVICE_PATH)/seccomp/mediaextractor-seccomp.policy:vendor/etc/seccomp_policy/mediaextractor.policy \
++    $(CONFIG_REPO_PATH)/common/seccomp_policy/codec2.vendor.base.policy:vendor/etc/seccomp_policy/codec2.vendor.base.policy \
++    $(CONFIG_REPO_PATH)/common/seccomp_policy/codec2.vendor.ext.policy:vendor/etc/seccomp_policy/codec2.vendor.ext.policy
++
++PRODUCT_PACKAGES += \
++    libg1 \
++    libhantro \
++    libcodec \
++    libhantro_h1 \
++    libcodec_enc \
++    DirectAudioPlayer
++
++# imx c2 codec binary
++PRODUCT_PACKAGES += \
++    lib_vpu_wrapper \
++    lib_imx_c2_videodec \
++    lib_imx_c2_vpuwrapper_dec \
++    lib_imx_c2_videodec_common \
++    lib_imx_c2_videoenc_common \
++    lib_imx_c2_vpuwrapper_enc \
++    lib_imx_c2_videoenc \
++    lib_imx_c2_process \
++    lib_imx_c2_process_dummy_post \
++    lib_imx_c2_process_g2d_pre \
++    c2_component_register \
++    c2_component_register_ms \
++    c2_component_register_ra
++
++ifeq ($(PREBUILT_FSL_IMX_CODEC),true)
++ifneq ($(IMX8_BUILD_32BIT_ROOTFS),true)
++INSTALL_64BIT_LIBRARY := true
++endif
++endif
++
++# -------@block_memory-------
++
++# Include Android Go config for low memory device.
++ifeq ($(LOW_MEMORY),true)
++  $(call inherit-product, build/target/product/go_defaults.mk)
++endif
++
++# -------@block_miscellaneous-------
++
++# Copy device related config and binary to board
++PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.imx8mm.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mm.rc \
++    $(IMX_DEVICE_PATH)/init.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.rc \
++    $(IMX_DEVICE_PATH)/required_hardware.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/required_hardware.xml
++
++ifeq ($(TARGET_USE_VENDOR_BOOT),true)
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:$(TARGET_COPY_OUT_VENDOR_RAMDISK)/init.recovery.nxp.rc
++else
++  PRODUCT_COPY_FILES += \
++    $(IMX_DEVICE_PATH)/init.recovery.nxp.rc:root/init.recovery.nxp.rc
++endif
++
++# ONLY devices that meet the CDD's requirements may declare these features
++PRODUCT_COPY_FILES += \
++    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
++    frameworks/native/data/etc/android.hardware.bluetooth_le.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.bluetooth_le.xml \
++    frameworks/native/data/etc/android.hardware.camera.external.xml:vendor/etc/permissions/android.hardware.camera.external.xml \
++    frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
++    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
++    frameworks/native/data/etc/android.hardware.ethernet.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.ethernet.xml \
++    frameworks/native/data/etc/android.hardware.screen.landscape.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.landscape.xml \
++    frameworks/native/data/etc/android.hardware.screen.portrait.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.screen.portrait.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.multitouch.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.xml \
++    frameworks/native/data/etc/android.hardware.touchscreen.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.xml \
++    frameworks/native/data/etc/android.hardware.usb.accessory.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.accessory.xml \
++    frameworks/native/data/etc/android.hardware.usb.host.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.usb.host.xml \
++    frameworks/native/data/etc/android.software.vulkan.deqp.level-2021-03-01.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.vulkan.deqp.level.xml \
++    frameworks/native/data/etc/android.software.opengles.deqp.level-2021-03-01.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.opengles.deqp.level.xml \
++    frameworks/native/data/etc/android.hardware.wifi.direct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.direct.xml \
++    frameworks/native/data/etc/android.hardware.wifi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.xml \
++    frameworks/native/data/etc/android.hardware.wifi.passpoint.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.wifi.passpoint.xml \
++    frameworks/native/data/etc/android.software.app_widgets.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.app_widgets.xml \
++    frameworks/native/data/etc/android.software.backup.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.backup.xml \
++    frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
++    frameworks/native/data/etc/android.software.managed_users.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.managed_users.xml \
++    frameworks/native/data/etc/android.software.midi.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.midi.xml \
++    frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml \
++    frameworks/native/data/etc/android.software.sip.voip.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.sip.voip.xml \
++    frameworks/native/data/etc/android.software.verified_boot.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.verified_boot.xml \
++    frameworks/native/data/etc/android.software.voice_recognizers.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.voice_recognizers.xml \
++    frameworks/native/data/etc/android.software.activities_on_secondary_displays.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.activities_on_secondary_displays.xml \
++    frameworks/native/data/etc/android.software.picture_in_picture.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.picture_in_picture.xml
++
++# trusty loadable apps
++PRODUCT_COPY_FILES += \
++    vendor/nxp/fsl-proprietary/uboot-firmware/imx8m/confirmationui.app:/vendor/firmware/tee/confirmationui.app
++
++# Included GMS package
++$(call inherit-product-if-exists, vendor/partner_gms/products/gms.mk)
++PRODUCT_SOONG_NAMESPACES += vendor/partner_gms
++
+diff --git a/imx8m/redwood_8mm/redwood_8mm_drm.mk b/imx8m/redwood_8mm/redwood_8mm_drm.mk
+deleted file mode 120000
+index 24ca5e57..00000000
+--- a/imx8m/redwood_8mm/redwood_8mm_drm.mk
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/evk_8mm_drm.mk
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/redwood_8mm_drm.mk b/imx8m/redwood_8mm/redwood_8mm_drm.mk
+new file mode 100644
+index 00000000..871b3f34
+--- /dev/null
++++ b/imx8m/redwood_8mm/redwood_8mm_drm.mk
+@@ -0,0 +1,71 @@
++# This is a FSL Android Reference Design platform based on i.MX8MM board
++# It will inherit from FSL core product which in turn inherit from Google generic
++
++IMX_DEVICE_PATH := device/nxp/imx8m/evk_8mm
++
++PRODUCT_IMX_DRM := true
++
++# copy drm specific files before inherit evk_8mm.mk, otherwise copy is ignored
++PRODUCT_COPY_FILES += \
++	$(IMX_DEVICE_PATH)/init.imx8mm.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mm.main.rc \
++	$(IMX_DEVICE_PATH)/init.imx8mm.drm.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.nxp.imx8mm.rc \
++	$(TOPDIR)device/nxp/imx8m/tee-supplicant.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/tee-supplicant.rc \
++
++
++$(call inherit-product, $(TOPDIR)device/nxp/imx8m/optee-packages.mk)
++$(call inherit-product, $(TOPDIR)$(IMX_DEVICE_PATH)/evk_8mm.mk)
++
++TARGET_KERNEL_DEFCONFIG := imx_v8_android_defconfig
++
++
++# Overrides
++PRODUCT_NAME := evk_8mm_drm
++
++CFG_DRM_SECURE_DATA_PATH ?= y
++CFG_RDC_SECURE_DATA_PATH ?= y
++
++ifeq ($(CFG_DRM_SECURE_DATA_PATH),y)
++CFG_SECURE_DATA_PATH := y
++SOONG_CONFIG_IMXPLUGIN += CFG_SECURE_DATA_PATH
++SOONG_CONFIG_IMXPLUGIN_CFG_SECURE_DATA_PATH = y
++CFG_TEE_SDP_MEM_BASE := 0xB6000000
++CFG_TEE_SDP_MEM_SIZE := 0x02000000
++ifeq ($(CFG_RDC_SECURE_DATA_PATH),y)
++DECRYPTED_BUFFER_START	:= $(CFG_TEE_SDP_MEM_BASE)
++DECRYPTED_BUFFER_LEN	:= $(CFG_TEE_SDP_MEM_SIZE)
++DECODED_BUFFER_START	:= 0xB8400000
++DECODED_BUFFER_LEN		:= 0x05C00000
++endif
++endif
++
++TARGET_BOARD_DTS_CONFIG := imx8mm:imx8mm-evk-drm.dtb imx8mm-mipi-panel:imx8mm-evk-rm67191.dtb imx8mm-m4:imx8mm-evk-m4.dtb
++
++# Exoplayer
++PRODUCT_PACKAGES += \
++	exoplayer \
++
++# Playready
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/playready/Samples/devcert.dat:$(TARGET_COPY_OUT_VENDOR)/playready/devcert.dat \
++	vendor/nxp/drm_artifacts/playready/Samples/priv.dat:$(TARGET_COPY_OUT_VENDOR)/playready/priv.dat \
++	vendor/nxp/drm_artifacts/playready/bgroupcert.dat:$(TARGET_COPY_OUT_VENDOR)/playready/bgroupcert.dat \
++	vendor/nxp/drm_artifacts/playready/zgpriv_protected.dat:$(TARGET_COPY_OUT_VENDOR)/playready/zgpriv_protected.dat \
++
++ifneq ($(CFG_BUILD_DRM_FROM_SOURCES),y)
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/playready/ta/82dbae9c-9ce0-47e0-a1cb4048cfdb84aa.ta:$(TARGET_COPY_OUT_VENDOR)/lib/optee_armtz/82dbae9c-9ce0-47e0-a1cb4048cfdb84aa.ta \
++	vendor/nxp/drm_artifacts/playready/libdrmplayreadyplugin.so:$(TARGET_COPY_OUT_VENDOR)/lib64/mediadrm/libdrmplayreadyplugin.so \
++	vendor/nxp/drm_artifacts/playready/optee_playready_test:$(TARGET_COPY_OUT_VENDOR)/bin/optee_playready_test
++endif
++
++ifneq ($(CFG_BUILD_DRM_FROM_SOURCES),y)
++# Widevine
++PRODUCT_COPY_FILES += \
++	vendor/nxp/drm_artifacts/widevine/lib/liboemcrypto.so:$(TARGET_COPY_OUT_VENDOR)/lib/liboemcrypto.so \
++	vendor/nxp/drm_artifacts/widevine/lib/libwvdrmengine.so:$(TARGET_COPY_OUT_VENDOR)/lib/mediadrm/libwvdrmengine.so \
++	vendor/nxp/drm_artifacts/widevine/lib/libvtswidevine.so:$(TARGET_COPY_OUT_VENDOR)/lib/drm-vts-test-libs/libvtswidevine.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/liboemcrypto.so:$(TARGET_COPY_OUT_VENDOR)/lib64/liboemcrypto.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/libwvdrmengine.so:$(TARGET_COPY_OUT_VENDOR)/lib64/mediadrm/libwvdrmengine.so \
++	vendor/nxp/drm_artifacts/widevine/lib64/libvtswidevine.so:$(TARGET_COPY_OUT_VENDOR)/lib64/drm-vts-test-libs/libvtswidevine.so \
++	vendor/nxp/drm_artifacts/widevine/ta/706f6574-7765-6469-77656e6942656665.ta:$(TARGET_COPY_OUT_VENDOR)/lib/optee_armtz/706f6574-7765-6469-77656e6942656665.ta
++endif
+diff --git a/imx8m/redwood_8mm/required_hardware.xml b/imx8m/redwood_8mm/required_hardware.xml
+deleted file mode 120000
+index 7bb5fb1d..00000000
+--- a/imx8m/redwood_8mm/required_hardware.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/required_hardware.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/required_hardware.xml b/imx8m/redwood_8mm/required_hardware.xml
+new file mode 100644
+index 00000000..766e1843
+--- /dev/null
++++ b/imx8m/redwood_8mm/required_hardware.xml
+@@ -0,0 +1,35 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- Copyright (C) 2009 The Android Open Source Project
++     Copyright 2018 NXP
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++
++<!-- These are the hardware components that are included in i.MX reference board
++-->
++<permissions>
++    <!-- This is Android and fully CTS compatible.  Basically this is for CTS tests to use. -->
++    <feature name="android.software.cts" />
++    <feature name="android.hardware.microphone" />
++    <feature name="android.hardware.camera.any" />
++    <feature name="android.software.cant_save_state" />
++    <feature name="android.software.home_screen" />
++    <feature name="android.software.input_methods" />
++    <feature name="android.hardware.location" />
++    <feature name="android.hardware.location.network" />
++    <feature name="android.hardware.bluetooth" />
++    <feature name="android.software.companion_device_setup" />
++    <feature name="android.software.autofill" />
++    <feature name="android.software.secure_lock_screen" />
++    <feature name="android.hardware.keystore.app_attest_key" />
++</permissions>
+diff --git a/imx8m/redwood_8mm/seccomp b/imx8m/redwood_8mm/seccomp
+deleted file mode 120000
+index 0931b9d0..00000000
+--- a/imx8m/redwood_8mm/seccomp
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/seccomp
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/seccomp/mediacodec-seccomp.policy b/imx8m/redwood_8mm/seccomp/mediacodec-seccomp.policy
+new file mode 100644
+index 00000000..9bac41bf
+--- /dev/null
++++ b/imx8m/redwood_8mm/seccomp/mediacodec-seccomp.policy
+@@ -0,0 +1 @@
++select: 1
+diff --git a/imx8m/redwood_8mm/seccomp/mediaextractor-seccomp.policy b/imx8m/redwood_8mm/seccomp/mediaextractor-seccomp.policy
+new file mode 100644
+index 00000000..abbef2c2
+--- /dev/null
++++ b/imx8m/redwood_8mm/seccomp/mediaextractor-seccomp.policy
+@@ -0,0 +1,5 @@
++uname: 1
++fchmodat: 1
++ftruncate64: 1
++readlinkat: 1
++pread64: 1
+diff --git a/imx8m/redwood_8mm/sepolicy b/imx8m/redwood_8mm/sepolicy
+deleted file mode 120000
+index ce046708..00000000
+--- a/imx8m/redwood_8mm/sepolicy
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/sepolicy
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/sepolicy/file_contexts b/imx8m/redwood_8mm/sepolicy/file_contexts
+new file mode 100644
+index 00000000..281379b1
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/file_contexts
+@@ -0,0 +1,25 @@
++/dev/block/mmcblk2boot0                      u:object_r:emmc_boot0:s0
++/dev/block/mmcblk1                           u:object_r:sdcard:s0
++
++#peripheral
++/vendor/bin/fsl_sensor_fusion   u:object_r:sensors_exec:s0
++/dev/ttymxc[0-9]*               u:object_r:tty_device:s0
++/dev/sda[0-8]*                  u:object_r:fuse:s0
++
++#Thermal HAL service
++/vendor/bin/hw/android\.hardware\.thermal@2\.0-service.imx         u:object_r:hal_thermal_default_exec:s0
++
++/vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
++
++/dev/block/pmem0  u:object_r:rebootescrow_device:s0
++
++# android.system.suspend@1.0-service
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-powerkey/wakeup/wakeup[0-9]*(/.*)?                                  u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/wakeup/wakeup[0-9]*(/.*)?                                    u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/alarmtimer.0.auto/wakeup/wakeup[0-9]*(/.*)?         u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/battery/wakeup[0-9]*(/.*)?                                                                                  u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/power_supply/usb/wakeup[0-9]*(/.*)?                                                                                      u:object_r:sysfs_wakeup:s0
++/sys/devices/virtual/wakeup/wakeup[0-9]*(/.*)?                                                                                                u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply/tcpm-source-psy-1-0050/wakeup[0-9]*(/.*)?                     u:object_r:sysfs_wakeup:s0
++/sys/devices/platform/soc@0/30800000.bus/30be0000.ethernet/net/eth0/wakeup[0-9]*(/.*)?                                                        u:object_r:sysfs_wakeup:s0
++
+diff --git a/imx8m/redwood_8mm/sepolicy/genfs_contexts b/imx8m/redwood_8mm/sepolicy/genfs_contexts
+new file mode 100644
+index 00000000..516b76ab
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy/genfs_contexts
+@@ -0,0 +1,20 @@
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/power_supply u:object_r:sysfs_batteryinfo:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30a30000.i2c/i2c-1/1-0050/extcon   u:object_r:sysfs_extcon:s0
++genfscon sysfs /devices/platform/soc@0/30000000.bus/30370000.snvs/30370000.snvs:snvs-rtc-lp/rtc/rtc0/hctosys     u:object_r:sysfs_rtc:s0
++
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/mmc1:aaaa/block/mmcblk1 u:object_r:sysfs_block_devices:s0
++
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b60000.mmc/mmc_host/mmc2/mmc2:0001/block/mmcblk2 u:object_r:sysfs_block_devices:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30bb0000.spi/spi_master/spi3/spi3.0/mtd/mtd0/mtdblock0        u:object_r:sysfs_block_devices:s0
++
++genfscon sysfs /devices/platform/soc@0/33002000.nand-controller/mtd/mtd0/mtdblock0/                                     u:object_r:sysfs_block_devices:s0
++
++genfscon sysfs /devices/platform/soc@0/32c00000.bus/32e10000.mipi_dsi/32e10000.mipi_dsi.0/backlight u:object_r:sysfs_leds:s0
++
++#sys/class/net
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30be0000.ethernet/net                                u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b40000.mmc/mmc_host/mmc0/mmc0:0001/mmc0:0001:1/net u:object_r:sysfs_net:s0
++genfscon sysfs /devices/platform/soc@0/30800000.bus/30b50000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/net u:object_r:sysfs_net:s0
++
++# for dumpstate to access the stat file
++genfscon sysfs /devices/platform/b8500000.pmem/ndbus0/region0/namespace0.0/block/pmem0                                            u:object_r:sysfs_block_devices:s0
+diff --git a/imx8m/redwood_8mm/sepolicy_drm b/imx8m/redwood_8mm/sepolicy_drm
+deleted file mode 120000
+index cefbb2e1..00000000
+--- a/imx8m/redwood_8mm/sepolicy_drm
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/sepolicy_drm
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/file_contexts b/imx8m/redwood_8mm/sepolicy_drm/file_contexts
+new file mode 100644
+index 00000000..52f0eedf
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/file_contexts
+@@ -0,0 +1,7 @@
++/vendor/bin/tee-supplicant     u:object_r:tee_exec:s0
++/vendor/bin/xtest              u:object_r:tee_exec:s0
++
++/dev/teepriv[0-9]*             u:object_r:tee_device:s0
++/dev/tee[0-9]*                 u:object_r:tee_device:s0
++/data/vendor/tee(/.*)?         u:object_r:tee_data_file:s0
++
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/hal_drm_default.te b/imx8m/redwood_8mm/sepolicy_drm/hal_drm_default.te
+new file mode 100644
+index 00000000..db30cdcf
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/hal_drm_default.te
+@@ -0,0 +1,2 @@
++allow hal_drm_default vendor_data_file:dir { create add_name search write };
++allow hal_drm_default vendor_data_file:file { create lock open read write getattr };
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/mediadrmserver.te b/imx8m/redwood_8mm/sepolicy_drm/mediadrmserver.te
+new file mode 100644
+index 00000000..c6dc56f7
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/mediadrmserver.te
+@@ -0,0 +1,3 @@
++allow mediadrmserver ion_device:chr_file { open read ioctl };
++allow mediadrmserver vendor_file:file { read getattr };
++allow mediadrmserver vendor_file:dir { read };
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/netd.te b/imx8m/redwood_8mm/sepolicy_drm/netd.te
+new file mode 100644
+index 00000000..4bc801ea
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/netd.te
+@@ -0,0 +1,4 @@
++# Rules on netd domain for optee xtest 200x tests
++allow netd tee:tcp_socket { read write getopt setopt };
++allow netd tee:udp_socket { read write getopt setopt };
++allow netd tee:fd { use };
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/shell.te b/imx8m/redwood_8mm/sepolicy_drm/shell.te
+new file mode 100644
+index 00000000..7b28d012
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/shell.te
+@@ -0,0 +1,4 @@
++allow shell tee_exec:file { getattr execute read open execute_no_trans };
++allow shell tee_data_file:file { create write open getattr unlink read };
++allow shell tee_data_file:dir { write add_name remove_name rename search };
++allow shell tee_data_file:chr_file { read write open ioctl };
+diff --git a/imx8m/redwood_8mm/sepolicy_drm/tee.te b/imx8m/redwood_8mm/sepolicy_drm/tee.te
+new file mode 100644
+index 00000000..14b48925
+--- /dev/null
++++ b/imx8m/redwood_8mm/sepolicy_drm/tee.te
+@@ -0,0 +1,18 @@
++# allow run xtest as shell
++domain_auto_trans(shell, tee_exec, tee);
++allow tee console_device:chr_file {  getattr read write ioctl };
++allow tee shell:fd { use };
++
++allow tee tee_data_file:dir { create rmdir rename };
++allow tee vendor_data_file:dir { write remove_name };
++
++# For xtest 200x tests
++allow tee tee:tcp_socket { create connect read write getopt setopt };
++allow tee tee:udp_socket { create connect read write getopt getattr };
++allow tee tee:capability { net_raw };
++allow tee fwmarkd_socket:sock_file { write };
++allow tee port:tcp_socket { name_connect };
++
++# For tee-supplicant
++allow tee system_data_file:dir getattr;
++allow tee vendor_data_file:dir { write create add_name };
+diff --git a/imx8m/redwood_8mm/task_profiles.json b/imx8m/redwood_8mm/task_profiles.json
+deleted file mode 120000
+index c0101125..00000000
+--- a/imx8m/redwood_8mm/task_profiles.json
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/task_profiles.json
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/task_profiles.json b/imx8m/redwood_8mm/task_profiles.json
+new file mode 100644
+index 00000000..449a5054
+--- /dev/null
++++ b/imx8m/redwood_8mm/task_profiles.json
+@@ -0,0 +1,644 @@
++{
++  "Attributes": [
++    {
++      "Name": "LowCapacityCPUs",
++      "Controller": "cpuset",
++      "File": "background/cpus"
++    },
++    {
++      "Name": "HighCapacityCPUs",
++      "Controller": "cpuset",
++      "File": "foreground/cpus"
++    },
++    {
++      "Name": "MaxCapacityCPUs",
++      "Controller": "cpuset",
++      "File": "top-app/cpus"
++    },
++    {
++      "Name": "MemLimit",
++      "Controller": "memory",
++      "File": "memory.limit_in_bytes"
++    },
++    {
++      "Name": "MemSoftLimit",
++      "Controller": "memory",
++      "File": "memory.soft_limit_in_bytes"
++    },
++    {
++      "Name": "MemSwappiness",
++      "Controller": "memory",
++      "File": "memory.swappiness"
++    },
++    {
++      "Name": "UClampMin",
++      "Controller": "cpu",
++      "File": "cpu.uclamp.min"
++    },
++    {
++      "Name": "UClampMax",
++      "Controller": "cpu",
++      "File": "cpu.uclamp.max"
++    },
++    {
++      "Name": "UClampLatencySensitive",
++      "Controller": "cpu",
++      "File": "cpu.uclamp.latency_sensitive"
++    },
++    {
++      "Name": "FreezerState",
++      "Controller": "freezer",
++      "File": "cgroup.freeze"
++    }
++  ],
++
++  "Profiles": [
++    {
++      "Name": "HighEnergySaving",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "Frozen",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "FreezerState",
++            "Value": "1"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "Unfrozen",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "FreezerState",
++            "Value": "0"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "NormalPerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "system"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "ServicePerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "system-background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "HighPerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "foreground"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "MaxPerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "top-app"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "RealtimePerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "rt"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "CameraServicePerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "camera-daemon"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "NNApiHALPerformance",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpu",
++            "Path": "nnapi-hal"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "CpuPolicySpread",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "UClampLatencySensitive",
++            "Value": "1"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "CpuPolicyPack",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "UClampLatencySensitive",
++            "Value": "0"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "VrKernelCapacity",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": ""
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrServiceCapacityLow",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system/background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrServiceCapacityNormal",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrServiceCapacityHigh",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system/performance"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrProcessCapacityLow",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "application/background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrProcessCapacityNormal",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "application"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "VrProcessCapacityHigh",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "application/performance"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "ProcessCapacityLow",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "ProcessCapacityNormal",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": ""
++          }
++        }
++      ]
++    },
++    {
++      "Name": "ProcessCapacityHigh",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "foreground"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "ProcessCapacityMax",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "top-app"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "ServiceCapacityLow",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system-background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "ServiceCapacityRestricted",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "restricted"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "CameraServiceCapacity",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "camera-daemon"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "LowIoPriority",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "blkio",
++            "Path": "background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "NormalIoPriority",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "blkio",
++            "Path": ""
++          }
++        }
++      ]
++    },
++    {
++      "Name": "HighIoPriority",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "blkio",
++            "Path": ""
++          }
++        }
++      ]
++    },
++    {
++      "Name": "MaxIoPriority",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "blkio",
++            "Path": ""
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "TimerSlackHigh",
++      "Actions": [
++        {
++          "Name": "SetTimerSlack",
++          "Params":
++          {
++            "Slack": "40000000"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "TimerSlackNormal",
++      "Actions": [
++        {
++          "Name": "SetTimerSlack",
++          "Params":
++          {
++            "Slack": "50000"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "SFMainPolicy",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system-background"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "SFRenderEnginePolicy",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "cpuset",
++            "Path": "system-background"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "PerfBoost",
++      "Actions": [
++        {
++          "Name": "SetClamps",
++          "Params":
++          {
++            "Boost": "50%",
++            "Clamp": "0"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "PerfClamp",
++      "Actions": [
++        {
++          "Name": "SetClamps",
++          "Params":
++          {
++            "Boost": "0",
++            "Clamp": "30%"
++          }
++        }
++      ]
++    },
++
++    {
++      "Name": "LowMemoryUsage",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "MemSoftLimit",
++            "Value": "16MB"
++          }
++        },
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "MemSwappiness",
++            "Value": "150"
++
++          }
++        }
++      ]
++    },
++    {
++      "Name": "HighMemoryUsage",
++      "Actions": [
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "MemSoftLimit",
++            "Value": "512MB"
++          }
++        },
++        {
++          "Name": "SetAttribute",
++          "Params":
++          {
++            "Name": "MemSwappiness",
++            "Value": "100"
++          }
++        }
++      ]
++    },
++    {
++      "Name": "SystemMemoryProcess",
++      "Actions": [
++        {
++          "Name": "JoinCgroup",
++          "Params":
++          {
++            "Controller": "memory",
++            "Path": "system"
++          }
++        }
++      ]
++    }
++  ],
++
++  "AggregateProfiles": [
++    {
++      "Name": "SCHED_SP_DEFAULT",
++      "Profiles": [ "TimerSlackNormal" ]
++    },
++    {
++      "Name": "SCHED_SP_BACKGROUND",
++      "Profiles": [ "HighEnergySaving", "LowIoPriority", "TimerSlackHigh" ]
++    },
++    {
++      "Name": "SCHED_SP_FOREGROUND",
++      "Profiles": [ "HighPerformance", "HighIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "SCHED_SP_TOP_APP",
++      "Profiles": [ "MaxPerformance", "MaxIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "SCHED_SP_SYSTEM",
++      "Profiles": [ "ServicePerformance", "LowIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "SCHED_SP_RT_APP",
++      "Profiles": [ "RealtimePerformance", "MaxIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "CPUSET_SP_DEFAULT",
++      "Profiles": [ "TimerSlackNormal" ]
++    },
++    {
++      "Name": "CPUSET_SP_BACKGROUND",
++      "Profiles": [ "HighEnergySaving", "ProcessCapacityLow", "LowIoPriority", "TimerSlackHigh" ]
++    },
++    {
++      "Name": "CPUSET_SP_FOREGROUND",
++      "Profiles": [ "HighPerformance", "ProcessCapacityHigh", "HighIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "CPUSET_SP_TOP_APP",
++      "Profiles": [ "MaxPerformance", "ProcessCapacityMax", "MaxIoPriority", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "CPUSET_SP_SYSTEM",
++      "Profiles": [ "ServiceCapacityLow", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "CPUSET_SP_RESTRICTED",
++      "Profiles": [ "ServiceCapacityRestricted", "TimerSlackNormal" ]
++    },
++    {
++      "Name": "Dex2OatBootComplete",
++      "Profiles": [ "SCHED_SP_BACKGROUND" ]
++    }
++  ]
++}
+diff --git a/imx8m/redwood_8mm/thermal_info_config_imx8mm.json b/imx8m/redwood_8mm/thermal_info_config_imx8mm.json
+deleted file mode 120000
+index b4a817d5..00000000
+--- a/imx8m/redwood_8mm/thermal_info_config_imx8mm.json
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/thermal_info_config_imx8mm.json
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/thermal_info_config_imx8mm.json b/imx8m/redwood_8mm/thermal_info_config_imx8mm.json
+new file mode 100755
+index 00000000..3e8b013d
+--- /dev/null
++++ b/imx8m/redwood_8mm/thermal_info_config_imx8mm.json
+@@ -0,0 +1,59 @@
++{
++    "HotplugCPUs":[
++            "cpu2",
++            "cpu3"
++    ],
++    "Sensors":[
++        {
++            "Name":"cpu-thermal",
++            "Type":"CPU",
++            "HotThreshold":[
++                "NAN",
++                80.0,
++                82.0,
++                86.0,
++                88.0,
++                "NAN",
++                90.0
++            ],
++            "HotHysteresis":[
++                2.0,
++                2.0,
++                2.0,
++                2.0,
++                2.0,
++                2.0,
++                2.0
++            ],
++            "VrThreshold":"NAN",
++            "Multiplier":0.001,
++            "Monitor":true
++        },
++        {
++            "Name":"battery",
++            "Type":"BATTERY",
++            "HotThreshold":[
++                "NAN",
++                "NAN",
++                "NAN",
++                "NAN",
++                "NAN",
++                "NAN",
++                100.0
++            ],
++            "VrThreshold":"NAN",
++            "Multiplier":0.001,
++            "Monitor":true
++        }
++    ],
++    "CoolingDevices":[
++        {
++            "Name":"thermal-gpufreq-0",
++            "Type":"GPU"
++        },
++        {
++            "Name":"thermal-cpufreq-0",
++            "Type":"CPU"
++        }
++    ]
++}
+diff --git a/imx8m/redwood_8mm/ueventd.nxp.rc b/imx8m/redwood_8mm/ueventd.nxp.rc
+deleted file mode 120000
+index 9eeafb2e..00000000
+--- a/imx8m/redwood_8mm/ueventd.nxp.rc
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/ueventd.nxp.rc
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/ueventd.nxp.rc b/imx8m/redwood_8mm/ueventd.nxp.rc
+new file mode 100644
+index 00000000..d2681454
+--- /dev/null
++++ b/imx8m/redwood_8mm/ueventd.nxp.rc
+@@ -0,0 +1,25 @@
++/dev/block/by-name/presistdata 0600   system     system
++/dev/ttymxc0              0660   bluetooth  bluetooth
++/dev/snd/*                0660   system     audio
++/dev/video*               0660   system     camera
++/dev/mxc_hantro           0666   media      drmrpc
++/dev/mxc_hantro_h1        0666   media      drmrpc
++/dev/vsi_daemon_ctrl      0666   media      drmrpc
++/dev/ion                  0666   media      drmrpc
++/dev/galcore	          0666 	 system     graphics
++/dev/graphics/fb0         0660   system     graphics
++/dev/watchdog             0660   system     root
++/dev/mmcblk2rpmb    0600   system     system
++/dev/trusty-ipc-dev0      0660   system     drmrpc
++/dev/block/pmem0          0660 system system
++/dev/dma_heap/reserved    0666   system     system
++/dev/dma_heap/reserved-uncached    0666   system     system
++/dev/dma_heap/secure      0666   system     system
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_temp 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_temp 0660 system system
++
++/sys/devices/virtual/thermal/thermal_zone* trip_point_0_hyst 0660 system system
++/sys/devices/virtual/thermal/thermal_zone* trip_point_1_hyst 0660 system system
++
++/dev/dmabuf_imx           0664   system     system
+diff --git a/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml b/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml
+deleted file mode 120000
+index dc22f9a8..00000000
+--- a/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml
++++ /dev/null
+@@ -1 +0,0 @@
+-../evk_8mm/usb_audio_policy_configuration-direct-output.xml
+\ No newline at end of file
+diff --git a/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml b/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml
+new file mode 100644
+index 00000000..b826785a
+--- /dev/null
++++ b/imx8m/redwood_8mm/usb_audio_policy_configuration-direct-output.xml
+@@ -0,0 +1,56 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!-- Copyright (C) 2019 The Android Open Source Project
++     Copyright 2019 NXP
++
++     Licensed under the Apache License, Version 2.0 (the "License");
++     you may not use this file except in compliance with the License.
++     You may obtain a copy of the License at
++
++          http://www.apache.org/licenses/LICENSE-2.0
++
++     Unless required by applicable law or agreed to in writing, software
++     distributed under the License is distributed on an "AS IS" BASIS,
++     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++     See the License for the specific language governing permissions and
++     limitations under the License.
++-->
++<!-- USB Audio HAL Audio Policy Configuration file -->
++
++<module name="usb" halVersion="2.0">
++    <mixPorts>
++        <mixPort name="usb_accessory output" role="source">
++            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                     samplingRates="44100" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++        </mixPort>
++        <mixPort name="direct output" role="source" flags="AUDIO_OUTPUT_FLAG_DIRECT">
++            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                     samplingRates="384000" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++        </mixPort>
++        <mixPort name="usb_device output" role="source"/>
++        <mixPort name="usb_device input" role="sink"/>
++    </mixPorts>
++    <devicePorts>
++        <devicePort tagName="USB Host Out" type="AUDIO_DEVICE_OUT_USB_ACCESSORY" role="sink">
++            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
++                     samplingRates="44100" channelMasks="AUDIO_CHANNEL_OUT_STEREO"/>
++        </devicePort>
++        <devicePort tagName="USB Device Out" type="AUDIO_DEVICE_OUT_USB_DEVICE" role="sink"/>
++        <devicePort tagName="USB Headset Out" type="AUDIO_DEVICE_OUT_USB_HEADSET" role="sink"/>
++        <devicePort tagName="USB Device In" type="AUDIO_DEVICE_IN_USB_DEVICE" role="source"/>
++        <devicePort tagName="USB Headset In" type="AUDIO_DEVICE_IN_USB_HEADSET" role="source"/>
++    </devicePorts>
++    <routes>
++        <route type="mix" sink="USB Host Out"
++               sources="usb_accessory output"/>
++        <route type="mix" sink="USB Device Out"
++               sources="usb_device output"/>
++        <route type="mix" sink="USB Headset Out"
++               sources="usb_device output"/>
++        <route type="mix" sink="usb_device input"
++               sources="USB Device In,USB Headset In"/>
++        <route type="mix" sink="USB Device Out"
++               sources="direct output"/>
++        <route type="mix" sink="USB Headset Out"
++               sources="direct output"/>
++    </routes>
++</module>

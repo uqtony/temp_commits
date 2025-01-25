@@ -1,0 +1,46 @@
+5e5f3eb260 Andrew Su 2020-09-04
+
+Revert "AOS-291: check property ro.idt.ts_orientation and change touch screen orientation if needed"
+
+This reverts commit ebf72ec0e7addf3d2dc149e2dc3f2da74abcd473.
+
+Reason for revert: instead of fix touch orientation, change display and touch orientation by system in framework
+
+Change-Id: I68e63928c1079a76b72f2423928e7092a9cb9a1f
+
+diff --git a/services/inputflinger/InputReader.cpp b/services/inputflinger/InputReader.cpp
+index 697d767f3c..74de87db8b 100644
+--- a/services/inputflinger/InputReader.cpp
++++ b/services/inputflinger/InputReader.cpp
+@@ -52,7 +52,6 @@
+ #include <stdlib.h>
+ #include <unistd.h>
+ 
+-#include <cutils/properties.h>
+ #include <log/log.h>
+ 
+ #include <android-base/stringprintf.h>
+@@ -3565,23 +3564,6 @@ void TouchInputMapper::configureSurface(nsecs_t when, bool* outResetNeeded) {
+             int32_t naturalPhysicalWidth, naturalPhysicalHeight;
+             int32_t naturalPhysicalLeft, naturalPhysicalTop;
+             int32_t naturalDeviceWidth, naturalDeviceHeight;
+-            // for IDT BigCypress change primary display touch screen orientation
+-            char value[PROPERTY_VALUE_MAX];
+-            int32_t ts_orientation;
+-            property_get("ro.idt.ts_orientation", value, "0");
+-            ts_orientation = atoi(value);
+-            switch (ts_orientation) {
+-            case DISPLAY_ORIENTATION_0:
+-            case DISPLAY_ORIENTATION_90:
+-            case DISPLAY_ORIENTATION_180:
+-            case DISPLAY_ORIENTATION_270:
+-                mViewport.orientation = ts_orientation;
+-                break;
+-            default:
+-                mViewport.orientation = DISPLAY_ORIENTATION_0;
+-                break;
+-            }
+-
+             switch (mViewport.orientation) {
+             case DISPLAY_ORIENTATION_90:
+                 naturalLogicalWidth = mViewport.logicalBottom - mViewport.logicalTop;

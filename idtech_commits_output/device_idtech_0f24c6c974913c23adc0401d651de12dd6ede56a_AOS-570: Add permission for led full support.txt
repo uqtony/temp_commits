@@ -1,0 +1,84 @@
+0f24c6c9 jay deng 2021-03-31
+
+AOS-570: Add permission for led full support
+
+Change-Id: I92fd2bd98cd0b8de5bcd119b9140a68063c45375
+
+diff --git a/imx8m/bigcypress_8mq/sepolicy/file_contexts b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+index 2f71ac36..ac6a6e6e 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/file_contexts
++++ b/imx8m/bigcypress_8mq/sepolicy/file_contexts
+@@ -50,6 +50,9 @@
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+ 
+ #Kiosk Led file node
+-/sys/devices/platform/leds/leds/LED_KIOSK_[0-9]/brightness     u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/brightness     u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/trigger        u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/delay_on       u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/delay_off      u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+ /vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
+diff --git a/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
+index 21fc1603..bc47f581 100644
+--- a/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
++++ b/imx8m/bigcypress_8mq/sepolicy/hal_kioskled_default.te
+@@ -5,5 +5,5 @@ init_daemon_domain(hal_kioskled_default)
+ hal_server_domain(hal_kioskled_default, hal_kioskled)
+ 
+ allow hal_kioskled_default sysfs_idtech_kioskleds:file rw_file_perms;
+-allow hal_kioskled_default sysfs_leds:dir search;
++allow hal_kioskled_default sysfs_leds:dir { search read open };
+ 
+diff --git a/imx8m/bigcypress_8mq/ueventd.nxp.rc b/imx8m/bigcypress_8mq/ueventd.nxp.rc
+index a84f90c4..cdd6ce4f 100644
+--- a/imx8m/bigcypress_8mq/ueventd.nxp.rc
++++ b/imx8m/bigcypress_8mq/ueventd.nxp.rc
+@@ -21,4 +21,7 @@
+ /dev/usb/lp0              0666   root         root
+ 
+ #KIOSK LED
+-/sys/class/leds/LED_KIOSK_* brightness 0666 root root
++/sys/class/leds/* brightness 0666 root root
++/sys/class/leds/* trigger 0666 root root
++/sys/class/leds/* delay_on 0666 root root
++/sys/class/leds/* delay_off 0666 root root
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/file_contexts b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+index f91a72cc..600ce8fc 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/file_contexts
++++ b/imx8m/kingscanyon_8mq/sepolicy/file_contexts
+@@ -50,6 +50,9 @@
+ /vendor/bin/hw/android\.hardware\.media\.c2@1\.0-service    u:object_r:mediacodec_exec:s0
+ 
+ #Kiosk Led file node
+-/sys/devices/platform/leds/leds/LED_KIOSK_[0-9]/brightness     u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/brightness     u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/trigger        u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/delay_on       u:object_r:sysfs_idtech_kioskleds:s0
++/sys/devices/platform/leds/leds/(.*)/delay_off      u:object_r:sysfs_idtech_kioskleds:s0
+ /vendor/bin/hw/android\.hardware\.kioskled@1\.0-service        u:object_r:hal_kioskled_default_exec:s0
+ /vendor/bin/hw/android\.hardware\.kioskled-service             u:object_r:hal_kioskled_default_exec:s0
+diff --git a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+index 21fc1603..bc47f581 100644
+--- a/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
++++ b/imx8m/kingscanyon_8mq/sepolicy/hal_kioskled_default.te
+@@ -5,5 +5,5 @@ init_daemon_domain(hal_kioskled_default)
+ hal_server_domain(hal_kioskled_default, hal_kioskled)
+ 
+ allow hal_kioskled_default sysfs_idtech_kioskleds:file rw_file_perms;
+-allow hal_kioskled_default sysfs_leds:dir search;
++allow hal_kioskled_default sysfs_leds:dir { search read open };
+ 
+diff --git a/imx8m/kingscanyon_8mq/ueventd.nxp.rc b/imx8m/kingscanyon_8mq/ueventd.nxp.rc
+index c9ab4e6b..b39b1896 100644
+--- a/imx8m/kingscanyon_8mq/ueventd.nxp.rc
++++ b/imx8m/kingscanyon_8mq/ueventd.nxp.rc
+@@ -21,4 +21,7 @@
+ /dev/usb/lp0              0666   root         root
+ 
+ #KIOSK LED
+-/sys/class/leds/LED_KIOSK_* brightness 0666 root root
++/sys/class/leds/* brightness 0666 root root
++/sys/class/leds/* trigger 0666 root root
++/sys/class/leds/* delay_on 0666 root root
++/sys/class/leds/* delay_off 0666 root root

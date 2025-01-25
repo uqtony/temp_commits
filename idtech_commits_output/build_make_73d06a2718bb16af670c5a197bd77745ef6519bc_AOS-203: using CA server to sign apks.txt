@@ -1,0 +1,287 @@
+73d06a271 owen.wen 2020-06-03
+
+AOS-203: using CA server to sign apks
+
+this change provide the function of
+1. dump hash data of apks and apex
+2. send the hash data to test CA server
+3. combine the signature with apk and apex
+
+get the hash data from apk or apex:
+./build/make/tools/releasetools/dump_apks_to_sign.sh \
+        dump \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.owenwen/META/apexkeys.txt \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apex_tosign-eng.owenwen.zip
+the hash data will auto generated when "make dist", so most of time don't need to dump manually
+1. out/dist/vp6820_8mq-apks_tosign-eng.$username.zip
+2. out/dist/vp6820_8mq-apex_tosign-eng.$username.zip
+
+get the signature from test CA server:
+./build/make/tools/releasetools/dump_apks_to_sign.sh \
+        stsv \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.owenwen/META/apexkeys.txt \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apex_tosign-eng.owenwen.zip \
+        build/make/tools/releasetools/CAserver.pem
+
+comb the signature with apk or apex:
+./build/make/tools/releasetools/dump_apks_to_sign.sh \
+        comb \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.owenwen/META/apexkeys.txt \
+        out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apex_tosign-eng.owenwen.zip
+
+Change-Id: Ie88440e0e8b25dbb31d9dbefe354ac4710d17a98
+
+diff --git a/core/Makefile b/core/Makefile
+index 7811094ac..f0b0236e9 100644
+--- a/core/Makefile
++++ b/core/Makefile
+@@ -3714,6 +3714,25 @@ $(BUILT_TARGET_FILES_PACKAGE): intermediates := $(intermediates)
+ $(BUILT_TARGET_FILES_PACKAGE): \
+ 	    zip_root := $(intermediates)/$(name)
+ 
++BUILT_APKS_TO_SIGN_PACKAGE := $(intermediates)/$(TARGET_PRODUCT)-apks_tosign-$(FILE_NAME_TAG).zip
++$(BUILT_APKS_TO_SIGN_PACKAGE): intermediates := $(intermediates)
++$(BUILT_APKS_TO_SIGN_PACKAGE): zip_root := $(intermediates)/$(name)
++$(BUILT_APKS_TO_SIGN_PACKAGE): $(BUILT_TARGET_FILES_PACKAGE)
++	build/make/tools/releasetools/dump_apks_to_sign.sh dump $(zip_root)/META/apkcerts.txt $(BUILT_APKS_TO_SIGN_PACKAGE)
++
++.PHONY: built-apks-to-sign-package
++built-apks-to-sign-package: $(BUILT_APKS_TO_SIGN_PACKAGE)
++
++BUILT_APEX_TO_SIGN_PACKAGE := $(intermediates)/$(TARGET_PRODUCT)-apex_tosign-$(FILE_NAME_TAG).zip
++$(BUILT_APEX_TO_SIGN_PACKAGE): intermediates := $(intermediates)
++$(BUILT_APEX_TO_SIGN_PACKAGE): zip_root := $(intermediates)/$(name)
++$(BUILT_APEX_TO_SIGN_PACKAGE): $(BUILT_APKS_TO_SIGN_PACKAGE)
++$(BUILT_APEX_TO_SIGN_PACKAGE): $(BUILT_TARGET_FILES_PACKAGE)
++	build/make/tools/releasetools/dump_apks_to_sign.sh dump $(zip_root)/META/apexkeys.txt $(BUILT_APEX_TO_SIGN_PACKAGE)
++
++.PHONY: built-apex-to-sign-package
++built-apex-to-sign-package: $(BUILT_APEX_TO_SIGN_PACKAGE)
++
+ # $(1): Directory to copy
+ # $(2): Location to copy it to
+ # The "ls -A" is to prevent "acp s/* d" from failing if s is empty.
+@@ -3845,6 +3864,7 @@ $(BUILT_TARGET_FILES_PACKAGE): \
+ 	    $(HOST_OUT_EXECUTABLES)/imgdiff \
+ 	    $(HOST_OUT_EXECUTABLES)/bsdiff \
+ 	    $(HOST_OUT_EXECUTABLES)/care_map_generator \
++	    $(HOST_OUT_EXECUTABLES)/apksigner \
+ 	    $(BUILD_IMAGE_SRCS) \
+ 	    $(BUILT_ASSEMBLED_FRAMEWORK_MANIFEST) \
+ 	    $(BUILT_ASSEMBLED_VENDOR_MANIFEST) \
+diff --git a/core/main.mk b/core/main.mk
+index e9b1bca4a..b25f43cda 100644
+--- a/core/main.mk
++++ b/core/main.mk
+@@ -1734,6 +1734,8 @@ else # TARGET_BUILD_APPS
+     $(INSTALLED_FILES_JSON_RECOVERY) \
+     $(INSTALLED_BUILD_PROP_TARGET) \
+     $(BUILT_TARGET_FILES_PACKAGE) \
++    $(BUILT_APKS_TO_SIGN_PACKAGE) \
++    $(BUILT_APEX_TO_SIGN_PACKAGE) \
+     $(INSTALLED_ANDROID_INFO_TXT_TARGET) \
+     $(INSTALLED_RAMDISK_TARGET) \
+    )
+diff --git a/tools/releasetools/dump_apks_to_sign.sh b/tools/releasetools/dump_apks_to_sign.sh
+new file mode 100755
+index 000000000..19367412a
+--- /dev/null
++++ b/tools/releasetools/dump_apks_to_sign.sh
+@@ -0,0 +1,191 @@
++#!/bin/bash
++set -e
++
++argv=$1
++apkcerts=$2
++apkzippath=$3
++CAcert=$4
++
++APKSIGNER="out/host/linux-x86/bin/apksigner"
++DER_PATH="device/idtech/common/security/IDT_CA_TESTING"
++FAKEKS="$DER_PATH/fake.keystore"
++KSPASS="testtest"
++SIG_SIZE=512
++CA_SERVER="99.93.153.229:7001"
++CAID1="Admin1"
++CAID2="Admin2"
++CAPS1="idtech"
++CAPS2="idtech"
++CACA="ID TECH PKI TEST"
++
++dump_apks_to_sign() {
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.$USER_NAME/META/apkcerts.txt
++    APKCERTS=$1
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.$USER_NAME/
++    TGT_ROOT=$(dirname $(dirname $APKCERTS))
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apks-tosign-eng.$USER_NAME.zip
++    APKS_TO_SIGN_ZIP=$(basename $2)
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/
++    APKS_TO_SIGN=$(dirname $2)
++
++    if [[ "$APKCERTS" == *"apexkeys.txt" ]]; then
++        declare -a keytypes=("apex")
++    else
++        declare -a keytypes=("media" "networkstack" "platform" "shared" "testkey")
++    fi
++    for keytype in "${keytypes[@]}"
++    do
++        echo $keytype
++        if [ "$keytype" = "media" ]; then
++            RT="Application_Auth_ID_TECH"
++        elif [ "$keytype" = "networkstack" ]; then
++            RT="FW_Auth_NEO2.0_v2"
++        elif [ "$keytype" = "platform" ]; then
++            RT="FW_AUTH_VP8800"
++        elif [ "$keytype" = "shared" ]; then
++            RT="MFG_Commands_NEO2.0_v2"
++        elif [ "$keytype" = "testkey" ]; then
++            RT="Secure_Message_ID_TECH"
++        elif [ "$keytype" = "apex" ]; then
++            RT="Secure_Message_ID_TECH"
++        fi
++        cp "$DER_PATH/$RT.der" cert.der
++        mkdir -p $APKS_TO_SIGN/$keytype
++        apks=($(grep "$keytype" $APKCERTS | grep -v "PRESIGNED" | cut -d'"' -f2))
++        for apk in "${apks[@]}"
++        do
++            apkpath=$(find $TGT_ROOT -name $apk)
++            if [ ! -f "$apkpath" ]; then
++                continue
++            fi
++            echo $apkpath
++            $APKSIGNER sign --dump-sign-data true --v1-signing-enabled false --ks $FAKEKS --ks-pass pass:$KSPASS $apkpath
++            mv v2.to-sign.hex $APKS_TO_SIGN/$keytype/$apk.v2.hex
++            mv v3.to-sign.hex $APKS_TO_SIGN/$keytype/$apk.v3.hex
++        done
++        rm cert.der
++    done
++    pushd $APKS_TO_SIGN
++    zip -r "$APKS_TO_SIGN_ZIP" "${keytypes[@]}"
++    rm -rf "${keytypes[@]}"
++    popd
++}
++
++combine_signature() {
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.$USER_NAME/META/apkcerts.txt
++    APKCERTS=$1
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-target_files-eng.$USER_NAME/
++    TGT_ROOT=$(dirname $(dirname $APKCERTS))
++    # out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apks-tosign-eng.$USER_NAME
++    SIGN_PATH=$(dirname $2)/$(basename $2 .zip)
++
++    if [[ "$APKCERTS" == *"apexkeys.txt" ]]; then
++        declare -a keytypes=("apex")
++        filename_suffix="apex"
++    else
++        declare -a keytypes=("media" "networkstack" "platform" "shared" "testkey")
++        filename_suffix="apk"
++    fi
++    for keytype in "${keytypes[@]}"
++    do
++        echo $keytype
++        if [ "$keytype" = "media" ]; then
++            RT="Application_Auth_ID_TECH"
++        elif [ "$keytype" = "networkstack" ]; then
++            RT="FW_Auth_NEO2.0_v2"
++        elif [ "$keytype" = "platform" ]; then
++            RT="FW_AUTH_VP8800"
++        elif [ "$keytype" = "shared" ]; then
++            RT="MFG_Commands_NEO2.0_v2"
++        elif [ "$keytype" = "testkey" ]; then
++            RT="Secure_Message_ID_TECH"
++        elif [ "$keytype" = "apex" ]; then
++            RT="Secure_Message_ID_TECH"
++        fi
++        cp "$DER_PATH/$RT.der" cert.der
++        array=()
++        for item in $SIGN_PATH/$keytype/*.sig.bin
++        do
++            array+=("$(basename $item | rev | cut -d'.' -f 5- | rev)")
++        done
++        sorted=($(echo "${array[@]}" | tr ' ' '
+' | sort -u | tr '
+' ' '))
++        for apkname in "${sorted[@]}"
++        do
++            apkpath=$(find $TGT_ROOT -name ${apkname})
++            echo $apkpath
++            cp $SIGN_PATH/$keytype/$apkname.v2.hex.sig.bin v2.sig.bin
++            cp $SIGN_PATH/$keytype/$apkname.v3.hex.sig.bin v3.sig.bin
++            $APKSIGNER sign --combine-signature-data true --v1-signing-enabled false --ks $FAKEKS --ks-pass pass:$KSPASS $apkpath
++            rm v2.sig.bin
++            rm v3.sig.bin
++        done
++        rm cert.der
++    done
++}
++
++send_to_server() {
++    #out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apks-tosign-eng.$USER_NAME.zip
++    APKS_TO_SIGN_ZIP=$2
++    #out/target/product/vp6820_8mq/obj/PACKAGING/target_files_intermediates/vp6820_8mq-apks-tosign-eng.$USER_NAME
++    APKS_TO_SIGN=$(dirname $APKS_TO_SIGN_ZIP)/$(basename $APKS_TO_SIGN_ZIP .zip)
++    CACERT=$3
++
++    rm -rf $APKS_TO_SIGN
++    unzip -d $APKS_TO_SIGN $APKS_TO_SIGN_ZIP
++    if [[ "$APKS_TO_SIGN_ZIP" == *"apex"* ]]; then
++        declare -a keytypes=("apex")
++    else
++        declare -a keytypes=("media" "networkstack" "platform" "shared" "testkey")
++    fi
++    if [ -z "$ANDROID_BUILD_TOP" ]; then
++        echo "cannot find ANDROID_BUILD_TOP"
++        exit 1
++    fi
++    pushd $APKS_TO_SIGN
++    for key in "${keytypes[@]}"
++    do
++        pushd $key
++            for item in *.hex
++            do
++                echo `pwd`/$item
++                hex=$(cat $item)
++                if [ "$key" = "media" ]; then
++                    RT="Application Auth (ID TECH)"
++                elif [ "$key" = "networkstack" ]; then
++                    RT="FW Auth (NEO2.0)"
++                elif [ "$key" = "platform" ]; then
++                    RT="FW Auth (VP8800)"
++                elif [ "$key" = "shared" ]; then
++                    RT="MFG Commands (NEO2.0)"
++                elif [ "$key" = "testkey" ]; then
++                    RT="Secure Message (ID TECH)"
++                elif [ "$key" = "apex" ]; then
++                    RT="Secure Message (ID TECH)"
++                fi
++                echo "using RT: $RT"
++                size=0
++                while [ "$size" != "$SIG_SIZE" ]
++                do
++                    set +e
++                    value=$(timeout 2s openssl s_client -connect $CA_SERVER -cert $CACERT -ign_eof <<< $"[AORKLO;DA$CAID1;CH$CAPS1]
+[AORKLO;DA$CAID2;CH$CAPS2]
+[AORKGS;CA$CACA;RT$RT;RF$hex;HS1;RG4;ZA1]
+
+")
++                    set -e
++                    searchstring="RH"
++                    signature=${value#*$searchstring}
++                    signature=$(echo $signature | cut -d';' -f1)
++                    echo -n $signature > $(basename $item).sig
++                    size=$(stat -c "%s" $(basename $item).sig)
++                    xxd -r -p $(basename $item).sig $(basename $item).sig.bin
++                done
++            done
++        popd
++    done
++}
++
++if [ "$argv" = "dump" ]; then
++    dump_apks_to_sign $apkcerts $apkzippath
++elif [ "$argv" = "comb" ]; then
++    combine_signature $apkcerts $apkzippath
++elif [ "$argv" = "stsv" ]; then
++    send_to_server $apkcerts $apkzippath $(readlink -e $CAcert)
++fi
++

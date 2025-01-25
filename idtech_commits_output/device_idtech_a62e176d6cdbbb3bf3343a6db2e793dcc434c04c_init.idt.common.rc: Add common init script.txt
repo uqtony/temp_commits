@@ -1,0 +1,60 @@
+a62e176d Sergii Postulga 2019-12-19
+
+init.idt.common.rc: Add common init script
+
+Patch defines init script for
+common features/env's that need to be
+initialized for all products.
+
+Patch also enable automatic permissions
+approval for the apps.
+
+Change-Id: Ie976c289c9122c2d6f94419dabe2616c9a6f051e
+Signed-off-by: Sergii Postulga <sergii.postulga@idtechproducts.com>
+
+diff --git a/imx8m/ProductConfigCommon.mk b/imx8m/ProductConfigCommon.mk
+index ff22c63e..257b0e6e 100644
+--- a/imx8m/ProductConfigCommon.mk
++++ b/imx8m/ProductConfigCommon.mk
+@@ -325,6 +325,10 @@ PRODUCT_COPY_FILES += \
+     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
+ 
++# Copy soc related config and binary to board
++PRODUCT_COPY_FILES += \
++    device/idtech/imx8m/init.idt.common.rc:root/init.idt.common.rc
++
+ PRODUCT_PROPERTY_OVERRIDES += \
+     pm.dexopt.boot=quicken \
+     ro.hardware.bootctrl=avb \
+diff --git a/imx8m/init.idt.common.rc b/imx8m/init.idt.common.rc
+new file mode 100644
+index 00000000..62435ab5
+--- /dev/null
++++ b/imx8m/init.idt.common.rc
+@@ -0,0 +1,3 @@
++on early-boot
++    # Approve Apps permissions
++    setprop ro.idt.app_perm_approve true
+diff --git a/imx8m/vp6820_8mn/init.rc b/imx8m/vp6820_8mn/init.rc
+index 7313285c..8c377792 100644
+--- a/imx8m/vp6820_8mn/init.rc
++++ b/imx8m/vp6820_8mn/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /init.idt.common.rc
+ 
+ on early-init
+     # mount the debugfs
+diff --git a/imx8m/vp6820_8mq/init.rc b/imx8m/vp6820_8mq/init.rc
+index e35b468d..d1591877 100644
+--- a/imx8m/vp6820_8mq/init.rc
++++ b/imx8m/vp6820_8mq/init.rc
+@@ -1,5 +1,6 @@
+ import /vendor/etc/init/hw/init.${ro.hardware}.usb.rc
+ import /vendor/etc/init/hw/init.${ro.hardware}.${ro.boot.soc_type}.rc
++import /init.idt.common.rc
+ 
+ on early-init
+     # mount the debugfs
