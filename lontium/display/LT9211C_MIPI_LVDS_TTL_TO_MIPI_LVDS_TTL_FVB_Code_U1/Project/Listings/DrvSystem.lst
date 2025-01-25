@@ -1,0 +1,251 @@
+C51 COMPILER V9.53.0.0   DRVSYSTEM                                                         06/30/2023 14:32:03 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE DRVSYSTEM
+OBJECT MODULE PLACED IN ..\..\..\..\..\out\DrvSystem.obj
+COMPILER INVOKED BY: C:\Keil_v5\c51\C51\BIN\C51.EXE ..\User\Driver\DrvSystem.c LARGE OPTIMIZE(8,SIZE) OPTIMIZE(8,SIZE) R
+                    -EGFILE(..\..\..\..\..\out\LT9211C_MIPI DSI to LVDS test.ORC) BROWSE INCDIR(..\User\Driver;..\User\App;..\User\Ocm;..\Use
+                    -r\Module) DEBUG OBJECTEXTEND PRINT(.\Listings\DrvSystem.lst) OBJECT(..\..\..\..\..\out\DrvSystem.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9211C
+   3            * @file: DrvSystem.c
+   4            * @author: sxue
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2023.01.29
+   7          /******************************************************************************/
+   8          
+   9          #include "include.h"
+  10          
+  11          #if LT9211C_MODE_SEL != PATTERN_OUT
+  12          
+  13          void Drv_SystemActRx_Sel(IN u8 ucSrc)
+  14          {
+  15   1          HDMI_WriteI2C_Byte(0xff,0x85);
+  16   1          HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) & 0xf8));
+  17   1      
+  18   1          switch(ucSrc)
+  19   1          {
+  20   2              case LVDSRX:
+  21   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | LVDSRX));
+  22   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) & 0xcf)); //[5:4]00: LVDSRX
+  23   2              break;
+  24   2              case MIPIRX:
+  25   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | MIPIRX));
+  26   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | BIT4_1)); //[5:4]01: MIPIRX
+  27   2              break;
+  28   2              case TTLRX:
+  29   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | TTLRX));
+  30   2              break;
+  31   2              case PATTERN:
+  32   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | PATTERN));
+  33   2              break;
+  34   2              default:
+  35   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | LVDSRX));
+  36   2              break;
+  37   2              
+  38   2          }
+  39   1      }
+  40          
+  41          void Drv_SystemTxSram_Sel(IN u8 ucSrc)
+  42          {
+  43   1          //[7:6]2'b00: TX Sram sel MIPITX; others sel LVDSTX
+  44   1          HDMI_WriteI2C_Byte(0xff,0x85);
+  45   1          HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) & 0x3f)); 
+  46   1      
+  47   1          switch(ucSrc)
+  48   1          {
+  49   2              case LVDSTX:
+  50   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) | BIT6_1));
+  51   2              break;
+  52   2              case MIPITX:
+  53   2                  HDMI_WriteI2C_Byte(0x30,(HDMI_ReadI2C_Byte(0x30) & BIT6_0));
+C51 COMPILER V9.53.0.0   DRVSYSTEM                                                         06/30/2023 14:32:03 PAGE 2   
+
+  54   2              break;
+  55   2          }
+  56   1      }
+  57          
+  58          u8 Drv_System_GetPixelEncoding(void)
+  59          {
+  60   1          return g_stChipRx.ucRxFormat;
+  61   1      }
+  62          
+  63          
+  64          void Drv_System_VidChkClk_SrcSel(u8 ucSrc)
+  65          {
+  66   1          HDMI_WriteI2C_Byte(0xff,0x81);
+  67   1          HDMI_WriteI2C_Byte(0x80,(HDMI_ReadI2C_Byte(0x80) & 0xfc));
+  68   1      
+  69   1          switch (ucSrc)
+  70   1          {
+  71   2              case RXPLL_PIX_CLK:
+  72   2                  HDMI_WriteI2C_Byte(0x80,(HDMI_ReadI2C_Byte(0x80) | RXPLL_PIX_CLK));
+  73   2              break;
+  74   2              case DESSCPLL_PIX_CLK:
+  75   2                  HDMI_WriteI2C_Byte(0x80,(HDMI_ReadI2C_Byte(0x80) | DESSCPLL_PIX_CLK));
+  76   2              break;
+  77   2              case RXPLL_DEC_DDR_CLK:
+  78   2                  HDMI_WriteI2C_Byte(0x80,(HDMI_ReadI2C_Byte(0x80) | RXPLL_DEC_DDR_CLK));
+  79   2              break;
+  80   2              case MLRX_BYTE_CLK:
+  81   2                  HDMI_WriteI2C_Byte(0x80,(HDMI_ReadI2C_Byte(0x80) | MLRX_BYTE_CLK));
+  82   2              break;    
+  83   2              
+  84   2          }
+  85   1      
+  86   1      }
+  87          
+  88          void Drv_System_VidChk_SrcSel(u8 ucSrc)
+  89          {
+  90   1          HDMI_WriteI2C_Byte(0xff,0x86);
+  91   1          HDMI_WriteI2C_Byte(0x3f,(HDMI_ReadI2C_Byte(0x80) & 0xf8));
+  92   1      
+  93   1          switch (ucSrc)
+  94   1          {
+  95   2              case LVDSRX:
+  96   2                  HDMI_WriteI2C_Byte(0x3f,LVDSRX);
+  97   2              break;
+  98   2              case MIPIRX:
+  99   2                  HDMI_WriteI2C_Byte(0x3f,MIPIRX);
+ 100   2              break;
+ 101   2              case TTLRX:
+ 102   2                  HDMI_WriteI2C_Byte(0x3f,TTLRX);
+ 103   2              break;
+ 104   2              case PATTERN:
+ 105   2                  HDMI_WriteI2C_Byte(0x3f,PATTERN);
+ 106   2              break;
+ 107   2              case LVDSDEBUG:
+ 108   2                  HDMI_WriteI2C_Byte(0x3f,LVDSDEBUG);
+ 109   2              case MIPIDEBUG:
+ 110   2                  HDMI_WriteI2C_Byte(0x3f,MIPIDEBUG);
+ 111   2              break;
+ 112   2              case TTLDEBUG:
+ 113   2                  HDMI_WriteI2C_Byte(0x3f,TTLDEBUG);
+ 114   2              break;    
+ 115   2              
+C51 COMPILER V9.53.0.0   DRVSYSTEM                                                         06/30/2023 14:32:03 PAGE 3   
+
+ 116   2          }
+ 117   1      
+ 118   1      }
+ 119          
+ 120          
+ 121          u16 Drv_VidChkSingle_Get(u8 ucPara)
+ 122          { 
+ 123   1          u16 usRtn = 0;
+ 124   1      
+ 125   1          HDMI_WriteI2C_Byte(0xff,0x81);
+ 126   1          HDMI_WriteI2C_Byte(0x0b,0x7f);
+ 127   1          HDMI_WriteI2C_Byte(0x0b,0xff);
+ 128   1          Ocm_Timer0_Delay1ms(80);
+ 129   1          HDMI_WriteI2C_Byte(0xff,0x86);
+ 130   1          switch(ucPara)
+ 131   1          {
+ 132   2              case HTOTAL_POS:
+ 133   2                  usRtn = (HDMI_ReadI2C_Byte(0x60) << 8) + HDMI_ReadI2C_Byte(0x61);
+ 134   2              break;
+ 135   2              case HACTIVE_POS:
+ 136   2                  usRtn = (HDMI_ReadI2C_Byte(0x5c) << 8) + HDMI_ReadI2C_Byte(0x5d);  
+ 137   2              break;
+ 138   2              case HFP_POS:
+ 139   2                  usRtn = (HDMI_ReadI2C_Byte(0x58) << 8) + HDMI_ReadI2C_Byte(0x59);
+ 140   2              break;
+ 141   2              case HSW_POS:
+ 142   2                  usRtn = (HDMI_ReadI2C_Byte(0x50) << 8) + HDMI_ReadI2C_Byte(0x51);
+ 143   2              break;    
+ 144   2              case HBP_POS:
+ 145   2                  usRtn = (HDMI_ReadI2C_Byte(0x54) << 8) + HDMI_ReadI2C_Byte(0x55);
+ 146   2              break;
+ 147   2              case VTOTAL_POS:
+ 148   2                  usRtn = (HDMI_ReadI2C_Byte(0x62) << 8) + HDMI_ReadI2C_Byte(0x63);
+ 149   2              break;
+ 150   2              case VACTIVE_POS:
+ 151   2                  usRtn = (HDMI_ReadI2C_Byte(0x5e) << 8) + HDMI_ReadI2C_Byte(0x5f);
+ 152   2              break;
+ 153   2              case VFP_POS:
+ 154   2                  usRtn = (HDMI_ReadI2C_Byte(0x5a) << 8) + HDMI_ReadI2C_Byte(0x5b);
+ 155   2              break;
+ 156   2              case VSW_POS:
+ 157   2                  usRtn = (HDMI_ReadI2C_Byte(0x52) << 8) + HDMI_ReadI2C_Byte(0x53);
+ 158   2              break;
+ 159   2              case VBP_POS:
+ 160   2                  usRtn = (HDMI_ReadI2C_Byte(0x56) << 8) + HDMI_ReadI2C_Byte(0x57);
+ 161   2              break;
+ 162   2              case HSPOL_POS:
+ 163   2                  usRtn = (HDMI_ReadI2C_Byte(0x4f) & 0x01);
+ 164   2              break;
+ 165   2              case VSPOL_POS:
+ 166   2                  usRtn = (HDMI_ReadI2C_Byte(0x4f) & 0x02);
+ 167   2              break;
+ 168   2              default:
+ 169   2              break;
+ 170   2          }
+ 171   1          return usRtn;
+ 172   1      }
+ 173          
+ 174          void Drv_VidChkAll_Get(OUT StructVidChkTiming *video_time)
+ 175          {
+ 176   1          video_time->usHtotal    =     Drv_VidChkSingle_Get(HTOTAL_POS);
+ 177   1          video_time->usHact      =     Drv_VidChkSingle_Get(HACTIVE_POS);
+C51 COMPILER V9.53.0.0   DRVSYSTEM                                                         06/30/2023 14:32:03 PAGE 4   
+
+ 178   1          video_time->usHfp       =     Drv_VidChkSingle_Get(HFP_POS);
+ 179   1          video_time->usHs        =     Drv_VidChkSingle_Get(HSW_POS);
+ 180   1          video_time->usHbp       =     Drv_VidChkSingle_Get(HBP_POS);
+ 181   1          
+ 182   1          video_time->usVtotal    =     Drv_VidChkSingle_Get(VTOTAL_POS);
+ 183   1          video_time->usVact      =     Drv_VidChkSingle_Get(VACTIVE_POS);
+ 184   1          video_time->usVfp       =     Drv_VidChkSingle_Get(VFP_POS);
+ 185   1          video_time->usVs        =     Drv_VidChkSingle_Get(VSW_POS);
+ 186   1          video_time->usVbp       =     Drv_VidChkSingle_Get(VBP_POS);
+ 187   1          
+ 188   1          video_time->ucHspol     =     Drv_VidChkSingle_Get(HSPOL_POS);
+ 189   1          video_time->ucVspol     =     Drv_VidChkSingle_Get(VSPOL_POS);        
+ 190   1          video_time->ucFrameRate =     Drv_VidChk_FrmRt_Get(); 
+ 191   1      }
+ 192          
+ 193          #endif
+ 194          
+ 195          u8 Drv_VidChk_FrmRt_Get(void)
+ 196          {
+ 197   1          u8 ucframerate = 0; 
+ 198   1          u32 ulframetime = 0;
+ 199   1      
+ 200   1          HDMI_WriteI2C_Byte(0xff,0x86);
+ 201   1          ulframetime = HDMI_ReadI2C_Byte(0x43);
+ 202   1          ulframetime = (ulframetime << 8) + HDMI_ReadI2C_Byte(0x44);
+ 203   1          ulframetime = (ulframetime << 8) + HDMI_ReadI2C_Byte(0x45);
+ 204   1          ucframerate = (u8)(((float)25000000 / (float)(ulframetime)) + (float)(0.5)); //2500000/ulframetime
+ 205   1          return ucframerate;
+ 206   1      }
+ 207          
+ 208          u32 Drv_System_FmClkGet(IN u8 ucSrc)
+ 209          {
+ 210   1          u32 ulRtn = 0;
+ 211   1          HDMI_WriteI2C_Byte(0xff,0x86);
+ 212   1          HDMI_WriteI2C_Byte(0X90,ucSrc);
+ 213   1          Ocm_Timer0_Delay1ms(5);
+ 214   1          HDMI_WriteI2C_Byte(0x90,(ucSrc | BIT7_1));
+ 215   1          ulRtn = (HDMI_ReadI2C_Byte(0x98) & 0x0f);
+ 216   1          ulRtn = (ulRtn << 8) + HDMI_ReadI2C_Byte(0x99);
+ 217   1          ulRtn = (ulRtn << 8) + HDMI_ReadI2C_Byte(0x9a);
+ 218   1          HDMI_WriteI2C_Byte(0x90,(HDMI_ReadI2C_Byte(0x90) & BIT7_0));
+ 219   1          return ulRtn;
+ 220   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1301    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----      19
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

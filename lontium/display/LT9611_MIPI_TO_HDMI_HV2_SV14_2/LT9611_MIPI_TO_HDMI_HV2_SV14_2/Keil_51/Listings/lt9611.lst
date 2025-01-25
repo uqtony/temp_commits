@@ -1,0 +1,2727 @@
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE LT9611
+OBJECT MODULE PLACED IN .\Objects\lt9611.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\C51\BIN\C51.EXE ..\User\lt9611.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\N76E003_Dr
+                    -iver\inc) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\Listings\lt9611.lst) TABS(2) OBJECT(.\Objects\lt9611.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9611
+   3            * @file: lt9611.c
+   4            * @author: xhguo
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2017.07.25
+   7          /******************************************************************************/
+   8          /*******************************************************************************
+   9          History:
+  10          V9.0 20200612
+  11          1. Add CEC interrupter.
+  12          
+  13          V10 20200612
+  14          1. update txpll power on sequence.
+  15          2. update hpd source from hpd and rx dc det.
+  16          
+  17          V11 20200806
+  18          1. change hpd source from hpd only(0x8258 = 0x0a).
+  19          2. pcr_m --;
+  20          
+  21          V12 20201009
+  22          1. CEC compliance Test.
+  23          
+  24          V13. 20201024
+  25          1. support U3.
+  26          
+  27          ********************************************************************************/
+  28          
+  29          #include   "include.h"
+  30          
+  31          struct Lontium_IC_Mode lt9611 = {
+  32          single_port_mipi, //mipi_port_cnt; //single_port_mipi or dual_port_mipi
+  33          lane_cnt_4,       //mipi_lane_cnt; //1 or 2 or 4
+  34          dsi,              //mipi_mode;     //dsi or csi
+  35          Burst_Mode,
+  36          audio_i2s,        //audio_out            //audio_i2s or audio_spdif
+  37          dc_mode,          //hdmi_coupling_mode   //ac_mode or dc_mode
+  38          hdcp_disable,     //hdcp_encryption      //hdcp_enable or hdcp_disable
+  39          HDMI,             //HDMI or DVI
+  40          RGB888            //RGB888 or YUV422
+  41          };
+  42          
+  43          // hfp, hs, hbp,hact,htotal,vfp, vs, vbp,vact,vtotal, hfp, hs, hbp,hact,htotal,vfp, vs, vbp,vact,vtotal, h
+             -_polary, v_polary, vic, pclk_khz
+  44          code struct video_timing video_640x480_60Hz     =    {16,  96, 48,  640,   800,   10, 2,  33, 480,  525,  
+             -0,0,1, AR_4_3, 25000};
+  45          code struct video_timing video_720x480_60Hz     =    {16,  62, 60,  720,   858,   9,  6,  30, 480,  525,  
+             -0,0,2, AR_4_3, 27000};
+  46          code struct video_timing video_720x576_50Hz     =    {12,  64, 68,  720,   864,   5,  5,  39, 576,  625,  
+             -0,0,17,AR_4_3, 27000};
+  47          
+  48          code struct video_timing video_1280x720_60Hz    =    {110, 40, 220, 1280,  1650,  5,  5,  20, 720,  750,  
+             -1,1,4, AR_16_9,74250};
+  49          code struct video_timing video_1280x720_50Hz    =    {440, 40, 220, 1280,  1980,  5,  5,  20, 720,  750,  
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 2   
+
+             -1,1,19,AR_16_9,74250};
+  50          code struct video_timing video_1280x720_30Hz    =    {1760,40, 220, 1280,  3300,  5,  5,  20, 720,  750,  
+             -1,1,0, AR_16_9,74250};
+  51          
+  52          code struct video_timing video_1920x1080_60Hz   =    {88,  44, 148, 1920,  2200,  4,  5,  36, 1080, 1125, 
+             -1,1,16,AR_16_9,148500};
+  53          code struct video_timing video_1920x1080_50Hz   =    {528, 44, 148, 1920,  2640,  4,  5,  36, 1080, 1125, 
+             -1,1,31,AR_16_9,148500};
+  54          code struct video_timing video_1920x1080_30Hz   =    {88,  44, 148, 1920,  2200,  4,  5,  36, 1080, 1125, 
+             -1,1,34,AR_16_9,74250};
+  55          code struct video_timing video_1920x1080_25Hz   =    {528, 44, 148, 1920,  2640,  4,  5,  36, 1080, 1125, 
+             -1,1,33,AR_16_9,74250};
+  56          code struct video_timing video_1920x1080_24Hz   =    {638, 44, 148, 1920,  2750,  4,  5,  36, 1080, 1125, 
+             -1,1,32,AR_16_9,74250};
+  57          
+  58          code struct video_timing video_3840x2160_30Hz   =    {176,  88, 296, 3840, 4400,  8,  10, 72, 2160, 2250, 
+             -1,1,95,AR_16_9, 297000};
+  59          code struct video_timing video_3840x2160_25Hz   =    {1056, 88, 296, 3840, 5280,  8,  10, 72, 2160, 2250, 
+             -1,1,94,AR_16_9, 297000};
+  60          code struct video_timing video_3840x2160_24Hz   =    {1276, 88, 296, 3840, 5500,  8,  10, 72, 2160, 2250, 
+             -1,1,93,AR_16_9, 297000};
+  61          
+  62          //VESA-DMT
+  63          //code struct video_timing video_1440x2560_70Hz   =    {50, 20,  50,  1440,  1560,  9,  3,  13, 2560,  258
+             -5,   1,1,0,AR_16_9,282300};
+  64          //code struct video_timing video_1366x768_60Hz    =    {70, 143, 213, 1366,  1792,  3,  3,  24, 768,   798
+             -,    1,1,0,AR_16_9,85500};
+  65          //code struct video_timing video_1400x1050_60Hz   =    {88, 144, 232, 1400,  1864,  3,  4,  32, 1050,  108
+             -9,   1,1,0,AR_16_9,121750};
+  66          
+  67          //code struct video_timing video_800x600_60Hz     =    {48, 128, 88, 800, 1056,  1,  4,  23, 600, 628,    
+             - 1,1,0,AR_16_9,40000};
+  68          
+  69          code struct video_timing video_1024x768_60Hz    =    {24, 136, 160, 1024, 1344,  3,  6,  29, 768, 806,   0
+             -,0,0,AR_16_9,65000};
+  70          //code struct video_timing video_1280x768_60Hz    =    {48, 32,   80, 1280, 1440,  3,  7,  12, 768, 790,  
+             - 1,0,0,AR_16_9,68250}; //reduced blank
+  71          //code struct video_timing video_1280x768_60Hz    =    {64, 128,   192, 1280, 1664,  3,  7,  20, 768, 798,
+             -   0,1,0,AR_16_9,79500}; //Normal
+  72          //code struct video_timing video_2560x1080_60Hz   =    {248,44, 148,2560,2720,  4,  5, 11, 1080,1100, 1,1,
+             -0,AR_16_9,198000};
+  73          ////20190328
+  74          //code struct video_timing video_1280x800_60Hz    =    {72, 128, 200, 1280, 1680,  3,  6,  22, 800, 831, 0
+             -,1,0,AR_16_9,83500};
+  75          //code struct video_timing video_1280x800_60Hz    =    {28, 32, 100, 1280, 1440,  2,  6,  15, 800, 823, 0,
+             -0,0,AR_16_9,71000};
+  76          //code struct video_timing video_1280x960_60Hz    =    {96, 112, 312, 1280, 1800,  1,  3,  36, 960, 1000, 
+             -1,1,0,AR_16_9,108000};
+  77          
+  78          //code struct video_timing video_1280x800_30Hz    =    {72, 128, 200, 1280, 1680,  3,  6,  22, 800, 831, 0
+             -,1,0,AR_16_9,41750};
+  79          //code struct video_timing video_1280x960_30Hz    =    {96, 112, 312, 1280, 1800,  1,  3,  36, 960, 1000, 
+             -1,1,0,AR_16_9,54000};
+  80          
+  81          //code struct video_timing video_1280x1024_60Hz   =    {48, 112, 248, 1280, 1688,  1,  3,  38, 1024, 1066,
+             - 1,1,0,AR_16_9,108000};
+  82          //code struct video_timing video_1600x1200_60Hz   =    {64, 192, 304, 1600, 2160,  1,  3,  46, 1200, 1250,
+             - 1,1,0,AR_16_9,162000};
+  83          //code struct video_timing video_1680x1050_60Hz   =    {48, 32,   80, 1680, 1840,  3,  6,  21, 1050, 1080,
+             - 1,0,0,AR_16_9,119000}; //reduced blank
+  84          //code struct video_timing video_1680x1050_60Hz   =    {104, 176,   280, 1680, 2240,  3,  6,  30, 1050, 10
+             -89, 0,1,0,AR_16_9,146250};//Normal
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 3   
+
+  85          
+  86          //code struct video_timing video_1280x720_30Hz    =    {1760, 40, 220,1280,  3300,  5,  5,  20, 720, 750, 
+             -  1,1,0, AR_16_9,74250};
+  87          //code struct video_timing video_1024x600_60Hz    =    {60,60, 100,1024,  1154,  2,  5, 10, 600, 617,     
+             - 1,1,0,AR_16_9,34000};
+  88          
+  89          //code struct video_timing video_2560x1440_50Hz   =    {176,272, 448,2560,  3456,  3,  5, 36, 1440, 1484, 
+             - 1,1,0, AR_16_9,256250};
+  90          //code struct video_timing video_2560x1440_60Hz   =    {48,32, 80,2560,  2720,  3,  5, 33, 1440, 1481,    
+             - 1,1,0, AR_16_9,241500};
+  91          
+  92          ////20180731                        //hfp, hs, hbp,hact,htotal,vfp, vs, vbp,vact,vtotal, pclk_khz
+  93          //code struct video_timing video_2560x1600_60Hz   =    {48,32, 80,2560,  2720,  3,  6, 37, 1600, 1646,    
+             - 1,1,0,AR_16_9,268500};
+  94          
+  95          ////VR timing
+  96          //code struct video_timing video_3840x1080_60Hz   =    {176,88, 296,3840,  4400,  4,  5,  36, 1080, 1125, 
+             -  1,1,0, AR_16_9,297000};
+  97          //code struct video_timing video_2560x720_60Hz    =    {220,80, 440,2560,  3300,  5,  5,  20, 720,   750, 
+             -1, 1, 0, AR_16_9,148500};
+  98          
+  99          ////mipi panel resolution
+ 100          //code struct video_timing video_1080x1920_60Hz   =    {4,  5,  36, 1080, 1125, 88, 44, 148,1920,  2200,  
+             -1,1,0,AR_16_9,148500};
+ 101          //code struct video_timing video_720x1280_60Hz    =    {5,  5,  20, 720,   750, 110,40, 220,1280,  1650,  
+             -1,1,0,AR_16_9,74250};
+ 102          //code struct video_timing video_540x960_60Hz     =    {30, 10, 30, 540, 610,  10,  10,  10, 960, 990,    
+             -  1,1,0,AR_16_9,33500};
+ 103          
+ 104          ////others
+ 105          //code struct video_timing video_1200x1920_60Hz    ={180,60, 160, 1200, 1600,  35, 10, 25, 1920, 1990, 1, 
+             -1, 0, AR_16_9,191040}; 
+ 106          //code struct video_timing video_1920x720_60Hz     ={88, 44, 148, 1920, 2200,  5,  5,  20, 720,  750,  1, 
+             -1, 0, AR_16_9,100000}; 
+ 107          
+ 108          u8 Sink_EDID[256];
+ 109          
+ 110          struct video_timing *video;
+ 111          struct cec_msg lt9611_cec_msg = {0};
+ 112          
+ 113          static u8 CEC_RxData_Buff[16];
+ 114          static u8 CEC_TxData_Buff[18];
+ 115          
+ 116          enum PCRFormat PCR_Format;
+ 117          
+ 118          bool flag_cec_data_received = 0;
+ 119          
+ 120          u8 Tx_HPD=0;
+ 121          u8 pcr_m;
+ 122          
+ 123          
+ 124          
+ 125          
+ 126          bool delay_1ms(u8 cnt)
+ 127          {
+ 128   1          static u16 i = 0;
+ 129   1          static u16 j = 0;
+ 130   1          i++;
+ 131   1          if(i>250)
+ 132   1          {
+ 133   2             i = 0;
+ 134   2             j++;
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 4   
+
+ 135   2             //printf("\n xxxxxxxxxx");
+ 136   2          }
+ 137   1          if(j > cnt)
+ 138   1          {
+ 139   2             i = 0;
+ 140   2             j = 0;
+ 141   2             return 1;
+ 142   2          }
+ 143   1          else
+ 144   1          {
+ 145   2             return 0;
+ 146   2          }
+ 147   1      }
+ 148          
+ 149          void LT9611_Chip_ID(void)
+ 150          {
+ 151   1          HDMI_WriteI2C_Byte(0xFF,0x80);
+ 152   1          HDMI_WriteI2C_Byte(0xee,0x01);
+ 153   1          printf("\nLT9611 ring Chip ID = 0x%bx, 0x%bx",
+ 154   1          HDMI_ReadI2C_Byte(0x00),
+ 155   1          HDMI_ReadI2C_Byte(0x01));
+ 156   1          HDMI_WriteI2C_Byte(0xFF,0x81);
+ 157   1          HDMI_WriteI2C_Byte(0x01,0x18); //sel xtal clock
+ 158   1          HDMI_WriteI2C_Byte(0xFF,0x80);
+ 159   1      }
+ 160          
+ 161          void LT9611_RST_PD_Init(void)
+ 162          {
+ 163   1        /* power consumption for standby */
+ 164   1        HDMI_WriteI2C_Byte(0xFF,0x81);
+ 165   1        HDMI_WriteI2C_Byte(0x02,0x48);
+ 166   1        HDMI_WriteI2C_Byte(0x23,0x80);
+ 167   1        HDMI_WriteI2C_Byte(0x30,0x00);
+ 168   1        HDMI_WriteI2C_Byte(0x01,0x00); /* i2c stop work */
+ 169   1      }
+ 170          
+ 171          void LT9611_LowPower_mode(bool on)
+ 172          {
+ 173   1        /* only hpd irq is working for low power consumption */
+ 174   1        /* 1.8V: 15 mA */
+ 175   1        if(on)
+ 176   1        {
+ 177   2          HDMI_WriteI2C_Byte(0xFF,0x81);
+ 178   2          HDMI_WriteI2C_Byte(0x02,0x49);
+ 179   2          HDMI_WriteI2C_Byte(0x23,0x80);
+ 180   2          HDMI_WriteI2C_Byte(0x30,0x00); //0x00 --> 0xc0, tx phy and clk can not power down, otherwise dc det do
+             -n't work.
+ 181   2      
+ 182   2          HDMI_WriteI2C_Byte(0xff,0x80);
+ 183   2          HDMI_WriteI2C_Byte(0x11,0x0a);
+ 184   2          printf("\r\n\ LT9611_LowPower_mode: enter low power mode ");
+ 185   2        }
+ 186   1        else
+ 187   1        {
+ 188   2          HDMI_WriteI2C_Byte(0xFF,0x81);
+ 189   2          HDMI_WriteI2C_Byte(0x02,0x12);
+ 190   2          HDMI_WriteI2C_Byte(0x23,0x40);
+ 191   2          HDMI_WriteI2C_Byte(0x30,0xea);
+ 192   2      
+ 193   2          HDMI_WriteI2C_Byte(0xff,0x80);
+ 194   2          HDMI_WriteI2C_Byte(0x11,0xfa);
+ 195   2          printf("\r\n\ LT9611_LowPower_mode: exit low power mode ");
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 5   
+
+ 196   2        }
+ 197   1      }
+ 198          
+ 199          void LT9611_System_Init(void)  //dsren
+ 200          {
+ 201   1          HDMI_WriteI2C_Byte(0xFF,0x82);
+ 202   1      //    HDMI_WriteI2C_Byte(0x45,0x70);//RGB SWAP
+ 203   1          HDMI_WriteI2C_Byte(0x51,0x11);
+ 204   1          //Timer for Frequency meter
+ 205   1          HDMI_WriteI2C_Byte(0x1b,0x69); //Timer 2
+ 206   1          HDMI_WriteI2C_Byte(0x1c,0x78);
+ 207   1          HDMI_WriteI2C_Byte(0xcb,0x69); //Timer 1
+ 208   1          HDMI_WriteI2C_Byte(0xcc,0x78);
+ 209   1          
+ 210   1          /*power consumption for work*/
+ 211   1          HDMI_WriteI2C_Byte(0xff,0x80); 
+ 212   1          HDMI_WriteI2C_Byte(0x04,0xf0);
+ 213   1          HDMI_WriteI2C_Byte(0x06,0xf0);
+ 214   1          HDMI_WriteI2C_Byte(0x0a,0x80);
+ 215   1          HDMI_WriteI2C_Byte(0x0b,0x46); //csc clk//46
+ 216   1          HDMI_WriteI2C_Byte(0x0d,0xef);
+ 217   1          HDMI_WriteI2C_Byte(0x11,0xfa);
+ 218   1      }
+ 219          
+ 220          void LT9611_MIPI_Input_Analog(void)//xuxi
+ 221          {
+ 222   1        //mipi mode
+ 223   1        HDMI_WriteI2C_Byte(0xff,0x81);
+ 224   1      //  HDMI_WriteI2C_Byte(0x03,0xF8); //Dp/Dn swap
+ 225   1        HDMI_WriteI2C_Byte(0x06,0x60); //port A rx current
+ 226   1        HDMI_WriteI2C_Byte(0x07,0x3f); //eq
+ 227   1        HDMI_WriteI2C_Byte(0x08,0x3f); //eq
+ 228   1        HDMI_WriteI2C_Byte(0x0a,0xfe); //port A ldo voltage set
+ 229   1        HDMI_WriteI2C_Byte(0x0b,0xbf); //enable port A lprx
+ 230   1      
+ 231   1        HDMI_WriteI2C_Byte(0x11,0x60); //port B rx current
+ 232   1        HDMI_WriteI2C_Byte(0x12,0x3f); //eq
+ 233   1        HDMI_WriteI2C_Byte(0x13,0x3f); //eq
+ 234   1        HDMI_WriteI2C_Byte(0x15,0xfe); //port B ldo voltage set
+ 235   1        HDMI_WriteI2C_Byte(0x16,0xbf); //enable port B lprx
+ 236   1        
+ 237   1        HDMI_WriteI2C_Byte(0x1c,0x03); //PortA clk lane no-LP mode.
+ 238   1        HDMI_WriteI2C_Byte(0x20,0x03); //PortB clk lane no-LP mode.
+ 239   1      }
+ 240          
+ 241          void LT9611_MIPI_Input_Digtal(void) //weiguo
+ 242          {
+ 243   1        u8 lanes;
+ 244   1        lanes = lt9611.mipi_lane_cnt;
+ 245   1      
+ 246   1        printf("\nLT9611_MIPI_Input_Digtal: lt9611 set mipi lanes = %bd", lanes);
+ 247   1        
+ 248   1        
+ 249   1      //  if(P10)//portA input
+ 250   1      //  {
+ 251   1          HDMI_WriteI2C_Byte(0xff,0x82); 
+ 252   1          HDMI_WriteI2C_Byte(0x50,0x10);
+ 253   1          HDMI_WriteI2C_Byte(0xff,0x83);
+ 254   1          HDMI_WriteI2C_Byte(0x03,0x00);
+ 255   1          printf("\nLT9611_MIPI_Input_Digtal: portA input");
+ 256   1      //  }
+ 257   1      //  
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 6   
+
+ 258   1      //  else//portB input
+ 259   1      //  {
+ 260   1      //    HDMI_WriteI2C_Byte(0xff,0x82);
+ 261   1      //    HDMI_WriteI2C_Byte(0x50,0x14);
+ 262   1      //    HDMI_WriteI2C_Byte(0xff,0x83);
+ 263   1      //    HDMI_WriteI2C_Byte(0x03,0x40);
+ 264   1      //    printf("\nLT9611_MIPI_Input_Digtal: portB input");
+ 265   1      //  }
+ 266   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+ 267   1        HDMI_WriteI2C_Byte(0x4f,0x80);    //[7] = Select ad_txpll_d_clk.
+ 268   1      //  HDMI_WriteI2C_Byte(0x50,0x10); //signal port switch: portA:10;  portB:14
+ 269   1        
+ 270   1        HDMI_WriteI2C_Byte(0xff,0x83); 
+ 271   1        HDMI_WriteI2C_Byte(0x00,lanes); 
+ 272   1      //  HDMI_WriteI2C_Byte(0x03,0x00); //signal port switch: portA:00;  portB:40
+ 273   1        HDMI_WriteI2C_Byte(0x02,0x10); //settle
+ 274   1        HDMI_WriteI2C_Byte(0x06,0x10); //settle
+ 275   1      
+ 276   1        if(lt9611.mipi_port_cnt==dual_port_mipi)    //dual_port_mipi
+ 277   1        {
+ 278   2          HDMI_WriteI2C_Byte(0x0a,0x03); //1=dual_lr, 0=dual_en
+ 279   2          printf("\nLT9611_MIPI_Input_Digtal: lt9611 set mipi port = 2");
+ 280   2        }
+ 281   1        else//single_port_mipi
+ 282   1        {
+ 283   2          HDMI_WriteI2C_Byte(0x0a,0x00); //1=dual_lr, 0=dual_en
+ 284   2          printf("\nLT9611_MIPI_Input_Digtal: lt9611 set mipi ports = 1");
+ 285   2        }
+ 286   1      
+ 287   1      #if 1
+ 288   1        if(lt9611.mipi_mode==csi)
+ 289   1        {
+ 290   2          printf("\nLT9611_MIPI_Input_Digtal: LT9611.mipi_mode = csi");
+ 291   2          HDMI_WriteI2C_Byte(0xff,0x83); 
+ 292   2          HDMI_WriteI2C_Byte(0x08,0x10); //csi_en
+ 293   2          HDMI_WriteI2C_Byte(0x2c,0x40); //csi_sel
+ 294   2      
+ 295   2            if(lt9611.input_color_space == RGB888)
+ 296   2            {
+ 297   3              HDMI_WriteI2C_Byte(0xff,0x83);
+ 298   3              HDMI_WriteI2C_Byte(0x1c,0x01); 
+ 299   3            }    
+ 300   2        }
+ 301   1        else
+ 302   1        printf("\nLT9611_MIPI_Input_Digtal: LT9611.mipi_mode = dsi"); 
+ 303   1      #endif
+ 304   1      }
+ 305          
+ 306          void LT9611_Video_Check(void) //dsren
+ 307          {
+ 308   1        #if 1
+ 309   1        u8 mipi_video_format=0x00;
+ 310   1        u16 h_act, h_act_a ,h_act_b, v_act,v_tal;
+ 311   1        u16 h_total_sysclk;
+ 312   1      
+ 313   1        HDMI_WriteI2C_Byte(0xff,0x82); // top video check module
+ 314   1        h_total_sysclk = HDMI_ReadI2C_Byte(0x86);
+ 315   1        h_total_sysclk = (h_total_sysclk<<8) + HDMI_ReadI2C_Byte(0x87);
+ 316   1        printf("\33[32m");
+ 317   1        printf("\n-----------------------------------------------------------------------------");
+ 318   1        printf("\nLT9611_Video_Check: h_total_sysclk = %d",h_total_sysclk);
+ 319   1      
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 7   
+
+ 320   1        v_act=HDMI_ReadI2C_Byte(0x82);
+ 321   1        v_act=(v_act<<8)+HDMI_ReadI2C_Byte(0x83);
+ 322   1        v_tal=HDMI_ReadI2C_Byte(0x6c);
+ 323   1        v_tal=(v_tal<<8)+HDMI_ReadI2C_Byte(0x6d);
+ 324   1        
+ 325   1        HDMI_WriteI2C_Byte(0xff,0x83);
+ 326   1        h_act_a = HDMI_ReadI2C_Byte(0x82);
+ 327   1        h_act_a = (h_act_a<<8)+HDMI_ReadI2C_Byte(0x83);
+ 328   1        
+ 329   1        h_act_b = HDMI_ReadI2C_Byte(0x86);
+ 330   1        h_act_b =(h_act_b<<8)+HDMI_ReadI2C_Byte(0x87);
+ 331   1      
+ 332   1      
+ 333   1        if(lt9611.input_color_space==YUV422)
+ 334   1        {
+ 335   2          printf("\nLT9611_Video_Check: lt9611.input_color_space = YUV422");
+ 336   2          h_act_a /= 2; 
+ 337   2          h_act_b /= 2;
+ 338   2        }
+ 339   1        else if(lt9611.input_color_space==RGB888)
+ 340   1        {
+ 341   2            printf("\nLT9611_Video_Check: lt9611.input_color_space = RGB888");
+ 342   2            h_act_a /= 3; 
+ 343   2            h_act_b /= 3;
+ 344   2        }
+ 345   1      
+ 346   1        mipi_video_format=HDMI_ReadI2C_Byte(0x88);
+ 347   1      
+ 348   1        printf("\nLT9611_Video_Check: h_act_a, h_act_b, v_act, v_tal: %d, %d, %d, %d, ",h_act_a, h_act_b, v_act, 
+             -v_tal);
+ 349   1        printf("\nLT9611_Video_Check: mipi_video_format: 0x%bx",mipi_video_format);
+ 350   1                 
+ 351   1        if(lt9611.mipi_port_cnt==dual_port_mipi)//dual port.
+ 352   1          h_act = h_act_a + h_act_b;
+ 353   1        else
+ 354   1          h_act = h_act_a;
+ 355   1      
+ 356   1      
+ 357   1        printf("\r\nLT9611_Video_Check: PCR_Format =");
+ 358   1      ///////////////////////formate detect///////////////////////////////////
+ 359   1      
+ 360   1      //DTV
+ 361   1          if((h_act==video_640x480_60Hz.hact)&&(v_act==video_640x480_60Hz.vact))
+ 362   1          {
+ 363   2            printf(" video_640x480_60Hz ");
+ 364   2            PCR_Format = PCR_640x480_60Hz;
+ 365   2            video = &video_640x480_60Hz;
+ 366   2          }
+ 367   1          else if((h_act==(video_720x480_60Hz.hact))&&(v_act==video_720x480_60Hz.vact))
+ 368   1          {
+ 369   2            printf(" video_720x480_60Hz ");
+ 370   2            PCR_Format=PCR_Standard;
+ 371   2            video = &video_720x480_60Hz;
+ 372   2          }
+ 373   1          
+ 374   1          else if((h_act==(video_720x576_50Hz.hact))&&(v_act==video_720x576_50Hz.vact))
+ 375   1          {
+ 376   2            printf(" video_720x576_50Hz ");
+ 377   2            PCR_Format=PCR_Standard;
+ 378   2            video = &video_720x576_50Hz;
+ 379   2          }
+ 380   1        
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 8   
+
+ 381   1          else if((h_act==video_1280x720_60Hz.hact) && (v_act==video_1280x720_60Hz.vact))
+ 382   1          {
+ 383   2            if(h_total_sysclk < 630)
+ 384   2            {
+ 385   3              printf(" video_1280x720_60Hz ");
+ 386   3              PCR_Format=PCR_Standard;
+ 387   3              video = &video_1280x720_60Hz;
+ 388   3            }
+ 389   2            else if(h_total_sysclk < 750)
+ 390   2            {
+ 391   3              printf(" video_1280x720_50Hz ");
+ 392   3              PCR_Format=PCR_Standard;
+ 393   3              video = &video_1280x720_50Hz;
+ 394   3            }
+ 395   2            else if(h_total_sysclk < 1230)
+ 396   2            {
+ 397   3              printf(" video_1280x720_30Hz ");
+ 398   3              PCR_Format=PCR_Standard;
+ 399   3              video = &video_1280x720_30Hz;
+ 400   3            }
+ 401   2          }
+ 402   1      
+ 403   1          else if((h_act==video_1920x1080_60Hz.hact) && (v_act==video_1920x1080_60Hz.vact))//1080P
+ 404   1          {
+ 405   2            if(h_total_sysclk < 430)
+ 406   2            {
+ 407   3              printf(" video_1920x1080_60Hz ");
+ 408   3              PCR_Format=PCR_Standard;
+ 409   3              video = &video_1920x1080_60Hz;
+ 410   3            }
+ 411   2      
+ 412   2            else if(h_total_sysclk < 510)
+ 413   2            {
+ 414   3              printf(" video_1920x1080_50Hz ");
+ 415   3              PCR_Format=PCR_Standard;
+ 416   3              video = &video_1920x1080_50Hz;
+ 417   3            }
+ 418   2      
+ 419   2            else if(h_total_sysclk < 830)
+ 420   2            {
+ 421   3              printf(" video_1920x1080_30Hz ");
+ 422   3              PCR_Format=PCR_Standard;
+ 423   3              video = &video_1920x1080_30Hz;
+ 424   3            }
+ 425   2      
+ 426   2            else if(h_total_sysclk < 980)
+ 427   2            {
+ 428   3              printf(" video_1920x1080_25Hz ");
+ 429   3              PCR_Format=PCR_Standard;
+ 430   3              video = &video_1920x1080_25Hz;
+ 431   3            }
+ 432   2      
+ 433   2            else if(h_total_sysclk < 1030)
+ 434   2            {
+ 435   3              printf(" video_1920x1080_24Hz ");
+ 436   3              PCR_Format=PCR_Standard;
+ 437   3              video = &video_1920x1080_24Hz;
+ 438   3            }
+ 439   2          }
+ 440   1          
+ 441   1          else if((h_act==video_3840x2160_30Hz.hact) && (v_act==video_3840x2160_30Hz.vact)) //2160P
+ 442   1          {
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 9   
+
+ 443   2            HDMI_WriteI2C_Byte(0x02,0x10); //settle
+ 444   2            HDMI_WriteI2C_Byte(0x06,0x10); //settle
+ 445   2            if(h_total_sysclk < 430)
+ 446   2            {
+ 447   3              printf(" video_3840x2160_30Hz ");
+ 448   3              PCR_Format=PCR_Standard;
+ 449   3              video = &video_3840x2160_30Hz;
+ 450   3            }
+ 451   2            else if(h_total_sysclk < 490)
+ 452   2            {
+ 453   3              printf(" video_3840x2160_25Hz ");
+ 454   3              PCR_Format=PCR_Standard;
+ 455   3              video = &video_3840x2160_25Hz;
+ 456   3            }
+ 457   2            else if(h_total_sysclk < 520)
+ 458   2            {
+ 459   3              printf(" video_3840x2160_24Hz ");
+ 460   3              PCR_Format=PCR_Standard;
+ 461   3              video = &video_3840x2160_24Hz;
+ 462   3            }
+ 463   2          }
+ 464   1          
+ 465   1      //  else if((h_act==(video_1440x2560_70Hz.hact))&&(v_act==video_1440x2560_70Hz.vact))
+ 466   1      //  {
+ 467   1      //    printf(" video_1440x2560_70Hz ");
+ 468   1      //    PCR_Format = PCR_Standard;
+ 469   1      //    video = &video_1440x2560_70Hz;
+ 470   1      //  }
+ 471   1      //  else if((h_act==video_1366x768_60Hz.hact)&&(v_act==video_1366x768_60Hz.vact))
+ 472   1      //  {
+ 473   1      //    printf(" video_1366x768_60Hz ");
+ 474   1      //    PCR_Format=PCR_Standard;
+ 475   1      //    video = &video_1366x768_60Hz;
+ 476   1      //  }
+ 477   1      //  else if((h_act==video_1400x1050_60Hz.hact)&&(v_act==video_1400x1050_60Hz.vact))
+ 478   1      //  {
+ 479   1      //    printf(" video_1400x1050_60Hz ");
+ 480   1      //    PCR_Format=PCR_Standard;
+ 481   1      //    video = &video_1400x1050_60Hz;
+ 482   1      //  }
+ 483   1          
+ 484   1      //  else if((h_act==(video_800x600_60Hz.hact))&&(v_act==video_800x600_60Hz.vact))
+ 485   1      //  {
+ 486   1      //    printf(" video_800x600_60Hz ");
+ 487   1      //    PCR_Format = PCR_Standard;
+ 488   1      //    video = &video_800x600_60Hz;
+ 489   1      //  }
+ 490   1      
+ 491   1        else if((h_act==(video_1024x768_60Hz.hact))&&(v_act==video_1024x768_60Hz.vact))
+ 492   1        {
+ 493   2          printf(" video_1024x768_60Hz ");
+ 494   2          PCR_Format = PCR_Standard;
+ 495   2          video = &video_1024x768_60Hz;
+ 496   2        }
+ 497   1      /*  
+ 498   1        else if((h_act==(video_1280x768_60Hz.hact))&&(v_act==video_1280x768_60Hz.vact))
+ 499   1        {
+ 500   1          printf(" video_1280x768_60Hz ");
+ 501   1          PCR_Format = PCR_Standard;
+ 502   1          video = &video_1280x768_60Hz;
+ 503   1        }
+ 504   1          
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 10  
+
+ 505   1        else if((h_act==(video_1280x800_60Hz.hact))&&(v_act==video_1280x800_60Hz.vact))
+ 506   1        {
+ 507   1            if(h_total_sysclk < 560)
+ 508   1            {
+ 509   1              printf(" video_1280x800_60Hz ");
+ 510   1              PCR_Format = PCR_Standard;
+ 511   1              video = &video_1280x800_60Hz;
+ 512   1            }
+ 513   1            else
+ 514   1            {
+ 515   1              printf(" video_1280x800_30Hz ");
+ 516   1              PCR_Format = PCR_Standard;
+ 517   1              video = &video_1280x800_30Hz;
+ 518   1            }
+ 519   1        }
+ 520   1      
+ 521   1        else if((h_act==(video_1280x960_60Hz.hact))&&(v_act==video_1280x960_60Hz.vact))
+ 522   1        {
+ 523   1      
+ 524   1            if(h_total_sysclk < 460)
+ 525   1            {
+ 526   1              printf(" video_1280x960_60Hz ");
+ 527   1              PCR_Format = PCR_Standard;
+ 528   1              video = &video_1280x960_60Hz;
+ 529   1            }
+ 530   1            else
+ 531   1            {
+ 532   1              printf(" video_1280x960_30Hz ");
+ 533   1              PCR_Format = PCR_Standard;
+ 534   1              video = &video_1280x960_30Hz;
+ 535   1            }
+ 536   1        }
+ 537   1      
+ 538   1        else if((h_act==(video_1280x1024_60Hz.hact))&&(v_act==video_1280x1024_60Hz.vact))
+ 539   1        {
+ 540   1            printf(" video_1280x1024_60Hz ");
+ 541   1            PCR_Format = PCR_Standard;
+ 542   1            video = &video_1280x1024_60Hz;
+ 543   1        }
+ 544   1      
+ 545   1        else if((h_act==(video_1600x1200_60Hz.hact))&&(v_act==video_1600x1200_60Hz.vact))
+ 546   1        {
+ 547   1            printf(" video_1600x1200_60Hz ");
+ 548   1            PCR_Format = PCR_Standard;
+ 549   1            video = &video_1600x1200_60Hz;
+ 550   1        }
+ 551   1      
+ 552   1        else if((h_act==(video_1680x1050_60Hz.hact))&&(v_act==video_1680x1050_60Hz.vact))
+ 553   1        {
+ 554   1            printf(" video_1680x1050_60Hz ");
+ 555   1            PCR_Format = PCR_Standard;
+ 556   1            video = &video_1680x1050_60Hz;
+ 557   1        }
+ 558   1      
+ 559   1        else if((h_act==video_2560x1440_60Hz.hact)&&(v_act==video_2560x1440_60Hz.vact))
+ 560   1        {
+ 561   1            if(h_total_sysclk < 310)
+ 562   1            {
+ 563   1              printf(" video_2560x1440_60Hz ");
+ 564   1              PCR_Format = PCR_Standard;
+ 565   1              video = &video_2560x1440_60Hz;
+ 566   1            }
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 11  
+
+ 567   1      
+ 568   1            else if(h_total_sysclk < 370)
+ 569   1            {
+ 570   1              printf(" video_2560x1440_50Hz ");
+ 571   1              PCR_Format = PCR_Standard;
+ 572   1              video = &video_2560x1440_50Hz;
+ 573   1            }
+ 574   1        }
+ 575   1      
+ 576   1        else if((h_act== video_720x1280_60Hz.hact)&&(v_act== video_720x1280_60Hz.vact))
+ 577   1        {
+ 578   1          printf(" video_720x1080_60Hz ");
+ 579   1          PCR_Format=PCR_Standard;
+ 580   1          video = &video_720x1280_60Hz;
+ 581   1        }
+ 582   1      
+ 583   1        else if((h_act==video_1080x1920_60Hz.hact)&&(v_act==video_1080x1920_60Hz.vact))//&&
+ 584   1        {
+ 585   1          printf(" video_1080x1920_60Hz ");
+ 586   1          PCR_Format=PCR_Standard;
+ 587   1          video = &video_1080x1920_60Hz;
+ 588   1        }
+ 589   1            
+ 590   1        else if((h_act==video_3840x1080_60Hz.hact)&&(v_act==video_3840x1080_60Hz.vact))//&&
+ 591   1        {
+ 592   1          printf(" video_3840x1080_60Hz ");
+ 593   1          PCR_Format = PCR_Standard;
+ 594   1          video = &video_3840x1080_60Hz;
+ 595   1        } 
+ 596   1        else if((h_act==video_1024x600_60Hz.hact)&&(v_act==video_1024x600_60Hz.vact))//&&
+ 597   1        {
+ 598   1          printf(" video_1024x600_60Hz ");
+ 599   1          PCR_Format = PCR_Standard;
+ 600   1          video = &video_1024x600_60Hz;
+ 601   1        } 
+ 602   1        else if((h_act==video_1280x800_60Hz.hact)&&(v_act==video_1280x800_60Hz.vact))//&&
+ 603   1        {
+ 604   1          printf(" video_1280x800_60Hz ");
+ 605   1          PCR_Format = PCR_Standard;
+ 606   1          video = &video_1280x800_60Hz;
+ 607   1        } 
+ 608   1        else if((h_act==video_540x960_60Hz.hact)&&(v_act==video_540x960_60Hz.vact))//&&
+ 609   1        {
+ 610   1          printf(" video_540x960_60Hz ");
+ 611   1          PCR_Format = PCR_Standard;
+ 612   1          video = &video_540x960_60Hz;
+ 613   1        }  
+ 614   1           
+ 615   1        else if((h_act==video_2560x1600_60Hz.hact)&&(v_act==video_2560x1600_60Hz.vact))//&&
+ 616   1        {
+ 617   1          printf(" video_2560x1600_60Hz ");
+ 618   1          PCR_Format = PCR_Standard;
+ 619   1          video = &video_2560x1600_60Hz;
+ 620   1        }  
+ 621   1      
+ 622   1        else if((h_act==video_2560x1080_60Hz.hact)&&(v_act==video_2560x1080_60Hz.vact))//&&
+ 623   1        {
+ 624   1          printf(" video_2560x1080_60Hz ");
+ 625   1          PCR_Format = PCR_Standard;
+ 626   1          video = &video_2560x1080_60Hz;
+ 627   1        }   
+ 628   1          
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 12  
+
+ 629   1        else if((h_act==video_2560x720_60Hz.hact)&&(v_act==video_2560x720_60Hz.vact))//&&
+ 630   1        {
+ 631   1          printf(" video_2560x720_60Hz ");
+ 632   1          PCR_Format = PCR_Standard;
+ 633   1          video = &video_2560x720_60Hz;
+ 634   1        } 
+ 635   1      
+ 636   1        else if((h_act==video_1200x1920_60Hz.hact)&&(v_act==video_1200x1920_60Hz.vact))//&&
+ 637   1        {
+ 638   1          printf(" video_1200x1920_60Hz ");
+ 639   1          PCR_Format = PCR_Standard;
+ 640   1          video = &video_1200x1920_60Hz;
+ 641   1        }   
+ 642   1        else if((h_act==video_1920x720_60Hz.hact)&&(v_act==video_1920x720_60Hz.vact))//&&
+ 643   1        {
+ 644   1          printf(" video_1920x720_60Hz ");
+ 645   1          PCR_Format = PCR_Standard;
+ 646   1          video = &video_1920x720_60Hz;
+ 647   1        }   
+ 648   1      */
+ 649   1        else
+ 650   1        {
+ 651   2          PCR_Format = PCR_None;
+ 652   2          printf(" unknown video format ");
+ 653   2        }
+ 654   1      printf("\n-----------------------------------------------------------------------------");  
+ 655   1      printf("\033[37m\033[37m");
+ 656   1      #endif
+ 657   1      
+ 658   1      }
+ 659          
+ 660          
+ 661          void LT9611_MIPI_Video_Timing(struct video_timing *video_format) //weiguo
+ 662          {
+ 663   1        HDMI_WriteI2C_Byte(0xff,0x83);
+ 664   1        HDMI_WriteI2C_Byte(0x0d,(u8)(video_format->vtotal/256));
+ 665   1        HDMI_WriteI2C_Byte(0x0e,(u8)(video_format->vtotal%256));//vtotal
+ 666   1        HDMI_WriteI2C_Byte(0x0f,(u8)(video_format->vact/256));
+ 667   1        HDMI_WriteI2C_Byte(0x10,(u8)(video_format->vact%256));  //vactive
+ 668   1        HDMI_WriteI2C_Byte(0x11,(u8)(video_format->htotal/256));
+ 669   1        HDMI_WriteI2C_Byte(0x12,(u8)(video_format->htotal%256));//htotal
+ 670   1        HDMI_WriteI2C_Byte(0x13,(u8)(video_format->hact/256));
+ 671   1        HDMI_WriteI2C_Byte(0x14,(u8)(video_format->hact%256)); //hactive
+ 672   1        HDMI_WriteI2C_Byte(0x15,(u8)(video_format->vs%256));   //vsa
+ 673   1        HDMI_WriteI2C_Byte(0x16,(u8)(video_format->hs%256));   //hsa
+ 674   1        HDMI_WriteI2C_Byte(0x17,(u8)(video_format->vfp%256));  //vfp
+ 675   1        HDMI_WriteI2C_Byte(0x18,(u8)((video_format->vs+video_format->vbp)%256));  //vss
+ 676   1        HDMI_WriteI2C_Byte(0x19,(u8)(video_format->hfp%256));  //hfp
+ 677   1        HDMI_WriteI2C_Byte(0x1a,(u8)(((video_format->hfp/256)<<4)+(video_format->hs+video_format->hbp)/256));   /
+             -/20180901
+ 678   1        HDMI_WriteI2C_Byte(0x1b,(u8)((video_format->hs+video_format->hbp)%256));  //hss
+ 679   1      }
+ 680          
+ 681          void LT9611_MIPI_Pcr(struct video_timing *video_format) //weiguo
+ 682          {
+ 683   1        u8 POL;
+ 684   1        u16 hact;
+ 685   1        hact = video_format->hact;
+ 686   1        POL = (video_format-> h_polarity)*0x02 + (video_format-> v_polarity);
+ 687   1        POL = ~POL;
+ 688   1        POL &= 0x03;
+ 689   1      
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 13  
+
+ 690   1        HDMI_WriteI2C_Byte(0xff,0x83); 
+ 691   1      
+ 692   1        if(lt9611.mipi_port_cnt==dual_port_mipi) //dual port
+ 693   1        {
+ 694   2          hact = (hact>>2);
+ 695   2          hact += 0x50;
+ 696   2      
+ 697   2          hact = (0x3e0>hact ? hact:0x3e0);
+ 698   2          
+ 699   2          HDMI_WriteI2C_Byte(0x0b,(u8)(hact >>8)); //vsync mode
+ 700   2          HDMI_WriteI2C_Byte(0x0c,(u8)hact); //=1/4 hact
+ 701   2          //hact -=0x40; 
+ 702   2          HDMI_WriteI2C_Byte(0x48,(u8)(hact >>8)); //de mode delay
+ 703   2          HDMI_WriteI2C_Byte(0x49,(u8)(hact)); //
+ 704   2        }
+ 705   1      
+ 706   1        else
+ 707   1        {
+ 708   2          HDMI_WriteI2C_Byte(0x0b,0x01); //vsync read delay(reference value)
+ 709   2          HDMI_WriteI2C_Byte(0x0c,0x10); //
+ 710   2          
+ 711   2          HDMI_WriteI2C_Byte(0x48,0x00); //de mode delay
+ 712   2          HDMI_WriteI2C_Byte(0x49,0x81); //=1/4 hact
+ 713   2        }
+ 714   1      
+ 715   1        /* stage 1 */
+ 716   1        HDMI_WriteI2C_Byte(0x21,0x4a); //bit[3:0] step[11:8]
+ 717   1        //HDMI_WriteI2C_Byte(0x22,0x40);//step[7:0]
+ 718   1        
+ 719   1        HDMI_WriteI2C_Byte(0x24,0x71); //bit[7:4]v/h/de mode; line for clk stb[11:8]
+ 720   1        HDMI_WriteI2C_Byte(0x25,0x30); //line for clk stb[7:0]
+ 721   1        
+ 722   1        HDMI_WriteI2C_Byte(0x2a,0x01); //clk stable in
+ 723   1        
+ 724   1        /* stage 2 */
+ 725   1        HDMI_WriteI2C_Byte(0x4a,0x40); //offset //0x10
+ 726   1        HDMI_WriteI2C_Byte(0x1d,(0x10|POL)); //PCR de mode step setting.
+ 727   1      
+ 728   1        /* MK limit */
+ 729   1      
+ 730   1      //  switch(PCR_Format)
+ 731   1      //  {
+ 732   1      //    case PCR_640x480_60Hz:
+ 733   1      //    HDMI_WriteI2C_Byte(0xff,0x83);
+ 734   1      //    HDMI_WriteI2C_Byte(0x0b,0x02);
+ 735   1      //    HDMI_WriteI2C_Byte(0x0c,0x40);
+ 736   1      //    HDMI_WriteI2C_Byte(0x48,0x01);
+ 737   1      //    HDMI_WriteI2C_Byte(0x49,0x10);
+ 738   1      //    HDMI_WriteI2C_Byte(0x24,0x70);
+ 739   1      //    HDMI_WriteI2C_Byte(0x25,0x80);
+ 740   1      //    HDMI_WriteI2C_Byte(0x2a,0x10);
+ 741   1      //    HDMI_WriteI2C_Byte(0x2b,0x80);
+ 742   1      //    HDMI_WriteI2C_Byte(0x23,0x28);
+ 743   1      //    HDMI_WriteI2C_Byte(0x4a,0x10);
+ 744   1      //    HDMI_WriteI2C_Byte(0x1d,0xf3);
+ 745   1      //    printf("\r\nLT9611_MIPI_Pcr: 640x480_60Hz");
+ 746   1      //    break;
+ 747   1      //  
+ 748   1      //    case PCR_1024x600_60Hz:
+ 749   1      //    HDMI_WriteI2C_Byte(0x24,0x70); //bit[7:4]v/h/de mode; line for clk stb[11:8]
+ 750   1      //    HDMI_WriteI2C_Byte(0x25,0x80); //line for clk stb[7:0]
+ 751   1      //    HDMI_WriteI2C_Byte(0x2a,0x10); //clk stable in
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 14  
+
+ 752   1      //    /* stage 2 */
+ 753   1      //    //HDMI_WriteI2C_Byte(0x23,0x04); //pcr h mode step
+ 754   1      //    //HDMI_WriteI2C_Byte(0x4a,0x10); //offset //0x10
+ 755   1      //    HDMI_WriteI2C_Byte(0x1d,0xf0); //PCR de mode step setting.
+ 756   1      //    break;
+ 757   1      //    
+ 758   1      //    default: break;
+ 759   1      //  }
+ 760   1      
+ 761   1        LT9611_MIPI_Video_Timing(video);
+ 762   1        
+ 763   1        HDMI_WriteI2C_Byte(0xff,0x83);
+ 764   1        HDMI_WriteI2C_Byte(0x26,pcr_m);
+ 765   1        
+ 766   1        HDMI_WriteI2C_Byte(0xff,0x80);
+ 767   1        HDMI_WriteI2C_Byte(0x11,0x5a); //Pcr reset
+ 768   1        Timer0_Delay1ms(10);
+ 769   1        HDMI_WriteI2C_Byte(0x11,0xfa);
+ 770   1      }
+ 771          
+ 772          void LT9611_PLL(struct video_timing *video_format) //zhangzhichun
+ 773          {
+ 774   1        u32 pclk;
+ 775   1        u8 pll_lock_flag, cal_done_flag, band_out;
+ 776   1        u8 hdmi_post_div;
+ 777   1        u8 i;
+ 778   1        pclk = video_format->pclk_khz;
+ 779   1        printf("\r\nLT9611_PLL: set rx pll = %ld", pclk);
+ 780   1        
+ 781   1        HDMI_WriteI2C_Byte(0xff,0x81);
+ 782   1        HDMI_WriteI2C_Byte(0x23,0x40); //Enable LDO and disable PD
+ 783   1        HDMI_WriteI2C_Byte(0x24,0x62); //0x62, LG25UM58 issue, 20180824
+ 784   1        HDMI_WriteI2C_Byte(0x25,0x80); //pre-divider
+ 785   1        HDMI_WriteI2C_Byte(0x26,0x55);
+ 786   1        HDMI_WriteI2C_Byte(0x2c,0x37);
+ 787   1        //HDMI_WriteI2C_Byte(0x2d,0x99); //txpll_divx_set&da_txpll_freq_set
+ 788   1        //HDMI_WriteI2C_Byte(0x2e,0x01);
+ 789   1        HDMI_WriteI2C_Byte(0x2f,0x01);
+ 790   1        //HDMI_WriteI2C_Byte(0x26,0x55);
+ 791   1        HDMI_WriteI2C_Byte(0x27,0x66);
+ 792   1        HDMI_WriteI2C_Byte(0x28,0x88);
+ 793   1        
+ 794   1        HDMI_WriteI2C_Byte(0x2a,0x20); //for U3.
+ 795   1        
+ 796   1        if(pclk > 150000)
+ 797   1        {
+ 798   2            HDMI_WriteI2C_Byte(0x2d,0x88);
+ 799   2            hdmi_post_div = 0x01;
+ 800   2        }
+ 801   1        else if(pclk > 80000)
+ 802   1        {
+ 803   2            HDMI_WriteI2C_Byte(0x2d,0x99);
+ 804   2            hdmi_post_div = 0x02;
+ 805   2        }
+ 806   1        else
+ 807   1        {
+ 808   2            HDMI_WriteI2C_Byte(0x2d,0xaa); //0xaa
+ 809   2            hdmi_post_div = 0x04;
+ 810   2        }
+ 811   1          
+ 812   1        pcr_m = (u8)((pclk*5*hdmi_post_div)/27000);
+ 813   1        pcr_m --;
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 15  
+
+ 814   1        printf("\r\nLT9611_PLL: pcr_m = 0x%bx, hdmi_post_div = %bd", pcr_m, hdmi_post_div); //Hex
+ 815   1          
+ 816   1        HDMI_WriteI2C_Byte(0xff,0x83);
+ 817   1        HDMI_WriteI2C_Byte(0x2d,0x40); //M up limit
+ 818   1        HDMI_WriteI2C_Byte(0x31,0x08); //M down limit
+ 819   1        HDMI_WriteI2C_Byte(0x26,0x80|pcr_m); /* fixed M is to let pll locked*/
+ 820   1      
+ 821   1        pclk = pclk / 2;
+ 822   1        HDMI_WriteI2C_Byte(0xff,0x82);     //13.5M
+ 823   1        HDMI_WriteI2C_Byte(0xe3,pclk/65536);
+ 824   1        pclk = pclk % 65536;
+ 825   1        HDMI_WriteI2C_Byte(0xe4,pclk/256);
+ 826   1        HDMI_WriteI2C_Byte(0xe5,pclk%256);
+ 827   1      
+ 828   1        HDMI_WriteI2C_Byte(0xde,0x20); // pll cal en, start calibration
+ 829   1        HDMI_WriteI2C_Byte(0xde,0xe0);
+ 830   1      
+ 831   1        HDMI_WriteI2C_Byte(0xff,0x80);
+ 832   1        HDMI_WriteI2C_Byte(0x11,0x5a); /* Pcr clk reset */
+ 833   1        HDMI_WriteI2C_Byte(0x11,0xfa);
+ 834   1        HDMI_WriteI2C_Byte(0x16,0xf2); /* pll cal digital reset */ 
+ 835   1        HDMI_WriteI2C_Byte(0x18,0xdc); /* pll analog reset */
+ 836   1        HDMI_WriteI2C_Byte(0x18,0xfc);
+ 837   1        HDMI_WriteI2C_Byte(0x16,0xf3); /*start calibration*/ 
+ 838   1        
+ 839   1        /* pll lock status */
+ 840   1        for(i = 0; i < 5 ; i++)
+ 841   1        {
+ 842   2           HDMI_WriteI2C_Byte(0xff,0x80); 
+ 843   2           HDMI_WriteI2C_Byte(0x16,0xe3); /* pll lock logic reset */
+ 844   2           HDMI_WriteI2C_Byte(0x16,0xf3);
+ 845   2           HDMI_WriteI2C_Byte(0xff,0x82);
+ 846   2           cal_done_flag = HDMI_ReadI2C_Byte(0xe7);
+ 847   2           band_out = HDMI_ReadI2C_Byte(0xe6);
+ 848   2           pll_lock_flag = HDMI_ReadI2C_Byte(0x15);
+ 849   2      
+ 850   2           if((pll_lock_flag & 0x80)&&(cal_done_flag & 0x80)&&(band_out != 0xff))
+ 851   2           {
+ 852   3              printf("\r\nLT9611_PLL: HDMI pll locked，band out: 0x%bx", band_out);
+ 853   3              break;
+ 854   3           }
+ 855   2           else
+ 856   2           {
+ 857   3              HDMI_WriteI2C_Byte(0xff,0x80);
+ 858   3              HDMI_WriteI2C_Byte(0x11,0x5a); /* Pcr clk reset */
+ 859   3              Timer0_Delay1ms(10);
+ 860   3              HDMI_WriteI2C_Byte(0x11,0xfa);
+ 861   3      
+ 862   3              HDMI_WriteI2C_Byte(0x16,0xf2); /* pll cal digital reset */ 
+ 863   3              HDMI_WriteI2C_Byte(0x18,0xdc); /* pll analog reset */
+ 864   3              Timer0_Delay1ms(10);
+ 865   3              HDMI_WriteI2C_Byte(0x18,0xfc);
+ 866   3              HDMI_WriteI2C_Byte(0x16,0xf3); /*start calibration*/ 
+ 867   3              printf("\r\nLT9611_PLL: HDMI pll unlocked, reset pll");
+ 868   3              Timer0_Delay1ms(10);
+ 869   3           }
+ 870   2        }
+ 871   1      }
+ 872          
+ 873          void LT9611_HDMI_TX_Phy(void) //xyji
+ 874          {
+ 875   1        HDMI_WriteI2C_Byte(0xff,0x81);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 16  
+
+ 876   1        HDMI_WriteI2C_Byte(0x30,0x6a);
+ 877   1        if(lt9611.hdmi_coupling_mode==ac_mode)
+ 878   1        {
+ 879   2          HDMI_WriteI2C_Byte(0x31,0x73); //DC: 0x44, AC:0x73
+ 880   2          printf("\r\nLT9611_HDMI_TX_Phy: AC couple");
+ 881   2        }
+ 882   1        else //lt9611.hdmi_coupling_mode==dc_mode
+ 883   1        {
+ 884   2          HDMI_WriteI2C_Byte(0x31,0x44);
+ 885   2          printf("\r\nLT9611_HDMI_TX_Phy: DC couple");
+ 886   2        }
+ 887   1        HDMI_WriteI2C_Byte(0x32,0x4a);
+ 888   1        HDMI_WriteI2C_Byte(0x33,0x0b);
+ 889   1        HDMI_WriteI2C_Byte(0x34,0x00);
+ 890   1        HDMI_WriteI2C_Byte(0x35,0x00);
+ 891   1        HDMI_WriteI2C_Byte(0x36,0x00);
+ 892   1        HDMI_WriteI2C_Byte(0x37,0x44);
+ 893   1        HDMI_WriteI2C_Byte(0x3f,0x0f);
+ 894   1        HDMI_WriteI2C_Byte(0x40,0x98); //clk swing
+ 895   1        HDMI_WriteI2C_Byte(0x41,0x98); //D0 swing
+ 896   1        HDMI_WriteI2C_Byte(0x42,0x98); //D1 swing
+ 897   1        HDMI_WriteI2C_Byte(0x43,0x98); //D2 swing
+ 898   1        HDMI_WriteI2C_Byte(0x44,0x0a);
+ 899   1      }
+ 900          
+ 901          #if 0
+              void LT9611_HDMI_TX_Phy(void) //xyji
+              {
+                // AC mode with VL pass
+                HDMI_WriteI2C_Byte(0xff,0x81);
+                HDMI_WriteI2C_Byte(0x30,0xff);
+                HDMI_WriteI2C_Byte(0x31,0x44); //DC: 0x44, AC:0x73 
+                HDMI_WriteI2C_Byte(0x32,0xfe);
+                HDMI_WriteI2C_Byte(0x33,0x73);
+                HDMI_WriteI2C_Byte(0x34,0x03);
+                HDMI_WriteI2C_Byte(0x35,0x03);
+                HDMI_WriteI2C_Byte(0x36,0x03);
+                HDMI_WriteI2C_Byte(0x37,0x44);
+                HDMI_WriteI2C_Byte(0x3f,0x0f);
+                HDMI_WriteI2C_Byte(0x40,0x98); //clk swing
+                HDMI_WriteI2C_Byte(0x41,0x98); //D0 swing
+                HDMI_WriteI2C_Byte(0x42,0x98); //D1 swing
+                HDMI_WriteI2C_Byte(0x43,0x98); //D2 swing
+                HDMI_WriteI2C_Byte(0x44,0x0a);
+              }
+              #endif
+ 922          
+ 923          //void LT9611_HDCP_Init(void) //luodexing
+ 924          //{
+ 925          //  HDMI_WriteI2C_Byte(0xff,0x85);
+ 926          //  HDMI_WriteI2C_Byte(0x07,0x1f);
+ 927          //  HDMI_WriteI2C_Byte(0x13,0xfe);// [7]=force_hpd, [6]=force_rsen, [5]=vsync_pol, [4]=hsync_pol,
+ 928          //                                // [3]=hdmi_mode, [2]=no_accs_when_rdy, [1]=skip_wt_hdmi
+ 929          //  HDMI_WriteI2C_Byte(0x17,0x0f);// [7]=ri_short_read, [3]=sync_pol_mode, [2]=srm_chk_done,
+ 930          //                                // [1]=bksv_srm_pass, [0]=ksv_list_vld
+ 931          //  HDMI_WriteI2C_Byte(0x15,0x05);
+ 932          //  //HDMI_WriteI2C_Byte(0x15,0x65);// [7]=key_ddc_st_sel, [6]=tx_hdcp_en,[5]=tx_auth_en, [4]=tx_re_auth
+ 933          //}
+ 934          
+ 935          void LT9611_HDCP_Init(void) //luodexing
+ 936          {
+ 937   1        HDMI_WriteI2C_Byte(0xff,0x85); 
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 17  
+
+ 938   1        HDMI_WriteI2C_Byte(0x07,0x1f);
+ 939   1        
+ 940   1        if(lt9611.hdmi_mode == HDMI)
+ 941   1        {
+ 942   2          HDMI_WriteI2C_Byte(0x13,0xfc);// [7]=force_hpd, [6]=force_rsen, [5]=vsync_pol, [4]=hsync_pol,
+ 943   2                                        // [3]=hdmi_mode, [2]=no_accs_when_rdy, [1]=skip_wt_hdmi
+ 944   2        }
+ 945   1        else
+ 946   1        {
+ 947   2          HDMI_WriteI2C_Byte(0x13,0xf4);// [7]=force_hpd, [6]=force_rsen, [5]=vsync_pol, [4]=hsync_pol,
+ 948   2                                        // [3]=hdmi_mode, [2]=no_accs_when_rdy, [1]=skip_wt_hdmi
+ 949   2        }
+ 950   1        
+ 951   1        HDMI_WriteI2C_Byte(0x17,0x0f);// [7]=ri_short_read, [3]=sync_pol_mode, [2]=srm_chk_done, 
+ 952   1                                      // [1]=bksv_srm_pass, [0]=ksv_list_vld
+ 953   1        HDMI_WriteI2C_Byte(0x15,0x05);
+ 954   1        //HDMI_WriteI2C_Byte(0x15,0x65);// [7]=key_ddc_st_sel, [6]=tx_hdcp_en,[5]=tx_auth_en, [4]=tx_re_auth
+ 955   1      }
+ 956          
+ 957          //void LT9611_load_hdcp_key(void) //luodexing
+ 958          //{
+ 959          //  HDMI_WriteI2C_Byte(0xff,0x85);
+ 960          //  HDMI_WriteI2C_Byte(0x00,0x85);
+ 961          //  //HDMI_WriteI2C_Byte(0x02,0x0a); //I2C 100K
+ 962          //  HDMI_WriteI2C_Byte(0x03,0xc1); //bit1: Software-controlled key-loading procedure //bit0: During load ke
+             -y operation, it should keep high
+ 963          ////  HDMI_WriteI2C_Byte(0x03,0xc3); //bit1: Automatic key-loading procedure //bit0: During load key opera
+             -tion, it should keep high
+ 964          //  HDMI_WriteI2C_Byte(0x04,0xa0); //0xA0 is eeprom device address
+ 965          //  HDMI_WriteI2C_Byte(0x05,0x00); //0x00 is eeprom offset address
+ 966          //  HDMI_WriteI2C_Byte(0x06,0x20); //length for read
+ 967          //  HDMI_WriteI2C_Byte(0x14,0xff);
+ 968          
+ 969          //  HDMI_WriteI2C_Byte(0x07,0x19); //bit[2-0]: Sequential byte read
+ 970          //  Timer0_Delay1ms(50); // wait 5ms for loading key.
+ 971          ////  HDMI_WriteI2C_Byte(0x07,0x1F); //bit[2-0]: None
+ 972          
+ 973          //  //printf("\r\nLT9611_load_hdcp_key: 0x%02bx",HDMI_ReadI2C_Byte(0x40));
+ 974          //  
+ 975          //  if((HDMI_ReadI2C_Byte(0x40)&0x01) == 0x01)//0x81
+ 976          //  {
+ 977          //    printf("\r\nLT9611_load_hdcp_key: external key valid!");
+ 978          //  }
+ 979          //  
+ 980          //  else
+ 981          //  {
+ 982          //    printf("\r\nLT9611_load_hdcp_key: external key unvalid!");
+ 983          //  }
+ 984          //  
+ 985          //  HDMI_WriteI2C_Byte(0x03,0xc0);
+ 986          //  HDMI_WriteI2C_Byte(0x07,0x1f); //bit[2-0]: None      
+ 987          //}
+ 988          
+ 989          void LT9611_load_hdcp_key(void) //luodexing
+ 990          {
+ 991   1      
+ 992   1            HDMI_WriteI2C_Byte(0xff,0x85);
+ 993   1            HDMI_WriteI2C_Byte(0x00,0x85);
+ 994   1            //HDMI_WriteI2C_Byte(0x02,0x0a); //I2C 100K
+ 995   1            HDMI_WriteI2C_Byte(0x03,0xc0);
+ 996   1            HDMI_WriteI2C_Byte(0x03,0xc3);
+ 997   1            HDMI_WriteI2C_Byte(0x04,0xa0); //0xA0 is eeprom device address
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 18  
+
+ 998   1            HDMI_WriteI2C_Byte(0x05,0x00); //0x00 is eeprom offset address
+ 999   1            HDMI_WriteI2C_Byte(0x06,0x20); //length for read
+1000   1            HDMI_WriteI2C_Byte(0x14,0xff);
+1001   1      
+1002   1            HDMI_WriteI2C_Byte(0x07,0x11); //0x31
+1003   1            HDMI_WriteI2C_Byte(0x07,0x17); //0x37
+1004   1            Timer0_Delay1ms(50); // wait 5ms for loading key.
+1005   1            //printf("\r\nLT9611_load_hdcp_key: 0x%02bx",HDMI_ReadI2C_Byte(0x40));
+1006   1          
+1007   1            if((HDMI_ReadI2C_Byte(0x40)&0x81) == 0x81)
+1008   1            {
+1009   2              printf("\r\nLT9611_load_hdcp_key: external key valid");
+1010   2            }
+1011   1            else
+1012   1            {
+1013   2              printf("\r\nLT9611_load_hdcp_key: external key unvalid, using internal test key!");
+1014   2            }
+1015   1                
+1016   1            HDMI_WriteI2C_Byte(0x03,0xc2);
+1017   1            HDMI_WriteI2C_Byte(0x07,0x1f);      
+1018   1      }
+1019          
+1020          void LT9611_HDCP_Enable(void) //luodexing
+1021          {
+1022   1        HDMI_WriteI2C_Byte(0xff,0x80);
+1023   1        HDMI_WriteI2C_Byte(0x14,0x80);//0x7f
+1024   1        HDMI_WriteI2C_Byte(0x14,0xff);
+1025   1        HDMI_WriteI2C_Byte(0xff,0x85);
+1026   1        HDMI_WriteI2C_Byte(0x15,0x01);//disable HDCP
+1027   1        HDMI_WriteI2C_Byte(0x15,0x71);//enable HDCP
+1028   1        HDMI_WriteI2C_Byte(0x15,0x65);//enable HDCP
+1029   1        printf("\r\n LT9611_HDCP_Enable!");
+1030   1      }
+1031          
+1032          void LT9611_HDCP_Disable(void) //luodexing
+1033          {
+1034   1        HDMI_WriteI2C_Byte(0xff,0x85);
+1035   1        HDMI_WriteI2C_Byte(0x15,0x45);
+1036   1        printf("\r\n LT9611_HDCP_Disable!");
+1037   1      }
+1038          
+1039          void LT9611_HDMI_Out_Enable(void) //dsren
+1040          {
+1041   1        HDMI_WriteI2C_Byte(0xff,0x81);
+1042   1        HDMI_WriteI2C_Byte(0x23,0x40);
+1043   1        
+1044   1        HDMI_WriteI2C_Byte(0xff,0x82);
+1045   1        HDMI_WriteI2C_Byte(0xde,0x20);
+1046   1        HDMI_WriteI2C_Byte(0xde,0xe0);
+1047   1          
+1048   1        HDMI_WriteI2C_Byte(0xff,0x80); 
+1049   1        HDMI_WriteI2C_Byte(0x18,0xdc); /* txpll sw rst */
+1050   1        HDMI_WriteI2C_Byte(0x18,0xfc);
+1051   1        HDMI_WriteI2C_Byte(0x16,0xf1); /* txpll calibration rest */ 
+1052   1        HDMI_WriteI2C_Byte(0x16,0xf3);
+1053   1        
+1054   1        HDMI_WriteI2C_Byte(0x11,0x5a); //Pcr reset
+1055   1        HDMI_WriteI2C_Byte(0x11,0xfa);
+1056   1        
+1057   1        HDMI_WriteI2C_Byte(0xff,0x81);
+1058   1        HDMI_WriteI2C_Byte(0x30,0xea);
+1059   1      
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 19  
+
+1060   1        if(lt9611.hdcp_encryption == hdcp_enable)
+1061   1        {
+1062   2          LT9611_HDCP_Enable();
+1063   2        }
+1064   1      //  else
+1065   1      //  {
+1066   1      //    LT9611_HDCP_Disable();
+1067   1      //  }
+1068   1      
+1069   1        printf("\r\n\ LT9611_HDMI_Out_Enable");
+1070   1      }
+1071          
+1072          void LT9611_HDMI_Out_Disable(void) //dsren
+1073          {
+1074   1        HDMI_WriteI2C_Byte(0xff,0x81);
+1075   1        HDMI_WriteI2C_Byte(0x30,0x00); /* Txphy PD */
+1076   1        HDMI_WriteI2C_Byte(0x23,0x80); /* Txpll PD */ 
+1077   1        printf("\r\n LT9611_HDMI_Out_Disable");
+1078   1        if(lt9611.hdcp_encryption == hdcp_enable)
+1079   1        {
+1080   2          LT9611_HDCP_Disable();
+1081   2        }
+1082   1      }
+1083          
+1084          void LT9611_HDMI_TX_Digital(struct video_timing *video_format) //dsren
+1085          {
+1086   1          //bool hdmi_mode = lt9611->hdmi_mode;
+1087   1          u8 VIC = video_format->vic;
+1088   1          u8 AR = video_format->aspact_ratio;
+1089   1          u8 pb0,pb2,pb4;
+1090   1          u8 infoFrame_en;
+1091   1      
+1092   1          //infoFrame_en = (AIF_PKT_EN|AVI_PKT_EN|SPD_PKT_EN);//9611 RX为MIPI，不需要发SPD_PKT
+1093   1          infoFrame_en = (AIF_PKT_EN|AVI_PKT_EN);
+1094   1          //MPEG_PKT_EN,AIF_PKT_EN,SPD_PKT_EN,AVI_PKT_EN,UD0_PKT_EN,UD1_PKT_EN
+1095   1          printf("\r\nLT9611_HDMI_TX_Digital: infoFrame_en = 0x%02bx",infoFrame_en);
+1096   1      
+1097   1          pb2 =  (AR<<4) + 0x08;
+1098   1      
+1099   1          if(VIC == 95)
+1100   1          {
+1101   2            pb4 = 0x00;
+1102   2          }
+1103   1          else
+1104   1          {
+1105   2            pb4 =  VIC;
+1106   2          }
+1107   1      
+1108   1          pb0 = (((pb2 + pb4) <= 0x5f)?(0x5f - pb2 - pb4):(0x15f - pb2 - pb4));/////////////////////////////////
+             -///////
+1109   1      
+1110   1          HDMI_WriteI2C_Byte(0xff,0x82);
+1111   1      
+1112   1          if(lt9611.hdmi_mode == HDMI)
+1113   1          {
+1114   2            HDMI_WriteI2C_Byte(0xd6,0x8e); //sync polarity
+1115   2            printf("\r\nLT9611_HDMI_TX_Digital: HMDI mode = HDMI");
+1116   2          }
+1117   1          else if(lt9611.hdmi_mode == DVI)
+1118   1          {
+1119   2            HDMI_WriteI2C_Byte(0xd6,0x0e); //sync polarity
+1120   2            printf("\r\nLT9611_HDMI_TX_Digital: HMDI mode = DVI");
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 20  
+
+1121   2          }
+1122   1      
+1123   1          //AVI
+1124   1          HDMI_WriteI2C_Byte(0xff,0x84);
+1125   1          HDMI_WriteI2C_Byte(0x43,pb0); //AVI_PB0
+1126   1      //    HDMI_WriteI2C_Byte(0x44,0x30);//AVI_PB1///////////////////////////////////YUV422
+1127   1          HDMI_WriteI2C_Byte(0x45,pb2); //AVI_PB2
+1128   1          HDMI_WriteI2C_Byte(0x47,pb4); //AVI_PB4
+1129   1          HDMI_WriteI2C_Byte(0xff,0x84);
+1130   1          HDMI_WriteI2C_Byte(0x10,0x02); //data iland
+1131   1          HDMI_WriteI2C_Byte(0x12,0x64); //act_h_blank
+1132   1          
+1133   1      //    //AIF
+1134   1      //    HDMI_WriteI2C_Byte(0xb5,0x57);
+1135   1      //    HDMI_WriteI2C_Byte(0xb6,0x07);
+1136   1      //    HDMI_WriteI2C_Byte(0xb7,0x00);
+1137   1      //    HDMI_WriteI2C_Byte(0xb8,0x00);
+1138   1      //    HDMI_WriteI2C_Byte(0xb9,0x13);
+1139   1          
+1140   1          if(VIC == 95)//VS_IF, 4k 30hz need send VS_IF packet.
+1141   1          {
+1142   2             HDMI_WriteI2C_Byte(0xff,0x84);
+1143   2             HDMI_WriteI2C_Byte(0x3d,infoFrame_en|UD0_PKT_EN); //UD1 infoframe enable //revise on 20200715
+1144   2      
+1145   2             HDMI_WriteI2C_Byte(0x74,0x81);  //HB0
+1146   2             HDMI_WriteI2C_Byte(0x75,0x01);  //HB1
+1147   2             HDMI_WriteI2C_Byte(0x76,0x05);  //HB2
+1148   2             HDMI_WriteI2C_Byte(0x77,0x49);  //PB0
+1149   2             HDMI_WriteI2C_Byte(0x78,0x03);  //PB1
+1150   2             HDMI_WriteI2C_Byte(0x79,0x0c);  //PB2
+1151   2             HDMI_WriteI2C_Byte(0x7a,0x00);  //PB3
+1152   2             HDMI_WriteI2C_Byte(0x7b,0x20);  //PB4
+1153   2             HDMI_WriteI2C_Byte(0x7c,0x01);  //PB5
+1154   2          }
+1155   1          else
+1156   1          {
+1157   2             HDMI_WriteI2C_Byte(0xff,0x84);
+1158   2             HDMI_WriteI2C_Byte(0x3d,infoFrame_en); //UD1 infoframe enable
+1159   2          }
+1160   1          
+1161   1      //////////////////////////////////////////////////9611 RX为MIPI，不需要发这个包
+1162   1      //    if(infoFrame_en&&SPD_PKT_EN)
+1163   1      //    {
+1164   1      //       HDMI_WriteI2C_Byte(0xff,0x84);
+1165   1      //       HDMI_WriteI2C_Byte(0xc0,0x83);  //HB0
+1166   1      //       HDMI_WriteI2C_Byte(0xc1,0x01);  //HB1
+1167   1      //       HDMI_WriteI2C_Byte(0xc2,0x19);  //HB2
+1168   1      
+1169   1      //       HDMI_WriteI2C_Byte(0xc3,0x00);  //PB0
+1170   1      //       HDMI_WriteI2C_Byte(0xc4,0x01);  //PB1
+1171   1      //       HDMI_WriteI2C_Byte(0xc5,0x02);  //PB2
+1172   1      //       HDMI_WriteI2C_Byte(0xc6,0x03);  //PB3
+1173   1      //       HDMI_WriteI2C_Byte(0xc7,0x04);  //PB4
+1174   1      //       HDMI_WriteI2C_Byte(0xc8,0x00);  //PB5
+1175   1      //    } 
+1176   1      //////////////////////////////////////////////////    
+1177   1      }
+1178          
+1179          void LT9611_CSC(void) 
+1180          {
+1181   1        if(lt9611.input_color_space == YUV422)
+1182   1        {
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 21  
+
+1183   2           HDMI_WriteI2C_Byte(0xff,0x82);
+1184   2           HDMI_WriteI2C_Byte(0xb9,0x18); //0x1C
+1185   2      //     HDMI_WriteI2C_Byte(0xba,0x0C);
+1186   2           printf("\r\nLT9611_CSC: Ypbpr 422 to RGB888");
+1187   2        }
+1188   1      }
+1189          
+1190          
+1191          void LT9611_Audio_Init(void) //sujin
+1192          {   
+1193   1        if(lt9611.audio_out==audio_i2s)
+1194   1        {
+1195   2          printf("\r\nAudio inut = I2S 2ch");
+1196   2          
+1197   2          HDMI_WriteI2C_Byte(0xFF,0x82);
+1198   2          HDMI_WriteI2C_Byte(0xd7,0x04);
+1199   2        
+1200   2          HDMI_WriteI2C_Byte(0xff,0x84);
+1201   2          HDMI_WriteI2C_Byte(0x06,0x08);
+1202   2          HDMI_WriteI2C_Byte(0x07,0x10);
+1203   2      
+1204   2                
+1205   2          HDMI_WriteI2C_Byte(0x0f,0x2b);//48K sampling frequency
+1206   2          HDMI_WriteI2C_Byte(0x34,0xd4);//CTS_N 20180823 0xd5: sclk = 32fs, 0xd4: sclk = 64fs
+1207   2            
+1208   2          HDMI_WriteI2C_Byte(0x35,0x00);// N value = 6144
+1209   2          HDMI_WriteI2C_Byte(0x36,0x18);
+1210   2          HDMI_WriteI2C_Byte(0x37,0x00); 
+1211   2          
+1212   2              
+1213   2      //    HDMI_WriteI2C_Byte(0x0f,0xab);//96K sampling frequency
+1214   2      //    HDMI_WriteI2C_Byte(0x34,0xd4);//CTS_N 20180823 0xd5: sclk = 32fs, 0xd4: sclk = 64fs
+1215   2      //      
+1216   2      //    HDMI_WriteI2C_Byte(0x35,0x00);// N value = 12288
+1217   2      //    HDMI_WriteI2C_Byte(0x36,0x30);
+1218   2      //    HDMI_WriteI2C_Byte(0x37,0x00); 
+1219   2      
+1220   2      
+1221   2            
+1222   2      //    HDMI_WriteI2C_Byte(0x0f,0x0b);//44.1K sampling frequency
+1223   2      //    HDMI_WriteI2C_Byte(0x34,0xd4);//CTS_N 20180823 0xd5: sclk = 32fs, 0xd4: sclk = 64fs
+1224   2      //      
+1225   2      //    HDMI_WriteI2C_Byte(0x35,0x00);// N value = 6272
+1226   2      //    HDMI_WriteI2C_Byte(0x36,0x18);
+1227   2      //    HDMI_WriteI2C_Byte(0x37,0x80);
+1228   2        }
+1229   1        
+1230   1        if(lt9611.audio_out==audio_spdif)
+1231   1        {
+1232   2          printf("\r\nAudio inut = SPDIF");
+1233   2          
+1234   2          HDMI_WriteI2C_Byte(0xFF,0x82);
+1235   2          HDMI_WriteI2C_Byte(0xd7,0x80);
+1236   2      
+1237   2          HDMI_WriteI2C_Byte(0xff,0x84);
+1238   2          HDMI_WriteI2C_Byte(0x06,0x0c);
+1239   2          HDMI_WriteI2C_Byte(0x07,0x10);  
+1240   2      
+1241   2          HDMI_WriteI2C_Byte(0x34,0xd4); //CTS_N
+1242   2          HDMI_WriteI2C_Byte(0x36,0x20);
+1243   2        }
+1244   1      }
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 22  
+
+1245          
+1246          
+1247          void LT9611_Read_EDID(void) //luodexing
+1248          {
+1249   1      #ifdef _enable_read_edid_
+              
+                    u8 i,j, edid_data;
+                    u8 extended_flag = 00;
+              
+                    memset(Sink_EDID,0,sizeof Sink_EDID);
+                    
+                    HDMI_WriteI2C_Byte(0xff,0x85);
+                    //HDMI_WriteI2C_Byte(0x02,0x0a); //I2C 100K
+                    HDMI_WriteI2C_Byte(0x03,0xc9);
+                    HDMI_WriteI2C_Byte(0x04,0xA0); //0xA0 is EDID device address
+                    HDMI_WriteI2C_Byte(0x05,0x00); //0x00 is EDID offset address
+                    HDMI_WriteI2C_Byte(0x06,0x20); //length for read
+                    HDMI_WriteI2C_Byte(0x14,0x7f);
+              
+                    for(i=0;i < 8;i++) // block 0 & 1
+                    {
+                      HDMI_WriteI2C_Byte(0x05,i*32); //0x00 is EDID offset address
+                      HDMI_WriteI2C_Byte(0x07,0x36);
+                      HDMI_WriteI2C_Byte(0x07,0x34); //0x31
+                      HDMI_WriteI2C_Byte(0x07,0x37); //0x37
+                      Timer0_Delay1ms(5); // wait 5ms for reading edid data.
+                      if(HDMI_ReadI2C_Byte(0x40)&0x02) //KEY_DDC_ACCS_DONE=1
+                      {
+                        if(HDMI_ReadI2C_Byte(0x40)&0x50)//DDC No Ack or Abitration lost
+                        {
+                         printf("\r\nread edid failed: no ack");
+                         goto end;
+                        }
+                        else
+                        {
+                          printf("\r\n");
+                          for(j=0; j<32; j++)
+                          {
+                              edid_data = HDMI_ReadI2C_Byte(0x83);
+                              Sink_EDID[i*32+j]= edid_data; // write edid data to Sink_EDID[];
+                              if((i == 3)&&( j == 30))
+                              {
+                                  extended_flag = edid_data & 0x03;
+                              }
+                              printf("%02bx,",edid_data);
+                          }
+                          if(i == 3)
+                          {
+                            if(extended_flag < 1) //no block 1, stop reading edid. 
+                            {
+                              goto end; 
+                            }
+                          }
+                        }
+                      }
+                      else
+                      {
+                        printf("\r\nread edid failed: accs not done");
+                        goto end;
+                      }
+                    }
+              
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 23  
+
+                    if(extended_flag < 2) //no block 2, stop reading edid. 
+                    {
+                      goto end; 
+                    }
+              
+                    for(i=0;i< 8;i++) //  // block 2 & 3
+                    {
+                      HDMI_WriteI2C_Byte(0x05,i*32); //0x00 is EDID offset address
+                      HDMI_WriteI2C_Byte(0x07,0x76); //0x31
+                      HDMI_WriteI2C_Byte(0x07,0x74); //0x31
+                      HDMI_WriteI2C_Byte(0x07,0x77); //0x37
+                      Timer0_Delay1ms(5); // wait 5ms for reading edid data.
+                      if(HDMI_ReadI2C_Byte(0x40)&0x02) //KEY_DDC_ACCS_DONE=1
+                      {
+                        if(HDMI_ReadI2C_Byte(0x40)&0x50)//DDC No Ack or Abitration lost
+                        {
+                         printf("\r\nread edid failed: no ack");
+                         goto end;
+                        }
+                        else
+                        {
+                            printf("\r\n");
+                          for(j=0; j<32; j++)
+                            {
+                              edid_data = HDMI_ReadI2C_Byte(0x83);
+                              //Sink_EDID[256+i*32+j]= edid_data; // write edid data to Sink_EDID[];
+                              printf("%02bx,",edid_data);
+                            }
+                          if(i == 3)
+                          {
+                            if(extended_flag < 3) //no block 1, stop reading edid. 
+                            {
+                              goto end; 
+                            }
+                          }
+                        }
+                      }
+                      else
+                      {
+                        printf("\r\nread edid failed: accs not done");
+                        goto end;
+                      }
+                    }
+                end:
+                HDMI_WriteI2C_Byte(0x03,0xc2);
+                HDMI_WriteI2C_Byte(0x07,0x1f);
+              #endif
+1354   1      }
+1355          
+1356          
+1357          u8 LT9611_Get_HPD_Status(void)
+1358          {
+1359   1        HDMI_WriteI2C_Byte(0xff,0x82);
+1360   1        
+1361   1        if(((HDMI_ReadI2C_Byte(0x5e))&0x04) == 0x04) //20200727
+1362   1        {
+1363   2          Timer0_Delay1ms(10);
+1364   2          if(((HDMI_ReadI2C_Byte(0x5e))&0x04) == 0x04)
+1365   2          {
+1366   3            return 1;
+1367   3          }
+1368   2          else
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 24  
+
+1369   2          {
+1370   3            return 0;
+1371   3          }
+1372   2        }
+1373   1        else
+1374   1        {
+1375   2          return 0;
+1376   2        }
+1377   1      }
+1378          
+1379          
+1380          ////////////////////////////////////////////////////CEC: start////////////////////////////////////////////
+             -//////////
+1381          void LT9611_HDMI_CEC_ON(bool enable)
+1382          {
+1383   1        if(enable){
+1384   2        /* cec init */
+1385   2        HDMI_WriteI2C_Byte(0xff, 0x80);
+1386   2        HDMI_WriteI2C_Byte(0x0d, 0xff);
+1387   2        HDMI_WriteI2C_Byte(0x15, 0xf1); //reset cec logic
+1388   2        HDMI_WriteI2C_Byte(0x15, 0xf9); 
+1389   2        HDMI_WriteI2C_Byte(0xff, 0x86); 
+1390   2        HDMI_WriteI2C_Byte(0xfe, 0xa5); //clk div
+1391   2        }
+1392   1        else{
+1393   2        HDMI_WriteI2C_Byte(0xff, 0x80);
+1394   2        HDMI_WriteI2C_Byte(0x15, 0xf1); 
+1395   2        }
+1396   1      }
+1397          
+1398          void lt9611_cec_logical_reset(void)
+1399          {
+1400   1        HDMI_WriteI2C_Byte(0xff, 0x80);
+1401   1        HDMI_WriteI2C_Byte(0x15, 0xf1); //reset cec logic
+1402   1        HDMI_WriteI2C_Byte(0x15, 0xf9);
+1403   1      }
+1404          
+1405          
+1406          void lt9611_cec_msg_set_logical_address(struct cec_msg *cec_msg)
+1407          {
+1408   1          u8 logical_address;
+1409   1      /*
+1410   1          0xf8, 0xf7   //Register
+1411   1          0x00, 0x01,  //LA 0
+1412   1          0x00, 0x02,  //LA 1
+1413   1          0x00, 0x03,  //LA 2
+1414   1          0x00, 0x04,  //LA 3
+1415   1          0x00, 0x10,  //LA 4
+1416   1          0x00, 0x20,  //LA 5
+1417   1          0x00, 0x30,  //LA 6
+1418   1          0x00, 0x40,  //LA 7
+1419   1          0x01, 0x00,  //LA 8
+1420   1          0x02, 0x00,  //LA 9
+1421   1          0x03, 0x00,  //LA 10
+1422   1          0x04, 0x00,  //LA 11
+1423   1          0x10, 0x00,  //LA 12
+1424   1          0x20, 0x00,  //LA 13
+1425   1          0x30, 0x00,  //LA 14
+1426   1          0x40, 0x00   //LA 15
+1427   1      */
+1428   1      
+1429   1      if(!cec_msg->la_allocation_done)
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 25  
+
+1430   1          logical_address = 15;
+1431   1      else
+1432   1          logical_address = cec_msg->logical_address;
+1433   1      
+1434   1          if(logical_address > 15)
+1435   1          {
+1436   2              printf("\n LA error!");
+1437   2              return;
+1438   2          }
+1439   1      
+1440   1          HDMI_WriteI2C_Byte(0xff, 0x86);
+1441   1          
+1442   1          switch(logical_address) 
+1443   1          {
+1444   2          case 0: 
+1445   2          HDMI_WriteI2C_Byte(0xf7, 0x01);
+1446   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1447   2          break;
+1448   2      
+1449   2          case 1: 
+1450   2          HDMI_WriteI2C_Byte(0xf7, 0x02);
+1451   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1452   2          break;
+1453   2      
+1454   2          case 2: 
+1455   2          HDMI_WriteI2C_Byte(0xf7, 0x03);
+1456   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1457   2          break;
+1458   2      
+1459   2          case 3: 
+1460   2          HDMI_WriteI2C_Byte(0xf7, 0x04);
+1461   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1462   2          break;
+1463   2      
+1464   2          case 4: 
+1465   2          HDMI_WriteI2C_Byte(0xf7, 0x10);
+1466   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1467   2          break;
+1468   2      
+1469   2          case 5: 
+1470   2          HDMI_WriteI2C_Byte(0xf7, 0x20);
+1471   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1472   2          break;
+1473   2      
+1474   2          case 6: 
+1475   2          HDMI_WriteI2C_Byte(0xf7, 0x30);
+1476   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1477   2          break;
+1478   2      
+1479   2          case 7: 
+1480   2          HDMI_WriteI2C_Byte(0xf7, 0x40);
+1481   2          HDMI_WriteI2C_Byte(0xf8, 0x00);
+1482   2          break;
+1483   2      
+1484   2          case 8: 
+1485   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1486   2          HDMI_WriteI2C_Byte(0xf8, 0x01);
+1487   2          break;
+1488   2      
+1489   2          case 9: 
+1490   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1491   2          HDMI_WriteI2C_Byte(0xf8, 0x02);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 26  
+
+1492   2          break;
+1493   2      
+1494   2          case 10: 
+1495   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1496   2          HDMI_WriteI2C_Byte(0xf8, 0x03);
+1497   2          break;
+1498   2      
+1499   2          case 11: 
+1500   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1501   2          HDMI_WriteI2C_Byte(0xf8, 0x04);
+1502   2          break;
+1503   2      
+1504   2          case 12: 
+1505   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1506   2          HDMI_WriteI2C_Byte(0xf8, 0x10);
+1507   2          break;
+1508   2      
+1509   2          case 13: 
+1510   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1511   2          HDMI_WriteI2C_Byte(0xf8, 0x20);
+1512   2          break;
+1513   2      
+1514   2          case 14: 
+1515   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1516   2          HDMI_WriteI2C_Byte(0xf8, 0x30);
+1517   2          break;
+1518   2          
+1519   2          case 15: 
+1520   2          HDMI_WriteI2C_Byte(0xf7, 0x00);
+1521   2          HDMI_WriteI2C_Byte(0xf8, 0x40);
+1522   2          break;
+1523   2      
+1524   2          default: break;   
+1525   2          }
+1526   1      }
+1527          
+1528          
+1529          static int do_checksum(const unsigned char *x, u8 len)
+1530          {
+1531   1        unsigned char check = x[len];
+1532   1        unsigned char sum = 0;
+1533   1        int i;
+1534   1      
+1535   1        printf("\nChecksum: 0x%bx", check);
+1536   1      
+1537   1        for (i = 0; i < len; i++)
+1538   1          sum += x[i];
+1539   1      
+1540   1        if ((unsigned char)(check + sum) != 0) {
+1541   2          printf(" (should be 0x%bx)\n", -sum & 0xff);
+1542   2          return 0;
+1543   2        }
+1544   1      
+1545   1        printf(" (valid)\n");
+1546   1        return 1;
+1547   1      }
+1548          
+1549          
+1550          int lt9611_parse_physical_address(struct cec_msg *cec_msg, u8 *edid) // parse edid data from edid.
+1551          {
+1552   1          int ret = 0;
+1553   1        int version;
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 27  
+
+1554   1        int offset = 0;
+1555   1          int offset_d = 0;
+1556   1          int tag_code;
+1557   1          u16 physical_address;
+1558   1      
+1559   1          version = edid[0x81];
+1560   1          offset_d = edid[0x82];
+1561   1      
+1562   1          if(!do_checksum(edid, 255))
+1563   1              return 0; //prase_physical_address fail.
+1564   1              
+1565   1        if (version < 3)
+1566   1              return 0; //prase_physical_address fail.
+1567   1      
+1568   1          if (offset_d < 5)
+1569   1              return 0; //prase_physical_address fail.
+1570   1      
+1571   1          tag_code = (edid[0x84 + offset] & 0xe0)>>5;
+1572   1               
+1573   1          while(tag_code != 0x03){
+1574   2              if((edid[0x84 + offset]&0x1f) == 0 )
+1575   2                  return 0;
+1576   2              offset += edid[0x84 + offset]&0x1f;
+1577   2              offset++;
+1578   2      
+1579   2              if(offset > (offset_d - 4))
+1580   2                  return 0;
+1581   2      
+1582   2              tag_code = (edid[0x84 + offset] & 0xe0)>>5;
+1583   2      
+1584   2              }
+1585   1          
+1586   1          printf("\nvsdb: 0x%bx,0x%bx,0x%bx", edid[0x84 + offset],edid[0x85 + offset],edid[0x86 + offset]);
+1587   1      
+1588   1          if((edid[0x84 + offset + 1] == 0x03)&&
+1589   1              (edid[0x84 + offset + 2] == 0x0c)&&
+1590   1              (edid[0x84 + offset + 3] == 0x00))
+1591   1              {
+1592   2                  physical_address = edid[0x84 + offset + 4];
+1593   2                  physical_address = (physical_address<<8) + edid[0x84 + offset + 5];
+1594   2              
+1595   2                  cec_msg->physical_address = physical_address; 
+1596   2                  printf("\nprase physical address success! %x",physical_address);
+1597   2                  return 1;
+1598   2              }
+1599   1      return 0;      
+1600   1      }
+1601          
+1602          void lt9611_hdmi_cec_read(struct cec_msg *cec_msg) // transfer cec msg from LT9611 regisrer to rx_buffer.
+1603          {
+1604   1          u8 size, i;
+1605   1          HDMI_WriteI2C_Byte(0xff, 0x86); 
+1606   1          HDMI_WriteI2C_Byte(0xf5, 0x01); //lock rx data buff
+1607   1          size = HDMI_ReadI2C_Byte(0xd3);
+1608   1          cec_msg->rx_data_buff[0] = size;
+1609   1          //printf("\r\ncec rec: ");
+1610   1          for(i = 1;i<= size; i++)
+1611   1          {
+1612   2              cec_msg->rx_data_buff[i] = HDMI_ReadI2C_Byte(0xd3 + i);
+1613   2              //printf("0x%02bx, ",cec_msg->rx_data_buff[i]);
+1614   2          }
+1615   1          HDMI_WriteI2C_Byte(0xf5, 0x00); //unlock rx data buff
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 28  
+
+1616   1      }
+1617          
+1618          
+1619          void lt9611_hdmi_cec_write(struct cec_msg *cec_msg)// send cec msg which is in tx_buffer.
+1620          {
+1621   1          u8 size, i;
+1622   1          size = cec_msg->tx_data_buff[0];
+1623   1          cec_msg->retries_times = 0;
+1624   1          
+1625   1          HDMI_WriteI2C_Byte(0xff, 0x86);
+1626   1          HDMI_WriteI2C_Byte(0xf5, 0x01); //lock rx data buff
+1627   1          HDMI_WriteI2C_Byte(0xf4, size);   
+1628   1          for(i = 0;i<= size; i++)
+1629   1          {
+1630   2              HDMI_WriteI2C_Byte(0xe4+i, cec_msg->tx_data_buff[1+i]);  
+1631   2          }
+1632   1        HDMI_WriteI2C_Byte(0xf9, 0x03); //start send msg
+1633   1        Timer0_Delay1ms(25*i); //wait HDMI
+1634   1          HDMI_WriteI2C_Byte(0xf5, 0x00); //unlock rx data buff
+1635   1      }
+1636          
+1637          
+1638          
+1639          void lt9611_cec_msg_write_demo(void) //for debug
+1640          {
+1641   1            CEC_TxData_Buff[0] = 0x05; //data counter to be send
+1642   1            CEC_TxData_Buff[1] = 0x40; //first cec data(in spec, sender id = 0x05, 
+1643   1                           //receiver id = 0x00
+1644   1            CEC_TxData_Buff[2] = 0x84; //second cec data(in spec, it is opcode =0x84)
+1645   1            CEC_TxData_Buff[3] = 0x10; //parameter of opcode
+1646   1            CEC_TxData_Buff[4] = 0x00; //parameter of opcode
+1647   1            CEC_TxData_Buff[5] = 0x05; //parameter of opcode
+1648   1      
+1649   1            //lt9611_hdmi_cec_write(CEC_TxData_Buff);
+1650   1      }
+1651          
+1652          void lt9611_broad_cast_demo(void) // for debug
+1653          {
+1654   1        
+1655   1            CEC_TxData_Buff[0] = 0x05; //data counter to be send
+1656   1            CEC_TxData_Buff[1] = 0x40; //first cec data(in spec, sender id = 0x05, 
+1657   1                           //receiver id = 0x00
+1658   1            CEC_TxData_Buff[2] = 0x84; //second cec data(in spec, it is opcode =0x84)
+1659   1            CEC_TxData_Buff[3] = 0x10; //parameter of opcode
+1660   1            CEC_TxData_Buff[4] = 0x00; //parameter of opcode
+1661   1            CEC_TxData_Buff[5] = 0x05; //parameter of opcode
+1662   1      
+1663   1            //lt9611_hdmi_cec_write(CEC_TxData_Buff);
+1664   1      }
+1665          
+1666          
+1667          void lt9611_cec_la_allocation(struct cec_msg *cec_msg) //polling  logical address.
+1668          {
+1669   1          u8 logical_address;
+1670   1       
+1671   1          logical_address = cec_msg->logical_address;
+1672   1          cec_msg->tx_data_buff[0] = 0x01; //data counter to be send
+1673   1          cec_msg->tx_data_buff[1] = (logical_address<<4)|logical_address; 
+1674   1                                           //first cec data(in spec, sender id = 0x04, 
+1675   1                               //receiver id = 0x04;
+1676   1          lt9611_hdmi_cec_write(cec_msg);
+1677   1      }
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 29  
+
+1678          
+1679          void lt9611_cec_report_physical_address(struct cec_msg *cec_msg) // report physical address.
+1680          {
+1681   1              cec_msg->tx_data_buff[0] = 0x05; //data counter to be send
+1682   1              cec_msg->tx_data_buff[1] = (cec_msg->logical_address<<4)|0x0f; 
+1683   1                                          //first cec data([7:4]=initiator ;[7:4]= destintion)
+1684   1              cec_msg->tx_data_buff[2] = 0x84; //opcode
+1685   1              cec_msg->tx_data_buff[3] = (u8)(cec_msg->physical_address>>8); //parameter of opcode
+1686   1              cec_msg->tx_data_buff[4] = (u8)(cec_msg->physical_address); //parameter of opcode
+1687   1              cec_msg->tx_data_buff[5] = 0x04; //device type = playback device
+1688   1      
+1689   1              //printf("\nPA:%bx, %bx",cec_msg->tx_data_buff[3],cec_msg->tx_data_buff[4]);
+1690   1                                              
+1691   1              lt9611_hdmi_cec_write(cec_msg);
+1692   1      }
+1693          
+1694          
+1695          
+1696          void lt9611_cec_menu_activate(struct cec_msg *cec_msg) // report physical address.
+1697          {
+1698   1              cec_msg->tx_data_buff[0] = 0x04; //data counter to be send
+1699   1              cec_msg->tx_data_buff[1] = (cec_msg->logical_address<<4)|cec_msg->destintion; 
+1700   1                                          //first cec data([7:4]=initiator ;[7:4]= destintion)
+1701   1              cec_msg->tx_data_buff[2] = 0x8e; //opcode
+1702   1              cec_msg->tx_data_buff[3] = 0x00; //parameter of opcode
+1703   1       
+1704   1      
+1705   1              //printf("\nPA:%bx, %bx",cec_msg->tx_data_buff[3],cec_msg->tx_data_buff[4]);
+1706   1                                              
+1707   1              lt9611_hdmi_cec_write(cec_msg);
+1708   1      }
+1709          
+1710          void lt9611_cec_feature_abort(struct cec_msg *cec_msg, u8 reason)// report feature abort 
+1711          {
+1712   1              cec_msg->tx_data_buff[0] = 0x03; //data counter to be send
+1713   1              cec_msg->tx_data_buff[1] = (cec_msg->logical_address<<4)|cec_msg->destintion; 
+1714   1                                               //first cec data([7:4]=initiator ;[7:4]= destintion) 
+1715   1              cec_msg->tx_data_buff[2] = 0x00; //opcode
+1716   1              cec_msg->tx_data_buff[3] = reason; //parameter1 of opcode
+1717   1              
+1718   1              lt9611_hdmi_cec_write(cec_msg);
+1719   1      }
+1720          
+1721          void lt9611_cec_frame_retransmission(struct cec_msg *cec_msg) 
+1722          {
+1723   1          if(cec_msg->retries_times < 5){
+1724   2              HDMI_WriteI2C_Byte(0xff, 0x86);   
+1725   2              HDMI_WriteI2C_Byte(0xf9, 0x02);
+1726   2              HDMI_WriteI2C_Byte(0xf9, 0x03);   //start send msg
+1727   2          }
+1728   1          cec_msg->retries_times ++; 
+1729   1      }
+1730          
+1731          
+1732          void lt9611_cec_device_polling(struct cec_msg *cec_msg)
+1733          {
+1734   1          static u8 i;
+1735   1          if(!cec_msg->la_allocation_done)
+1736   1              {
+1737   2                  cec_msg->tx_data_buff[0] = 0x01; //data counter to be send
+1738   2                  cec_msg->tx_data_buff[1] = i;    //first cec data(in spec, sender id = 0x04, 
+1739   2                                           //receiver id = 0x04;
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 30  
+
+1740   2                  lt9611_hdmi_cec_write(cec_msg);
+1741   2                  if(i >13 )
+1742   2                  cec_msg->la_allocation_done = 1;
+1743   2                  (i>13)?(i=0):(i++);
+1744   2              }
+1745   1      }
+1746          
+1747          void lt9611_cec_msg_tx_handle(struct cec_msg *cec_msg)
+1748          {
+1749   1          u8 cec_status;
+1750   1          u8 header;
+1751   1          u8 opcode;
+1752   1          u8 i;
+1753   1          cec_status = cec_msg ->cec_status;
+1754   1          
+1755   1      //    if( cec_msg ->send_msg_done) //There is no tx msg to be handled 
+1756   1      //        return; 
+1757   1      
+1758   1          if(cec_status&CEC_ERROR_INITIATOR){
+1759   2              printf("\nCEC_ERROR_INITIATOR.");
+1760   2              lt9611_cec_logical_reset();
+1761   2              return;
+1762   2              }
+1763   1      
+1764   1          if(cec_status&CEC_ARB_LOST){
+1765   2              printf("\nCEC_ARB_LOST."); //lost arbitration
+1766   2              return;
+1767   2              }
+1768   1      
+1769   1          if(cec_status&(CEC_SEND_DONE|CEC_NACK|CEC_ERROR_FOLLOWER)) do {
+1770   2      
+1771   2              printf("\ntx_date: ");
+1772   2              for(i = 0; i < cec_msg->tx_data_buff[0]; i++)
+1773   2                  printf("0x%02bx, ",cec_msg->tx_data_buff[i + 1]);
+1774   2      
+1775   2      
+1776   2              if(cec_status&CEC_SEND_DONE)
+1777   2                  printf("CEC_SEND_DONE >>");
+1778   2              if(cec_status&CEC_NACK)
+1779   2                  printf("NACK >>"); 
+1780   2                    
+1781   2              header = cec_msg ->tx_data_buff[1];
+1782   2      
+1783   2              if((header == 0x44)||(header == 0x88)||(header == 0xbb)) //logical address allocation
+1784   2              {
+1785   3                  if(cec_status&CEC_NACK){
+1786   4                  cec_msg ->logical_address = header&0x0f;
+1787   4                  printf("la_allocation_done.");
+1788   4                  lt9611_cec_msg_set_logical_address(cec_msg);
+1789   4                  lt9611_cec_report_physical_address(cec_msg);
+1790   4                  }
+1791   3      
+1792   3                  if(cec_status&CEC_SEND_DONE){
+1793   4                  
+1794   4                      if(cec_msg->logical_address == 4)// go to next la.
+1795   4                          cec_msg->logical_address = 8;
+1796   4                      else if(cec_msg->logical_address == 8)// go to next la. 
+1797   4                          cec_msg->logical_address = 11; 
+1798   4                      else if(cec_msg->logical_address == 11) // go to next la. 
+1799   4                          cec_msg->logical_address = 4;
+1800   4      
+1801   4                      lt9611_cec_la_allocation(cec_msg);     
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 31  
+
+1802   4                  }
+1803   3      
+1804   3                  break;
+1805   3              }
+1806   2      
+1807   2              if(cec_status&(CEC_NACK|CEC_ERROR_FOLLOWER)){
+1808   3                  lt9611_cec_frame_retransmission(cec_msg);        
+1809   3              }
+1810   2      
+1811   2              if(cec_msg ->tx_data_buff[0] < 2)  //check tx data length
+1812   2                  break;
+1813   2      
+1814   2         
+1815   2              opcode = cec_msg ->tx_data_buff[2];
+1816   2              if(opcode == 0x84){
+1817   3                    cec_msg ->report_physical_address_done = 1;
+1818   3                    printf("report_physical_address.");
+1819   3              } 
+1820   2      
+1821   2              if(opcode == 0x00){
+1822   3                    printf("feature abort"); 
+1823   3              } 
+1824   2      
+1825   2              } while (0);
+1826   1      }
+1827          
+1828          
+1829          void lt9611_cec_msg_rx_parse(struct cec_msg *cec_msg)
+1830          {
+1831   1          u8 cec_status;
+1832   1          u8 header;
+1833   1          u8 opcode;
+1834   1          u8 initiator;
+1835   1          u8 destintion;
+1836   1          u8 i;
+1837   1          cec_status = cec_msg ->cec_status;
+1838   1      
+1839   1      //    if( cec_msg ->parse_msg_done) //There is no Rx msg to be parsed 
+1840   1      //        return; 
+1841   1      
+1842   1          if(cec_status&CEC_ERROR_FOLLOWER){
+1843   2              printf("\nCEC_ERROR_FOLLOWER.");
+1844   2              return;
+1845   2              }
+1846   1      
+1847   1          if(!(cec_status&CEC_REC_DATA)){
+1848   2              return;
+1849   2              }
+1850   1              
+1851   1          lt9611_hdmi_cec_read(&lt9611_cec_msg);
+1852   1      
+1853   1          if(cec_msg ->rx_data_buff[0] < 1) //check rx data length
+1854   1              return; 
+1855   1      
+1856   1          printf("\nrx_date: ");
+1857   1          for(i = 0; i < cec_msg->rx_data_buff[0]; i++)
+1858   1          printf("0x%02bx, ",cec_msg->rx_data_buff[i + 1]);
+1859   1      
+1860   1          printf("parse <<");
+1861   1          header = cec_msg ->rx_data_buff[1]; 
+1862   1          destintion = header&0x0f;
+1863   1          initiator = (header&0xf0) >> 4;
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 32  
+
+1864   1          //cec_msg ->parse_msg_done = 1;
+1865   1      
+1866   1          if(header == 0x4f){
+1867   2             printf("lt9611 broadcast msg.");
+1868   2              }
+1869   1          
+1870   1          if(cec_msg ->rx_data_buff[0] < 2) //check rx data length
+1871   1              return; 
+1872   1          
+1873   1          opcode = cec_msg ->rx_data_buff[2];
+1874   1      
+1875   1      // CECT 12 Invalid Msg Tests
+1876   1      if((header&0x0f) == 0x0f){ 
+1877   2          if((opcode == 0x00)||
+1878   2              (opcode == 0x83)||
+1879   2              (opcode == 0x8e)||
+1880   2              (opcode == 0x90)||
+1881   2              (opcode == 0xff)){
+1882   3              printf("Invalid msg, destination address error"); //these msg should not be broadcast msg, but the
+             -y do.
+1883   3              return;
+1884   3          }
+1885   2      }else{
+1886   2          if((opcode == 0x84)||
+1887   2              (opcode == 0x84)||
+1888   2              (opcode == 0x84)){
+1889   3              printf("Invalid msg, destination address error"); //these msg should be broadcast msg, but they no
+             -t.
+1890   3              return;
+1891   3          }
+1892   2      }
+1893   1              
+1894   1          if(opcode == 0xff) //abort
+1895   1          {
+1896   2              printf("abort.");
+1897   2              if(destintion == 0x0f) //ignor broadcast abort msg.
+1898   2                  return; 
+1899   2              cec_msg ->destintion = initiator;
+1900   2              lt9611_cec_feature_abort(cec_msg, CEC_ABORT_REASON_0);
+1901   2          }
+1902   1      
+1903   1          if(opcode == 0x83) //give physical address
+1904   1          {
+1905   2              printf("give physical address.");
+1906   2              lt9611_cec_report_physical_address(cec_msg);
+1907   2          }
+1908   1      
+1909   1          if(opcode == 0x90) //report power status
+1910   1          {
+1911   2              printf("report power status.");
+1912   2              if(cec_msg ->rx_data_buff[0] < 3) {
+1913   3                  printf("<error:parameters missing");
+1914   3                  return; //parameters missing, ignor this msg.
+1915   3              }
+1916   2          }
+1917   1      
+1918   1          if(opcode == 0x8e) //menu status
+1919   1          {
+1920   2              printf("menu status.");
+1921   2              if(cec_msg ->rx_data_buff[0] < 3) {
+1922   3                  printf("<error:parameters missing");
+1923   3                  return; //parameters missing, ignor this msg.
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 33  
+
+1924   3              }
+1925   2          }
+1926   1      
+1927   1          if(opcode == 0x00) //feature abort
+1928   1          {
+1929   2              printf("feature abort.");
+1930   2              if(cec_msg ->rx_data_buff[0] < 3) {
+1931   3                  printf("<error:parameters missing");
+1932   3                  return; //parameters missing, ignor this msg.
+1933   3              }
+1934   2          }
+1935   1      
+1936   1          if(opcode == 0x9e) //cec version
+1937   1          {
+1938   2              printf("cec version.");
+1939   2              if(cec_msg ->rx_data_buff[0] < 3) {
+1940   3                  printf("<error:parameters missing");
+1941   3                  return; //parameters missing, ignor this msg.
+1942   3              }
+1943   2          }
+1944   1      
+1945   1          if(opcode == 0x84) //report physical address
+1946   1          {
+1947   2              printf("report physical address.");
+1948   2              if(cec_msg ->rx_data_buff[0] < 5) {
+1949   3                  printf("<error:parameters missing");
+1950   3                  return; //parameters missing, ignor this msg.
+1951   3              }
+1952   2          }
+1953   1      
+1954   1          if(opcode == 0x86) //set stream path
+1955   1          {
+1956   2              printf("set stream path.");
+1957   2              if(cec_msg ->rx_data_buff[0] < 4) {
+1958   3                  printf("<error:parameters missing");
+1959   3                  return; //parameters missing, ignor this msg.
+1960   3              }
+1961   2              lt9611_cec_report_physical_address(cec_msg);
+1962   2              Timer0_Delay1ms(120);
+1963   2              lt9611_cec_menu_activate(cec_msg);
+1964   2          }
+1965   1      }
+1966          
+1967          void lt9611_cec_msg_init(struct cec_msg *cec_msg)
+1968          {
+1969   1          LT9611_HDMI_CEC_ON(1);
+1970   1          cec_msg->physical_address = 0x2000;
+1971   1          cec_msg->logical_address = 4;
+1972   1          cec_msg->report_physical_address_done = 0;
+1973   1          cec_msg->la_allocation_done = 0;
+1974   1          lt9611_cec_msg_set_logical_address(cec_msg);
+1975   1      }
+1976          /////////////////////////////////////////CEC: end////////////////////////////////////////////
+1977          
+1978          
+1979          
+1980          
+1981          
+1982          /////////////////////////////////////////////////////////////
+1983          //These function for debug: start
+1984          /////////////////////////////////////////////////////////////
+1985          void LT9611_Frequency_Meter_Byte_Clk(void)
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 34  
+
+1986          {
+1987   1      #ifdef _Frequency_Meter_Byte_Clk_
+1988   1        u8 temp;
+1989   1        u32 reg=0x00;
+1990   1      
+1991   1        /* port A byte clk meter */
+1992   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+1993   1        HDMI_WriteI2C_Byte(0xc7,0x03); //PortA
+1994   1        Timer0_Delay1ms(50);
+1995   1        temp = HDMI_ReadI2C_Byte(0xcd);
+1996   1        if((temp&0x60)==0x60) /* clk stable */
+1997   1        {
+1998   2          reg = (u32)(temp&0x0f)*65536;
+1999   2          temp = HDMI_ReadI2C_Byte(0xce);
+2000   2          reg = reg + (u16)temp*256;
+2001   2          temp = HDMI_ReadI2C_Byte(0xcf);
+2002   2          reg = reg + temp;
+2003   2          printf("\r\nport A byte clk = %ld",reg);
+2004   2        }
+2005   1        else /* clk unstable */
+2006   1        printf("\r\nport A byte clk unstable");
+2007   1        
+2008   1        /* port B byte clk meter */
+2009   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+2010   1        HDMI_WriteI2C_Byte(0xc7,0x04); 
+2011   1        Timer0_Delay1ms(50);
+2012   1        temp = HDMI_ReadI2C_Byte(0xcd);
+2013   1        if((temp&0x60)==0x60) /* clk stable */
+2014   1        {
+2015   2          reg = (u32)(temp&0x0f)*65536;
+2016   2          temp = HDMI_ReadI2C_Byte(0xce);
+2017   2          reg =reg + (u16)temp*256;
+2018   2          temp = HDMI_ReadI2C_Byte(0xcf);
+2019   2          reg = reg + temp;
+2020   2          printf("\r\nport B byte clk = %ld",reg);
+2021   2        }
+2022   1        else /* clk unstable */
+2023   1        printf("\r\nport B byte clk unstable");
+2024   1      #endif
+2025   1      }
+2026          
+2027          void LT9611_Htotal_Sysclk(void)
+2028          {
+2029   1      #ifdef _htotal_stable_check_
+2030   1        u16 reg;
+2031   1        u8 loopx;
+2032   1        for(loopx = 0; loopx < 10; loopx++)
+2033   1        {
+2034   2          HDMI_WriteI2C_Byte(0xff,0x82);
+2035   2          reg = HDMI_ReadI2C_Byte(0x86);
+2036   2          reg = reg*256+HDMI_ReadI2C_Byte(0x87);
+2037   2          printf("\r\nHtotal_Sysclk = %d", reg);
+2038   2          //printdec_u32(reg);
+2039   2        }
+2040   1      #endif
+2041   1      }
+2042          
+2043          void LT9611_Pcr_MK_Print(void)
+2044          {
+2045   1        #ifdef _pcr_mk_printf_
+2046   1        u8 loopx;
+2047   1        for(loopx = 0; loopx < 10; loopx++)
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 35  
+
+2048   1        {
+2049   2          HDMI_WriteI2C_Byte(0xff,0x83); 
+2050   2          printf("\r\nPCRstable_bit4:0x%bx",HDMI_ReadI2C_Byte(0x97));
+2051   2          printf("\r\n 0x%bx",HDMI_ReadI2C_Byte(0xb4));
+2052   2          printf(" 0x%bx",HDMI_ReadI2C_Byte(0xb5));
+2053   2          printf(" 0x%bx",HDMI_ReadI2C_Byte(0xb6));
+2054   2          printf(" 0x%bx",HDMI_ReadI2C_Byte(0xb7));
+2055   2          Timer0_Delay1ms(1000);
+2056   2        }
+2057   1        #endif
+2058   1      }
+2059          
+2060          void LT9611_Dphy_debug(void)
+2061          {
+2062   1        #ifdef _mipi_Dphy_debug_
+2063   1        u8 temp;
+2064   1        
+2065   1        HDMI_WriteI2C_Byte(0xff,0x83);
+2066   1        temp = HDMI_ReadI2C_Byte(0xbc);
+2067   1        if(temp == 0x55)
+2068   1        printf("\r\nport A lane PN is right");
+2069   1        else
+2070   1        printf("\r\nport A lane PN error 0x83bc = 0x%bx",temp);
+2071   1        
+2072   1        temp = HDMI_ReadI2C_Byte(0x99);
+2073   1        if(temp == 0xb8)
+2074   1        printf("\r\nport A lane 0 sot right ");
+2075   1        else
+2076   1        printf("\r\nport A lane 0 sot error = 0x%bx",temp);
+2077   1      
+2078   1        temp = HDMI_ReadI2C_Byte(0x9b);
+2079   1        if(temp == 0xb8)
+2080   1        printf("\r\nport A lane 1 sot right ");
+2081   1        else
+2082   1        printf("\r\nport A lane 1 sot error = 0x%bx",temp);
+2083   1        
+2084   1        temp = HDMI_ReadI2C_Byte(0x9d);
+2085   1        if(temp == 0xb8)
+2086   1        printf("\r\nport A lane 2 sot right ");
+2087   1        else
+2088   1        printf("\r\nport A lane 2 sot error = 0x%bx",temp);
+2089   1        
+2090   1        temp = HDMI_ReadI2C_Byte(0x9f);
+2091   1        if(temp == 0xb8)
+2092   1        printf("\r\nport A lane 3 sot right ");
+2093   1        else
+2094   1        printf("\r\nport A lane 3 sot error = 0x%bx",temp);
+2095   1        
+2096   1        printf("\r\nport A lane 0 settle = 0x%bx",HDMI_ReadI2C_Byte(0x98));
+2097   1        printf("\r\nport A lane 1 settle = 0x%bx",HDMI_ReadI2C_Byte(0x9a));
+2098   1        printf("\r\nport A lane 2 settle = 0x%bx",HDMI_ReadI2C_Byte(0x9c));
+2099   1        printf("\r\nport A lane 3 settle = 0x%bx",HDMI_ReadI2C_Byte(0x9e));
+2100   1      
+2101   1        #endif
+2102   1      }
+2103          
+2104          /////////////////////////////////////////////////////////////
+2105          //These function for debug: end
+2106          /////////////////////////////////////////////////////////////
+2107          
+2108          
+2109          
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 36  
+
+2110          
+2111          
+2112          void LT9611_IRQ_Init(void) //dsren
+2113          {            
+2114   1        //int hpd interrupt
+2115   1        HDMI_WriteI2C_Byte(0xff,0x82);
+2116   1        //HDMI_WriteI2C_Byte(0x10,0x00); //Output low level active;
+2117   1        HDMI_WriteI2C_Byte(0x58,0x0a); //Det HPD 0x0a --> 0x08 20200727
+2118   1        HDMI_WriteI2C_Byte(0x59,0x00); //HPD debounce width
+2119   1      
+2120   1        //intial vid change interrupt
+2121   1        HDMI_WriteI2C_Byte(0x9e,0xf7);
+2122   1      }
+2123          
+2124          void LT9611_Globe_Interrupts(bool on)
+2125          {
+2126   1        if(on)
+2127   1        {
+2128   2          HDMI_WriteI2C_Byte(0xff,0x81);
+2129   2          HDMI_WriteI2C_Byte(0x51,0x10); //hardware mode irq pin out
+2130   2        }
+2131   1        else
+2132   1        {
+2133   2          HDMI_WriteI2C_Byte(0xff,0x81); //software mode irq pin out = 1;
+2134   2          HDMI_WriteI2C_Byte(0x51,0x30); 
+2135   2        }
+2136   1      }
+2137          
+2138          
+2139          void LT9611_Enable_Interrupts(u8 interrupts, bool on)
+2140          {
+2141   1           if(interrupts == HPD_INTERRUPT_ENABLE)
+2142   1            {
+2143   2              if(on)
+2144   2              {
+2145   3                 HDMI_WriteI2C_Byte(0xff,0x82);
+2146   3                 HDMI_WriteI2C_Byte(0x07,0xff); //clear3
+2147   3                 HDMI_WriteI2C_Byte(0x07,0x3f); //clear3
+2148   3                 HDMI_WriteI2C_Byte(0x03,0x3f); //mask3  //Tx_det
+2149   3                 printf("\r\nLT9611_Enable_Interrupts: hpd_irq_enable");
+2150   3              }
+2151   2             else
+2152   2              {
+2153   3                 HDMI_WriteI2C_Byte(0xff,0x82);
+2154   3                 HDMI_WriteI2C_Byte(0x07,0xff); //clear3
+2155   3                 HDMI_WriteI2C_Byte(0x03,0xff); //mask3  //Tx_det
+2156   3                 printf("\r\nLT9611_Enable_Interrupts: hpd_irq_disable");
+2157   3              }
+2158   2            }
+2159   1      
+2160   1         if(interrupts == VID_CHG_INTERRUPT_ENABLE)
+2161   1         {
+2162   2               if(on)
+2163   2               {
+2164   3                  HDMI_WriteI2C_Byte(0xff,0x82);
+2165   3                  HDMI_WriteI2C_Byte(0x9e,0xff); //clear vid chk irq
+2166   3                  HDMI_WriteI2C_Byte(0x9e,0xf7); 
+2167   3                  HDMI_WriteI2C_Byte(0x04,0xff); //clear0
+2168   3                  HDMI_WriteI2C_Byte(0x04,0xfe); //clear0
+2169   3                  HDMI_WriteI2C_Byte(0x00,0xfe); //mask0 vid_chk_IRQ
+2170   3                  printf("\r\nLT9611_Enable_Interrupts: vid_chg_irq_enable");
+2171   3               }
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 37  
+
+2172   2               else
+2173   2               {
+2174   3                  HDMI_WriteI2C_Byte(0xff,0x82);
+2175   3                  HDMI_WriteI2C_Byte(0x04,0xff); //clear0
+2176   3                  HDMI_WriteI2C_Byte(0x00,0xff); //mask0 vid_chk_IRQ
+2177   3                  printf("\r\nLT9611_Enable_Interrupts: vid_chg_irq_disable");
+2178   3               }
+2179   2         }
+2180   1         if(interrupts == CEC_INTERRUPT_ENABLE)
+2181   1         {
+2182   2            if(on)
+2183   2            {
+2184   3                HDMI_WriteI2C_Byte(0xff, 0x86); 
+2185   3                HDMI_WriteI2C_Byte(0xfa, 0x00); //cec interrup mask
+2186   3                HDMI_WriteI2C_Byte(0xfc, 0x7f); //cec irq clr
+2187   3                HDMI_WriteI2C_Byte(0xfc, 0x00); 
+2188   3                
+2189   3                /* cec irq init */
+2190   3                HDMI_WriteI2C_Byte(0xff, 0x82);
+2191   3                HDMI_WriteI2C_Byte(0x01, 0x7f); //mask bit[7]
+2192   3                HDMI_WriteI2C_Byte(0x05, 0xff); //clr bit[7]
+2193   3                HDMI_WriteI2C_Byte(0x05, 0x7f);
+2194   3            }
+2195   2            else
+2196   2            {
+2197   3                HDMI_WriteI2C_Byte(0xff, 0x86); 
+2198   3                HDMI_WriteI2C_Byte(0xfa, 0xff); //cec interrup mask
+2199   3                HDMI_WriteI2C_Byte(0xfc, 0x7f); //cec irq clr
+2200   3                
+2201   3                /* cec irq init */
+2202   3                HDMI_WriteI2C_Byte(0xff, 0x82);
+2203   3                HDMI_WriteI2C_Byte(0x01, 0xff); //mask bit[7]
+2204   3                HDMI_WriteI2C_Byte(0x05, 0xff); //clr bit[7]
+2205   3            }
+2206   2          
+2207   2         }
+2208   1      }
+2209          
+2210          
+2211          void LT9611_HDP_Interrupt_Handle(void)
+2212          {
+2213   1        
+2214   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+2215   1        HDMI_WriteI2C_Byte(0x07,0xff); //clear3
+2216   1        HDMI_WriteI2C_Byte(0x07,0x3f); //clear3
+2217   1        
+2218   1      ////////////////////////////////////////////////////////////////////  HDCP_CTS
+2219   1        printf("\r\nLT9611_HDP_Interrupt_Handle: HPD acted!");
+2220   1        LT9611_HDMI_Out_Disable();
+2221   1      ////////////////////////////////////////////////////////////////////
+2222   1        
+2223   1        if(LT9611_Get_HPD_Status())
+2224   1        {
+2225   2          printf("\r\nLT9611_HDP_Interrupt_Handle: HDMI connected.");
+2226   2          LT9611_LowPower_mode(0);
+2227   2          LT9611_Enable_Interrupts(VID_CHG_INTERRUPT_ENABLE, 1);
+2228   2          Timer0_Delay1ms(100);
+2229   2          LT9611_Read_EDID(); 
+2230   2             
+2231   2      #ifdef cec_on
+                     lt9611_parse_physical_address(&lt9611_cec_msg, Sink_EDID);
+                     lt9611_cec_la_allocation(&lt9611_cec_msg);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 38  
+
+              #endif
+2235   2          
+2236   2          LT9611_Video_Check();
+2237   2          if(PCR_Format != PCR_None)
+2238   2          {
+2239   3            LT9611_PLL(video);
+2240   3            LT9611_MIPI_Pcr(video);
+2241   3            LT9611_HDMI_TX_Digital(video);
+2242   3            LT9611_HDMI_Out_Enable();
+2243   3            LT9611_Pcr_MK_Print();
+2244   3          }
+2245   2          else
+2246   2          {
+2247   3            LT9611_HDMI_Out_Disable();
+2248   3            printf("\r\nLT9611_HDP_Interrupt_Handle: no mipi video, disable hdmi output");
+2249   3          }
+2250   2        }
+2251   1        else
+2252   1        {
+2253   2           printf("\r\nLT9611_HDP_Interrupt_Handle: HDMI disconnected");
+2254   2           LT9611_Enable_Interrupts(VID_CHG_INTERRUPT_ENABLE, 0);
+2255   2           LT9611_LowPower_mode(1);
+2256   2             
+2257   2      #ifdef cec_on
+                     lt9611_cec_msg_init(&lt9611_cec_msg);
+              #endif
+2260   2        }
+2261   1      }
+2262          
+2263          
+2264          void LT9611_Vid_Chg_Interrupt_Handle(void)
+2265          {
+2266   1        printf("\r\nLT9611_Vid_Chg_Interrupt_Handle: ");
+2267   1        #if 1
+2268   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+2269   1        HDMI_WriteI2C_Byte(0x9e,0xff); //clear vid chk irq
+2270   1        HDMI_WriteI2C_Byte(0x9e,0xf7); 
+2271   1      
+2272   1        HDMI_WriteI2C_Byte(0x04,0xff); //clear0 irq
+2273   1        HDMI_WriteI2C_Byte(0x04,0xfe); 
+2274   1        #endif
+2275   1        //Timer0_Delay1ms(100);
+2276   1        LT9611_Video_Check();
+2277   1      
+2278   1        if(PCR_Format != PCR_None)
+2279   1        {
+2280   2          HDMI_WriteI2C_Byte(0xff,0x80); 
+2281   2          HDMI_WriteI2C_Byte(0x11,0x5A);
+2282   2          Timer0_Delay1ms(10);
+2283   2          HDMI_WriteI2C_Byte(0x11,0xFA);
+2284   2            
+2285   2          LT9611_PLL(video);
+2286   2          LT9611_MIPI_Pcr(video);
+2287   2          LT9611_HDMI_TX_Digital(video);
+2288   2          LT9611_HDMI_Out_Enable();
+2289   2        }
+2290   1        else
+2291   1        {
+2292   2          //printf("\r\nLT9611_Vid_Chg_Interrupt_Handle: no mipi video");
+2293   2          LT9611_HDMI_Out_Disable();
+2294   2        } 
+2295   1      }
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 39  
+
+2296          
+2297          
+2298          void lt9611_cec_msg_Interrupt_Handle(struct cec_msg *cec_msg)
+2299          {
+2300   1          u8 cec_status;
+2301   1          
+2302   1          HDMI_WriteI2C_Byte(0xff,0x86);
+2303   1          cec_status = HDMI_ReadI2C_Byte(0xd2) ;
+2304   1      
+2305   1          cec_msg->cec_status = cec_status;
+2306   1          printf("\nIRQ cec_status: 0x%02bx",cec_status);
+2307   1      
+2308   1          HDMI_WriteI2C_Byte(0xff, 0x86); 
+2309   1          HDMI_WriteI2C_Byte(0xfc, 0x7f); //cec irq clr
+2310   1          HDMI_WriteI2C_Byte(0xfc, 0x00);
+2311   1      
+2312   1          HDMI_WriteI2C_Byte(0xff,0x82); 
+2313   1          HDMI_WriteI2C_Byte(0x05,0xff); //clear3
+2314   1          HDMI_WriteI2C_Byte(0x05,0x7f); //clear3
+2315   1      
+2316   1          lt9611_cec_msg_tx_handle(cec_msg);
+2317   1          lt9611_cec_msg_rx_parse(cec_msg);
+2318   1      }
+2319          
+2320          
+2321          
+2322          
+2323          
+2324          /////////////////////////////////////////////////////////////
+2325          //These function for Pattern output: start
+2326          /////////////////////////////////////////////////////////////
+2327          void LT9611_pattern_gcm(struct video_timing *video_format)
+2328          {
+2329   1        u8 POL;
+2330   1        POL = (video_format-> h_polarity)*0x10 + (video_format-> v_polarity)*0x20;
+2331   1        POL = ~POL;
+2332   1        POL &= 0x30;
+2333   1      
+2334   1        HDMI_WriteI2C_Byte(0xff,0x82);
+2335   1        HDMI_WriteI2C_Byte(0xa3,(u8)((video_format->hs+video_format->hbp)/256));//de_delay
+2336   1        HDMI_WriteI2C_Byte(0xa4,(u8)((video_format->hs+video_format->hbp)%256));
+2337   1        HDMI_WriteI2C_Byte(0xa5,(u8)((video_format->vs+video_format->vbp)%256));//de_top
+2338   1        HDMI_WriteI2C_Byte(0xa6,(u8)(video_format->hact/256));
+2339   1        HDMI_WriteI2C_Byte(0xa7,(u8)(video_format->hact%256));  //de_cnt
+2340   1        HDMI_WriteI2C_Byte(0xa8,(u8)(video_format->vact/256));
+2341   1        HDMI_WriteI2C_Byte(0xa9,(u8)(video_format->vact%256));  //de_line
+2342   1        HDMI_WriteI2C_Byte(0xaa,(u8)(video_format->htotal/256));
+2343   1        HDMI_WriteI2C_Byte(0xab,(u8)(video_format->htotal%256));//htotal
+2344   1        HDMI_WriteI2C_Byte(0xac,(u8)(video_format->vtotal/256));
+2345   1        HDMI_WriteI2C_Byte(0xad,(u8)(video_format->vtotal%256));//vtotal
+2346   1        HDMI_WriteI2C_Byte(0xae,(u8)(video_format->hs/256));
+2347   1        HDMI_WriteI2C_Byte(0xaf,(u8)(video_format->hs%256));    //hvsa
+2348   1        HDMI_WriteI2C_Byte(0xb0,(u8)(video_format->vs%256));    //vsa
+2349   1      
+2350   1        HDMI_WriteI2C_Byte(0x47,(u8)(POL|0x07));  //sync polarity
+2351   1      }
+2352          
+2353          void LT9611_pattern_pixel_clk(struct video_timing *video_format)
+2354          {
+2355   1        u32 pclk;
+2356   1        pclk = video_format->pclk_khz;
+2357   1        printf("\r\nset pixel clk = %ld", pclk);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 40  
+
+2358   1        //printdec_u32(pclk); //Dec
+2359   1        
+2360   1        HDMI_WriteI2C_Byte(0xff,0x83);
+2361   1        HDMI_WriteI2C_Byte(0x2d,0x50);
+2362   1        
+2363   1        if(pclk == 297000)
+2364   1        {
+2365   2          HDMI_WriteI2C_Byte(0x26,0xb6);
+2366   2          HDMI_WriteI2C_Byte(0x27,0xf0);
+2367   2        }
+2368   1        if(pclk == 148500)
+2369   1        {
+2370   2          HDMI_WriteI2C_Byte(0x26,0xb7);
+2371   2        }
+2372   1        if(pclk == 74250)
+2373   1        {
+2374   2          HDMI_WriteI2C_Byte(0x26,0x9c);
+2375   2        }
+2376   1        HDMI_WriteI2C_Byte(0xff,0x80);
+2377   1        HDMI_WriteI2C_Byte(0x11,0x5a); //Pcr reset
+2378   1        HDMI_WriteI2C_Byte(0x11,0xfa);
+2379   1      }
+2380          
+2381          void LT9611_pattern_en(void)
+2382          {
+2383   1        HDMI_WriteI2C_Byte(0xff,0x82); 
+2384   1        HDMI_WriteI2C_Byte(0x4f,0x80);    //[7] = Select ad_txpll_d_clk.
+2385   1        HDMI_WriteI2C_Byte(0x50,0x20);
+2386   1      }
+2387          
+2388          void LT9611_pattern(void)
+2389          {
+2390   1        //DTV
+2391   1      //    video = &video_640x480_60Hz;
+2392   1      //    video = &video_720x480_60Hz;
+2393   1      //    video = &video_1280x720_60Hz;
+2394   1          video = &video_1920x1080_60Hz;
+2395   1      //    video = &video_3840x2160_30Hz;
+2396   1      
+2397   1        //DMT
+2398   1        //video = &video_1024x600_60Hz;
+2399   1        //video = &video_1024x600_60Hz;
+2400   1        //video = &video_1280x800_60Hz;
+2401   1        //video = &video_1920x1080_30Hz;
+2402   1      
+2403   1        LT9611_Chip_ID();
+2404   1        LT9611_System_Init(); 
+2405   1        LT9611_pattern_en();
+2406   1        
+2407   1        LT9611_PLL(video);
+2408   1        LT9611_pattern_gcm(video);
+2409   1        LT9611_HDMI_TX_Digital(video);
+2410   1        
+2411   1        LT9611_HDMI_TX_Phy();
+2412   1      
+2413   1      #if 0 
+                //Audio pattern
+                HDMI_WriteI2C_Byte(0xff,0x82);
+                HDMI_WriteI2C_Byte(0xd6,0x8c);
+                HDMI_WriteI2C_Byte(0xd7,0x06); //sync polarity
+                  
+                HDMI_WriteI2C_Byte(0xff,0x84);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 41  
+
+                HDMI_WriteI2C_Byte(0x06,0x0c);
+                HDMI_WriteI2C_Byte(0x07,0x10);
+                HDMI_WriteI2C_Byte(0x16,0x01);
+                
+                HDMI_WriteI2C_Byte(0x34,0xd4); //CTS_N
+              #endif
+2426   1      /////////////////////////////////////////////////////测试
+2427   1      //  HDMI_WriteI2C_Byte(0xff,0x81);
+2428   1      //  HDMI_WriteI2C_Byte(0x39,0x80);
+2429   1      //  HDMI_WriteI2C_Byte(0x3A,0xAA);
+2430   1      //  HDMI_WriteI2C_Byte(0x3B,0x80);
+2431   1      //  HDMI_WriteI2C_Byte(0x3C,0xAA);
+2432   1      //  HDMI_WriteI2C_Byte(0x3D,0x80);
+2433   1      //  HDMI_WriteI2C_Byte(0x3E,0xAA);
+2434   1      ////////////////////////////////////////////////////
+2435   1        LT9611_Audio_Init();
+2436   1      //  LT9611_HDCP_Init();
+2437   1      //  LT9611_load_hdcp_key();
+2438   1      //  LT9611_Read_EDID();
+2439   1        LT9611_HDMI_Out_Enable();
+2440   1        while(1);
+2441   1      //  LT9611_HDMI_CEC_ON(1);
+2442   1      //  lt9611_cec_msg_set_logical_address();
+2443   1      //  while(1)
+2444   1      //  {
+2445   1      //    lt9611_cec_msg_write_demo();
+2446   1      //  }
+2447   1      }
+2448          
+2449          /////////////////////////////////////////////////////////////
+2450          //These function for Pattern output: end
+2451          /////////////////////////////////////////////////////////////
+2452          
+2453          void LT9611_Init(void)
+2454          {
+2455   1        u32 cnt = 0;
+2456   1        //RESET_LT9611();
+2457   1        LT9611_Chip_ID();
+2458   1        LT9611_System_Init();
+2459   1      
+2460   1        //LT9611_RST_PD_Init(); 
+2461   1        LT9611_MIPI_Input_Analog(); 
+2462   1        LT9611_MIPI_Input_Digtal();
+2463   1      
+2464   1        Timer0_Delay1ms(1000);
+2465   1        LT9611_Video_Check();
+2466   1      
+2467   1        LT9611_PLL(video);
+2468   1        LT9611_MIPI_Pcr(video); //pcr setup
+2469   1        LT9611_Audio_Init();
+2470   1        LT9611_CSC();
+2471   1      
+2472   1        LT9611_HDCP_Init();
+2473   1        LT9611_load_hdcp_key();
+2474   1      
+2475   1        LT9611_HDMI_TX_Digital(video);
+2476   1        LT9611_HDMI_TX_Phy();
+2477   1      
+2478   1        LT9611_IRQ_Init();
+2479   1      
+2480   1      ////////////////////////////////////////////////////////////CEC
+2481   1        LT9611_HDMI_CEC_ON(1);
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 42  
+
+2482   1        //lt9611_cec_msg_set_logical_address();
+2483   1        lt9611_cec_msg_init(&lt9611_cec_msg);
+2484   1      ////////////////////////////////////////////////////////////
+2485   1      
+2486   1        LT9611_Enable_Interrupts(HPD_INTERRUPT_ENABLE, 1);
+2487   1        LT9611_Enable_Interrupts(VID_CHG_INTERRUPT_ENABLE, 0);
+2488   1        LT9611_Enable_Interrupts(CEC_INTERRUPT_ENABLE, 1);
+2489   1      
+2490   1        LT9611_Frequency_Meter_Byte_Clk();
+2491   1        LT9611_Dphy_debug();
+2492   1        LT9611_Htotal_Sysclk();
+2493   1      
+2494   1        Timer0_Delay1ms(200); //HPD have debounce, wait HPD irq.
+2495   1        LT9611_HDP_Interrupt_Handle();
+2496   1        //lt9611_cec_msg_write_demo();
+2497   1        printf("\r\n==========================LT9611 Initial End===============================");
+2498   1        
+2499   1        while(1)
+2500   1        {
+2501   2          if(irq_task_flag)
+2502   2          {
+2503   3            //print("\r\nirq task...");
+2504   3            LT9611_IRQ_Task();
+2505   3            irq_task_flag = 0;
+2506   3            set_EPI;
+2507   3          }
+2508   2          if(lt9611.hdcp_encryption == hdcp_enable)
+2509   2          {
+2510   3            if(LT9611_Get_HPD_Status())
+2511   3            {
+2512   4              HDMI_WriteI2C_Byte(0xff,0x85);
+2513   4              if(((HDMI_ReadI2C_Byte(0x44)&0x04)==0x04)&&((HDMI_ReadI2C_Byte(0x44)&0x02)==0x00))
+2514   4              {
+2515   5                LT9611_HDCP_Disable();
+2516   5                LT9611_HDCP_Enable();
+2517   5              }
+2518   4            }
+2519   3          }
+2520   2        }
+2521   1      }
+2522          
+2523          
+2524          void IntbInterruptFun(void) interrupt 7
+2525          {
+2526   1        if(PIF == 0x08)
+2527   1        {
+2528   2          PIF = 0x00; //clear interrupt flag
+2529   2          clr_IE0;
+2530   2        }
+2531   1        irq_task_flag = 1;
+2532   1        clr_EPI;
+2533   1      }
+2534          
+2535          
+2536          void LT9611_IRQ_Task(void)
+2537          {
+2538   1        u8 irq_flag3;
+2539   1        u8 irq_flag0;
+2540   1        u8 irq_flag1;
+2541   1      
+2542   1        //printf("\r\nLT9611_IRQ_Task :IRQ Task");
+2543   1      
+C51 COMPILER V9.53.0.0   LT9611                                                            06/07/2023 09:16:45 PAGE 43  
+
+2544   1        HDMI_WriteI2C_Byte(0xff,0x82);
+2545   1      
+2546   1        irq_flag0=HDMI_ReadI2C_Byte(0x0c);
+2547   1        irq_flag1=HDMI_ReadI2C_Byte(0x0d);
+2548   1        irq_flag3=HDMI_ReadI2C_Byte(0x0f);
+2549   1      
+2550   1        if((irq_flag1&0x80) == 0x80)
+2551   1        {
+2552   2          lt9611_cec_msg_Interrupt_Handle(&lt9611_cec_msg);
+2553   2        }
+2554   1      
+2555   1        if(irq_flag3&0xc0)   //HPD_interrupt
+2556   1        {
+2557   2          LT9611_HDP_Interrupt_Handle();
+2558   2        }
+2559   1      
+2560   1        if(irq_flag0&0x01) //vedio_change_interrupt
+2561   1        {
+2562   2          LT9611_Vid_Chg_Interrupt_Handle();
+2563   2        }
+2564   1      }
+2565          
+2566          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =  10287    ----
+   CONSTANT SIZE    =   3944    ----
+   XDATA SIZE       =    353     123
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,79 @@
+C51 COMPILER V9.53.0.0   MAIN                                                              06/07/2023 09:16:45 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\C51\BIN\C51.EXE ..\User\main.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\N76E003_Driv
+                    -er\inc) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\Listings\main.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          
+   2          #include "include.h"
+   3          
+   4          bool irq_task_flag = 0;
+   5          
+   6          void MCU_SystemInit(void)
+   7          {
+   8   1        P10_Input_Mode;
+   9   1        P11_Input_Mode;
+  10   1        P12_Input_Mode;
+  11   1        P03_Input_Mode;    //IRQ
+  12   1        P04_Input_Mode;
+  13   1      
+  14   1        P30_PushPull_Mode; //LT8911_RST_N
+  15   1        P13_OpenDrain_Mode;//SCL_CTL
+  16   1        P14_OpenDrain_Mode;//SDA_CTL
+  17   1        
+  18   1        //EA=1;
+  19   1        InitialUART0_Timer1(115200);//UART_INTI
+  20   1      
+  21   1        Enable_INT_Port0;
+  22   1        Enable_BIT3_FallEdge_Trig;
+  23   1        set_EPI;
+  24   1      
+  25   1        //set_EX1;
+  26   1        //set_IT1;
+  27   1        //set_IE1;
+  28   1        set_EA;
+  29   1      }
+  30          
+  31          void LT9611_Reset(void)
+  32          {
+  33   1         P30 = 0;
+  34   1         Timer0_Delay1ms(200);
+  35   1         P30 = 1;
+  36   1         Timer0_Delay1ms(200);
+  37   1      }
+  38          
+  39          void main(void)
+  40          {
+  41   1        MCU_SystemInit();
+  42   1        //Timer0_Delay1ms(3000);
+  43   1        printf("\r\n==================Modified on ("__DATE__ " - " __TIME__ ")==================");
+  44   1        LT9611_Reset();
+  45   1      
+  46   1        #ifdef _pattern_test_ 
+                LT9611_pattern();
+                #else
+  49   1        LT9611_Init();
+  50   1        #endif
+  51   1      
+  52   1        while(1);
+  53   1      }
+
+C51 COMPILER V9.53.0.0   MAIN                                                              06/07/2023 09:16:45 PAGE 2   
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    123    ----
+   CONSTANT SIZE    =     75    ----
+   XDATA SIZE       =      1    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

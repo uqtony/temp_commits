@@ -1,0 +1,265 @@
+C51 COMPILER V9.53.0.0   DRVI2CMASTER                                                      06/30/2023 14:32:02 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE DRVI2CMASTER
+OBJECT MODULE PLACED IN ..\..\..\..\..\out\DrvI2cMaster.obj
+COMPILER INVOKED BY: C:\Keil_v5\c51\C51\BIN\C51.EXE ..\User\Driver\DrvI2cMaster.c LARGE OPTIMIZE(8,SIZE) OPTIMIZE(8,SIZE
+                    -) REGFILE(..\..\..\..\..\out\LT9211C_MIPI DSI to LVDS test.ORC) BROWSE INCDIR(..\User\Driver;..\User\App;..\User\Ocm;..\
+                    -User\Module) DEBUG OBJECTEXTEND PRINT(.\Listings\DrvI2cMaster.lst) OBJECT(..\..\..\..\..\out\DrvI2cMaster.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9211C
+   3            * @file: DrvI2cMaster.c
+   4            * @author: sxue
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2023.01.29
+   7          /******************************************************************************/
+   8          
+   9          #include "include.h"
+  10          
+  11          #define  SCL_Set_High     P13=1
+  12          #define  SCL_Set_Low      P13=0
+  13          
+  14          #define  SDA_Set_High     P14=1
+  15          #define  SDA_Set_Low      P14=0 
+  16          
+  17          #define I2C_SDA_READ      P14
+  18          
+  19          u8   ucAck;
+  20          u8   ucI2cAddr = 0x5a; 
+  21          
+  22          static void I2C_Delay_us(u8 uscount)
+  23          {
+  24   1          u8 x;
+  25   1          for(x=0; x<uscount; x++)
+  26   1          {
+  27   2              ;
+  28   2          }        
+  29   1      }
+  30          
+  31          static void Start_I2c(void)
+  32          {
+  33   1          SDA_Set_High;   
+  34   1          I2C_Delay_us(1);
+  35   1          SCL_Set_High;
+  36   1          I2C_Delay_us(10); 
+  37   1          SDA_Set_Low;       
+  38   1          I2C_Delay_us(7);        
+  39   1          SCL_Set_Low;   
+  40   1          I2C_Delay_us(1);
+  41   1      }
+  42          
+  43          static void Stop_I2c(void)
+  44          {
+  45   1          SDA_Set_Low;    
+  46   1          I2C_Delay_us(2);
+  47   1          SCL_Set_High; 
+  48   1          I2C_Delay_us(10);
+  49   1          SDA_Set_High;  
+  50   1          I2C_Delay_us(10);
+  51   1      }
+  52          
+  53          static void  I2C_SendByte(u8 c)
+C51 COMPILER V9.53.0.0   DRVI2CMASTER                                                      06/30/2023 14:32:02 PAGE 2   
+
+  54          {
+  55   1          u8 bit_Cnt;
+  56   1      
+  57   1          for(bit_Cnt=0; bit_Cnt<8; bit_Cnt++) 
+  58   1          {
+  59   2              if((c<<bit_Cnt) & 0x80)
+  60   2              {
+  61   3                  SDA_Set_High;   
+  62   3              }
+  63   2              else
+  64   2              { 
+  65   3                  SDA_Set_Low;                
+  66   3              }
+  67   2              I2C_Delay_us(3);
+  68   2              SCL_Set_High;             
+  69   2              I2C_Delay_us(4);         
+  70   2              SCL_Set_Low; 
+  71   2          }
+  72   1      
+  73   1          I2C_Delay_us(1);
+  74   1          SDA_Set_High;              
+  75   1          I2C_Delay_us(3);  
+  76   1          SCL_Set_High;
+  77   1          I2C_Delay_us(3);
+  78   1      
+  79   1          if(I2C_SDA_READ != 0)
+  80   1          { 
+  81   2              ucAck = 0;
+  82   2          }     
+  83   1          else
+  84   1          {
+  85   2              ucAck = 1;
+  86   2          }     
+  87   1          SCL_Set_Low;
+  88   1          I2C_Delay_us(3);
+  89   1      }
+  90              
+  91          static u8 RcvByte(void)
+  92          {
+  93   1          u8 retc;
+  94   1          u8 bit_Cnt;
+  95   1          retc = 0; 
+  96   1          SDA_Set_High;                 
+  97   1          for (bit_Cnt=0; bit_Cnt<8; bit_Cnt++)
+  98   1          {
+  99   2              I2C_Delay_us(1);          
+ 100   2              SCL_Set_Low;                  
+ 101   2              I2C_Delay_us(4);
+ 102   2              SCL_Set_High;            
+ 103   2              I2C_Delay_us(2);
+ 104   2              retc=retc<<1;
+ 105   2              if (I2C_SDA_READ != 0)
+ 106   2              {
+ 107   3                  retc = retc+1;
+ 108   3              }                    
+ 109   2              I2C_Delay_us(2);
+ 110   2          }
+ 111   1          SCL_Set_Low;    
+ 112   1          I2C_Delay_us(5);
+ 113   1          return   retc;
+ 114   1      }
+ 115          
+C51 COMPILER V9.53.0.0   DRVI2CMASTER                                                      06/30/2023 14:32:02 PAGE 3   
+
+ 116          static void Ack_I2c(bool a)
+ 117          {
+ 118   1          if (a == 0)
+ 119   1          {
+ 120   2              SDA_Set_Low;
+ 121   2          }         
+ 122   1          else
+ 123   1          { 
+ 124   2              SDA_Set_High;
+ 125   2          }     
+ 126   1          I2C_Delay_us(8);     
+ 127   1          SCL_Set_High;
+ 128   1          I2C_Delay_us(15);  
+ 129   1          SCL_Set_Low;                 
+ 130   1          I2C_Delay_us(8);   
+ 131   1      }
+ 132          
+ 133          static bool i2c_write_byte(u8 sla,u8 suba,u8 *s,u8 no)
+ 134          {
+ 135   1          u8 i;
+ 136   1          Start_I2c();  
+ 137   1          I2C_SendByte(sla);  
+ 138   1          
+ 139   1          if(ucAck==0)
+ 140   1          {
+ 141   2              Stop_I2c();
+ 142   2              return  FALSE;
+ 143   2          }
+ 144   1          I2C_SendByte(suba);            
+ 145   1          if(ucAck == 0)
+ 146   1          {
+ 147   2              Stop_I2c();
+ 148   2              return FALSE;
+ 149   2          }
+ 150   1      
+ 151   1          for(i=0;i<no;i++)
+ 152   1          {   
+ 153   2              I2C_SendByte(*s);          
+ 154   2              if(ucAck == 0)
+ 155   2              {
+ 156   3                  Stop_I2c();
+ 157   3                  return  FALSE;
+ 158   3              }
+ 159   2              s++;
+ 160   2          } 
+ 161   1          Stop_I2c();             
+ 162   1          return TRUE;
+ 163   1      }
+ 164          
+ 165          static bool i2c_read_byte(u8 sla,u8 suba,u8 *s,u8 no)
+ 166          {
+ 167   1          u8 i;
+ 168   1          Start_I2c();                 
+ 169   1          I2C_SendByte(sla);              
+ 170   1          if(ucAck==0)
+ 171   1          {
+ 172   2              Stop_I2c();
+ 173   2              *s = 0x00;
+ 174   2              return FALSE;
+ 175   2          }
+ 176   1          I2C_SendByte(suba);             
+ 177   1          if (ucAck == 0)
+C51 COMPILER V9.53.0.0   DRVI2CMASTER                                                      06/30/2023 14:32:02 PAGE 4   
+
+ 178   1          {
+ 179   2              Stop_I2c();
+ 180   2              *s = 0x00;
+ 181   2              return  FALSE;
+ 182   2          }
+ 183   1          Start_I2c();            
+ 184   1          I2C_SendByte(sla+1);
+ 185   1          if (ucAck == 0)
+ 186   1          {
+ 187   2              Stop_I2c();
+ 188   2              *s = 0x00;
+ 189   2              return  FALSE;
+ 190   2          }
+ 191   1          for (i=0; i<no-1; i++)
+ 192   1          {   
+ 193   2              *s= RcvByte();              
+ 194   2              Ack_I2c(0);               
+ 195   2              s++;
+ 196   2          } 
+ 197   1          *s = RcvByte();
+ 198   1          Ack_I2c(1);                 
+ 199   1          Stop_I2c();                 
+ 200   1          return  TRUE;
+ 201   1      }
+ 202          
+ 203          u8 HDMI_ReadI2C_Byte(u8 RegAddr)
+ 204          {
+ 205   1          u8  p_data=0; 
+ 206   1          if (i2c_read_byte(ucI2cAddr, RegAddr, &p_data,1) != FALSE)
+ 207   1          {
+ 208   2              return p_data;
+ 209   2          }
+ 210   1          return 0;
+ 211   1      }
+ 212          
+ 213          bool HDMI_ReadI2C_ByteN(u8 RegAddr,u8 *p_data,u8 N)
+ 214          {
+ 215   1          bool flag;
+ 216   1          flag = i2c_read_byte(ucI2cAddr, RegAddr, p_data,N);
+ 217   1          return flag;
+ 218   1      }
+ 219          
+ 220          bool HDMI_WriteI2C_Byte(u8 RegAddr, u8 d)
+ 221          {
+ 222   1          bool flag;
+ 223   1          flag=i2c_write_byte(ucI2cAddr, RegAddr,&d,1);
+ 224   1          return flag;
+ 225   1      }
+ 226          
+ 227          bool HDMI_WriteI2C_ByteN(u8 RegAddr, u8 *d,u8 N)
+ 228          {
+ 229   1          bool flag;
+ 230   1          flag=i2c_write_byte(ucI2cAddr, RegAddr,d,N) ;
+ 231   1          return flag;
+ 232   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    552    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2      26
+   PDATA SIZE       =   ----    ----
+C51 COMPILER V9.53.0.0   DRVI2CMASTER                                                      06/30/2023 14:32:02 PAGE 5   
+
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

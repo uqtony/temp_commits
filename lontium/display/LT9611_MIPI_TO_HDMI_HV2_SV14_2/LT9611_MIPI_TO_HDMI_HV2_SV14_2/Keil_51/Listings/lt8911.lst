@@ -1,0 +1,523 @@
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE LT8911
+OBJECT MODULE PLACED IN .\Objects\lt8911.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ..\User\lt8911.c LARGE BROWSE INCDIR(..\N76E003_Driver\inc) DEFINE(FOSC_160
+                    -000) DEBUG OBJECTEXTEND PRINT(.\Listings\lt8911.lst) OBJECT(.\Objects\lt8911.obj)
+
+line level    source
+
+   1          /************************************************************
+   2          *       ProjectName:       LT8911
+   3          *       FileName:              LT8911.c
+   4          *       BuildData:           2018-05-24
+   5          *       Version£º        V1.0
+   6          *       Author:          xhguo
+   7          *       Company:             Lontium
+   8          ************************************************************/
+   9          #include        "include.h"
+*** ERROR C226 IN LINE 72 OF ..\USER\LT9611.H: 'video_timing': duplicate struct/union/enum tag
+  10          
+  11          #ifdef _1080P_eDP_Panel_
+              #define LANE_CNT 2
+              #define LVDS_PORT_CNT 2 //2port lvds
+                                                                                                                                         //hfp, hs, hbp,hact,htotal,vfp, vs, vbp, vact,vtotal,
+              const struct video_timing video ={88, 44, 148,1920,  2200,  4,  5,  36, 1080, 1125, 148500};
+              #endif
+  17          
+  18          
+  19          #ifdef _1366x768_eDP_Panel_
+  20          #define LANE_CNT 1
+  21          #define LVDS_PORT_CNT 1 //1port lvds
+  22                                                                                                                                                  //hfp, hs, hbp,hact,htotal,vfp, vs, vbp, vact,vtotal,
+  23          const struct video_timing video = {26, 110,  110,1366,  1592,  13,  6,  13, 768,   800, 81000};
+  24          #endif
+  25          
+  26          u8 EDID_DATA[128] = {0};
+  27          static bool edp_idle_flag = 1;
+  28          
+  29          
+  30          void LT8911_ChipID(void)
+  31          {
+  32   1              HDMI_WriteI2C_Byte(0xff,0x81);//register bank
+  33   1              HDMI_WriteI2C_Byte(0x08,0x7f);
+  34   1              print("\r\nLT8911EX chip ID:%x,",HDMI_ReadI2C_Byte(0x00));
+  35   1          print("%x, ",HDMI_ReadI2C_Byte(0x01));
+  36   1              print("%x, ",HDMI_ReadI2C_Byte(0x02));
+  37   1      }
+  38          
+  39          void LT8911_SetVideoTiming(struct video_timing *video_format)
+  40          {
+  41   1      
+  42   1              u32 pclk_khz;
+  43   1              u8 dessc_m;
+  44   1      
+  45   1          //edp msa 
+  46   1              HDMI_WriteI2C_Byte(0xff,0xa8);
+  47   1              HDMI_WriteI2C_Byte(0x2d,0x88); //bit[7]£º1 = register msa, 0 = hardware msa
+  48   1              
+  49   1      #ifdef _Msa_Active_Only_
+                      HDMI_WriteI2C_Byte(0x05,0x00);
+                      HDMI_WriteI2C_Byte(0x06,0x00);//htotal
+                      HDMI_WriteI2C_Byte(0x07,0x00);
+                      HDMI_WriteI2C_Byte(0x08,0x00);//h_start
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 2   
+
+                      HDMI_WriteI2C_Byte(0x09,0x00);
+                      HDMI_WriteI2C_Byte(0x0a,0x00);  //hsa
+                      HDMI_WriteI2C_Byte(0x0b,(u8)(video_format->hact/256));
+                      HDMI_WriteI2C_Byte(0x0c,(u8)(video_format->hact%256)); //hactive
+                      HDMI_WriteI2C_Byte(0x0d,0x00);
+                      HDMI_WriteI2C_Byte(0x0e,0x00);//vtotal
+                      HDMI_WriteI2C_Byte(0x11,0x00);
+                      HDMI_WriteI2C_Byte(0x12,0x00);
+                      HDMI_WriteI2C_Byte(0x14,0x00);
+                      HDMI_WriteI2C_Byte(0x15,(u8)(video_format->vact/256));
+                      HDMI_WriteI2C_Byte(0x16,(u8)(video_format->vact%256));  //vactive
+                                      
+              #else
+  67   1              HDMI_WriteI2C_Byte(0x05,(u8)(video_format->htotal/256));
+  68   1              HDMI_WriteI2C_Byte(0x06,(u8)(video_format->htotal%256));//htotal
+  69   1              HDMI_WriteI2C_Byte(0x07,(u8)((video_format->hs+video_format->hbp)/256));
+  70   1              HDMI_WriteI2C_Byte(0x08,(u8)((video_format->hs+video_format->hbp)%256));//h_start
+  71   1              HDMI_WriteI2C_Byte(0x09,(u8)(video_format->hs/256)); 
+  72   1              HDMI_WriteI2C_Byte(0x0a,(u8)(video_format->hs%256));   //hsa
+  73   1              HDMI_WriteI2C_Byte(0x0b,(u8)(video_format->hact/256));
+  74   1              HDMI_WriteI2C_Byte(0x0c,(u8)(video_format->hact%256)); //hactive
+  75   1              HDMI_WriteI2C_Byte(0x0d,(u8)(video_format->vtotal/256));
+  76   1              HDMI_WriteI2C_Byte(0x0e,(u8)(video_format->vtotal%256));//vtotal
+  77   1              HDMI_WriteI2C_Byte(0x11,(u8)((video_format->vs+video_format->vbp)/256));
+  78   1              HDMI_WriteI2C_Byte(0x12,(u8)((video_format->vs+video_format->vbp)%256));//v_start
+  79   1              HDMI_WriteI2C_Byte(0x14,(u8)(video_format->vs%256));    //vsa
+  80   1              HDMI_WriteI2C_Byte(0x15,(u8)(video_format->vact/256));
+  81   1              HDMI_WriteI2C_Byte(0x16,(u8)(video_format->vact%256));  //vactive
+  82   1      #endif
+  83   1      
+  84   1          // ldvd de only mode to regenerate h/v sync.
+  85   1              HDMI_WriteI2C_Byte(0xff,0xd8);
+  86   1              HDMI_WriteI2C_Byte(0x20,(u8)(video_format->hfp/256));
+  87   1              HDMI_WriteI2C_Byte(0x21,(u8)(video_format->hfp%256)); 
+  88   1      
+  89   1              HDMI_WriteI2C_Byte(0x22,(u8)(video_format->hs/256));
+  90   1              HDMI_WriteI2C_Byte(0x23,(u8)(video_format->hs%256)); 
+  91   1      
+  92   1              HDMI_WriteI2C_Byte(0x24,(u8)(video_format->htotal/256));
+  93   1              HDMI_WriteI2C_Byte(0x25,(u8)(video_format->htotal%256)); 
+  94   1      
+  95   1              HDMI_WriteI2C_Byte(0x26,(u8)(video_format->vfp%256)); 
+  96   1              HDMI_WriteI2C_Byte(0x27,(u8)(video_format->vs%256)); 
+  97   1      
+  98   1      
+  99   1              //de-sscpll to gererate pixel clock for pattern
+ 100   1              pclk_khz = video_format->pclk_khz;
+ 101   1              dessc_m =  (pclk_khz * 4) /(25*1000);
+ 102   1              HDMI_WriteI2C_Byte(0xff,0x85);  
+ 103   1              HDMI_WriteI2C_Byte(0xaa,dessc_m);       //MK[30:24]
+ 104   1              //      HDMI_WriteI2C_Byte(0xab,0xba);  //MK[23:16]
+ 105   1              //      HDMI_WriteI2C_Byte(0xac,0xe1);  //MK[15:8]
+ 106   1              //      HDMI_WriteI2C_Byte(0xad,0x47);  //MK[7:0]
+ 107   1      }
+ 108          
+ 109          void LT8911_Init(void)
+ 110          {
+ 111   1                  u8 loopx;
+ 112   1                      /* system clock init */
+ 113   1                      HDMI_WriteI2C_Byte(0xff,0x81);
+ 114   1                      HDMI_WriteI2C_Byte(0x49,0xff);
+ 115   1      
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 3   
+
+ 116   1                      /* Txpll */
+ 117   1                      HDMI_WriteI2C_Byte(0xff,0x87);
+ 118   1                      HDMI_WriteI2C_Byte(0x19,0x31);
+ 119   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 120   1                      HDMI_WriteI2C_Byte(0x02,0x42);
+ 121   1                      HDMI_WriteI2C_Byte(0x03,0x00);
+ 122   1                      HDMI_WriteI2C_Byte(0x03,0x01);
+ 123   1                      HDMI_WriteI2C_Byte(0xff,0x81);
+ 124   1                      HDMI_WriteI2C_Byte(0x09,0xfc);
+ 125   1                      HDMI_WriteI2C_Byte(0x09,0xfd);
+ 126   1                      HDMI_WriteI2C_Byte(0xff,0x87);
+ 127   1                      HDMI_WriteI2C_Byte(0x0c,0x11);
+ 128   1                              
+ 129   1                      for(loopx = 0; loopx < 5; loopx++) //Check Tx PLL
+ 130   1                      {
+ 131   2                              Timer0_Delay1ms(10);
+ 132   2                              if(HDMI_ReadI2C_Byte(0x37)&0x02)
+ 133   2                              {
+ 134   3                                      print("\r\nLT8911 tx pll locked");
+ 135   3                                      break;
+ 136   3                        }
+ 137   2                              else
+ 138   2                              {
+ 139   3                                      print("\r\nLT8911 tx pll unlocked");
+ 140   3                              }
+ 141   2                      }
+ 142   1      
+ 143   1                /* lvds Rx analog */
+ 144   1                //default setting
+ 145   1                /* lvds Rx pll */
+ 146   1                if(LVDS_PORT_CNT == 1) // 1port lvds
+ 147   1                {
+ 148   2                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 149   2                      HDMI_WriteI2C_Byte(0x63,0x84);
+ 150   2                      HDMI_WriteI2C_Byte(0x67,0x40);
+ 151   2                }
+ 152   1      
+ 153   1                /* dessc/pcr  pll- analog */
+ 154   1      #ifdef _EDP_Pattern_
+ 155   1                      HDMI_WriteI2C_Byte(0xff,0xd0);
+ 156   1                      HDMI_WriteI2C_Byte(0x08,0x08); 
+ 157   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 158   1                      HDMI_WriteI2C_Byte(0x6e,0x81);
+ 159   1                      HDMI_WriteI2C_Byte(0x6a,0x40); //0x50:Pattern; 0x10:mipi video
+ 160   1                      
+ 161   1                      /* dessc pll digital */
+ 162   1                      HDMI_WriteI2C_Byte(0xff,0x85);
+ 163   1                      HDMI_WriteI2C_Byte(0xa9,0x31);  //bit[0] = 1 : select software MK.
+ 164   1                      HDMI_WriteI2C_Byte(0xae,0x01);  //load MK value
+ 165   1                      HDMI_WriteI2C_Byte(0xae,0x11);
+ 166   1      #endif  
+ 167   1              
+ 168   1                      /* lvds digital */
+ 169   1                      HDMI_WriteI2C_Byte(0xff,0x81);
+ 170   1                      HDMI_WriteI2C_Byte(0x05,0xae);
+ 171   1                      HDMI_WriteI2C_Byte(0x05,0xfe);
+ 172   1                      HDMI_WriteI2C_Byte(0xff,0xd8);
+ 173   1      
+ 174   1                      if(LVDS_PORT_CNT == 1) // 1port lvds
+ 175   1                {
+ 176   2                      HDMI_WriteI2C_Byte(0x10,0x80);
+ 177   2                }
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 4   
+
+ 178   1      
+ 179   1                      #ifdef lvds_format_JEIDA
+                              HDMI_WriteI2C_Byte(0x11,0x40);
+                              #endif
+ 182   1                                      
+ 183   1      
+ 184   1                      #ifdef lvds_sync_de_only
+                              HDMI_WriteI2C_Byte(0x1f,0x20);
+                              #endif
+ 187   1                      
+ 188   1                      /* tx phy */
+ 189   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 190   1                      HDMI_WriteI2C_Byte(0x11,0x00);
+ 191   1                      HDMI_WriteI2C_Byte(0x13,0x10);
+ 192   1                      HDMI_WriteI2C_Byte(0x14,0x0c);
+ 193   1                      HDMI_WriteI2C_Byte(0x14,0x08);
+ 194   1                      HDMI_WriteI2C_Byte(0x13,0x20);
+ 195   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 196   1                      HDMI_WriteI2C_Byte(0x0e,0x25);
+ 197   1                      HDMI_WriteI2C_Byte(0x12,0xff);
+ 198   1                      HDMI_WriteI2C_Byte(0xff,0x80);
+ 199   1                      HDMI_WriteI2C_Byte(0x40,0x22);
+ 200   1                      
+ 201   1              
+ 202   1                      /*eDP Tx Digital */
+ 203   1                      HDMI_WriteI2C_Byte(0xff,0xa8);
+ 204   1                      #ifdef _EDP_Pattern_
+ 205   1                      HDMI_WriteI2C_Byte(0x27,0x50); //0x50:Pattern; 0x10:mipi video
+ 206   1                      #else
+                              HDMI_WriteI2C_Byte(0x27,0x10); //0x50:Pattern; 0x10:mipi video
+                              #endif
+ 209   1                      
+ 210   1                      /* nvid */
+ 211   1                      HDMI_WriteI2C_Byte(0xff,0xa0); //nvid = 0x080000;
+ 212   1                      HDMI_WriteI2C_Byte(0x00,0x08);
+ 213   1                      HDMI_WriteI2C_Byte(0x01,0x00);
+ 214   1                      
+ 215   1                      /* interrupt */
+ 216   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 217   1                      HDMI_WriteI2C_Byte(0x5f,0x00); //enable IRQ
+ 218   1                      
+ 219   1                      /* irq: lvds_clk_chg*/
+ 220   1                      HDMI_WriteI2C_Byte(0xff,0x85);
+ 221   1                      HDMI_WriteI2C_Byte(0x41,0x1c);
+ 222   1                      HDMI_WriteI2C_Byte(0x03,0x3f); //mask: bit[7:6]
+ 223   1                      HDMI_WriteI2C_Byte(0x08,0xff);
+ 224   1                      HDMI_WriteI2C_Byte(0x08,0x3f); //clear
+ 225   1      
+ 226   1      
+ 227   1                      /* gpio init */
+ 228   1                      HDMI_WriteI2C_Byte(0xff,0xd8);
+ 229   1                      HDMI_WriteI2C_Byte(0x16,sync_source); // lvds gpio test select: 0x02 port A, 0x03 portB, 0x01 lvds Rx
+ 230   1      
+ 231   1                      HDMI_WriteI2C_Byte(0xff,0x85);
+ 232   1                      HDMI_WriteI2C_Byte(0x1b,0x05); //gpio0: irq; gpio1: hpd; gpio2: test2; gpio3: test3; gpio4:test4
+ 233   1                      HDMI_WriteI2C_Byte(0xc0,0x00); //test2: de
+ 234   1                      HDMI_WriteI2C_Byte(0xc1,0x24); //test3: vs, test4£ºhs
+ 235   1      
+ 236   1                      HDMI_WriteI2C_Byte(0xff,0x82);
+ 237   1                      HDMI_WriteI2C_Byte(0x5a,0x01); //disable atest
+ 238   1                      HDMI_WriteI2C_Byte(0x5b,0xc0); //gpio0/1: oppen drain; gpio2/3 pp; 
+ 239   1      
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 5   
+
+ 240   1                      #ifdef _gpio_sync_output_
+ 241   1                      HDMI_WriteI2C_Byte(0x60,0x00); //gpio2/3: test mode
+ 242   1                      HDMI_WriteI2C_Byte(0x61,0x00); //gpio4: test mode
+ 243   1                      #else
+                              HDMI_WriteI2C_Byte(0x60,0x14); //gpio2/3: not test mode
+                              HDMI_WriteI2C_Byte(0x61,0x80); //gpio4: not test mode
+                              #endif
+ 247   1      }
+ 248          
+ 249          void LT8911_LinkTrain(void)
+ 250          {
+ 251   1                      /* Aux setup */
+ 252   1                      HDMI_WriteI2C_Byte(0xff,0xac);
+ 253   1                      HDMI_WriteI2C_Byte(0x00,0x60);  //Soft Link train
+ 254   1                      HDMI_WriteI2C_Byte(0xff,0xa6);
+ 255   1                      HDMI_WriteI2C_Byte(0x2a,0x00);
+ 256   1                      
+ 257   1                      HDMI_WriteI2C_Byte(0xff,0x81);
+ 258   1                      HDMI_WriteI2C_Byte(0x07,0xfe);
+ 259   1                      HDMI_WriteI2C_Byte(0x07,0xff);
+ 260   1                      HDMI_WriteI2C_Byte(0x0a,0xfc);
+ 261   1                      HDMI_WriteI2C_Byte(0x0a,0xfe);
+ 262   1              
+ 263   1                      /* link train */
+ 264   1                      HDMI_WriteI2C_Byte(0xff,0x85);
+ 265   1                      HDMI_WriteI2C_Byte(0x1a,LANE_CNT); 
+ 266   1                      //HDMI_WriteI2C_Byte(0x13,0xd1);
+ 267   1                      HDMI_WriteI2C_Byte(0xff,0xac);
+ 268   1                      HDMI_WriteI2C_Byte(0x00,0x64);
+ 269   1                      HDMI_WriteI2C_Byte(0x01,0x0a);
+ 270   1                      HDMI_WriteI2C_Byte(0x0c,0x85);
+ 271   1                      HDMI_WriteI2C_Byte(0x0c,0xc5);
+ 272   1      }
+ 273          
+ 274          bool LT8911_VideoCheck(struct video_timing *video_format)
+ 275          {
+ 276   1          u16 vact;
+ 277   1              u8 loopx;
+ 278   1      
+ 279   1          HDMI_WriteI2C_Byte(0xff,0x85);
+ 280   1      
+ 281   1              for(loopx = 0; loopx < 5; loopx++)
+ 282   1              {
+ 283   2                      Timer0_Delay1ms(100);
+ 284   2                      vact = HDMI_ReadI2C_Byte(0x88);
+ 285   2                      vact = vact*0x100 + HDMI_ReadI2C_Byte(0x89);
+ 286   2              
+ 287   2                      if(vact != video_format->vact)
+ 288   2                         return 0;
+ 289   2              }
+ 290   1      return 1;
+ 291   1      }
+ 292          
+ 293          
+ 294          
+ 295          
+ 296          void LT8911_LvdsClockCheckDebug(void)
+ 297          {
+ 298   1      #ifdef _uart_debug_
+ 299   1              u32 fm_value;
+ 300   1      
+ 301   1              HDMI_WriteI2C_Byte(0xff,0x85);
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 6   
+
+ 302   1              HDMI_WriteI2C_Byte(0x1d,0x03);
+ 303   1              Timer0_Delay1ms(200);
+ 304   1          fm_value = 0;
+ 305   1              fm_value = HDMI_ReadI2C_Byte(0x4d);
+ 306   1          fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4e);
+ 307   1              fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4f);
+ 308   1              print("\r\nlvds portA clock: ");
+ 309   1              printdec_u32(fm_value);
+ 310   1      
+ 311   1              HDMI_WriteI2C_Byte(0x1d,0x03);
+ 312   1              Timer0_Delay1ms(200);
+ 313   1          fm_value = 0;
+ 314   1              fm_value = HDMI_ReadI2C_Byte(0x4d);
+ 315   1          fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4e);
+ 316   1              fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4f);
+ 317   1              print("\r\nlvds portB clock: ");
+ 318   1              printdec_u32(fm_value);
+ 319   1      
+ 320   1              HDMI_WriteI2C_Byte(0x1d,0x08);
+ 321   1              Timer0_Delay1ms(200);
+ 322   1          fm_value = 0;
+ 323   1              fm_value = HDMI_ReadI2C_Byte(0x4d);
+ 324   1          fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4e);
+ 325   1              fm_value = fm_value*0x100 + HDMI_ReadI2C_Byte(0x4f);
+ 326   1              print("\r\nlvds pixel clock: ");
+ 327   1              printdec_u32(fm_value);
+ 328   1      #endif
+ 329   1      }
+ 330          
+ 331          
+ 332          void LT8911_LvdsVideoCheckDebug(void)
+ 333          {
+ 334   1      #ifdef _uart_debug_
+ 335   1              u16 hfp, hs, hbp,hact,htotal,vfp, vs, vbp, vact,vtotal;
+ 336   1              u8 sync_polarity;
+ 337   1      
+ 338   1              HDMI_WriteI2C_Byte(0xff,0x85);
+ 339   1              HDMI_WriteI2C_Byte(0xa1,0x01); //video check slect lvds
+ 340   1              sync_polarity = HDMI_ReadI2C_Byte(0x7a);
+ 341   1              vs = HDMI_ReadI2C_Byte(0x7b);
+ 342   1      
+ 343   1              hs = HDMI_ReadI2C_Byte(0x7c);
+ 344   1              hs = hs*0x100 + HDMI_ReadI2C_Byte(0x7d);
+ 345   1      
+ 346   1              vbp = HDMI_ReadI2C_Byte(0x7e);
+ 347   1              vfp = HDMI_ReadI2C_Byte(0x7f);
+ 348   1      
+ 349   1              hbp = HDMI_ReadI2C_Byte(0x80);
+ 350   1              hbp = hbp*0x100 + HDMI_ReadI2C_Byte(0x81);
+ 351   1      
+ 352   1              hfp = HDMI_ReadI2C_Byte(0x82);
+ 353   1              hfp = hfp*0x100 + HDMI_ReadI2C_Byte(0x83);
+ 354   1      
+ 355   1              vtotal = HDMI_ReadI2C_Byte(0x84);
+ 356   1              vtotal = vtotal*0x100 + HDMI_ReadI2C_Byte(0x85);
+ 357   1      
+ 358   1              htotal = HDMI_ReadI2C_Byte(0x86);
+ 359   1              htotal = htotal*0x100 + HDMI_ReadI2C_Byte(0x87);
+ 360   1      
+ 361   1              vact = HDMI_ReadI2C_Byte(0x88);
+ 362   1              vact = vact*0x100 + HDMI_ReadI2C_Byte(0x89);
+ 363   1      
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 7   
+
+ 364   1              hact = HDMI_ReadI2C_Byte(0x8a);
+ 365   1              hact = hact*0x100 + HDMI_ReadI2C_Byte(0x8b);
+ 366   1      
+ 367   1              print("\r\nsync_polarity = %x", sync_polarity);
+ 368   1      
+ 369   1          print("\r\nhfp, hs, hbp, hact, htotal = ");
+ 370   1              printdec_u32(hfp);
+ 371   1              printdec_u32(hs);
+ 372   1              printdec_u32(hbp);
+ 373   1              printdec_u32(hact);
+ 374   1              printdec_u32(htotal);
+ 375   1      
+ 376   1              print("\r\nvfp, vs, vbp, vact, vtotal = ");
+ 377   1              printdec_u32(vfp);
+ 378   1              printdec_u32(vs);
+ 379   1              printdec_u32(vbp);
+ 380   1              printdec_u32(vact);
+ 381   1              printdec_u32(vtotal);
+ 382   1      #endif
+ 383   1      }
+ 384          
+ 385          void LT8911_LinkTrainRresultDebug(void)
+ 386          {
+ 387   1              u8 i;
+ 388   1              u8 val;
+ 389   1          int ret;
+ 390   1      
+ 391   1              HDMI_WriteI2C_Byte(0xff,0xac);
+ 392   1              for(i = 0; i< 10; i++)
+ 393   1              {
+ 394   2                  val = HDMI_ReadI2C_Byte(0x82); 
+ 395   2                      if(val & 0x20)
+ 396   2                      {
+ 397   3                              if((val & 0x1f)==0x1e)
+ 398   3                              {
+ 399   4                                      //val = HDMI_ReadI2C_Byte(0x82); 
+ 400   4                                  print("\r\nedp link train successed: %x", val);
+ 401   4                          }
+ 402   3                              else{
+ 403   4                                      //val = HDMI_ReadI2C_Byte(0x82); 
+ 404   4                              print("\r\nedp link train failed: %x", val);
+ 405   4                               }
+ 406   3                        val = HDMI_ReadI2C_Byte(0x83);
+ 407   3                        print("\r\npanel link rate: %x",val);
+ 408   3                        val = HDMI_ReadI2C_Byte(0x84);
+ 409   3                        print("\r\npanel link count: %x",val);
+ 410   3                        return;
+ 411   3                      }
+ 412   2                      else
+ 413   2                      print("\r\nlink trian on going...");
+ 414   2                Timer0_Delay1ms(100);
+ 415   2              }
+ 416   1      }
+ 417          
+ 418          
+ 419          
+ 420          void LT8911_MainLoop(void)
+ 421          {
+ 422   1      #ifndef _EDP_Pattern_
+                if(edp_idle_flag)
+                 {
+                              HDMI_WriteI2C_Byte(0xff,0x85);
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 8   
+
+                              if((HDMI_ReadI2C_Byte(0x12)&0xc0) == 0x40) //clock stable
+                              {
+                                      HDMI_WriteI2C_Byte(0xff,0x87);
+                                      if((HDMI_ReadI2C_Byte(0x37)&0x40 == 0x00))//pll unlocked
+                                              {
+                                                 HDMI_WriteI2C_Byte(0xff,0x81);  //rxpll reset
+                                                 HDMI_WriteI2C_Byte(0x04,0xfd);
+                                                 HDMI_WriteI2C_Byte(0x04,0xff);
+                                                 print("\r\nlvds rxpll unlocked, reset rxpll");
+                                              }
+              
+                                      if(LT8911_VideoCheck(&video)) //video check no error
+                                              {
+                                                      HDMI_WriteI2C_Byte(0xff,0xa8);
+                                                      HDMI_WriteI2C_Byte(0x2d,0x80);  //edp output video ;
+                                                      edp_idle_flag = 0;
+                                                      print("\r\nlvds video check correct");
+                                              }
+                                  else//video check error
+                                              {
+                                                      HDMI_WriteI2C_Byte(0xff,0x81); //reset lvds digtal
+                                                      HDMI_WriteI2C_Byte(0x05,0xae);
+                                                      HDMI_WriteI2C_Byte(0x05,0xfe);
+                                                  print("\r\nlvds video check error, reset lvds rx");
+                                              }
+                              }
+                      }
+              #endif
+ 454   1      } 
+ 455          
+ 456          void LT8911_Config(void)
+ 457          {
+ 458   1              LT8911_ChipID();
+ 459   1              LT8911_SetVideoTiming(&video);
+ 460   1              LT8911_Init();
+ 461   1              LT8911_LinkTrain();
+ 462   1      
+ 463   1              LT8911_LvdsClockCheckDebug();
+ 464   1              LT8911_LvdsVideoCheckDebug();
+ 465   1              LT8911_LinkTrainRresultDebug();
+ 466   1      
+ 467   1              while(1)
+ 468   1              {
+ 469   2               LT8911_MainLoop();
+ 470   2               Timer0_Delay1ms(1000);
+ 471   2              }
+ 472   1      }
+ 473          
+ 474          
+ 475          void IntbInterruptFun(void) interrupt 7
+ 476          {
+ 477   1          print("\r\nirq task...");
+ 478   1              if(PIF == 0x08)
+ 479   1              {
+ 480   2                      PIF = 0x00; //clear interrupt flag
+ 481   2                      clr_IE0;
+ 482   2              }
+ 483   1      
+ 484   1      #ifndef _EDP_Pattern_
+                      HDMI_WriteI2C_Byte(0xff,0xa8);
+                      HDMI_WriteI2C_Byte(0x2d,0x84);  //edp output idle pattern;
+              
+C51 COMPILER V9.00   LT8911                                                                05/29/2018 17:01:23 PAGE 9   
+
+                  HDMI_WriteI2C_Byte(0xff,0x85);
+                      HDMI_WriteI2C_Byte(0x08,0xc0); 
+                      HDMI_WriteI2C_Byte(0x08,0x00);
+                      edp_idle_flag = 1;
+              #endif
+ 493   1      }
+*** WARNING C316 IN LINE 493 OF ..\User\lt8911.c: unterminated conditionals
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  1 ERROR(S)

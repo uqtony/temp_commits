@@ -1,0 +1,586 @@
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE DRVLVDSTX
+OBJECT MODULE PLACED IN ..\..\..\..\..\out\DrvLvdsTx.obj
+COMPILER INVOKED BY: C:\Keil_v5\c51\C51\BIN\C51.EXE ..\User\Driver\DrvLvdsTx.c LARGE OPTIMIZE(8,SIZE) OPTIMIZE(8,SIZE) R
+                    -EGFILE(..\..\..\..\..\out\LT9211C_MIPI DSI to LVDS test.ORC) BROWSE INCDIR(..\User\Driver;..\User\App;..\User\Ocm;..\Use
+                    -r\Module) DEBUG OBJECTEXTEND PRINT(.\Listings\DrvLvdsTx.lst) OBJECT(..\..\..\..\..\out\DrvLvdsTx.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9211C
+   3            * @file: DrvLvdsTx.c
+   4            * @author: xding
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2023.01.29
+   7          /******************************************************************************/
+   8          
+   9          #include "include.h"
+  10          
+  11          #if ((LT9211C_MODE_SEL == LVDS_IN_LVDS_OUT)||(LT9211C_MODE_SEL == MIPI_IN_LVDS_OUT)||(LT9211C_MODE_SEL == 
+             -TTL_IN_LVDS_OUT))
+  12          
+  13          void Drv_LvdsTxSw_Rst()
+  14          {
+  15   1          HDMI_WriteI2C_Byte(0xff,0x81);
+  16   1          HDMI_WriteI2C_Byte(0x08,0x6f); //LVDS TX SW reset
+  17   1          Ocm_Timer0_Delay1ms(2);
+  18   1          HDMI_WriteI2C_Byte(0x08,0x7f);
+  19   1          LTLog(LOG_INFO,"LVDS Tx Video Out");
+  20   1      }
+  21          
+  22          void Drv_LVDSTxPhy_PowerOff()
+  23          {
+  24   1          HDMI_WriteI2C_Byte(0xff,0x82);
+  25   1          HDMI_WriteI2C_Byte(0x36,0x00); //lvds enable
+  26   1          HDMI_WriteI2C_Byte(0x37,0x00);
+  27   1      }
+  28          
+  29          void Drv_LvdsTxPhy_Poweron(void)
+  30          {
+  31   1      #if LVDSTX_PORT_SEL  == PORTA
+                  HDMI_WriteI2C_Byte(0xff,0x82);
+                  HDMI_WriteI2C_Byte(0x36,0x01); //lvds enable
+                  HDMI_WriteI2C_Byte(0x37,0x40);
+                  LTLog(LOG_INFO,"LVDS Output PortA");
+                  #if LVDSTX_LANENUM == FIVE_LANE
+                  HDMI_WriteI2C_Byte(0x36,0x03); 
+                  #endif
+                  
+              #elif LVDSTX_PORT_SEL  == PORTB
+                  HDMI_WriteI2C_Byte(0xff,0x82);
+                  HDMI_WriteI2C_Byte(0x36,0x02); //lvds enable
+                  HDMI_WriteI2C_Byte(0x37,0x04);
+                  LTLog(LOG_INFO,"LVDS Output PortB");
+              #elif LVDSTX_PORT_SEL  == DOU_PORT
+  46   1          HDMI_WriteI2C_Byte(0xff,0x82);
+  47   1          HDMI_WriteI2C_Byte(0x36,0x03); //lvds enable
+  48   1          HDMI_WriteI2C_Byte(0x37,0x44); //port rterm enable
+  49   1          LTLog(LOG_INFO,"LVDS Output PortA&B");
+  50   1      #endif    
+  51   1          
+  52   1          HDMI_WriteI2C_Byte(0x38,0x14);
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 2   
+
+  53   1          HDMI_WriteI2C_Byte(0x39,0x31);
+  54   1          HDMI_WriteI2C_Byte(0x3a,0xc8);
+  55   1          HDMI_WriteI2C_Byte(0x3b,0x00);
+  56   1          HDMI_WriteI2C_Byte(0x3c,0x0f);
+  57   1      
+  58   1          HDMI_WriteI2C_Byte(0x46,0x40);
+  59   1          HDMI_WriteI2C_Byte(0x47,0x40);
+  60   1          HDMI_WriteI2C_Byte(0x48,0x40);
+  61   1          HDMI_WriteI2C_Byte(0x49,0x40);
+  62   1          HDMI_WriteI2C_Byte(0x4a,0x40);
+  63   1          HDMI_WriteI2C_Byte(0x4b,0x40);
+  64   1          HDMI_WriteI2C_Byte(0x4c,0x40);
+  65   1          HDMI_WriteI2C_Byte(0x4d,0x40);
+  66   1          HDMI_WriteI2C_Byte(0x4e,0x40);
+  67   1          HDMI_WriteI2C_Byte(0x4f,0x40);
+  68   1          HDMI_WriteI2C_Byte(0x50,0x40);
+  69   1          HDMI_WriteI2C_Byte(0x51,0x40);
+  70   1      
+  71   1          HDMI_WriteI2C_Byte(0xff,0x81);
+  72   1          HDMI_WriteI2C_Byte(0x03,0xbf); //mltx reset
+  73   1          HDMI_WriteI2C_Byte(0x03,0xff); //mltx release
+  74   1      }
+  75          
+  76          void Drv_LvdsTxPll_RefPixClk_Set()
+  77          {
+  78   1              HDMI_WriteI2C_Byte(0xff,0x82);
+  79   1      //      
+  80   1      //    /*lvds to lvds use rxpll pix clk as txpll ref clk*/
+  81   1      //    #if (LT9211C_MODE_SEL == LVDS_IN_LVDS_OUT)
+  82   1      //    HDMI_WriteI2C_Byte(0x30,0x00); //[7]0:txpll normal work; txpll ref clk sel pix clk
+  83   1      //        #if LVDSRX_DESSC_SEL == ENABLED
+  84   1      //        HDMI_WriteI2C_Byte(0x30,0x06); //[7]0:txpll normal work; txpll ref clk sel ad desscpll fast pix 
+             -clk
+  85   1      //        #endif
+  86   1      //    #endif
+  87   1      //    
+  88   1      //    /*mipi to lvds use desscpll pix clk as txpll ref clk*/
+  89   1      //    #if (LT9211C_MODE_SEL == MIPI_IN_LVDS_OUT)
+  90   1      //    HDMI_WriteI2C_Byte(0x30,0x06); //[7]0:txpll normal work; txpll ref clk sel ad desscpll fast pix clk
+  91   1      //    #endif
+  92   1      //    
+  93   1      //    /*ttl to lvds use desscpll pix clk as txpll ref clk*/
+  94   1      //    #if (LT9211C_MODE_SEL == TTL_IN_LVDS_OUT)
+  95   1          HDMI_WriteI2C_Byte(0x30,0x00); //[7]0:txpll normal work; txpll ref clk sel pix clk
+  96   1      //    #endif
+  97   1      }
+  98          
+  99          void Drv_LvdsTxPll_Config(void)
+ 100          {
+ 101   1          u8 ucPreDiv = 0;
+ 102   1          u8 ucSericlkDiv = 0;
+ 103   1          u8 ucDivSet = 0;
+ 104   1          float ucPixClkDiv = 0;
+ 105   1          u32 ulLvdsTXPhyClk = 0;
+ 106   1      
+ 107   1          /* txphyclk = vco clk * ucSericlkDiv */
+ 108   1      #if (LVDSTX_PORT_SEL == DOU_PORT)
+ 109   1          ulLvdsTXPhyClk = (u32)(g_stRxVidTiming.ulPclk_Khz * 7 / 2); //2 port: byte clk = pix clk / 2;
+ 110   1          HDMI_WriteI2C_Byte(0xff,0x85);
+ 111   1          HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | BIT0_1)); //htotal -> 2n
+ 112   1          
+ 113   1          #if ((LVDSTX_COLORSPACE == YUV422) && (LVDSTX_COLORDEPTH == DEPTH_8BIT) && (LVDSTX_LANENUM == FIVE_LAN
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 3   
+
+             -E))
+                  ulLvdsTXPhyClk = (u32)(g_stRxVidTiming.ulPclk_Khz * 7 / 4); //2 port YUV422 8bit 5lane: byte clk = pix
+             - clk / 4;
+                  HDMI_WriteI2C_Byte(0xff,0x85);
+                  HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | BIT1_1)); //htotal -> 4n
+                  #endif 
+ 118   1      #else
+                  ulLvdsTXPhyClk = (u32)(g_stRxVidTiming.ulPclk_Khz * 7); //1 port: byte clk = pix clk;
+                  
+                  #if ((LVDSTX_COLORSPACE == YUV422) && (LVDSTX_COLORDEPTH == DEPTH_8BIT) && (LVDSTX_LANENUM == FIVE_LAN
+             -E))
+                  ulLvdsTXPhyClk = (u32)(g_stRxVidTiming.ulPclk_Khz * 7 / 2); //1 port YUV422 8bit 5lane: byte clk = pix
+             - clk / 2;
+                  HDMI_WriteI2C_Byte(0xff,0x85);
+                  HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | BIT0_1)); //htotal -> 2n
+                  #endif
+              #endif
+ 127   1          
+ 128   1          /*txpll prediv sel*/
+ 129   1          HDMI_WriteI2C_Byte(0xff,0x82);
+ 130   1          if (g_stRxVidTiming.ulPclk_Khz < 20000)
+ 131   1          {
+ 132   2              HDMI_WriteI2C_Byte(0x31,0x28); //[2:0]3'b000: pre div set div1
+ 133   2              ucPreDiv = 1;
+ 134   2          }
+ 135   1          else if (g_stRxVidTiming.ulPclk_Khz >= 20000 && g_stRxVidTiming.ulPclk_Khz < 40000)
+ 136   1          {
+ 137   2              HDMI_WriteI2C_Byte(0x31,0x28); //[2:0]3'b000: pre div set div1
+ 138   2              ucPreDiv = 1;
+ 139   2          }
+ 140   1          else if (g_stRxVidTiming.ulPclk_Khz >= 40000 && g_stRxVidTiming.ulPclk_Khz < 80000)
+ 141   1          {
+ 142   2              HDMI_WriteI2C_Byte(0x31,0x29); //[2:0]3'b001: pre div set div2
+ 143   2              ucPreDiv = 2;
+ 144   2          }
+ 145   1          else if (g_stRxVidTiming.ulPclk_Khz >= 80000 && g_stRxVidTiming.ulPclk_Khz < 160000)
+ 146   1          {
+ 147   2              HDMI_WriteI2C_Byte(0x31,0x2a); //[2:0]3'b010: pre div set div4
+ 148   2              ucPreDiv = 4;
+ 149   2          }
+ 150   1          else if (g_stRxVidTiming.ulPclk_Khz >= 160000 && g_stRxVidTiming.ulPclk_Khz < 320000)
+ 151   1          {
+ 152   2              HDMI_WriteI2C_Byte(0x31,0x2b); //[2:0]3'b011: pre div set div8
+ 153   2              ucPreDiv = 8;
+ 154   2      //        ulLvdsTXPhyClk = ulDessc_Pix_Clk * 3.5;
+ 155   2          }
+ 156   1          else if (g_stRxVidTiming.ulPclk_Khz >= 320000)
+ 157   1          {
+ 158   2              HDMI_WriteI2C_Byte(0x31,0x2f); //[2:0]3'b111: pre div set div16
+ 159   2              ucPreDiv = 16;
+ 160   2      //        ulLvdsTXPhyClk = ulDessc_Pix_Clk * 3.5;
+ 161   2          }
+ 162   1      
+ 163   1          /*txpll serick_divsel*/
+ 164   1          HDMI_WriteI2C_Byte(0xff,0x82);
+ 165   1          if (ulLvdsTXPhyClk >= 640000 )//640M~1.28G
+ 166   1          {
+ 167   2              HDMI_WriteI2C_Byte(0x32,0x42);
+ 168   2              ucSericlkDiv = 1; //sericlk div1 [6:4]:0x40
+ 169   2          }
+ 170   1          else if (ulLvdsTXPhyClk >= 320000 && ulLvdsTXPhyClk < 640000)
+ 171   1          {
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 4   
+
+ 172   2              HDMI_WriteI2C_Byte(0x32,0x02);
+ 173   2              ucSericlkDiv = 2; //sericlk div2 [6:4]:0x00
+ 174   2          }
+ 175   1          else if (ulLvdsTXPhyClk >= 160000 && ulLvdsTXPhyClk < 320000)
+ 176   1          {
+ 177   2              HDMI_WriteI2C_Byte(0x32,0x12);
+ 178   2              ucSericlkDiv = 4; //sericlk div4 [6:4]:0x10
+ 179   2          }
+ 180   1          else if (ulLvdsTXPhyClk >= 80000 && ulLvdsTXPhyClk < 160000)
+ 181   1          {
+ 182   2              HDMI_WriteI2C_Byte(0x32,0x22);
+ 183   2              ucSericlkDiv = 8; //sericlk div8 [6:4]:0x20
+ 184   2          }
+ 185   1          else //40M~80M
+ 186   1          {
+ 187   2              HDMI_WriteI2C_Byte(0x32,0x32);
+ 188   2              ucSericlkDiv = 16; //sericlk div16 [6:4]:0x30
+ 189   2          }
+ 190   1      
+ 191   1          /* txpll_pix_mux_sel & txpll_pixdiv_sel*/
+ 192   1          HDMI_WriteI2C_Byte(0xff,0x82);
+ 193   1          if (g_stRxVidTiming.ulPclk_Khz > 150000)
+ 194   1          {
+ 195   2              HDMI_WriteI2C_Byte(0x33,0x04); //pixclk > 150000, pixclk mux sel (vco clk / 3.5)
+ 196   2              ucPixClkDiv = 3.5;
+ 197   2          }
+ 198   1          else
+ 199   1          {
+ 200   2              ucPixClkDiv = (u8)((ulLvdsTXPhyClk * ucSericlkDiv) / (g_stRxVidTiming.ulPclk_Khz * 7));
+ 201   2      
+ 202   2              if (ucPixClkDiv <= 1)
+ 203   2              {
+ 204   3                  HDMI_WriteI2C_Byte(0x33,0x00); //pixclk div sel /7
+ 205   3              }
+ 206   2              else if ((ucPixClkDiv > 1) && (ucPixClkDiv <= 2))
+ 207   2              {
+ 208   3                  HDMI_WriteI2C_Byte(0x33,0x01); //pixclk div sel /14
+ 209   3              }
+ 210   2              else if ((ucPixClkDiv > 2) && (ucPixClkDiv <= 4))
+ 211   2              {
+ 212   3                  HDMI_WriteI2C_Byte(0x33,0x02); //pixclk div sel /28
+ 213   3              }
+ 214   2              else if ((ucPixClkDiv > 4) && (ucPixClkDiv <= 8))
+ 215   2              {
+ 216   3                  HDMI_WriteI2C_Byte(0x33,0x03); //pixclk div sel /56
+ 217   3              }
+ 218   2              else
+ 219   2              {
+ 220   3                  HDMI_WriteI2C_Byte(0x33,0x03); //pixclk div sel /56
+ 221   3              }
+ 222   2          }
+ 223   1          
+ 224   1          ucDivSet = (u8)((ulLvdsTXPhyClk * ucSericlkDiv) / (g_stRxVidTiming.ulPclk_Khz / ucPreDiv));
+ 225   1          
+ 226   1              HDMI_WriteI2C_Byte(0x34,0x01); //txpll div set software output enable
+ 227   1          HDMI_WriteI2C_Byte(0x35,ucDivSet);
+ 228   1          LTLog(LOG_DEBUG,"ulPclk_Khz: %ld, ucPreDiv: %bd, ucSericlkDiv: %bd, ucPixClkDiv: %.1f, ucDivSet: %bd",
+ 229   1                          g_stRxVidTiming.ulPclk_Khz, ucPreDiv, ucSericlkDiv, ucPixClkDiv, ucDivSet);
+ 230   1          
+ 231   1          #if LVDS_SSC_SEL != NO_SSC
+              
+                  HDMI_WriteI2C_Byte(0xff,0x82);
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 5   
+
+                  HDMI_WriteI2C_Byte(0x34,0x00); //hardware mode
+                  
+                  HDMI_WriteI2C_Byte(0xff,0x85);
+                  HDMI_WriteI2C_Byte(0x6e,0x10); //sram select
+                  
+                  HDMI_WriteI2C_Byte(0xff,0x81);
+                  HDMI_WriteI2C_Byte(0x81,((HDMI_ReadI2C_Byte(0x81) & 0xe0) | 0x15));
+                  
+                  HDMI_WriteI2C_Byte(0xff,0x87);
+              
+                  HDMI_WriteI2C_Byte(0x1e,0x00); //modulation disable
+                  
+                  HDMI_WriteI2C_Byte(0x17,0x02); //2 order
+              
+                  
+                  HDMI_WriteI2C_Byte(0x18,0x04);
+                  HDMI_WriteI2C_Byte(0x19,0xd4); //ssc_prd
+              
+                  #if LVDS_SSC_SEL == SSC_1920x1080_30k5
+                      HDMI_WriteI2C_Byte(0x1a,0x00);
+                      HDMI_WriteI2C_Byte(0x1b,0x12); //delta1
+                      HDMI_WriteI2C_Byte(0x1c,0x00);
+                      HDMI_WriteI2C_Byte(0x1d,0x24); //delta
+                      
+                      HDMI_WriteI2C_Byte(0x1f,0x1c); //M
+                      HDMI_WriteI2C_Byte(0x20,0x00);
+                      HDMI_WriteI2C_Byte(0x21,0x00);
+                      LTLog(LOG_INFO,"LVDS Output SSC 1920x1080 30k5%");
+                  #elif LVDS_SSC_SEL == SSC_3840x2160_30k5
+                      HDMI_WriteI2C_Byte(0x1a,0x00);
+                      HDMI_WriteI2C_Byte(0x1b,0x12); //delta1
+                      HDMI_WriteI2C_Byte(0x1c,0x00);
+                      HDMI_WriteI2C_Byte(0x1d,0x24); //delta
+                      
+                      HDMI_WriteI2C_Byte(0x1f,0x1c); //M
+                      HDMI_WriteI2C_Byte(0x20,0x00);
+                      HDMI_WriteI2C_Byte(0x21,0x00);
+                      LTLog(LOG_INFO,"LVDS Output SSC 3840x2160 30k5%");
+                  #endif
+              
+                  HDMI_WriteI2C_Byte(0x1e,0x02); //modulation enable
+                  
+                  HDMI_WriteI2C_Byte(0xff,0x81);
+                  HDMI_WriteI2C_Byte(0x0c,0xfe); //txpll reset
+                  HDMI_WriteI2C_Byte(0x0c,0xff); //txpll release
+                  
+                  #endif
+ 281   1      }
+ 282          
+ 283          u8 Drv_LvdsTxPll_Cali(void)
+ 284          {
+ 285   1          u8 ucloopx;
+ 286   1          u8 ucRtn = FAIL;
+ 287   1      
+ 288   1          HDMI_WriteI2C_Byte(0xff,0x81);
+ 289   1              HDMI_WriteI2C_Byte(0x0c,0xfe); //txpll reset
+ 290   1          Ocm_Timer0_Delay1ms(1);
+ 291   1              HDMI_WriteI2C_Byte(0x0c,0xff); //txpll release
+ 292   1      
+ 293   1          do
+ 294   1          {
+ 295   2                      HDMI_WriteI2C_Byte(0xff,0x87);
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 6   
+
+ 296   2                      HDMI_WriteI2C_Byte(0x0f,0x00);
+ 297   2                      HDMI_WriteI2C_Byte(0x0f,0x01);
+ 298   2                      Ocm_Timer0_Delay1ms(20);
+ 299   2      
+ 300   2                      ucloopx++;
+ 301   2              }while((ucloopx < 3) && ((HDMI_ReadI2C_Byte(0x39) & 0x01) != 0x01));
+ 302   1      
+ 303   1          if(HDMI_ReadI2C_Byte(0x39) & 0x04)
+ 304   1          {
+ 305   2              ucRtn = SUCCESS;
+ 306   2              LTLog(LOG_INFO,"Tx Pll Lock");
+ 307   2          }
+ 308   1          else
+ 309   1          {
+ 310   2              LTLog(LOG_ERROR,"Tx Pll Unlocked");
+ 311   2          }
+ 312   1      
+ 313   1          return ucRtn;
+ 314   1      }
+ 315          
+ 316          void Drv_LvdsTx_VidTiming_Set(void)
+ 317          {
+ 318   1          u16 vss,eav,sav;
+ 319   1              Ocm_Timer0_Delay1ms(100);
+ 320   1              HDMI_WriteI2C_Byte(0xff,0x85); 
+ 321   1          
+ 322   1          vss = g_stVidChk.usVs + g_stVidChk.usVbp;
+ 323   1          eav = g_stVidChk.usHs + g_stVidChk.usHbp + g_stVidChk.usHact + 4;
+ 324   1          sav = g_stVidChk.usHs + g_stVidChk.usHbp;
+ 325   1          
+ 326   1          
+ 327   1          HDMI_WriteI2C_Byte(0x5f,0x00);    
+ 328   1              HDMI_WriteI2C_Byte(0x60,0x00);  
+ 329   1          HDMI_WriteI2C_Byte(0x62,(u8)(g_stVidChk.usVact>>8));         //vact[15:8]
+ 330   1              HDMI_WriteI2C_Byte(0x61,(u8)(g_stVidChk.usVact));            //vact[7:0]
+ 331   1          HDMI_WriteI2C_Byte(0x63,(u8)(vss));                           //vss[7:0]
+ 332   1          HDMI_WriteI2C_Byte(0x65,(u8)(eav>>8));                        //eav[15:8]
+ 333   1              HDMI_WriteI2C_Byte(0x64,(u8)(eav));                           //eav[7:0]
+ 334   1          HDMI_WriteI2C_Byte(0x67,(u8)(sav>>8));                        //sav[15:8]
+ 335   1              HDMI_WriteI2C_Byte(0x66,(u8)(sav));                           //sav[7:0]        
+ 336   1          
+ 337   1      }
+ 338          
+ 339          
+ 340          void Drv_LvdsTxPort_Set()
+ 341          {
+ 342   1          HDMI_WriteI2C_Byte(0xff,0x85);
+ 343   1      #if ((LVDSTX_PORT_SEL == PORTA) || (LVDSTX_PORT_SEL == PORTB))
+                      HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0x80)); //[7]lvds function enable //[4]0:output 1port;
+             - [4]1:output 2port;
+                      //only portb output must use port copy from porta, so lvds digtial output port sel 2ports.
+              #elif (LVDSTX_PORT_SEL == DOU_PORT)
+ 347   1              HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0x90)); //[7]lvds function enable //[4]0:output 1port;
+             - [4]1:output 2port;
+ 348   1      #endif 
+ 349   1      }
+ 350          
+ 351          void Drv_LvdsTxVidFmt_Set()
+ 352          {
+ 353   1          HDMI_WriteI2C_Byte(0xff,0x85); 
+ 354   1      #if (LVDSTX_MODE == SYNC_MODE)
+ 355   1          HDMI_WriteI2C_Byte(0X6e,(HDMI_ReadI2C_Byte(0x6e) & BIT3_0));
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 7   
+
+ 356   1      #elif (LVDSTX_MODE == DE_MODE)
+                  HDMI_WriteI2C_Byte(0X6e,(HDMI_ReadI2C_Byte(0x6e) | BIT3_1)); //[3]lvdstx de mode
+              #endif
+ 359   1      
+ 360   1      #if (LVDSTX_DATAFORMAT == JEIDA)
+                  HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | BIT6_1)); //[6]1:JEIDA MODE
+                  LTLog(LOG_INFO,"Data Format: JEIDA");
+              #elif (LVDSTX_DATAFORMAT == VESA)
+ 364   1          HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) & BIT6_0)); //[6]0:VESA MODE;
+ 365   1          LTLog(LOG_INFO,"Data Format: VESA");
+ 366   1      #endif
+ 367   1      
+ 368   1      #if (LVDSTX_COLORSPACE == RGB)
+ 369   1          LTLog(LOG_INFO,"ColorSpace: RGB");
+ 370   1          #if (LVDSTX_COLORDEPTH == DEPTH_6BIT)
+                      LTLog(LOG_INFO,"ColorDepth: 6Bit");
+                      HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0x40)); //RGB666 [6]RGB666 output must select j
+             -eida mode
+                      HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) & 0xf3));
+                  #elif (LVDSTX_COLORDEPTH == DEPTH_8BIT)
+ 375   1              LTLog(LOG_INFO,"ColorDepth: 8Bit");
+ 376   1              HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0X04));
+ 377   1          #elif (LVDSTX_COLORDEPTH == DEPTH_10BIT)
+                      LTLog(LOG_INFO,"ColorDepth: 10Bit");
+                      HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0X0c));
+                  #endif
+ 381   1      
+ 382   1      #elif (LVDSTX_COLORSPACE == YUV422)
+                  LTLog(LOG_INFO,"ColorSpace: YUV422");    
+                  HDMI_WriteI2C_Byte(0xff,0x85);
+                  #if (LVDSTX_COLORDEPTH == DEPTH_8BIT)
+                      LTLog(LOG_INFO,"ColorDepth: 8Bit");
+                      HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0X04));
+                      #if (LVDSTX_LANENUM == FIVE_LANE)
+              
+                              LTLog(LOG_INFO,"LvdsLaneNum: 5Lane");
+                              HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0X40)); //YUV422-8bpc-5lane mode output
+             - must sel jeida mode
+                              HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0X28));  //YUV422-8bpc-5lane mode set
+                      #else
+                              LTLog(LOG_INFO,"LvdsLaneNum: 4Lane");
+                              HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) & 0Xbf)); //YUV422-8bpc-4lane mode output
+             - must sel vesa mode
+                      #endif
+                  #endif
+              #endif
+ 399   1      
+ 400   1      #if (LVDSTX_SYNC_INTER_MODE == ENABLED)
+                  Drv_LvdsTx_VidTiming_Set();    
+                  LTLog(LOG_INFO,"Lvds Sync Code Mode: Internal"); //internal sync code mode
+                      HDMI_WriteI2C_Byte(0x68,(HDMI_ReadI2C_Byte(0x68) | 0X01));
+                  #if (LVDSTX_VIDEO_FORMAT == I_FORMAT)
+                      LTLog(LOG_INFO,"Lvds Video Format: interlaced"); //internal sync code mode
+                          HDMI_WriteI2C_Byte(0x68,(HDMI_ReadI2C_Byte(0x68) | 0X02));
+                  #endif
+                  #if (LVDSTX_SYNC_CODE_SEND == REPECTIVE)
+                      LTLog(LOG_INFO,"Lvds Sync Code Send: respectively."); //sync code send method sel respectively
+                          HDMI_WriteI2C_Byte(0x68,(HDMI_ReadI2C_Byte(0x68) | 0X04));
+                  #endif
+              
+              #else
+ 414   1              HDMI_WriteI2C_Byte(0x68,0x00);
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 8   
+
+ 415   1      #endif 
+ 416   1      
+ 417   1      }
+ 418          
+ 419          void Drv_LvdsTxLaneNum_Set()
+ 420          {
+ 421   1          HDMI_WriteI2C_Byte(0xff,0x85);
+ 422   1              HDMI_WriteI2C_Byte(0x4a,0x01); //[0]hl_swap_en; [7:6]tx_pt0_src_sel: 0-pta;1-ptb
+ 423   1              HDMI_WriteI2C_Byte(0x4b,0x00);
+ 424   1              HDMI_WriteI2C_Byte(0x4c,0x10);
+ 425   1              HDMI_WriteI2C_Byte(0x4d,0x20);
+ 426   1              HDMI_WriteI2C_Byte(0x4e,0x50);
+ 427   1              HDMI_WriteI2C_Byte(0x4f,0x30);
+ 428   1      
+ 429   1      #if (LVDSTX_LANENUM  == FOUR_LANE)
+ 430   1              HDMI_WriteI2C_Byte(0x50,0x46); //[7:6]tx_pt1_src_sel: 0-pta;1-ptb
+ 431   1              HDMI_WriteI2C_Byte(0x51,0x10);
+ 432   1              HDMI_WriteI2C_Byte(0x52,0x20);
+ 433   1              HDMI_WriteI2C_Byte(0x53,0x50);
+ 434   1              HDMI_WriteI2C_Byte(0x54,0x30);
+ 435   1              HDMI_WriteI2C_Byte(0x55,0x00); //[7:4]pt1_tx4_src_sel
+ 436   1              HDMI_WriteI2C_Byte(0x56,0x20); //[3:0]pt1_tx5_src_sel
+ 437   1                                             //[6:5]rgd_mltx_src_sel: 0-mipitx;1-lvdstx
+ 438   1      #elif (LVDSTX_LANENUM == FIVE_LANE)
+                      HDMI_WriteI2C_Byte(0x50,0x44); //[7:6]tx_pt1_src_sel: 0-pta;1-ptb
+                      HDMI_WriteI2C_Byte(0x51,0x00);
+                      HDMI_WriteI2C_Byte(0x52,0x10);
+                      HDMI_WriteI2C_Byte(0x53,0x20);
+                      HDMI_WriteI2C_Byte(0x54,0x50);
+                      HDMI_WriteI2C_Byte(0x55,0x30); //[7:4]pt1_tx4_src_sel
+                      HDMI_WriteI2C_Byte(0x56,0x24); //[3:0]pt1_tx5_src_sel
+                                                     //[6:5]rgd_mltx_src_sel: 0-mipitx;1-lvdstx
+              
+              #if 0
+                      //swap when 9211 lvdstx_to_lvdsrx 2port 5lane link
+                      HDMI_WriteI2C_Byte(0x54,0x30);
+                      HDMI_WriteI2C_Byte(0x55,0x40);
+              #endif
+              
+              #endif
+ 455   1      
+ 456   1      }
+ 457          
+ 458          void Drv_LvdsTxPort_Swap()
+ 459          {
+ 460   1          #if LVDSTX_PORT_SEL == DOU_PORT
+ 461   1              #if LVDSTX_PORT_SWAP == ENABLED
+                          HDMI_WriteI2C_Byte(0xff,0x85);
+                          HDMI_WriteI2C_Byte(0x4a,0x41);
+                          HDMI_WriteI2C_Byte(0x50,(HDMI_ReadI2C_Byte(0x50) & BIT6_0));
+                          LTLog(LOG_INFO,"2Port Lvds Port Swap");
+                      #endif
+ 467   1          
+ 468   1          #elif LVDSTX_PORT_SEL == PORTB
+                      HDMI_WriteI2C_Byte(0xff,0x85);
+                      HDMI_WriteI2C_Byte(0x4a,0x41);
+                      HDMI_WriteI2C_Byte(0x50,(HDMI_ReadI2C_Byte(0x50) & BIT6_0));
+              
+                  #else 
+                      HDMI_WriteI2C_Byte(0xff,0x85);
+                      HDMI_WriteI2C_Byte(0x4a,0x01);
+                      HDMI_WriteI2C_Byte(0x50,(HDMI_ReadI2C_Byte(0x50) | BIT6_1));
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 9   
+
+                  #endif
+ 478   1      }
+ 479          
+ 480          void Drv_LvdsTxPort_Copy()
+ 481          {
+ 482   1      
+ 483   1          #if ((LVDSTX_PORT_COPY == ENABLED) &&  (LVDSTX_PORT_SEL != DOU_PORT))
+                      HDMI_WriteI2C_Byte(0xff,0x82);
+                      HDMI_WriteI2C_Byte(0x36,(HDMI_ReadI2C_Byte(0x36) | 0x03)); //port swap enable when porta & portb e
+             -nable
+              
+                      #if (LVDSTX_PORT_SEL == PORTA)
+                          HDMI_WriteI2C_Byte(0xff,0x85);
+                          HDMI_WriteI2C_Byte(0x4a,(HDMI_ReadI2C_Byte(0x4a) & 0xbf));
+                          HDMI_WriteI2C_Byte(0x50,(HDMI_ReadI2C_Byte(0x50) & 0xbf));
+                          LTLog(LOG_INFO,"Port A Copy");
+                      #elif (LVDSTX_PORT_SEL == PORTB)
+                          HDMI_WriteI2C_Byte(0xff,0x85);
+                          HDMI_WriteI2C_Byte(0x6f,(HDMI_ReadI2C_Byte(0x6f) | 0x10)); //[7]lvds function enable //[4]0:ou
+             -tput 1port; [4]1:output 2port;
+                          HDMI_WriteI2C_Byte(0x4a,(HDMI_ReadI2C_Byte(0x4a) | 0x40));
+                          HDMI_WriteI2C_Byte(0x50,(HDMI_ReadI2C_Byte(0x50) | 0x40));
+                          LTLog(LOG_INFO,"Port B Copy");
+                      #endif
+                  
+                  #endif
+ 501   1      
+ 502   1      }
+ 503          
+ 504          void Drv_LvdsTxCsc_Set()
+ 505          {
+ 506   1          #if LVDSTX_COLORSPACE == RGB
+ 507   1              LTLog(LOG_INFO,"Csc Set:    RGB");
+ 508   1          #elif LVDSTX_COLORSPACE == YUV422
+                      HDMI_WriteI2C_Byte(0xff,0x86);
+                      if((HDMI_ReadI2C_Byte(0x87) & 0x10) == 0)
+                      {
+                          HDMI_WriteI2C_Byte(0x85,HDMI_ReadI2C_Byte(0x85) | 0x10);
+                      }
+                      else
+                      {
+                          HDMI_WriteI2C_Byte(0x87,HDMI_ReadI2C_Byte(0x87) & 0xef);
+                      }
+                      if((HDMI_ReadI2C_Byte(0x86) & 0x04) == 0)
+                      {
+                          HDMI_WriteI2C_Byte(0x86,HDMI_ReadI2C_Byte(0x86) | 0x40);
+                      }
+                      else
+                      {
+                          HDMI_WriteI2C_Byte(0x86,HDMI_ReadI2C_Byte(0x86) & 0xfb);
+                      }
+                      LTLog(LOG_INFO,"Csc Set:    YUV422");
+                  #endif
+ 528   1      }
+ 529          
+ 530          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1780    ----
+   CONSTANT SIZE    =    217    ----
+   XDATA SIZE       =   ----      19
+C51 COMPILER V9.53.0.0   DRVLVDSTX                                                         06/30/2023 14:32:03 PAGE 10  
+
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

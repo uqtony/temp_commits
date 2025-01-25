@@ -1,0 +1,136 @@
+C51 COMPILER V9.53.0.0   MODLVDSTX                                                         06/30/2023 14:32:04 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MODLVDSTX
+OBJECT MODULE PLACED IN ..\..\..\..\..\out\ModLvdsTx.obj
+COMPILER INVOKED BY: C:\Keil_v5\c51\C51\BIN\C51.EXE ..\User\Module\ModLvdsTx.c LARGE OPTIMIZE(8,SIZE) OPTIMIZE(8,SIZE) R
+                    -EGFILE(..\..\..\..\..\out\LT9211C_MIPI DSI to LVDS test.ORC) BROWSE INCDIR(..\User\Driver;..\User\App;..\User\Ocm;..\Use
+                    -r\Module) DEBUG OBJECTEXTEND PRINT(.\Listings\ModLvdsTx.lst) OBJECT(..\..\..\..\..\out\ModLvdsTx.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9211C
+   3            * @file: ModLvdsTx.c
+   4            * @author: xding
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2023.01.29
+   7          /******************************************************************************/
+   8          #include    "include.h"
+   9          
+  10          #if ((LT9211C_MODE_SEL == LVDS_IN_LVDS_OUT)||(LT9211C_MODE_SEL == MIPI_IN_LVDS_OUT)||(LT9211C_MODE_SEL == 
+             -TTL_IN_LVDS_OUT))
+  11          
+  12          void Mod_LvdsTxPll_RefPixClk_Get()
+  13          {
+  14   1          /*lvds to lvds use rxpll pix clk as txpll ref clk*/
+  15   1          #if (LT9211C_MODE_SEL == LVDS_IN_LVDS_OUT)
+                  g_stRxVidTiming.ulPclk_Khz = Drv_System_FmClkGet(AD_RXPLL_PIX_CLK);
+                  #endif
+  18   1          /*mipi to lvds use desscpll pix clk as txpll ref clk*/
+  19   1          #if (LT9211C_MODE_SEL == MIPI_IN_LVDS_OUT)
+  20   1          g_stRxVidTiming.ulPclk_Khz = Drv_System_FmClkGet(AD_DESSCPLL_PIX_CLK);
+  21   1          #endif
+  22   1          /*ttl to lvds use desscpll pix clk as txpll ref clk*/
+  23   1          #if (LT9211C_MODE_SEL == TTL_IN_LVDS_OUT)
+                  g_stRxVidTiming.ulPclk_Khz = Drv_System_FmClkGet(AD_RXPLL_PIX_CLK);
+                  #endif
+  26   1      }
+  27          
+  28          void Mod_LvdsTxDig_Set()
+  29          {
+  30   1          Drv_LvdsTxPort_Set();
+  31   1          Drv_LvdsTxVidFmt_Set();
+  32   1          Drv_LvdsTxLaneNum_Set();
+  33   1          Drv_LvdsTxPort_Swap();
+  34   1          Drv_LvdsTxPort_Copy();
+  35   1          Drv_LvdsTxSw_Rst();
+  36   1          Drv_LvdsTxCsc_Set();
+  37   1      }
+  38          
+  39          void Mod_LvdsTx_StateJudge(void)
+  40          {
+  41   1          //monitor upstream video stable.
+  42   1          if(g_stChipTx.ucTxState > STATE_CHIPTX_UPSTREAM_VIDEO_READY)
+  43   1          {
+  44   2              if(g_stChipTx.b1UpstreamVideoReady == FALSE)
+  45   2              {
+  46   3                  Mod_SystemTx_SetState(STATE_CHIPTX_UPSTREAM_VIDEO_READY);
+  47   3              }
+  48   2          }
+  49   1      }
+  50          
+  51          void Mod_LvdsTx_StateHandler(void)
+  52          {
+C51 COMPILER V9.53.0.0   MODLVDSTX                                                         06/30/2023 14:32:04 PAGE 2   
+
+  53   1          switch (g_stChipTx.ucTxState)
+  54   1          {
+  55   2              case STATE_CHIPTX_POWER_ON:
+  56   2                  Mod_SystemTx_SetState(STATE_CHIPTX_UPSTREAM_VIDEO_READY);
+  57   2              break;
+  58   2      
+  59   2              case STATE_CHIPTX_UPSTREAM_VIDEO_READY:
+  60   2                  if(g_stChipTx.b1TxStateChanged == TRUE)
+  61   2                  {
+  62   3                      Drv_LVDSTxPhy_PowerOff();
+  63   3                      g_stChipTx.b1TxStateChanged = FALSE;
+  64   3                  }
+  65   2              
+  66   2                  if(g_stChipTx.b1UpstreamVideoReady == TRUE) 
+  67   2                  {
+  68   3                      Drv_SystemTxSram_Sel(LVDSTX);
+  69   3                      Drv_LvdsTxPhy_Poweron();
+  70   3                      Mod_SystemTx_SetState(STATE_CHIPTX_CONFIG_VIDEO);
+  71   3                  }
+  72   2              break;
+  73   2      
+  74   2              case STATE_CHIPTX_CONFIG_VIDEO:
+  75   2                  Mod_LvdsTxPll_RefPixClk_Get();
+  76   2                  Drv_LvdsTxPll_RefPixClk_Set();
+  77   2                  Drv_LvdsTxPll_Config();
+  78   2                  if(Drv_LvdsTxPll_Cali() == SUCCESS)
+  79   2                  {
+  80   3                      Mod_SystemTx_SetState(STATE_CHIPTX_VIDEO_OUT);
+  81   3                  }
+  82   2                  else
+  83   2                  {
+  84   3                      Mod_SystemTx_SetState(STATE_CHIPTX_CONFIG_VIDEO);
+  85   3                  }
+  86   2              break;
+  87   2      
+  88   2              case STATE_CHIPTX_VIDEO_OUT:
+  89   2                  Drv_VidChkAll_Get(&g_stVidChk);
+  90   2                  Mod_LvdsTxDig_Set();
+  91   2                  Mod_SystemTx_SetState(STATE_CHIPTX_PLAY_BACK);
+  92   2              break;
+  93   2      
+  94   2              case STATE_CHIPTX_PLAY_BACK:
+  95   2              break;
+  96   2              
+  97   2          }
+  98   1      }
+  99          
+ 100          void Mod_LvdsTx_Handler(void)
+ 101          {
+ 102   1          Mod_LvdsTx_StateJudge();
+ 103   1          Mod_LvdsTx_StateHandler();
+ 104   1      }
+ 105          
+ 106          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    156    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+C51 COMPILER V9.53.0.0   MODLVDSTX                                                         06/30/2023 14:32:04 PAGE 3   
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

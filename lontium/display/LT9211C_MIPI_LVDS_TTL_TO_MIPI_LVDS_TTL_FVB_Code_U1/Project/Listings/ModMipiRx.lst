@@ -1,0 +1,167 @@
+C51 COMPILER V9.53.0.0   MODMIPIRX                                                         06/30/2023 14:32:04 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE MODMIPIRX
+OBJECT MODULE PLACED IN ..\..\..\..\..\out\ModMipiRx.obj
+COMPILER INVOKED BY: C:\Keil_v5\c51\C51\BIN\C51.EXE ..\User\Module\ModMipiRx.c LARGE OPTIMIZE(8,SIZE) OPTIMIZE(8,SIZE) R
+                    -EGFILE(..\..\..\..\..\out\LT9211C_MIPI DSI to LVDS test.ORC) BROWSE INCDIR(..\User\Driver;..\User\App;..\User\Ocm;..\Use
+                    -r\Module) DEBUG OBJECTEXTEND PRINT(.\Listings\ModMipiRx.lst) OBJECT(..\..\..\..\..\out\ModMipiRx.obj)
+
+line level    source
+
+   1          /******************************************************************************
+   2            * @project: LT9211C
+   3            * @file: ModMipiRx.c
+   4            * @author: sxue
+   5            * @company: LONTIUM COPYRIGHT and CONFIDENTIAL
+   6            * @date: 2023.01.29
+   7          /******************************************************************************/
+   8          #include    "include.h"
+   9          
+  10          
+  11          #if ((LT9211C_MODE_SEL == MIPI_IN_LVDS_OUT)||(LT9211C_MODE_SEL == MIPI_IN_MIPI_OUT)||(LT9211C_MODE_SEL == 
+             -MIPI_IN_TTL_OUT))
+  12          
+  13          void Mod_MipiRx_Init()
+  14          {
+  15   1          memset(&g_stPcrPara,0 ,sizeof(StructPcrPara));
+  16   1          memset(&g_stMipiRxVidTiming_Get,0 ,sizeof(SrtuctMipiRx_VidTiming_Get));
+  17   1      }
+  18          
+  19          void Mod_MipiRxDig_Set()
+  20          {
+  21   1          Drv_MipiRx_InputSel();
+  22   1          Drv_MipiRx_LaneSet();
+  23   1      }
+  24          
+  25          u8 Mod_MipiRx_VidChk_Stable()
+  26          {
+  27   1          HDMI_WriteI2C_Byte(0xff, 0x86);
+  28   1          if((HDMI_ReadI2C_Byte(0x40) & 0x01) == 0x01)
+  29   1          {
+  30   2              return TRUE;
+  31   2          }
+  32   1          else
+  33   1          {
+  34   2              return FALSE;
+  35   2          }
+  36   1      
+  37   1      }
+  38          
+  39          //void Mod_MipiRx_Statejudge(void)
+  40          //{
+  41          
+  42          //    if (g_stChipRx.ucRxState > STATE_CHIPRX_VIDTIMING_CONFIG)
+  43          //    {
+  44          //        if (Drv_MipiRx_VidFmtUpdate() == TRUE)
+  45          //        {
+  46          //            LTLog(LOG_WARN,"Video Format Change");
+  47          //            g_stChipRx.pHdmiRxNotify(MIPIRX_VIDEO_OFF_EVENT);
+  48          //            Mod_SystemRx_SetState(STATE_CHIPRX_VIDTIMING_CONFIG);
+  49          //        }
+  50          //    }
+  51          //    
+  52          //    if (g_stChipRx.ucRxState > STATE_CHIPRX_VIDEO_CHECK)
+C51 COMPILER V9.53.0.0   MODMIPIRX                                                         06/30/2023 14:32:04 PAGE 2   
+
+  53          //    {
+  54          //        if (Mod_MipiRx_VidChk_Stable() == FALSE)
+  55          //        {
+  56          //            LTLog(LOG_WARN,"Video Timing Change");
+  57          //            g_stChipRx.pHdmiRxNotify(MIPIRX_VIDEO_OFF_EVENT);
+  58          //            Mod_SystemRx_SetState(STATE_CHIPRX_VIDTIMING_CONFIG);
+  59          //        }
+  60          //    }
+  61          //}
+  62          
+  63          
+  64          void Mod_MipiRx_StateHandler(void)
+  65          {
+  66   1          switch (g_stChipRx.ucRxState)
+  67   1          {
+  68   2              case STATE_CHIPRX_POWER_ON :
+  69   2                  Mod_MipiRx_Init();
+  70   2                  Mod_SystemRx_SetState(STATE_CHIPRX_WAITE_SOURCE);
+  71   2              break;
+  72   2              
+  73   2              case STATE_CHIPRX_WAITE_SOURCE:
+  74   2                  Drv_MipiRx_PhyPowerOn();
+  75   2                  Drv_MipiRxClk_Sel();
+  76   2                  Drv_System_VidChkClk_SrcSel(MLRX_BYTE_CLK);
+  77   2                  Drv_System_VidChk_SrcSel(MIPIDEBUG);
+  78   2                  Drv_SystemActRx_Sel(MIPIRX);
+  79   2                  Mod_MipiRxDig_Set();
+  80   2                  Mod_SystemRx_SetState(STATE_CHIPRX_VIDTIMING_CONFIG);
+  81   2              break;
+  82   2              
+  83   2              case STATE_CHIPRX_VIDTIMING_CONFIG:
+  84   2                  if(Drv_MipiRx_VidTiming_Get() == TRUE)
+  85   2                  {
+  86   3                      g_stChipRx.ucRxFormat = Drv_MipiRx_VidFmt_Get(g_stMipiRxVidTiming_Get.ucFmt);
+  87   3                      if (Drv_MipiRx_VidTiming_Sel() == TRUE)
+  88   3                      {
+  89   4                          Mod_SystemRx_SetState(STATE_CHIPRX_PLL_CONFIG);
+  90   4                      }
+  91   3                      else
+  92   3                      {
+  93   4                          LTLog(LOG_ERROR,"No Video Timing Matched");
+  94   4                          Mod_SystemRx_SetState(STATE_CHIPRX_WAITE_SOURCE);
+  95   4                      }
+  96   3                  }
+  97   2              break;
+  98   2        
+  99   2              case STATE_CHIPRX_PLL_CONFIG: 
+ 100   2                  Drv_MipiRx_DesscPll_Set();
+ 101   2                  if(Drv_MipiRx_PcrCali() == SUCCESS)
+ 102   2                  {
+ 103   3                      LTLog(LOG_INFO,"LT9211C pcr stable");
+ 104   3                                      Drv_System_VidChkClk_SrcSel(DESSCPLL_PIX_CLK);
+ 105   3                      Drv_System_VidChk_SrcSel(MIPIRX);
+ 106   3                      Mod_SystemRx_SetState(STATE_CHIPRX_VIDEO_CHECK);
+ 107   3                  }
+ 108   2                  else
+ 109   2                  {
+ 110   3                      Mod_SystemRx_SetState(STATE_CHIPRX_VIDTIMING_CONFIG);
+ 111   3                  }
+ 112   2              break;
+ 113   2      
+ 114   2              case STATE_CHIPRX_VIDEO_CHECK: 
+C51 COMPILER V9.53.0.0   MODMIPIRX                                                         06/30/2023 14:32:04 PAGE 3   
+
+ 115   2                  if (Mod_MipiRx_VidChk_Stable() == TRUE)
+ 116   2                  {
+ 117   3                      LTLog(LOG_INFO,"Video Check Stable");
+ 118   3                      g_stChipRx.pHdmiRxNotify(MIPIRX_VIDEO_ON_EVENT);
+ 119   3                      Mod_SystemRx_SetState(STATE_CHIPRX_PLAY_BACK);
+ 120   3                  }
+ 121   2              break;
+ 122   2      
+ 123   2              case STATE_CHIPRX_PLAY_BACK:
+ 124   2              break;
+ 125   2          }
+ 126   1      }
+ 127          
+ 128          
+ 129          
+ 130          void Mod_MipiRx_Handler(void)
+ 131          {
+ 132   1      //    Mod_MipiRx_Statejudge();
+ 133   1          Mod_MipiRx_StateHandler();
+ 134   1          
+ 135   1      }
+ 136          
+ 137          #endif
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    238    ----
+   CONSTANT SIZE    =     62    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

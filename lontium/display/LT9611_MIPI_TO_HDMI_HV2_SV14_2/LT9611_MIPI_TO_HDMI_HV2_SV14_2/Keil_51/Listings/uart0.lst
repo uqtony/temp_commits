@@ -1,0 +1,177 @@
+C51 COMPILER V9.53.0.0   UART0                                                             06/07/2023 09:16:45 PAGE 1   
+
+
+C51 COMPILER V9.53.0.0, COMPILATION OF MODULE UART0
+OBJECT MODULE PLACED IN .\Objects\uart0.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\C51\BIN\C51.EXE ..\User\uart0.c LARGE OPTIMIZE(8,SPEED) BROWSE INCDIR(..\N76E003_Dri
+                    -ver\inc) DEFINE(FOSC_160000) DEBUG OBJECTEXTEND PRINT(.\Listings\uart0.lst) TABS(2) OBJECT(.\Objects\uart0.obj)
+
+line level    source
+
+   1          
+   2          #include "include.h"
+   3          
+   4          
+   5          //----------------------------------------------------------------------------------
+   6          // UART0 baud rate initial setting 
+   7          //----------------------------------------------------------------------------------
+   8          void InitialUART0_Timer1(UINT32 u32Baudrate)    //T1M = 1, SMOD = 1
+   9          {
+  10   1        P06_Quasi_Mode;   //Setting UART pin as Quasi mode for transmit
+  11   1        P07_Quasi_Mode;   //Setting UART pin as Quasi mode for transmit
+  12   1        
+  13   1          SCON = 0x50;      //UART0 Mode1,REN=1,TI=1
+  14   1          TMOD |= 0x20;     //Timer1 Mode1
+  15   1          
+  16   1          set_SMOD;         //UART0 Double Rate Enable
+  17   1          set_T1M;
+  18   1          clr_BRCK;         //Serial port 0 baud rate clock source = Timer1
+  19   1       
+  20   1      #ifdef FOSC_160000
+  21   1          TH1 = 256 - (1000000/u32Baudrate+1);               /*16 MHz */
+  22   1      #endif      
+  23   1      #ifdef FOSC_166000
+                  TH1 = 256 - (1037500/u32Baudrate);                 /*16.6 MHz */
+              #endif
+  26   1          set_TR1;
+  27   1          set_TI;           //For printf function must setting TI = 1
+  28   1      }
+  29          //---------------------------------------------------------------
+  30          
+  31          #if 0
+              void InitialUART0_Timer3(UINT32 u32Baudrate) //use timer3 as Baudrate generator
+              {
+                P06_Quasi_Mode;   //Setting UART pin as Quasi mode for transmit
+                P07_Quasi_Mode;   //Setting UART pin as Quasi mode for transmit 
+                
+                  SCON = 0x50;     //UART0 Mode1,REN=1,TI=1
+                  set_SMOD;        //UART0 Double Rate Enable
+                  T3CON &= 0xF8;   //T3PS2=0,T3PS1=0,T3PS0=0(Prescale=1)
+                  set_BRCK;        //UART0 baud rate clock source = Timer3
+              
+              #ifdef FOSC_160000
+                RH3    = HIBYTE(65536 - (1000000/u32Baudrate)-1);     /*16 MHz */
+                RL3    = LOBYTE(65536 - (1000000/u32Baudrate)-1);     /*16 MHz */
+              #endif
+              #ifdef FOSC_166000
+                  RH3    = HIBYTE(65536 - (1037500/u32Baudrate));       /*16.6 MHz */
+                  RL3    = LOBYTE(65536 - (1037500/u32Baudrate));       /*16.6 MHz */
+              #endif
+                  set_TR3;         //Trigger Timer3
+                set_TI;          //For printf function must setting TI = 1
+              }
+              #endif
+  54          
+C51 COMPILER V9.53.0.0   UART0                                                             06/07/2023 09:16:45 PAGE 2   
+
+  55          //UINT8 Receive_Data_From_UART0(void)
+  56          //{
+  57          //    UINT8 c;
+  58          //    while (!RI);
+  59          //    c = SBUF;
+  60          //    RI = 0;
+  61          //    return (c);
+  62          //}
+  63          
+  64          void Send_Data_To_UART0 (UINT8 c)
+  65          {
+  66   1          TI = 0;
+  67   1          SBUF = c;
+  68   1          while(TI==0);
+  69   1      }
+  70           
+  71          
+  72          //void printByte(u8 UData)
+  73          //{
+  74          //  u8 reg_H,reg_L;
+  75          //  reg_L=UData&0x0f;
+  76          //  reg_H=(UData&0xf0)>>4;
+  77          // 
+  78          //  reg_L = (reg_L<0x0a) ? (reg_L+0x30):(reg_L+0x37);   //map reg_L to asicc 'a' to a (0x41),   a = 0x37 +
+             - 0x0a = 0x41
+  79          //  reg_H = (reg_H<0x0a) ? (reg_H+0x30):(reg_H+0x37); 
+  80          //  Send_Data_To_UART0(reg_H);
+  81          //  Send_Data_To_UART0(reg_L);  
+  82          //  Send_Data_To_UART0(0x20); //space 
+  83          //}
+  84          
+  85          //void printnewline(void)
+  86          //{
+  87          //  Send_Data_To_UART0(0x0a);   //huanhang
+  88          //}
+  89          
+  90          
+  91          //void Debug_printf(unsigned char *str)
+  92          //{ 
+  93          //#ifdef _uart_debug_
+  94          //  printf(str);  
+  95          //#endif
+  96          //}
+  97          
+  98          //void printWord(u16 U16Data)
+  99          //{
+ 100          //  printByte((U16Data&0xFF00)>>8);
+ 101          //  printByte((U16Data&0x00FF));
+ 102          //  Send_Data_To_UART0(0x0a);   //???
+ 103          //}
+ 104          
+ 105          
+ 106          //void printByteWithSpace(u8 U8Data)
+ 107          //{
+ 108          //  Send_Data_To_UART0(U8Data);
+ 109          //  Send_Data_To_UART0(0x20);   //space
+ 110          //     //0x3c |,  0x3e ~
+ 111          //}
+ 112          /*
+ 113          出厂前，每颗 N76E003都会预烧一个96位的序列号
+ 114          ，用以确保该芯片的唯一性，这个唯一代码被称为
+ 115          序列号UID (Unique Code)。用户获得序列号的唯
+C51 COMPILER V9.53.0.0   UART0                                                             06/07/2023 09:16:45 PAGE 3   
+
+ 116          一方式是通过 IAP指令读取，
+ 117          */
+ 118          //UINT8 UID_BYTE(UINT8 Addr)
+ 119          //{
+ 120          //  UINT8 DATATEMP;
+ 121          //  set_IAPEN;
+ 122          //  IAPAL = Addr;
+ 123          //    IAPAH = 0x00;
+ 124          //    IAPCN = READ_UID;
+ 125          //    set_IAPGO;
+ 126          //  DATATEMP = IAPFD;
+ 127          //  clr_IAPEN;
+ 128          //  return DATATEMP;
+ 129          //}
+ 130          
+ 131          //void READ_MCU_UID(void)
+ 132          //{
+ 133          //  UINT8 READ1,READ2;
+ 134          //
+ 135          //  READ1 = UID_BYTE(0x02);
+ 136          //  READ2 = UID_BYTE(0x05);
+ 137          //
+ 138          //  printf ("\n UID1 = 0x%bx",READ1);
+ 139          //  printf ("\n UID2 = 0x%bx",READ2);
+ 140          //}
+ 141          
+ 142          
+ 143          
+ 144          void printch(char ch)
+ 145          {
+ 146   1         Send_Data_To_UART0(ch);
+ 147   1      }
+ 148          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     68    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
